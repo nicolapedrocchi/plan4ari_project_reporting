@@ -9,7 +9,7 @@
 %           line on cover), any article option (e.g. 11pt is NOT recommended).
 % =====================================================================
 \NeedsTeXFormat{LaTeX2e}
-\ProvidesClass{plan4ari}[2026/10/01 v0.1 Plan4ARI deliverable class]
+\ProvidesClass{plan4ari_report}[2026/10/01 v0.2 Plan4ARI deliverable class]
 
 \newif\ifplan@pagenumbers \plan@pagenumberstrue
 \DeclareOption{pagenumbers}{\plan@pagenumberstrue}
@@ -20,8 +20,8 @@
 
 % ---------------------------------------------------------------- page
 % Word: A4, top/bottom 1020 twips (1.8 cm), left/right 1134 twips (2.0 cm)
-\RequirePackage[a4paper,top=1.8cm,bottom=1.8cm,left=2cm,right=2cm,
-  headsep=0.4cm,footskip=0.7cm,includefoot]{geometry}
+\RequirePackage[a4paper,top=0.8cm,bottom=1cm,left=2cm,right=2cm,
+  headheight=2.1cm,headsep=0.4cm,footskip=1.35cm,includeheadfoot]{geometry}
 
 % ---------------------------------------------------------------- colours
 % Word styles / theme1.xml
@@ -123,9 +123,43 @@
 \RequirePackage[hidelinks]{hyperref}
 \hypersetup{colorlinks=true,linkcolor=p4aHeading,citecolor=p4aHeading,urlcolor=p4aAccent}
 
-% ---------------------------------------------------------------- footer
+% ---------------------------------------------------------------- header and footer
+% Prefer the PNG asset names; retain compatibility with the shared JPGs.
+\newcommand{\plan@murlogo}{MUR.png}
+\IfFileExists{MUR.png}{}{\IfFileExists{mur.png}{%
+  \renewcommand{\plan@murlogo}{mur.png}}{\renewcommand{\plan@murlogo}{mur.jpg}}}
+\newcommand{\plan@fisalogo}{fisa.png}
+\IfFileExists{fisa.png}{}{\renewcommand{\plan@fisalogo}{fisa.jpg}}
+\newcommand{\plan@duallogo}{plan4ari-dual-logo.png}
+\newcommand{\plan@dualimage}{\includegraphics[width=3.6cm,height=0.65cm,keepaspectratio]{\plan@duallogo}}
+\IfFileExists{plan4ari-dual-logo.png}{}{%
+  \renewcommand{\plan@duallogo}{plan4ari-dual-logo - transparent.png}%
+  \renewcommand{\plan@dualimage}{\includegraphics[width=3.6cm,height=0.65cm,trim=250 130 250 130,clip,keepaspectratio]{\plan@duallogo}}}
+\newcommand{\plan@funding}{PLAN4ARI project (CUP: B43C25000520001), funded by MUR\\
+  under the FISA 2024 programme, D.D.M 1075 - 18/7/2024.}
+\newcommand{\plan@header}{%
+  \begin{minipage}{\textwidth}
+    \centering\setlength{\parskip}{0pt}%
+    \includegraphics[height=0.65cm]{\plan@murlogo}\hfill
+    \includegraphics[height=0.65cm,trim=250 300 250 300,clip]{plan4ari-wordmark-light.png}\hfill
+    \includegraphics[height=0.65cm]{\plan@fisalogo}\par
+  \end{minipage}}
+\newcommand{\plan@footer}{%
+  \begin{minipage}{0.22\textwidth}
+    \centering\setlength{\parskip}{0pt}%
+    \plan@dualimage\par
+    {\plan@headfont\fontsize{8}{9.5}\selectfont
+      \href{https://plan4ari-fisa24.cnr.it}{plan4ari-fisa24.cnr.it}\par}%
+  \end{minipage}}
 \RequirePackage{fancyhdr}
-\fancypagestyle{plain}{\fancyhf{}\renewcommand{\headrulewidth}{0pt}%
+\fancypagestyle{plain}{\fancyhf{}\renewcommand{\headrulewidth}{0.4pt}%
+  \renewcommand{\headrule}{\hbox to\headwidth{\color{p4aAccent}\leaders\hrule height\headrulewidth\hfill}\vskip-\headrulewidth}%
+  \renewcommand{\footrulewidth}{0.4pt}%
+  \renewcommand{\footrule}{\hbox to\headwidth{\color{p4aAccent}\leaders\hrule height\footrulewidth\hfill}\vskip\footruleskip}%
+  \fancyhead[C]{\plan@header}%
+  \fancyfoot[L]{\begin{minipage}{0.38\textwidth}\raggedright\setlength{\parskip}{0pt}%
+    \plan@headfont\fontsize{6}{7.2}\selectfont\color{p4aText}\plan@funding\end{minipage}}%
+  \fancyfoot[C]{\plan@footer}%
   \ifplan@pagenumbers\fancyfoot[R]{\plan@headfont\footnotesize\color{p4aAccent}\@planfootleft\quad\thepage}\fi}
 \pagestyle{plain}
 \newcommand{\@planfootleft}{\PlanARI\ \plan@deliverable}
@@ -145,7 +179,7 @@
 
 % ---------------------------------------------------------------- cover
 \newcommand{\makecover}{%
-  \thispagestyle{empty}%
+  \thispagestyle{plain}%
   \begin{center}
     {\plan@headfont\normalsize PLAN4ARI}\par\vspace{2pt}
     {\plan@headfont\fontsize{25}{30}\selectfont\bfseries\color{p4aHeading}%

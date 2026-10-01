@@ -21,3 +21,15 @@ $aux_dir = 'build';
 
 # Shared class and style files (plan4ari.cls, ...).
 ensure_path('TEXINPUTS', "$root/latex-style//");
+
+# BibTeX runs inside $aux_dir, so relative paths in \bibliography{} break.
+# Write \bibliography{references} (name only) and declare its folder with:
+#   bib_dirs('../SOTA/latex');
+use Cwd qw(abs_path);
+sub win_path {
+  # MSYS/Cygwin Perl (Git Bash) returns /c/... or /cygdrive/c/...; MiKTeX needs C:/...
+  my $p = abs_path(shift);
+  $p =~ s{^/(?:cygdrive/)?([a-zA-Z])/}{\U$1\E:/};
+  return $p;
+}
+sub bib_dirs { ensure_path('BIBINPUTS', map { win_path($_) } @_); }

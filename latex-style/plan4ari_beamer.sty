@@ -1,5 +1,12 @@
 \NeedsTeXFormat{LaTeX2e}
-\ProvidesPackage{plan4ari_theme}[2026/06/19 Polished Plan4ARI Beamer style]
+\ProvidesPackage{plan4ari_beamer}[2026/10/01 Plan4ARI Beamer style]
+\RequirePackage{tikz}
+\RequirePackage{graphicx}
+
+% Assets are resolved through TEXINPUTS, alongside this shared package.
+\newcommand{\planaridualasset}{plan4ari-dual-logo.png}
+\IfFileExists{plan4ari-dual-logo.png}{}{%
+  \renewcommand{\planaridualasset}{plan4ari-dual-logo - transparent.png}}
 
 % --- Colour palette ---------------------------------------------------------
 \definecolor{planblue}{RGB}{18,83,145}
@@ -33,6 +40,7 @@
   \setbeamercolor{exampleblock title}{fg=white,bg=plandeepblue}
   \setbeamercolor{exampleblock body}{fg=plandark,bg=blue!4}
   \setbeamercolor{footline}{fg=white,bg=plandark}
+  \setbeamercolor{footer logo}{fg=plandark,bg=white}
   \setbeamercolor{section in toc}{fg=planblue}
 
   \setbeamerfont{title}{series=\bfseries,size=\Large}
@@ -49,8 +57,13 @@
 % --- Frame title ------------------------------------------------------------
 \setbeamertemplate{frametitle}{%
   \nointerlineskip%
-  \begin{beamercolorbox}[wd=\paperwidth,ht=3.0ex,dp=1.0ex,leftskip=0.62cm,rightskip=0.62cm]{frametitle}%
-    \insertframetitle\hfill{\normalsize\insertframesubtitle}%
+  \begin{beamercolorbox}[wd=\paperwidth,sep=0pt,leftskip=0.62cm,rightskip=0.62cm]{frametitle}%
+    \vskip0.65ex%
+    \usebeamerfont{frametitle}\strut\insertframetitle\strut\par%
+    \ifx\insertframesubtitle\@empty\else%
+      {\usebeamerfont{framesubtitle}\usebeamercolor[fg]{framesubtitle}\insertframesubtitle\strut\par}%
+    \fi%
+    \vskip0.65ex%
   \end{beamercolorbox}%
 }
 
@@ -58,7 +71,13 @@
 \setbeamertemplate{footline}{%
   \leavevmode%
   \hbox{%
-    \begin{beamercolorbox}[wd=.70\paperwidth,ht=2.7ex,dp=1ex,leftskip=.62cm]{footline}%
+    % Beamer wraps titles and sections in navigation links. Keep their
+    % colour consistent with the footer instead of the global link colour.
+    \hypersetup{linkcolor=white}%
+    \begin{beamercolorbox}[wd=.18\paperwidth,ht=2.7ex,dp=1ex,center]{footer logo}%
+      \raisebox{-0.6ex}{\includegraphics[height=2.8ex,trim=250 130 250 130,clip]{\planaridualasset}}%
+    \end{beamercolorbox}%
+    \begin{beamercolorbox}[wd=.52\paperwidth,ht=2.7ex,dp=1ex,leftskip=.3cm]{footline}%
       \insertshorttitle
     \end{beamercolorbox}%
     \begin{beamercolorbox}[wd=.22\paperwidth,ht=2.7ex,dp=1ex,center]{footline}%
@@ -76,11 +95,19 @@
     \fill[planblue] (current page.north west) rectangle ([yshift=-0.40\paperheight]current page.north east);
     \fill[plandeepblue] (current page.north west) rectangle ([xshift=0.022\paperwidth]current page.south west);
     \fill[planorange] ([xshift=0.022\paperwidth,yshift=-0.40\paperheight]current page.north west) rectangle ([xshift=0.032\paperwidth]current page.south west);
+    % Anchor the white heading to its blue background, independently of
+    % Beamer's vertical centering of the title-page contents.
+    \node[anchor=west,inner sep=0pt,text width=\dimexpr\paperwidth-1.24cm\relax]
+      at ([xshift=0.62cm,yshift=-0.20\paperheight]current page.north west) {%
+        {\usebeamercolor[fg]{title}\usebeamerfont{title}\inserttitle\par}%
+        \vspace{0.8em}%
+        {\usebeamercolor[fg]{subtitle}\usebeamerfont{subtitle}\insertsubtitle\par}%
+      };
+    \node[anchor=east,inner sep=0pt]
+      at ([xshift=-0.62cm,yshift=-0.68\paperheight]current page.north east)
+      {\includegraphics[width=0.38\paperwidth]{plan4ari-wordmark-light.png}};
   \end{tikzpicture}%
-  \vspace*{0.18\paperheight}
-  {\usebeamercolor[fg]{title}\usebeamerfont{title}\inserttitle\par}
-  \vspace{0.8em}
-  {\usebeamercolor[fg]{subtitle}\usebeamerfont{subtitle}\insertsubtitle\par}
+  \vspace*{0.40\paperheight}
   \vfill
   {\usebeamerfont{author}\insertauthor\par}
   \vspace{0.2em}
@@ -92,9 +119,15 @@
 % --- Section divider --------------------------------------------------------
 \AtBeginSection[]{%
   \begin{frame}[plain,noframenumbering]
+    % Section headings contain a navigation link: its colour must also
+    % be white, otherwise it disappears against the planblue background.
+    \hypersetup{linkcolor=white}
     \begin{tikzpicture}[remember picture,overlay]
       \fill[planblue] (current page.north west) rectangle (current page.south east);
       \fill[planorange] (current page.south west) rectangle ([yshift=0.035\paperheight]current page.south east);
+      \node[anchor=north east,inner sep=0pt]
+        at ([xshift=-0.62cm,yshift=-0.45cm]current page.north east)
+        {\includegraphics[width=0.25\paperwidth]{logo.png}};
     \end{tikzpicture}
     \vfill
     {\color{white}\Huge\bfseries\insertsectionhead\par}

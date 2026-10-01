@@ -1,0 +1,13 @@
+# Plan4ARI presentation: shared Project Reporting config
+use File::Basename qw(dirname);
+use Cwd qw(abs_path);
+my $budgeting_dir = dirname(abs_path($rc_files_read[-1]));
+$root   = "$budgeting_dir/..";
+$engine = 'xelatex';
+do "$root/latexmkrc";
+
+# Use an absolute path so the shared styles are also found from build/.
+ensure_path('TEXINPUTS', win_path("$root/latex-style") . '//');
+
+# Presentation bibliography
+bib_dirs($budgeting_dir);

@@ -1,0 +1,10 @@
+# Plan4ARI presentation: shared Project Reporting config
+$root   = '../';
+$engine = 'xelatex';
+do "$root/latexmkrc";
+
+# Use an absolute path so the shared styles are also found from build/.
+ensure_path('TEXINPUTS', win_path("$root/latex-style") . '//');
+
+# Presentation bibliography
+bib_dirs('./');

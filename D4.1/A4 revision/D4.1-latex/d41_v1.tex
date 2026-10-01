@@ -1,12 +1,12 @@
 % =====================================================================
-%  Plan4ARI -- Deliverable D4.1 (A4 revision)
+%  Plan4ARI - Deliverable D4.1 (A4 revision)
 %  Updated Scientific Plan for Local and Global Autonomous Motion Planning
 %
-%  Class: ../../../latex-style/plan4ari.cls (layout of the Plan4ARI D1.1 template)
+%  Class: ../../../latex-style/plan4ari_report.cls (layout of the Plan4ARI D1.1 template)
 %  Build: latexmk main.tex        (XeLaTeX, see latexmkrc)
 %  Bibliography and MPPI SOTA body are shared with ../SOTA (LLM-wiki knowledge base)
 % =====================================================================
-\documentclass{plan4ari}
+\documentclass{plan4ari_report}
 
 \usepackage{amsmath,amssymb,bm}
 \usepackage{algorithm}
@@ -15,14 +15,14 @@
 \usetikzlibrary{arrows.meta,positioning,fit,backgrounds,calc}
 \usepackage{cite}
 \input{sota_macros}
-\sotafullfalse
+\sotafullfalse%
 
 \deliverable{D4.1}
 \deliverabletitle{Updated Scientific Plan for Local and\\ Global Autonomous Motion Planning}
-\docstatusline{Draft -- Version 0.1}
+\docstatusline{Draft~-~Version 0.1}
 \inforow{Project acronym}{Plan4ARI}
 \inforow{Project duration}{48 months}
-\inforow{Work package/activity}{Activity 4 -- Local and Global Autonomous Motion Planning}
+\inforow{Work package/activity}{Activity 4~-~Local and Global Autonomous Motion Planning}
 \inforow{Task basis}{Task 4.1 Update of the Scientific Plan with the latest State-of-the-Art Methodologies and Tools for Motion Planning; Task 4.7 Benchmarking and Evaluation}
 \inforow{Activity period}{M1--M6}
 \inforow{Suggested delivery point}{M6 (to be confirmed)}
@@ -58,5 +58,5 @@
 
 \clearpage
 \bibliographystyle{IEEEtran}
-\bibliography{../SOTA/latex/references}
+\bibliography{references}
 \end{document}

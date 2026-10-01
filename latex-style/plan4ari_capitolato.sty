@@ -1,5 +1,5 @@
 \NeedsTeXFormat{LaTeX2e}
-\ProvidesPackage{plan4ari}[2026/07/22 Plan4ARI document style]
+\ProvidesPackage{plan4ari_capitolato}[2026/07/22 Plan4ARI document style]
 
 \RequirePackage[a4paper,left=1.45cm,right=1.45cm,top=2.45cm,bottom=1.55cm,headheight=34pt,headsep=8pt,footskip=22pt]{geometry}
 \RequirePackage{fontspec}
@@ -73,7 +73,6 @@
 \renewcommand{\thesubsubsection}{\thesubsection.\arabic{subsubsection}}
 \renewcommand{\theparagraph}{\thesubsubsection.\arabic{paragraph}}
 \setcounter{secnumdepth}{4}
-\pretocmd{\section}{\clearpage}{}{}
 
 \titleformat{\section}[hang]{\normalfont\fontsize{13}{15}\selectfont\bfseries}{\thesection}{0.8em}{}
 \titleformat{\subsection}[hang]{\normalfont\fontsize{10.5}{12.5}\selectfont\bfseries}{\thesubsection}{0.75em}{}

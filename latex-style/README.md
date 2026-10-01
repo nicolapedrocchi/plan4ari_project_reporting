@@ -1,5 +1,14 @@
 # Plan4ARI LaTeX style
 
+## Beamer presentations
+
+Load `\usepackage{plan4ari_beamer}` with this folder on `TEXINPUTS`.
+The theme uses `plan4ari-wordmark-light.png` on the cover, `logo.png` on
+section dividers and the dual logo on a white footer area. It looks for
+`plan4ari-dual-logo.png`, falling back to `plan4ari-dual-logo - transparent.png`.
+Keep the images alongside the package. Compile with latexmk to resolve
+TikZ page positions over successive passes.
+
 `plan4ari.cls` reproduces the layout of the Plan4ARI Word deliverables (derived from
 `D1.1/Plan4ARI_D1.1_Project_Management_Report.docx`, 2026-10-01).
 

@@ -1,3 +1,8 @@
-# Build with XeLaTeX (Cambria/Calibri system fonts) and find the shared Plan4ARI class
-$pdf_mode = 5;
-ensure_path('TEXINPUTS', '../../../latex-style//', '../SOTA/latex//');
+# D4.1: XeLaTeX (Cambria/Calibri system fonts), shared Project Reporting config
+$root   = '../../..';
+$engine = 'xelatex';
+do "$root/latexmkrc";
+
+# SOTA macros and bibliography
+ensure_path('TEXINPUTS', '../SOTA/latex//');
+bib_dirs('../SOTA/latex');

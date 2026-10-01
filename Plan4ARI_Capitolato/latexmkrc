@@ -1,0 +1,14 @@
+# Plan4ARI capitolato: shared Project Reporting config
+use File::Basename qw(dirname);
+use Cwd qw(abs_path);
+# latexmk evaluates rc files as strings; __FILE__ is therefore not their path.
+my $capitolato_dir = dirname(abs_path($rc_files_read[-1]));
+$root   = "$capitolato_dir/..";
+$engine = 'xelatex';
+do "$root/latexmkrc";
+
+# Use an absolute path so the shared styles are also found from build/.
+ensure_path('TEXINPUTS', win_path("$root/latex-style") . '//');
+
+# Capitolato bibliography
+bib_dirs($capitolato_dir);
