@@ -1,0 +1,792 @@
+Dynamic Risk-Aware MPPI for Mobile Robots in Crowds via Efficient Monte Carlo Approximations
+Elia Trevisan1∗, Khaled A. Mustafa1∗, Godert Notten1,2, Xinwei Wang3, and Javier Alonso-Mora1
+
+arXiv:2506.21205v2 [cs.RO] 20 Aug 2025
+
+Abstract— Deploying mobile robots safely among humans requires the motion planner to account for the uncertainty in the other agents’ predicted trajectories. This remains challenging in traditional approaches, especially with arbitrarily shaped predictions and real-time constraints. To address these challenges, we propose a Dynamic Risk-Aware Model Predictive Path Integral control (DRA-MPPI), a motion planner that incorporates uncertain future motions modelled with potentially non-Gaussian stochastic predictions. By leveraging MPPI’s gradient-free nature, we propose a method that efficiently approximates the joint Collision Probability (CP) among multiple dynamic obstacles for several hundred sampled trajectories in real-time via a Monte Carlo (MC) approach. This enables the rejection of samples exceeding a predefined CP threshold or the integration of CP as a weighted objective within the navigation cost function. Consequently, DRAMPPI mitigates the freezing robot problem while enhancing safety. Real-world and simulated experiments with multiple dynamic obstacles demonstrate DRA-MPPI’s superior performance compared to state-of-the-art approaches, including Scenario-based Model Predictive Control (S-MPC), Frene´t planner, and vanilla MPPI. Videos of the experiments can be found at https://autonomousrobots.nl/paper websites/dra-mppi.
+I. INTRODUCTION
+Mobile robots have the potential to enhance various aspects of daily life, from optimizing logistics in warehouses to enabling safer and more efficient transportation through autonomous vehicles [1]–[3]. However, for robots to be successfully integrated into real-world settings like urban areas, they must be capable of safely and efficiently manoeuvring through human-populated spaces. Achieving this requires an ability to interpret and anticipate human movement—a task complicated by the inherent unpredictability of human behaviour. Prediction models, such as [4], provide probabilistic distributions over potential human trajectories. To ensure safe and efficient navigation, these probabilistic predictions must be incorporated into the motion planning process [5]–[7].
+A key challenge in planning under uncertainty is finding a safe trajectory despite the stochastic nature of surrounding
+This research is supported by the project “Sustainable Transportation and Logistics over Water: Electrification, Automation and Optimization (TRiLOGy)” of the Netherlands Organization for Scientific Research (NWO), domain Science (ENW), the Amsterdam Institute for Advanced Metropolitan Solutions (AMS) in the Netherlands, and the Dutch Research Council NWO-NWA, within the “Acting under uncertainty” (ACT) project (Grant No. NWA.1292.19.298).
+∗These authors have contributed equally. 1Cognitive Robotics Department, TU Delft, {e.trevisan, k.a.mustafa, j.alonsomora}@tudelft.nl 2Damen Naval 3Centre for Intelligent Transport, Queen Mary University of London, xinwei.wang@qmul.ac.uk
+
+obstacles. One approach to handle uncertainty in dynamic environments is robust optimization [8], which enforces safety guarantees by considering worst-case scenarios within bounded uncertainty sets. This method assumes that the probability density of uncertainty is nonzero within a defined region of the ego agent’s workspace, ensuring strict safety constraints. However, by accounting for all possible uncertainty realizations, robust optimization often leads to overly cautious behaviour, potentially rendering solutions infeasible in densely populated environments—a phenomenon commonly referred to as the “frozen robot” problem [9]. To mitigate excessive conservatism, stochastic optimization offers an alternative by employing chance constraints [10]– [12] that probabilistically bound the likelihood of constraint violations within a specified confidence level σ. This relaxation allows for more flexible decision-making while maintaining a controlled level of risk, enabling robots to navigate complex environments more effectively than purely robust approaches. In this work, we propose a risk-aware Model Predictive Path Integral (MPPI) that uses Monte-Carlo sampling to approximate the chance constraints for a mobile robot navigating among dynamic agents.
+II. RELATED WORK
+In stochastic optimization, constraint violations are regulated using chance constraints, which ensure that the probability of satisfying a given nominal constraint remains within a predefined threshold. Evaluating chance constraints exactly is often infeasible in real-world scenarios, necessitating approximations. Many existing methods address this challenge by introducing simplifying assumptions, such as modelling uncertainty with Gaussian distributions [10] or restricting the robot’s dynamics to linear systems [13], [14]. While these approximations facilitate tractability, they also limit the flexibility of the approach. Recent research has made significant progress in overcoming these limitations, enabling stochastic optimization to accommodate nonlinear robot dynamics and more general uncertainty distributions [12] by leveraging scenario optimization [15]. However, the Collision Probability (CP) in these works is computed per obstacle, which degrades performance when more obstacles influence the plan, i.e., in crowded environments. In addition, empirical evaluations indicate that the actual risk associated with the planned trajectory is significantly lower than the upper bound imposed by the chance constraint formulation [10]–[12]. To address this issue, [16] introduced a method to quantify the risk of planned trajectories by running multiple probabilistic planners in parallel with varying risk thresholds.
+
+This approach provides probabilistic safety guarantees by attaining a closer bound to the specified risk. However, the scalability of this approach is constrained by the number of probabilistic planners that can be executed in parallel. With the advantage of not requiring gradient information, probabilistic safety measures have been successfully employed in sampling-based motion planning frameworks. In [17], [18], chance constraints are applied to the Rapidly Random Trees (RRT) algorithm such that each node in the tree is statistically safe. [19] integrates risk measures to estimate the risk of violating a predefined safety specification into a samplingbased trajectory [20] to plan minimal risk trajectories. Model Predictive Path Integral (MPPI), a gradient-free local motion planner, has the advantage of massive parallelizability to compute finite horizon plans online via sampling [21]. [22] integrates the Conditional Value-at-Risk (CVaR) measure into MPPI to generate optimal control actions but only accounts for the uncertainty in the robot’s own dynamics.
+In this paper, we propose Dynamic Risk-Aware MPPI (DRA-MPPI), a planner approximating joint CPs among several dynamic obstacles by evaluating the probabilistic distributions of dynamic agents’ predicted trajectories, which can be non-Gaussian. The approximated probability of collision becomes a chance constraint by assigning a high enough cost to samples that violate the maximum threshold, essentially rejecting them from the final plan. Leveraging Monte Carlo (MC) sampling [23] enables greater flexibility and computational efficiency, as it effectively handles arbitrary probability distributions and scales well with an increasing number of dynamic agents.
+
+A. Contributions
+Our main contributions are twofold:
+1) DRA-MPPI: An MPPI-based planner that approximates the CPs of trajectories using MC methods. It handles joint CPs over several dynamic obstacles and manages non-Gaussian predictions with minimal approximations.
+2) A computationally efficient strategy to find the MC approximation of the joint CP for several hundred samples in parallel, achieving real-time performance.
+We design a comprehensive cost function for efficient navigation and validate the approach through simulations and real-world experiments with pedestrians. Our method, tested with Gaussian and non-Gaussian models, is compared to a state-of-the-art Scenario-based Model Predictive Control (SMPC), a risk-aware Frene´t planner, and a vanilla MPPI.
+
+III. PRELIMINARIES
+
+We consider a controlled robot moving in a 2D plane, W ⊆ R2, with non-linear discrete-time dynamics given by:
+
+xt+1 = F (xt, ut),
+
+(1)
+
+where xt = [qt, ψt] ∈ Rnx and ut ∈ Rnu denote the state and control input of the robot at stage t respectively. The
+state of the robot xt contains its position qt = [xt, yt] ∈ R2 ⊆ Rnx and orientation ψt. The robot navigates in an environment occupied by No dynamic obstacles whose
+
+future trajectories must be predicted. This necessitates a dynamic model of the obstacles’ motion, enabling the robot to proactively account for the obstacles’ behaviour while generating its own trajectory.
+
+A. Dynamic Obstacle Model
+
+The motion planner uses a model that probabilistically
+
+forecasts the behaviour of surrounding agents. In this setting,
+
+we model the positions of No dynamic obstacles as random
+
+variables. Specifically, the uncertain position of obstacle o at
+
+time
+
+step
+
+t
+
+as
+
+δo
+t
+
+=
+
+[xot ,
+
+yto]
+
+∈
+
+∆,
+
+where
+
+∆
+
+is
+
+the
+
+probability
+
+space capturing the uncertainty in the perception of these
+
+obstacles. This uncertainty is characterized by a probabil-
+
+ity measure P. To capture the inherent multi-modality in obstacle behaviour, we model the uncertainty in their mo-
+
+tion using a Mixture-of-Gaussians (MoG) distribution. This
+
+approach provides a flexible and expressive representation
+
+of uncertainty by combining multiple continuous probability
+
+distributions. Specifically, the probability density function of
+
+an obstacle’s position at time step t is given by:
+
+Nm
+
+pot (x, y) = ϕipt,i o (x, y),
+
+(2)
+
+i=1
+
+where Nm is the number of modes of the MoG, ϕi represents the weight associated with each mode such that i=1 Nm ϕi = 1, and pot,i(·) is the probability density function of the ith mode with mean µi ∈ R2 and covariance Σi ∈ R2×2:
+
+pot,i(·) = N (µi(t), Σi(t)).
+
+(3)
+
+As a result, the prediction model outputs a sequence of state distributions over the prediction horizon for each possible mode, enabling the planner to account for the stochastic nature of obstacle motion.
+
+B. Probabilistic Collision Avoidance
+The problem of planning under uncertainty can be formulated as a chance-constraint collision avoidance problem. Given a cost function J, the initial state of the robot x0 = xinit, and the predicted future states of all obstacles pot,i(·) over a horizon T , the objective is to compute optimal control inputs that guide the robot from its initial state to progress along a reference path, while the collision probability with any moving obstacle at each stage t is below an acceptable threshold σ. The resulting optimization problem is given by:
+
+T −1
+
+min
+
+Jt(xt, ut) + JT (xT )
+
+(4a)
+
+u∈U
+
+t=0
+
+s.t. x0 = xinit,
+
+(4b)
+
+xt+1 = F (xt, ut), x ∈ X, u ∈ U, (4c) P [||qt − δto||2 > r, ∀o] ≥ 1 − σ, ∀t, (4d)
+
+where Jt(xt, ut) represents the stage cost of the robot, and JT (xT ) denotes the terminal cost. States xt and inputs ut are bounded by the state and input constraint sets X and U, and radius r is the sum of the robot and obstacle radii.
+
+C. Model Predictive Path Integral Control (MPPI)
+Model Predictive Path Integral control (MPPI) [21], [24] is a sampling-based optimization method for solving stochastic optimal control problems. We consider a discrete-time dynamical system governed by the state-transition equation:
+
+xt+1 = F (xt, vt) vt ∼ N (ut, Σ),
+
+(5)
+
+where F represents a nonlinear state-transition function that dictates the evolution of the state x over discrete time steps t. The control input vt follows a Gaussian distribution centered at the commanded input ut with covariance Σ. To generate potential system trajectories, a set of K perturbed control sequences sequences Vk is sampled and rolled-out through the model F, producing K corresponding state trajectories Xk, k ∈ [0, K − 1], over a planning horizon of length T . Given the state trajectories Xk and a predefined cost function C to be minimized, the total state-cost Sk for each sampled sequence Vk is computed by evaluating Sk = C(Xk). An importance-sampling weighting scheme is then employed to approximate the optimal control sequence. The weight wk associated with trajectory Xk is computed using an inverse exponential function of the cost Sk, adjusted by a tuning parameter β known as the inverse temperature:
+
+11 K
+
+wk = η exp − β (Sk − ρ) ,
+
+wk = 1. (6)
+
+k=1
+
+Here, the minimum sampled cost ρ = mink Sk is introduced to enhance numerical stability, and η is a normalization
+factor ensuring weights sum to unity. The final control input sequence U ∗ is then computed as a weighted sum of the
+sampled control sequences:
+
+K
+
+U ∗ = wkVk.
+
+(7)
+
+k=1
+
+Once the optimal control sequence U ∗ is obtained, only the
+
+first
+
+control
+
+input
+
+u∗
+0
+
+is
+
+applied
+
+to
+
+the
+
+system.
+
+The
+
+procedure
+
+is then repeated at the next time step, where, at the next
+
+iteration, a time-shifted U ∗ is used as a warm-start.
+
+D. Risk Assessment
+To quantify risk in the context of pedestrian-robot interactions, we define a risk metric that assesses the likelihood of collision. Let Z represent the set of random variables capturing the uncertainty in pedestrian motion in the x and y directions. The risk metric is a function ζ : Z → R that maps these random variables to a real value corresponding to the collision probability. The probability of collision with an obstacle o, the marginal probability, is then expressed as:
+
+Pto(qt) =
+
+p
+
+o t
+
+(
+
+xt
+
+,
+
+yt
+
+)dxdy
+
+,
+
+∀t,
+
+o,
+
+(8)
+
+xt ,yt ∈R◦t
+
+where
+
+the
+
+integration
+
+domain
+
+R◦
+t
+
+is
+
+defined
+
+as
+
+a
+
+circular
+
+region, with radius r, centered at the planned robot pose qt
+
+at stage t along the planning horizon.
+
+When o > 1, the probability of colliding with at least
+
+one obstacle is given by the joint collision probability [25].
+
+Since, at each time step t, the marginal probabilities can be assumed independent, the joint collision probability can be computed using a multiplicative approach:
+
+No
+
+Pt(qt) = 1 − (1 − Pto(qt))
+
+(9)
+
+o
+
+IV. PROPOSED APPROACH
+
+To assess the risk associated with the robot’s optimal trajectory in MPPI, (8) and (9) must be evaluated for each sample and each time step in the horizon. For example, with K = 400 MPPI samples and a horizon T = 20, we must compute the collision probability 8000 times at each controller iteration. Computing these analytically is not feasible if the controller is to run in real-time. In Section IVA, we propose a Monte Carlo approximation to estimate the joint collision probability for many trajectories efficiently and in parallel. The cost function used to evaluate MPPI samples is detailed in Section IV-B, and an overview of the algorithm is presented in Section IV-C.
+
+A. Monte Carlo Approximation
+We propose an algorithm to compute all No integral approximations for all K samples efficiently and in parallel, allowing good scalability with the number of dynamic obstacles and samples. The process begins by sampling Nmc Monte Carlo coordinates from a rectangular collision region R□ t , which is bounded as follows:
+Rt□ = {(x, y) | xlower ≤ x ≤ xupper, ylower ≤ y ≤ yupper}. (10)
+The bounds of this region are determined by the minimum and maximum spatial positions of the robot’s states across all rollouts K at time step t, extended by the radius r:
+
+xlower = min(xk,t) − r, xupper = max(xk,t) + r
+
+k
+
+k
+
+ylower = min(yk,t) − r, yupper = max(yk,t) + r.
+
+k
+
+k
+
+Here, xk,t and yk,t denote the x and y robot’s position for rollout k at timestep t. By taking the minimum and maximum values as bounds and extending the area with the integral radius r, we cover the whole area where we need to approximate the integrals at time step t. Depending on the obstacles’ trajectory predictions, we get No × Nm total number of modes for all obstacles. To approximate the integral for all rollouts K we first evaluate the joint collision probability for all MC sample j:
+
+No
+Pjjoint(xj, yj) = 1 − (1 − pto(xj, yj)), ∀j (11)
+o=1
+
+where xj, yj represents a single MC sample. We then identify
+which of these sampled coordinates fall within the region R◦k,t of each k and compute the CP over the relevant domain:
+
+ˆ πr joint 2 Nmc
+◦
+
+P(xk,t, yk,t) =
+
+P (xj , yj ) · 1Rk,t (xj , yj ),
+
+NR◦k,t j=1
+
+(12)
+
+where
+
+πr2
+
+is
+
+the
+
+area
+
+of
+
+the
+
+collision
+
+region
+
+and
+
+NR◦
+k,t
+
+is
+
+the number of Monte Carlo samples in the circular region
+
+R◦k,t
+
+acting
+
+as
+
+a
+
+normalization
+
+factor.
+
+1R◦
+k,t
+
+is
+
+an
+
+indicator
+
+function to consider only MC samples in the circular colli-
+
+sion region R◦k,t. Given that all the coordinates xk,t and yk,t will be fairly close ∀k, there will also be significant overlap
+
+in the integration regions R◦k,t. Thus, the computation effort is massively reduced by using our approach of drawing and
+
+evaluating the MC samples only once ∀k. The Standard Error
+
+(SE) of Pˆ, if Pjoint were Gaussian distributed, would scale
+
+√
+
+with
+
+ΣP joint
+
+/NR◦
+k,t
+
+.
+
+In
+
+practice,
+
+we
+
+do
+
+not
+
+know
+
+a
+
+priori
+
+the
+
+number of samples in the collision region, and Pjoint is non-
+
+gaussian but, compared to an analytical solution, we have
+
+empirically observed that we misclassify the CP to be below
+
+the threshold less than 2% of the times.
+
+B. Cost Formulation
+A key component of MPPI is the design of the cost function Sk. We design our cost function as:
+
+Sk = Ctracking + Cspeed + Crotation + Crisk,
+
+(13)
+
+where Ctracking drives the robot towards its goal and penalizes the lateral deviation from the reference path, Cspeed penalizes differences with reference speed, and Crotation penalizes angular velocity. Crisk is defined as:
+
+Crisk = ωsoftPˆ(qk,t) + ωhard1σ(Pˆ(qk,t)),
+
+(14)
+
+with ωsoft and ωhard being tunable weights. The first part, ωsoftPˆ(qk,t), is a linear penalty on any collision probabilities, incentivising the planner to always choose lower risk. The second part, ωhard1σ(Pˆ(qk,t)) is an indicator function returning 1 when the CP is above a chosen risk threshold σ. Every sampled trajectory with a CP above the threshold, assuming that ωhard is high enough and that at least a few low-risk trajectories are sampled, will receive close to zero weight in the average in (7), essentially being rejected. One advantage is that if, for example, the robot starts planning from a state with CP above the threshold, MPPI still returns a solution in which the CP and the number of time steps with CP above the threshold will be minimised.
+
+C. Algorithm
+Algorithm 1 summarizes the proposed approach. Note that operations over k and j are parallelized, while the ones over t, i.e. rolling out the trajectories, are performed sequentially.
+As in [26], Ek are splines fitted to a Halton sequence for improved smoothness, the inverse temperature β is updated online, and U ∗ is time-shifted to be reused in the next iteration. We also always take one sample to be zero velocity throughout the horizon. This helps MPPI to converge to a braking manoeuvre when all other samples fail [27].
+Remark 1: A key difference between MPPI and MPC is that MPPI’s planned trajectory is not meant to be applied in open loop. When symmetries are present, e.g. when a robot faces an obstacle ahead, MPPI’s plan might go straight through the obstacle. This is intuitively clear given the weighted average in (7). For certain types of systems and cost
+
+functions, MPPI can be related to Path Integral Control [21]. Within the Path Integral control framework, because there is an assumption that the actions of the ego-agent are noisy, attempting to drive straight to the obstacle for a while is the optimal action. The symmetry is proven to break at some point [28]. For our planner, this means that while we can reject the samples k with collision probability higher than the threshold σ, we cannot guarantee that the resulting plan doesn’t violate the threshold. Again, this is expected as, in MPPI, only the first input of U ∗ is applied, and the rest is only used for warm-starting the next iteration.
+
+Algorithm 1 Dynamic Risk-Aware MPPI
+
+1: Initialize: Uinit = [0, . . . , 0] Ek ← sampleHaltonSplines()
+2: while taskNotDone do
+
+▷ Uinit ∈ RT ▷ k = 1...K
+
+3: x0 ← observeEnvironment()
+
+4: for k = 1 . . . K do
+
+▷ in parallel
+
+5:
+
+Vk = Uinit + Ek
+
+6:
+
+for t = 0 . . . T − 1 do
+
+7:
+
+xk,t+1 = F (xk,t, vk,t)
+
+8:
+
+R□ t ← getArea([x0,t, ..., xK,t])
+
+▷ (10)
+
+9:
+
+for j = 1 . . . Nmc do
+
+▷ in parallel
+
+10:
+
+xj, yj ← sampleUniform(R□ t )
+
+11: Pjjoint ← evaluateCP(xj, yj) ▷ (11)
+
+12:
+
+end for
+
+Pˆk,t+1 ←estimateJointCP(xk,t+1,
+
+13: P1joint, ..., PNmc joint ) ▷ (12)
+
+14:
+
+end for
+
+15:
+
+Sk ← getCost(Xk, Pˆk,1, ..., Pˆk,T )
+
+▷ (13)
+
+16:
+
+wk ← importanceSampling
+
+▷ (6)
+
+17: end for
+
+18: β ← updateBeta(β, η) 19: U ∗ = k=1 K wkVk 20: Uinit ← timeShift(U ∗) 21: applyInput(u∗0)
+22: end while
+
+V. SIMULATION EXPERIMENTS
+This section evaluates the proposed approach in the context of mobile robot navigation in a crowded environment shared with humans. Our algorithm’s implementation is built upon previous open-source MPPI solvers [26], [27]. The proposed approach is developed in Python using PyTorch and integrated with the Robot Operating System (ROS). The laptop running the simulations has an Intel® CoreTM i7 CPU@2.6GHz and NVIDIA GeForce RTX 2080.
+A. Simulation Setup
+The experimental evaluation is conducted in a simulated environment featuring a Clearpath Jackal robot navigating a 6-meter-wide corridor alongside multiple pedestrians. The robot has to follow the corridor’s centerline while maintaining a reference velocity of 2m/s. A visualization with
+
+(a)
+
+(b)
+
+(c)
+
+Fig. 1: Snapshots from the simulated environment under Gaussian pedestrian motion at different time instants. Blue circles depict the robot’s plan, whereas the pedestrians’ predicted trajectories are illustrated in distinct coloured circles. The black walls on both sides represent the corridor boundaries.
+
+Gaussian predictions is given in Fig. 1. The simulator runs at 20Hz, while the controllers run at 5Hz. Pedestrian dynamics are modelled using the Social Forces [29], implemented via open-source software [30]. In this model, pedestrians avoid one another and the robot. Future pedestrian positions are predicted by the robot’s motion planner using a constant velocity assumption. The mismatch between the model used for simulation and prediction is to emulate a real-world scenario where the predictions do not always match the ground-truth trajectory. Pedestrians are modelled with a radius of 0.3m and spawn on both sides of the corridor, and their goal is to reach the opposing side. The robot dynamics are described by a second-order unicycle model [31]. Simulations are conducted for three scenarios featuring 4, 8, and 12 pedestrians to evaluate the planner’s performance under varying crowd density levels.
+1) Pedestrians with Gaussian noise: In this setup, we model the uncertainty in pedestrian motion using a unimodal Gaussian distribution with covariance matrix Σw = 0.32I. By ‘unimodal’, it is meant that we predict a single trajectory for each pedestrian. We define the pedestrians’ dynamics as:
+δt+1 = δt + (v + δw,t)dt, δw,t ∼ N (0, Σw), (15)
+where v ∈ R2 is the velocity that follows the social forces model. The additive noise δw,t introduces stochastic perturbations, capturing the variability in pedestrian motion.
+2) Pedestrians with Mixture of Gaussians: In this setup, pedestrian motion is modelled as a Markov Chain, where transitions govern changes in the movement direction. Specifically, a pedestrian follows a horizontal trajectory with probability p = 0.975 at each time step while transitioning to a diagonal trajectory with probability p = 0.025. This behaviour is further perturbed by Gaussian noise as before. The pedestrians’ dynamics are described by:
+δt+1 = δt + (Bv + δw,t)dt, δw,t ∼ N (0, Σw), (16)
+where B is a transformation vector that depends on the current state of the Markov Chain and v is a constant preferred velocity. If the pedestrian is in the horizontal state, B = 1 0 T . Conversely, if the pedestrian switches to
+
+the diagonal state, B =
+
+1√
+/2
+
+1√
+/2
+
+T.
+
+The
+
+uncertainties
+
+associated with this motion can be modelled as a Mixture of
+
+Gaussians where each state transition in the Markov Chain
+
+leads to a separate mode with an associated probability. For
+
+a planning horizon of T = 20, the pedestrian may switch
+
+from horizontal to diagonal movement every 5-time steps,
+
+resulting in 4 distinct modes per pedestrian.
+
+B. Comparison to Baselines
+We compare DRA-MPPI against three baselines. Baselines are selected on the availability of an open-source implementation and their application to navigation in 2-D dynamic environments. We consider the following baselines:
+(i) Stochastic Model Predictive Control (SH-MPC) [25]: This baseline uses a scenario-based MPC and formulates the collision avoidance chance constraints over the entire trajectory as a scenario program.
+(ii) Vanilla MPPI [21]: This baseline assumes deterministic pedestrians’ behaviour by considering only the mean predicted trajectories and plans around them.
+(iii) Frene´t Planner [32]: This sampling-based planner generates trajectories in the Frene´t coordinate system. The risk metric used is similar to previous work [33].
+All planners have a horizon of T = 20 steps, with a discretization step of 0.2s, resulting in a time horizon of 4.0s. We set the maximum allowable risk level to σ = 0.05. DRA-MPPI uses K = 400 and Nmc = 20000 samples. The following metrics are considered for evaluation:
+1) Task Duration: Measures the time required for the robot to reach the end of the corridor.
+2) Velocity: Determines the average velocity maintained throughout the experiment.
+3) Collision Probability: Quantifies each experiment’s maximum joint collision probability (CP). The CP we report is computed a posteriori. Given the remark in section IV-C, the CP is only reported for the current time step instead of over the planned trajectory.
+4) Success Rate (SR): Evaluates the proportion of experiments in which the robot successfully avoids collisions with pedestrians and reaches its goal.
+
+# Pedestrians Method
+
+Task Duration [s] Velocity [m/s]
+
+CP
+
+SR %) Runtime [ms]
+
+SH-MPC [25]
+
+19.63 (0.98)
+
+1.79 (0.07) 0.047 (0.024)
+
+99
+
+53.8 (5.2)
+
+4 Frene´t-Planner [32] 20.17 (1.38) 1.76 (0.11) 0.112 (0.086) 91 105.9 (5.4)
+
+Vanilla MPPI [21]
+
+18.81 (0.14)
+
+1.87 (0.01)
+
+-
+
+86
+
+48.1 (4.1)
+
+DRA-MPPI (ours)
+
+19.13 (0.12)
+
+1.84 (0.04) 0.020 (0.013) 100
+
+96.9 (3.3)
+
+SH-MPC [25]
+
+20.31 (1.48)
+
+1.76 (0.11) 0.051 (0.022)
+
+96
+
+58.6 (5.1)
+
+8 Frene´t-Planner [32] 20.88 (1.37) 1.71 (0.11) 0.196 (0.084) 82 145.9 (9.4)
+
+Vanilla MPPI [21]
+
+18.83 (0.23)
+
+1.85 (0.01)
+
+-
+
+61
+
+58.45 (3.2)
+
+DRA-MPPI (ours)
+
+19.71 (0.26)
+
+1.82 (0.15) 0.034 (0.046)
+
+98
+
+109.9 (7.7)
+
+SH-MPC [25]
+
+21.34 (1.69)
+
+1.68 (0.12) 0.051 (0.065)
+
+96
+
+61.4 (5.4)
+
+12 Frene´t-Planner [32] 22.26 (1.55) 1.61 (0.11) 0.216 (0.164) 74 171.3 (8.6)
+
+Vanilla MPPI [21]
+
+18.98 (0.54)
+
+1.84 (0.03)
+
+-
+
+43
+
+68.64 (3.8)
+
+DRA-MPPI (ours)
+
+19.86 (0.14)
+
+1.78 (0.22) 0.040 (0.064)
+
+98
+
+114.2 (5.3)
+
+TABLE I: Performance comparison of different planning methods under different pedestrian densities. Quantitative results were obtained from over 100 experiments for uni-modal pedestrian predictions.
+
+# Pedestrians Method
+
+Task Duration [s] Velocity [m/s]
+
+CP
+
+SR (%) Runtime [ms]
+
+SH-MPC [25]
+
+20.92 (3.53)
+
+1.74 (0.18) 0.053 (0.028)
+
+95
+
+74.8 (6.1)
+
+8 Frene´t-Planner [32] 22.26 (3.51) 1.73 (0.18) 0.268 (0.146) 86 188.9 (6.8)
+
+Vanilla MPPI [21]
+
+19.71 (0.13)
+
+1.80 (0.01)
+
+-
+
+78
+
+86.41 (4.8)
+
+DRA-MPPI (ours)
+
+19.67 (0.17)
+
+1.81 (0.01) 0.024 (0.025)
+
+99
+
+118.9 (5.3)
+
+TABLE II: Performance comparison of different planning methods under different pedestrian densities. Quantitative results are obtained from 100 experiments for multi-modal pedestrian predictions.
+
+Fig. 4: Visualization of the task duration under multi-modal pedestrian prediction setting. Same conclusions as the uni-modal case.
+
+Fig. 2: The visualization illustrates the task duration, defined as the time required to reach the goal, under a uni-modal pedestrian prediction setting. Our method demonstrates a lower variance in task duration and a shorter completion time compared to SH-MPC and the Frene´t Planner. While Vanilla MPPI achieves the shortest task duration, this comes at the cost of a higher collision rate, as reported in Table I.
+Fig. 3: Visualization of maximum collision probability across 100 experiments under uni-modal pedestrian prediction setup. Frene´t Planner is discarded from this Fig. for better readability as its CP is much higher than SH-MPC and DRA-MPPI as seen in Table I.
+Table I and Fig. 2 and 3 present a quantitative comparison of different planning methods across varying pedestrian densities under uni-modal pedestrian predictions. The results, averaged over 100 experiments, highlight the trade-offs between task efficiency and safety among the evaluated approaches. Our proposed approach (DRA-MPPI) consistently demonstrates a favourable balance between task duration
+
+Fig. 5: Visualization of maximum collision probability across 100 experiments under multi-modal pedestrian prediction setup.
+and safety. While Vanilla MPPI achieves the shortest task duration across all scenarios, it does so at the expense of significantly lower safety due to its lack of risk awareness, particularly as pedestrian density increases. For instance, in the presence of 12 pedestrians, Vanilla MPPI completes the task in 18.98s but exhibits the lowest safety rate (43%), indicating a high collision frequency. In contrast, DRAMPPI maintains a competitive task duration (19.86s) while achieving a significantly higher safety rate of 98%, demonstrating its robustness in crowded environments. The Frene´t Planner exhibits longer task duration and suffers a notable drop in safety, particularly at higher pedestrian densities (74% safety at 12 pedestrians). This deterioration arises from the planner’s design, which does not explicitly optimize for risk minimization. Instead, it evaluates a set of sampled trajectories based on assigned costs and selects the one with the lowest one. However, in dense environments, the trajectory with the minimum cost may still entail substantial
+
+Fig. 6: Four snapshots of a Jackal robot running DRA-MPPI among five pedestrians. In orange is the trajectory planned by our proposed approach, with the top 30 samples colour-graded by their relative cost. In blue are the predicted trajectories of the pedestrians, and the circle size represents three standard deviations from the mean predicted centre of the obstacle. In green is the reference path. The behaviour is best appreciated in the accompanying video.
+
+risk, as observed in the experimental results. Remark 2: It is important to stress that, in our simulator,
+the pedestrians move with Social Forces but are predicted by a constant velocity model, i.e. the predictions are not the ground truth behaviour. This may result in the planner thinking its plan is below the risk threshold while, at the next iteration, it may find itself at a starting pose with a higher-than-allowed collision probability.
+SH-MPC strives to track the reference path very closely, often finding itself in riskier positions. SH-MPC relaxes the constraints with slack variables when no feasible solution is found in these riskier situations. When infeasible, SH-MPC switches to a fallback policy (braking). This leads to SHMPC taking longer to complete the task and often exhibiting collision probabilities higher than the threshold at least a few times per experiment, severely impacting the metrics.
+Thanks to its cost (13), DRA-MPPI always minimizes the CP, even when below the threshold. This makes it strive to avoid riskier situations altogether. Moreover, when DRAMPPI finds itself in a riskier situation, it will try to return to a state with CP below the threshold in the least amount of steps possible. For these reasons, DRA-MPPI demonstrates good task completion times while providing the highest safety. Moreover, DRA-MPPI and Vanilla MPPI exhibit a lower variance in task duration across experiments, indicating better consistency than SH-MPC and Frene´t Planner.
+Table II and Fig. 4 and 5 show that the key observations from the uni-modal case also hold in the multi-modal setting. DRA-MPPI outperforms other methods in balancing task efficiency and safety. It achieves the shortest task duration (19.67s) while maintaining the highest safety rate (99%), demonstrating its ability to navigate complex, uncertain environments effectively. In contrast, Vanilla MPPI completes the task in a comparable time (19.71s) but at the cost of reduced safety (78%), reflecting its lack of risk-awareness. DRA-MPPI also remains close to the maximum allowable risk while ensuring safety, demonstrating its consistency and robustness in complex pedestrian environments.
+C. Computation Time
+In Tables I and II, we also report the computation time (runtime) for SH-MPC and our approach. DRA-MPPI takes
+
+just below 100ms to compute the control action in the unimodal four-agents experiment, while SH-MPC is almost twice as fast. Both methods scale quite gracefully over the number of agents with multi-modal predictions. However, it is important to note that SH-MPC is written in C++, while DRA-MPPI is implemented in PyTorch. Recent work shows a reduction of compute time of up to two orders of magnitude when running MPPI in CUDA vs Pytorch [34], highlighting the potential for these massively parallelizable approaches.
+VI. REAL ROBOT EXPERIMENTS
+This section demonstrates the DRA-MPPI for a mobile robot driving among pedestrians in an arena, highlighting the real-time capability of the proposed approach.
+A. Experimental Setup
+The experiment occurs in a large arena where pedestrians walk alongside the robot. The robot and pedestrians’ positions are tracked by a motion capture system operating at 20 Hz. Pedestrian positions are filtered through a Kalman filter that also estimates velocities, which the planner uses to produce constant velocity predictions. The pedestrians are assumed to follow an uni-modal Gaussian distribution with a covariance matrix of Σw = 0.12I. The robot follows a reference path between two opposite sides of the environment and performs a turn upon reaching each side. The cost function is the same as in (13).
+B. Results
+In this set of experiments, the pedestrians were instructed to walk naturally from one side to the other while interacting with the robot. The experiment was conducted over a duration of 65 seconds, with snapshots captured at various time instances, as illustrated in Fig. 6. Throughout the trials, the maximum collision probability observed for the robot was 0.054, with an average of 0.023 and a standard deviation of 0.011. Notably, no collisions were recorded.
+VII. CONCLUSIONS
+We have presented DRA-MPPI, an MPPI-based planner capable of computing, in parallel, at each time step, the joint collision probability among many dynamic obstacles
+
+using potentially non-Gaussian predictions. Thanks to its
+gradient-free nature, we have shown that DRA-MPPI can
+reject samples with a collision probability above a desired
+threshold and directly minimise the collision probability. In simulated experiments, while the pedestrians were
+predicted with constant velocity, they moved with Social
+Forces. DRA-MPPI demonstrated the highest robustness to
+this mismatch by being the safest method among a Scenario-
+Based MPC approach, a risk-aware Frene´t Planner, and
+a Vanilla MPPI while maintaining high speed and good
+task completion times. Similar conclusions were drawn in
+experiments where the pedestrians could randomly switch
+directions, predicted by a Gaussian Mixture Model, demon-
+strating efficient planning with non-Gaussian distributions. Real-robot experiments showcased DRA-MPPI’s ease of
+transfer to the real world and real-time performance. Al-
+though we relied on a motion capture system, the pedestrian’s
+state and the map can be retrieved from onboard sensors [35]. While already real-time, in future work our PyTorch
+implementation could be rewritten in CUDA, dramatically
+improving computation times [34]. This could also allow for
+real-time computations of the Monte Carlo approximation
+of the joint collision probability over the planning horizon,
+allowing for accurate constraining of the joint collision
+probability over the entire trajectory.
+REFERENCES
+[1] M. Simon. (2019) Inside amazon warehouse where humans and machines become one. [Online]. Available: https://www.wired.com/st ory/amazon-warehouse-robots/
+[2] W. Knight. (2022) Self-driving vehicles are here—if you know where to look. [Online]. Available: https://www.wired.com/story/self-drivi ng-vehicles-here-if-know-where-look/
+[3] M. N. Network. (2018) 7 major developments in autonomous shipping in 2018. [Online]. Available: https://www.marineinsight.com/know-m ore/7-major-developments-in-autonomous-shipping-in-2018/
+[4] M. Pfeiffer, G. Paolo, H. Sommer, J. Nieto, R. Siegwart, and C. Cadena, “A data-driven model for interaction-aware pedestrian motion prediction in object cluttered environments,” IEEE International Conference on Robotics and Automation, 2018.
+[5] X. Huang, A. Jasour, M. Deyo, A. Hofmann, and B. C. Williams, “Hybrid risk-aware conditional planning with applications in autonomous vehicles,” IEEE Conference on Decision and Control (CDC)., 2018.
+[6] F. S. Barbosa, B. Lacerda, P. Duckworth, J. Tumova, and N. Hawes, “Risk-aware motion planning in partially known environments,” IEEE Conference on Decision and Control, 2021.
+[7] D. Sadigh and A. Kappor, “Safe control under uncertainty with probabilistic signal temporal logic,” Robotics: Science and System, 2016.
+[8] A. Ben-Tal and A. Nemirovski, “Robust convex optimisation,” Mathematics of Operations Research., vol. 23, no. 4, pp. 769–805, 1998.
+[9] P. Trautman and A. Krause, “Unfreezing the robot: Navigation in dense, interacting crowd,” IEEE/RSJ Int. Conf. on Intelligent Robots and Systems., pp. 797–803, 2010.
+[10] H. Zhu and J. Alonso-Mora, “Chance-Constrained Collision Avoidance for MAVs in Dynamic Environments,” IEEE Robotics and Automation Letters, vol. 4, no. 2, pp. 776–783, Apr. 2019.
+[11] A. Wange, A. Jasour, and B. Williams, “Non-gaussian chanceconstrained trajectory planning for autonomous vehicles under agent uncertainty,” IEEE Robotics and Automation Letters (RA-L), 2020.
+[12] O. De Groot, B. Brito, L. Ferranti, D. Gavrila, and J. AlonsoMora, “Scenario-Based Trajectory Optimization in Uncertain Dynamic Environments,” IEEE Robotics and Automation Letters, vol. 6, no. 3, pp. 5389–5396, Jul. 2021.
+[13] K. Okamoto and P. Tsiotras, “Stochastic model predictive control for constrained linear systems using optimal covariance steering,” arXiv:1905.13296, 2019.
+
+[14] L. Hewing and M. N. Zeilinger, “Stochastic model predictive control for linear systems using probabilistic reachable sets,” IEEE Conference on Decesion and Control, 2018.
+[15] M. C. Campi, S. Garatti, and F. A. Ramponi, “A general scenario theory for nonconvex optimization and decision making,” IEEE Transactions on Automatic Control, vol. 63, no. 12, pp. 4067–4078, 2018.
+[16] K. A. Mustafa, O. de Groot, X. Wang, J. Kober, and J. AlonsoMora, “Probabilistic risk assessment for chance-constrained collision avoidance in uncertain dynamic environments,” IEEE International Conference on Robotics and Automation, 2023.
+[17] B. Luders, M. Kothari, and J. How, “Chance constrained rrt for probabilistic robustness to environmental uncertainty,” Proceedings of the AIAA Guidance, Navigation, and Control Conference, 2010.
+[18] G. S. Aoude, B. D. Luders, J. M. Joseph, N. Roy, and J. P. How, “Probabilistically safe motion planning to avoid dynamic obstacles with uncertain motion patterns,” Autonomous Robots, 2013.
+[19] T. Nyberg, C. Pek, L. Dal Col, C. Noren, and J. Tumova, “Risk-aware Motion Planning for Autonomous Vehicles with Safety Specifications,” in 2021 IEEE Intelligent Vehicles Symposium (IV). Nagoya, Japan: IEEE, Jul. 2021, pp. 1016–1023.
+[20] M. Werling, S. Kammel, J. Ziegler, and L. Groll, “Optimal trajectories for time-critical street scenarios using discretized terminal manifolds,” The International Journal of Robotics Research, 2012.
+[21] G. Williams, P. Drews, B. Goldfain, J. M. Rehg, and E. A. Theodorou, “Information-Theoretic Model Predictive Control: Theory and Applications to Autonomous Driving,” IEEE Transactions on Robotics, vol. 34, no. 6, pp. 1603–1622, Dec. 2018.
+[22] J. Yin, Z. Zhang, and P. Tsiotras, “Risk-aware model predictive path integral control using conditional value-at-risk,” in 2023 IEEE International Conference on Robotics and Automation (ICRA). IEEE, 2023, pp. 7937–7943.
+[23] R. E. Caflisch, “Monte Carlo and quasi-Monte Carlo methods,” Acta Numerica, vol. 7, pp. 1–49, Jan. 1998.
+[24] G. Williams, A. Aldrich, and E. A. Theodorou, “Model predictive path integral control: From theory to parallel computation,” Journal of Guidance, Control, and Dynamics, vol. 40, no. 2, pp. 344–357, 2017.
+[25] O. de Groot, L. Ferranti, D. M. Gavrila, and J. Alonso-Mora, “Scenario-based motion planning with bounded probability of collision,” The International Journal of Robotics Research, 2023.
+[26] C. Pezzato, C. Salmi, E. Trevisan, M. Spahn, J. Alonso-Mora, and C. H. Corbato, “Sampling-based model predictive control leveraging parallelizable physics simulations,” IEEE Robotics and Automation Letters, 2025.
+[27] E. Trevisan and J. Alonso-Mora, “Biased-mppi: Informing samplingbased model predictive control by fusing ancillary controllers,” IEEE Robotics and Automation Letters, 2024.
+[28] H. J. Kappen, “Path integrals and symmetry breaking for optimal control theory,” Journal of Statistical Mechanics: Theory and Experiment, vol. 2005, no. 11, p. P11011, Nov. 2005.
+[29] D. Helbing and P. Molna´r, “Social force model for pedestrian dynamics,” Physical Review E, no. 5, 1995.
+[30] C. Gloor, “Pedsim: Pedestrian crowd simulation,” 2016. [Online]. Available: https://github.com/chgloor/pedsim
+[31] R. Siegwart and I. R. Nourbakhsh, “Introduction to autonomous mobile robots,” The MIT Press, 2011.
+[32] S. Sun, Z. Liu, H. Yin, and M. H. Ang, “Fiss: A trajectory planning framework using fast iterative search and sampling strategy for autonomous driving,” IEEE Robotics and Automation Letters, 2022.
+[33] K. A. Mustafa, D. J. Ornia, J. Kober, and J. Alonso-Mora, “Racp: Risk-aware contingency planning with multi-modal predictions,” IEEE Transactions on Intelligent Vehicles, 2024.
+[34] B. Vlahov, J. Gibson, M. Gandhi, and E. A. Theodorou, “Mppigeneric: A cuda library for stochastic optimization,” arXiv preprint arXiv:2409.07563, 2024.
+[35] B. Brito, B. Floor, L. Ferranti, and J. Alonso-Mora, “Model predictive contouring control for collision avoidance in unstructured dynamic environments,” IEEE Robotics and Automation Letters, vol. 4, no. 4, pp. 4459–4466, 2019.
+
+

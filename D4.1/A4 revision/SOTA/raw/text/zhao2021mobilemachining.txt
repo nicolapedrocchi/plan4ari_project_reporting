@@ -1,0 +1,420 @@
+Robotics and Computer–Integrated Manufacturing 71 (2021) 102153 Contents lists available at ScienceDirect
+Robotics and Computer-Integrated Manufacturing
+journal homepage: www.elsevier.com/locate/rcim
+
+Accuracy analysis in mobile robot machining of large-scale workpiece
+Xingwei Zhao, Bo Tao *, Shibo Han, Han Ding
+State Key Laboratory of Digital Manufacturing Equipment and Technology, School of Mechanical Science and Engineering, Huazhong University of Science and Technology, Wuhan 430074, China
+
+ARTICLE INFO
+Keywords: Accuracy analysis mobile robot machining large-scale workpiece
+
+ABSTRACT
+Mobile robot machining provides more flexible machining mode compared to the robot machining with a fixed base. However, its machining accuracy is frequently questioned. This paper focuses on the accuracy analysis in mobile robot machining. To evaluate the machining error qualitatively, the tool center point (TCP) error index is defined as the distance between the TCP and the designed machining point. The different error sources acting on the TCP error index are enumerated, and the theoretical accuracy analysis is proposed to eliminate the TCP error. The mobile robot machining strategy is then proposed based on the accuracy analysis. To ensure high machining accuracy, the global measurement system locates the position of the workpiece and the mobile platform. The force-controlled grinding head is used to compensate the TCP error. Experimental results show that the TCP error during mobile robot machining is lower than 40 mm, which mainly introduced by the calibration of the workpiece. The force-controlled grinding head can compensate the TCP error and the fluctuation of the grinding force under the control is lower than ±2 N.
+
+1. Introduction
+Large complex components, such as parts designed in aerospace, nuclear manufacturing, and energy industries, are difficult to machine by machine tools and robots with the fixed base due to the large size. To cope with it, the mobile robot machining process is proposed by different institutes, such as Fraunhofer institute [1], KUKA GmbH, Universit´e de Nantes and Laboratory et al. [2], etc [3]. Thanks to the mobile property, the mobile robot can move to designed work stations and adapt the shape of the workpiece.
+To accomplish mobile robot machining, a series of work should be done, including: calibration of the tool and workpiece frames [4-6], off-line programming [7, 8], robotic path planning [9], mobile robot control [10], and force control technology [11]. However, those works are generally based on the robot machining with the fixed base. When the robot base is movable, the works such as the calibration and path planning, should be recalculated in each work station.
+Localization of the mobile platform is the first issue of mobile robot machining. Borenstein et al. surveyed the localization of a mobile platform’s position [12], which can be roughly classified into with and without external sensors. Odometry and inertial navigation are two
+
+common localization methods with low accuracy. To improve the localization accuracy, the optics measurement system can be used, such as Laser tracker [13], monocular Vision [14], stereo Vision [10]. Then, the localization accuracy is determined by the accuracy of the measurement system.
+Kinematic parameter error can also deteriorate the machining accuracy, such as incorrect link lengths, assembly tolerances, etc [15]. Incorrect kinematic parameters degrade robot position and orientation accuracy. In early works, kinematic error calibration algorithms are based on Denavit-Hartenberg (D-H) parameters [16]. Later, screw-theory-based kinematic error models have been studied to address the singularity problem of the D-H parameter-based model [17]. Wu et al. [18] proposed a minimal POE-based kinematic calibration algorithm based on end-effector position data. To improve the accuracy of robots, modeling methods that evaluate both kinematic and non-kinematic error are considered simultaneously [19]. Nubiola and Bonev [20] established an error model that include kinematic errors, joint stiffness, and nonlinearity in joint.
+Calibration is of great significance to the subsequent operation procedures and it greatly affects the machining quality [21, 22]. Different to the localization of mobile platform, calibration need to determine the
+
+This work is co-supported by the National Science Foundation of China under Grant 91948301, 51905184 and 91748204, the National Key Research and Development Program of China under Grant 2019YFB1302500, and the Major Project of Hubei Province Technology Innovation under grant 2019AAA071
+* Corresponding author. E-mail addresses: taobo@mail.hust.edu.cn, taobo@hust.edu.cn (B. Tao).
+https://doi.org/10.1016/j.rcim.2021.102153 Received 29 October 2020; Received in revised form 27 December 2020; Accepted 2 March 2021 Available online 12 March 2021 0736-5845/© 2021 Elsevier Ltd. All rights reserved.
+
+X. Zhao et al.
+
+Robotics and Computer-Integrated Manufacturing 71 (2021) 102153
+
+related posture between the tool and workpiece. With the increase the size of the workpiece, the calibration of the coordinate frame between the tool and workpiece becomes difficult. Calibration is framed as solving a homogeneous equation AX=XB, where iterative and closed-form are two categories to find the solution [23]. The iterative solutions [24] based on numerical techniques are generally very accurate. In contrast, the closed-form solutions [25] are fast and are often used to bootstrap the iterative methods. A popular approach to robot calibration is to use a variety of measurement techniques such as tracking laser to measure the end-effector position [26]. Sun et al. [27] proposed a static relative calibration method by defined a zero reference. Li et al. [28] proposed a robot tool center point (TCP) calibration approach by using a criterion sphere as the calibration object, where the relation between the laser 3-D scanner and the robot can be obtained. Later, the TCP-based calibration method is used to calibrate the robot-assisted belt grinding system [29]. Xu et al. proposed a calibration method in the robotic belt grinding of complex blades, where the tool frame and the workpiece frame are calibrated simultaneously [30]. To improve the calibration accuracy, Li et al. considers the joint parameters error and position error of robot in visually-guided robot grinding process [31].
+In this paper, we will consider the whole process of mobile robot machining of a typical large-scale workpiece, i.e. wind turbine wind. Its error sources of the machining system will be analyzed in detail. As the mobile robot machining mode is currently a new machining mode, its accuracy issues are rare analyzed, especially for the large-scale workpiece. To the best of the authors’ knowledge, the accuracy analysis in system level for mobile robot machining of large wind turbine blade has not yet be presented despite its importance. The analysis method proposed in this paper can be further used in other workpiece with large size and free form surface.
+The rest of the paper is organized as follows: Section 2 describes the TCP error index for the mobile robot machining system. In section 3, the error model of the mobile robot machining system is established by numerical analysis. Section 4 illustrates the strategy of mobile robot machining, and experiments are conducted to testify the work strategy and its machining accuracy. Some conclusions are drawn in Section 5.
+
+Fig. 1. The mobile robot machining system (a) and Optitrack measurement system (b)
+
+2. TCP error index of mobile robot machining for large-scale workpiece
+
+2.1. TCP error index for mobile robot machining of large-scale workpiece
+
+Due to the heavy load and large size of large-scale workpiece, its transport occupies abundant manufacture time. By contrast, mobile robot can move toward the workpiece, and the large-scale workpiece can be machined in the original station. In this case, moving the robot requires less time compared to transporting the workpiece.
+The mobile robot machining system includes a mobile platform, robot and force-controlled grinding head. Optitrack is used to localize the workpiece and the mobile platform, shown in Fig. 1. The Optitrack system consists of 30 cameras, and its field of view covers a 7.5m*12m space. Part of the wind turbine blade and the mobile robot locate in the field of view. The Optitrack can record the position of target points, which are small balls covered by reflecting material and can be read by the cameras. The target points are located on the workpiece and the mobile robot respectively. Then, the location of the workpiece and the motion of the mobile robot can be calculated by the target points. Fig. 1 (a) illustrates the scene of the mobile robot machining. Fig. 1 (b) shows the target points in the Optitrack system.
+It is known that the machining accuracy may be influenced by the mobile platform, but how severe of the influence is currently unknown and will be analyzed in this paper. For a mobile robot machining system, there are four main coordinats, in terms of global coordinate system Kgl, workpiece coordinate system Kpiece, mobile platform coordinate system Kmob, and tool coordinate system Ktool. shown in Fig. 2.
+
+Fig. 2. Coordinate systems in mobile robot machining
+
+To describe the transformation relationship between coordinates, a
+
+homogeneous transformation matrix from coordinate a to b is defined as
+
+[
+
+]
+
+b b T R a = a pab (1)
+
+01
+
+For mobile robot machining, there is the following coordinate transformation chain, pieceTrob = ( glTpiece− 1)glTmobmobTrob (2)
+where bTa means the transformation matrix between the coordinates a
+
+2
+
+X. Zhao et al.
+
+Robotics and Computer-Integrated Manufacturing 71 (2021) 102153
+
+and b, the abbreviations rob, piece, and mob indicate the robot arm, workpiece and mobile platform. A TCP error index is used to measure the distance between the TCP and the work position on the large-scale workpiece, as shown in Fig. 3
+gleinx =‖ glPtool− glPcha ‖ (3)
+
+where glPtool is the TCP in global coordinate, and glPcha is the corresponding point on the workpiece.
+The error index can be further written as
+
+gleinx =‖ glTmobmobTrobrobPtool− glTpiecepiecePcha ‖ (4)
+
+[ where robPcha = robPcha
+
+1 ]T.
+
+If the error is introduced by the coordinate transformation, the error
+
+index can be expressed as,
+
+‖ ‖ gleinx =‖ glTmobmobTrobrobPtool− glTpiecepiecePcha ‖=
+
+( gl
+
+gl )( mob
+
+mob )rob
+
+( gl gl Tmob,r + Δ Tmob )piece Trob,r + Δ Trob Ptool (5)
+
+− Tpiece,r + Δ Tpiece
+
+Pcha
+
+where glTmob,r,mobTrob,r,glTpiece,r are the desired transformation matrix, ΔglTmob are their deviations. Ignoring the high order error, we have,
+gleinx ≈‖ ΔglTmobmobTrob,r robPtool (6) +glTmob,r ΔmobTrobrobPtool − ΔglTpiecepiecePcha ‖
+
+It is found that the TCP error index is related to the deviations of the transformation matrix, and the geometric information of the workpiece and machining tool. The advantage of the TCP error index is with clear physical meaning and easy to measure in experiments. The TCP error index can evaluate the machining accuracy in mobile robot machining.
+
+2.2. Calibration for the mobile robot machining system for large-scale workpiece
+The error sources of the TCP error index are analyzed in this part. In general, the TCP error index can be introduced by measurement system, calculation process, and the motion accuracy of robots.
+The transformation matrix of the workpiece glTpiece should be determined by the global measurement system (Optitrack). Least square method is used to optimize the transformation matrix,
+
+mine1
+
+1 ∑N gl piece gl (7)
+
+e1 =
+
+‖ Tpiece p1i− q1i ‖
+
+N i=1
+
+where p1i is the characteristic points in workpiece, and glq1i is the measured characteristic points in the Optitrack system. It is found that the precision of glTpiece is determined by the precision of the measured characteristic points glq1i.
+The characteristic point is hard to determine when the large-scale workpiece is with free form surface, such as wind turbine blade. In this case, iterative closest point algorithm (ICP) [32] is used to find the transformation matrix between the measured point and the points in the CAD model. The pints in the CAD model are marked as ai, and the characteristic points are defined as,
+mine1, ed
+
+1 ∑N gl
+
+piece ∗
+
+gl
+
+e1 =
+
+‖ Tpiece pcha,i− q1,i ‖
+
+N i=1
+
+(8)
+
+1 ∑ piece N
+
+piece ∗
+
+piece
+
+ed =
+
+‖ pcha,i−
+
+qcha,i ‖ , pcha,i ∈ ai
+
+N i=1
+
+where pcha,i ∗ the true characteristic points on the workpiece which matches the measured characteristic points, pcha,i is the estimated characteristic points, N is the number of the characteristic points. It is found that, when the workpiece is with free form surface, additional error ed may introduced when the estimated characteristic points is not coincided with the true characteristic points.
+The location of the mobile platform can be determined by the global measurement system. The transformation matrix of the mobile platform can be calculated as,
+
+mine2
+
+1 ∑N gl mob gl (9)
+
+e2 =
+
+‖ Tmob p2i− q2i ‖,
+
+N i=1
+
+The transformation matrix of the robot arm is determined by the forward and inverse kinematic models. The forward kinematic of robot arm is
+
+mobTrob = φ(l1, ..., ln, θ1, ..., θ6)
+
+(10)
+
+where li indicates the DH (Denavit-Hartenberg) parameters, θiis the ith
+
+robot joint angle. The error of the robot arm includes two parts, in terms
+
+of the imprecise DH parameters Δl and inaccurate robot joint angle Δθ,
+
+mob ̃ (
+
+)
+
+Trob = φ l1 + dl1, ..., ln + dln, θ1,k + dθ1, ..., θ6,k + dθ6
+
+≈mobTrob + JΔθ + HΔl
+
+(11)
+
+where J is the Jacobian matrix of the robot arm, H is the weight matrix of parameter uncertainty. The error of the robot arm is introduced by dθ and Δl,
+
+e3 = ‖ dθ ‖ + ‖ Δl ‖
+
+(12)
+
+As a summary, the calibration error in mobile robot machining is,
+
+Ec = e1 + e2 + e3 + ed
+
+(13)
+
+Ec can be considered as the sources of the TCP error index. The calibration error will influence the accuracy of the transformation matrix, thus influences the TCP error.
+
+3. Accuracy analysis for machining of large-scale workpiece
+
+Fig. 3. Definition of the TCP error index
+
+The accuracy analysis will be proposed in this part with the example of the wind turbine blade machining. The wind turbine blade is featured
+
+3
+
+X. Zhao et al.
+
+Robotics and Computer-Integrated Manufacturing 71 (2021) 102153
+
+by the large size and free form surface, shown in Fig. 4. We select characteristic points on the CAD model. If the selected points can be measured in the global measurement system, the transfer matrix can be calculated by Eq. (7). However, if the characteristic points in the CAD mode is unknown, the ICP algorithm should be used to calculate the transfer matrix by Eq. (8). We want to find the TCP error related to e1 and ed. Here, we assume ed is a fixed value, but e1 can be influenced by the accuracy of the measurement system.
+The error of the measurement system will affect the accuracy of the transfer matrix. The measured characteristic points in global system can be written as
+
+gl ̂
+
+gl
+
+Pcha= Pcha
+
++
+
+ε
+
+(14)
+
+where gl P̂cha is the measured characteristic points, ε is noise with
+
+Gaussian distribution. Fig. 5 shows the error bar diagram of the TCP
+
+error with the increasing noise, where 30 groups of measurements are
+
+used. The length of the error bar indicates the standard error of the
+
+mean. The blue line indicates the TCP error without considering the
+
+matching error ed, while the red line shows the TCP error considering the
+
+matching error ed. It is found that the TCP error index increases with the
+
+increase of the noise amplitude. When the measurement noise is small,
+
+the machining error is mainly influenced the matching error.
+
+The Optitrack system can also be used to localize the mobile plat­
+
+form. The Optitrack reads the target point on the mobile platform and
+
+calculate the posture of the mobile platform. However, since the size of
+
+the mobile platform is small, the small measurement error can introduce
+
+large TCP error. To cope with it, constraints can be added to localize the
+
+mobile platform. As the mobile platform moves in a plane, any error out
+
+of the motion plane can be ignored. Then, the transformation matrix of
+
+mobile platform satisfied following form,
+
+⎡
+
+⎤
+
+∗∗0∗
+
+glT ⎢ mobile = ⎢⎣ ∗ ∗ 0 ∗ ⎥ 0 0 0 0 ⎥⎦
+
+(15)
+
+0001
+
+Fig. 5. Relationship between the TCP error over the measurement error of the workpiece, where the blue line indicates the error index without the matching error ed, and the red line is the error index with the matching error ed
+Fig. 6. Relationship between the TCP error over the measurement error of the mobile platform, (a) without the constraint plane, (b) with the constraint plane.
+
+where glTmobile is the transformation matrix with the plane constraint. By doing this, the TCP error can be significant reduced, as shown in Fig. 6, where the blue line indicates the TCP error without the plane constraint, and the red line shows the TCP error with the plane constraint.
+Due to the serious object obstruction issue, the posture of the robot arm is hard to direct determine by optics sensors. Its posture is then calculated by the kinematic model of the robot arm. The motion error may be resulted by the incorrect DH parameters or the inaccuracy motion of robot joint. The motion error of the robot arm introduces the TCP error. To simulate the motion error of robot, we assume that the link error of robot arm is 3.33% of its true length, and the motion error of the robot joint is with 0.1 degree. We simplify the motion of the robot into a plane motion. Fig. 7 shows the TCP error introduced by the inaccuracy parameters or motions of the robot arm. The motion error is the summary of the joint error and link error. The TCP error increases when the
+
+Fig. 7. The TCP error resulted by the robot arm
+robot is close to the boundary of workspace. To the end, we summarize the different error sources to the TCP
+error, where the error sources include the matching error ed, measurement error of workpiece e1, measurement error of mobile platform e2 and motion error of robot arm e3. Fig. 8 shows the TCP error over the amplitude of measurement error. When the measurement error is small, the TCP error is mainly resulted by the matching error and the motion error of robot arm. When the measurement error continuously increases, the measurement error becomes the main source of the TCP error.
+
+4. Experiment investigation
+
+Fig. 4. Mobile robot machining of the wind turbine blade
+
+Experiments will be conducted in this section to testify the mobile robot machining strategy. The machining trajectory is normally planned through the CAD model on the local coordinate as pieceTtraj. The trans
+
+4
+
+­
+
+X. Zhao et al.
+
+Robotics and Computer-Integrated Manufacturing 71 (2021) 102153
+
+Fig. 8. TCP error of the mobile robot machining system considered different error sources
+
+formation matrix between the local and global coordinate is calculated
+
+by Eq. (8) as,
+
+⎡
+
+⎤
+
+− 0.0062 0.9874 − 0.1582 − 0.9959
+
+glT ⎢ piece = ⎢ 0 ⎣
+
+− 0.1582 − 0.9874
+
+2.4504
+
+⎥ ⎥
+
+⎦
+
+(16)
+
+− 1.0000 − 0.0061 0.0010 16.5598
+
+0
+
+0
+
+0
+
+1
+
+where glTpiece is the transformation matrix between the coordinate of the workpiece and the global coordinate, which can transform the planning trajectory to global coordinate.
+The relationship between the coordinate of the mobile platform and the base of the robot arm should be calibration. To calibrate the base of the robot arm, the robot arm moves around its first joint to find its rotation axis. Then, the original of the coordinate is the cross point between the rotation axis and the base plane. After calibration, we can calculate the base of the robot arm,
+
+gl Tbase =gl Tmob +mob Tbase
+
+(17)
+
+where glTbase is the coordinate of the base of the robot arm, glTmob is the coordinate of the mobile platform measured by the Optitrack system, mobTbase is the transformation matrix between the coordinates of the mobile platform and the base of the robot.
+
+The trajectory of the robot arm is calculated by,
+
+baseTtraj = ( glTbase)− 1( glTpiecepieceTtraj)
+
+(18)
+
+where pieceTtraj is the machining trajectory in the coordinate of the workpiece, baseTtraj is the trajectory in the coordinate of the base of the robot arm. After transformation, the trajectory of the robot arm is sent to the robot control system.
+The work flow chart of mobile robot machining is given in Table 1 and Fig. 9. In Fig. 9, the preparatory work and the online calculation are illustrated. In the preparatory, the workpiece and the mobile robot should be calibrated following the Eqs. (8) and (17). In the machining
+
+Fig. 9. Work strategy of mobile robot machining
+process, the Optitrack should measure the position of the mobile platform in each station, and the trajectory of the robot arm can be calculated by Eq. (18).
+Experiments are conducted on the mobile robot. There are three work stations as shown in Fig. 10. The mobile platform moves to each work station and then the robot arm starts to machine. In each station, the robot arm moves a “S” trajectory. The trajectories of the mobile platform and the robot arm are given in Fig. 11. Fig. 12 shows the trajectories over time. A force-controlled grinding head is used to compensate the machining error and ensures a constant grinding force. The length change of the grinding head is plotted in Fig. 13, which can be considered as the TCP error index of the robot machining system. The TCP error increases when the mobile platform moves from station 1 to station 3. In station 2 and 3, the TCP error varied within 10 mm and the error is correlated to the robot postures. The maximum error is within 40 mm. The directional error is mainly introduced by the calibration error of the workpiece. The estimated posture of the workpiece has a shift with its true posture, which results the directional TCP error. Even the error index is related to the work stations and the postures of the robot arm, the grinding force is almost constant (varied within ±2 N) due to the force-controlled grinding hand. Thus, the quality of the machining process can be ensured despite the TCP error.
+
+Table. 1 Work flow chart of mobile robot machining
+1. Planning the machining trajectory according to the CAD model 2. Calibration of the workpiece in the global coordinate and transform the trajectory to
+the global coordinate 3. Moving the platform close to the machining trajectory 4. Localization of the base of robot arm 5. Transforming the trajectory to the base of robot arm, and send the trajectory to the robot control 6. Start to machining 7. Moving to next machining station 8. Return to step 3 9. Finish the work flow.
+5
+
+Fig. 10. Three different machining stations recorded by the video
+
+X. Zhao et al.
+
+Robotics and Computer-Integrated Manufacturing 71 (2021) 102153
+
+Fig. 11. Trajectories of the mobile robot recorded by the Optitrack
+
+Fig. 13. The TCP error (a) and the grinding force (b) during mobile robot machining
+
+mobile robot machining is related to the work stations and the postures of the robot arm, which is mainly introduced by the calibration of the workpiece. This error can be compensated by force-controlled grinding head. Theoretical and experimental studies show that the mobile robot machining strategy can be used for large-scale workpiece machining, such as wind turbine blades. Our future work will be the study of the multi-mobile robot machining system. Mobile robots can cooperate with each other and conform the multi-mobile robot machining system. Then, the work efficiency can be significant raised. The motion planning, control strategy, and accuracy analysis of the multi-mobile robot machining system will be the challenging topics and should be further investigated.
+
+Authorship contributions
+Study conception and design: Zhao, Tao, Ding Acquisition of data: Zhao, Han Analysis and interpretation of data: Zhao, Tao, Han Drafting of manuscript: Zhao, Tao, Han Critical revision: Zhao, Tao, Han, Ding
+
+Fig. 12. Trajectories of the mobile platform and the robot arm over time
+5. Conclusion
+In this paper, a TCP error index is proposed to evaluate the accuracy in mobile robot machining. The TCP error index is defined as the distance between the TCP and the designed machining point. The accuracy analysis is proposed based on the TCP error index. The error by characteristic points matching, the measurement error and the robot motion error can result the TCP error. Since the TCP error is an integrated factor of different error sources, the machining accuracy is mainly influenced by the largest error term. A mobile robot machining strategy is proposed based on the accuracy analysis. Experiments show that the TCP error of
+
+Declaration of Competing Interest
+The authors declared that they have no conflicts of interest to this work. We declare that we do not have any commercial or associative interest that represents a conflict of interest in connection with the work submitted.
+References
+[1] C. Mo¨ller, HC. Schmidt, P. Koch, et al., Machining of large scaled cfrp-parts with mobile cnc-based robotic system in aerospace industry, Procedia Manufacturing 14 (2017) 17–29.
+[2] S. Garnier, K. Subrin, P. Arevalo-Siles, et al., Mobile robot stability for complex tasks in naval industries, Procedia CIRP 72 (2018) 297–302.
+[3] B. Tao, X. Zhao, H. Ding, Mobile-robotic machining for large complex components: A review study, Science China Technological Sciences (2019) 1–13.
+[4] F. Leali, A. Vergnano, F. Pini, M. Pellicciari, G. Berselli, A workcell calibration method for enhancing accuracy in robot machining of aerospace parts, The International Journal of Advanced Manufacturing Technology 85 (1-4) (2016) 47–55.
+
+6
+
+X. Zhao et al.
+[5] G. Du, P. Zhang, Online robot calibration based on vision measurement, Robotics and Computer-Integrated Manufacturing 29 (6) (2013) 484–492.
+[6] H. Xie, W.L. Li, D.H. Zhu, Z.P. Yin, H. Ding, A Systematic Model of Machining Error Reduction in Robotic Grinding, IEEE/ASME Transactions on Mechatronics 25 (6) (2020) 2961–2972.
+[7] N.R. Slavkovic, D.S. Milutinovic, M.M. Glavonjic, A method for off-line compensation of cutting force-induced errors in robotic machining by tool path modification, The International Journal of Advanced Manufacturing Technology 70 (9-12) (2014) 2083–2096.
+[8] Z. Pan, J. Polden, N. Larkin, S. Van Duin, J. Norrish, Recent progress on programming methods for industrial robots, in: ISR 2010 (41st International Symposium on Robotics) and ROBOTIK 2010 (6th German Conference on Robotics), VDE, 2010, pp. 1–8.
+[9] P. Zhao, Y. Shi, Posture adaptive control of the flexible grinding head for blisk manufacturing, The International Journal of Advanced Manufacturing Technology 70 (9-12) (2014) 1989–2001.
+[10] Y. Zhang, X. Zhao, B. Tao, H. Ding, Point stabilization of nonholonomic mobile robot by Bzier smooth subline constraint nonlinear model predictive control, IEEE/ ASME Transactions on Mechatronics, 2020.
+[11] A.E.K. Mohammad, J. Hong, D Wang, Design of a force-controlled end-effector with low-inertia effect for robotic polishing using macro-mini robot approach, 49, Robotics and Computer-Integrated Manufacturing, 2018, pp. 54–65.
+[12] J Borenstein, HR Everett, L. Feng, Navigating mobile robots: Systems and techniques, AK Peters Wellesley, MA, 1996.
+[13] B. Zi, B.Y. Duan, J.L. Du, et al., Dynamic modeling and active control of a cablesuspended parallel robot, Mechatronics 18 (2008) 1–12.
+[14] A. Babinec, L. Juriˇsica, P. Hubinský, F. Duchonˇ, Visual localization of mobile robot using artificial markers, Procedia Engineering 96 (2014) 1–9.
+[15] S.H. Kim, E. Nam, T.I. Ha, S.H. Hwang, J.H. Lee, S.H. Park, B.K. Min, Robotic machining: A review of recent progress, International Journal of Precision Engineering and Manufacturing 20 (2019) 1629–1642.
+[16] I.C. Ha, Kinematic parameter calibration method for industrial robot manipulator using the relative position, Journal of mechanical science and technology 22 (6) (2008) 1084–1090.
+[17] X. Yang, L. Wu, J. Li, K. Chen, A minimal kinematic model for serial robot calibration using POE formula, Robotics and Computer-Integrated Manufacturing 30 (3) (2014) 326–334.
+[18] L. Wu, X. Yang, K. Chen, H. Ren, A minimal POE-based model for robotic kinematic calibration with only position measurements, IEEE Transactions on Automation Science and Engineering 12 (2) (2014) 758–763.
+
+Robotics and Computer-Integrated Manufacturing 71 (2021) 102153
+[19] J. Zhou, H.N. Nguyen, H.J. Kang, Simultaneous identification of joint compliance and kinematic parameters of industrial robots, International journal of precision engineering and manufacturing 15 (11) (2014) 2257–2264.
+[20] A. Nubiola, I.A. Bonev, Absolute calibration of an ABB IRB 1600 robot using a laser tracker, Robotics and Computer-Integrated Manufacturing 29 (1) (2013) 236–245.
+[21] M.V. Andulkar, S.S. Chiddarwar, A.S. Marathe, Novel integrated offline trajectory generation approach for robot assisted spray painting operation, Journal of Manufacturing Systems 37 (2015) 201–216.
+[22] X. Wang, Y. Shi, Y. Yan, X. Gu, Intelligent welding robot path optimization based on discrete elite PSO, Soft Computing 21 (20) (2017) 5869–5881.
+[23] F. Dornaika, R. Horaud, Simultaneous robot-world and hand-eye calibration, IEEE transactions on Robotics and Automation 14 (4) (1998) 617–622.
+[24] K.H. Strobl, G. Hirzinger, Optimal hand-eye calibration, in: 2006 IEEE/RSJ international conference on intelligent robots and systems, 2006, pp. 4647–4653.
+[25] H. Zhuang, Z.S. Roth, R. Sudhakar, Simultaneous robot/world and tool/flange calibration by solving homogeneous transformation equations of the form AX=YB, IEEE Transactions on Robotics and Automation 10 (4) (1994) 549–554.
+[26] H. Zhuang, B. Li, Z.S. Roth, X. Xie, Self-calibration and mirror center offset elimination of a multi-beam laser tracking system, Robotics and autonomous systems 9 (4) (1992) 255–269.
+[27] Y. Sun, D.J. Giblin, K. Kazerounian, Accurate robotic belt grinding of workpieces with complex geometries using relative calibration techniques, Robotics and Computer-Integrated Manufacturing 25 (1) (2009) 204–210.
+[28] J. Li, J. Zhu, Y. Guo, X. Lin, K. Duan, Y. Wang, Q. Tang, Calibration of a portable laser 3-D scanner used by a robot and its use in measurement, Optical Engineering 47 (1) (2008), 017202.
+[29] X. Xu, D. Zhu, H. Zhang, S. Yan, H. Ding, TCP-based calibration in robot-assisted belt grinding of aero-engine blades using scanner measurements, The International Journal of Advanced Manufacturing Technology 90 (1-4) (2017) 635–647.
+[30] X. Xu, D. Zhu, J. Wang, S. Yan, H. Ding, Calibration and accuracy analysis of robotic belt grinding system using the ruby probe and criteria sphere, Robotics and Computer-Integrated Manufacturing 51 (2018) 189–201.
+[31] W.L. Li, H. Xie, G. Zhang, S.J. Yan, Z.P. Yin, Hand–eye calibration in visuallyguided robot grinding, IEEE transactions on cybernetics 46 (11) (2015) 2634–2642.
+[32] Y. Chen, G. Medioni, Object modelling by registration of multiple range images, Image and vision computing 10 (3) (1992) 145–155.
+
+7
+
+

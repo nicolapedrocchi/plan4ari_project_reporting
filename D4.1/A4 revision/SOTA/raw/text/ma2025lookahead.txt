@@ -1,0 +1,832 @@
+2025 10th Asia-Pacific Conference on Intelligent Robot Systems (ACIRS) | 979-8-3315-5792-8/25/$31.00 ©2025 IEEE | DOI: 10.1109/ACIRS66343.2025.11360954
+
+2025 10th Asia-Pacific Conference on Intelligent Robot Systems
+Real-time Look-ahead Trajectory Planning Algorithm Based on Small Line Segment Pose Synchronization
+
+Jianing Ma School of Information and Communication Engineering
+Hainan University Haikou, China
+23220854020027@hainanu.edu.c n
+
+Hao Tang School of Information and Communication Engineering
+Hainan University Haikou, China
+melineth@hainanu.edu.cn
+
+Rong Guo* School of Information and Communication Engineering
+Hainan University Haikou, China
+guor@hainanu.edu.cn *Corresponding author
+
+Chengqian Wu School of Information and Communication Engineering
+Hainan University Haikou, China
+23220854100037@hainanu.edu.c n
+
+Uzair Aslam Bhatti School of Information and Communication Engineering
+Hainan University Haikou, China
+uzairaslambhatti@hainanu.edu.cn
+
+Chong Wen Tong Department of Mechanical
+Engineering Faculty of Engineering University of Malaya Kuala Lumpur, Malaysia chong_wentong@um.edu.my
+
+Abstract—To address the inefficiency and unstable posture synchronization caused by frequent start-stop motions in smallsegment machining, we propose a real-time look-ahead trajectory planning algorithm that combines logarithmic-space virtual line fitting with a seven-segment quintic polynomial. The integration of logarithmic-space mapping with Bezier curves enables positionposture decoupling, effectively eliminating the posture oscillation inherent in traditional coupling approaches. A seven-segment quintic polynomial combined with a bidirectional scanning module dynamically adjusts the trajectory to satisfy real-time path constraints. Simulation results demonstrate the algorithm's feasibility and real-time performance.
+Keywords—small segment, posture synchronization, Bezier curve, Look-ahead
+I. INTRODUCTION
+With the advancement of industrial automation, robots are increasingly employed to machine complex curved surfaces[1]. For six-axis robotic systems, enhancing motion performance is critical to achieving high machining accuracy.
+Path continuity assurance methods are primarily categorized into joint-space smoothing and end-effector-space smoothing approaches. Joint-space smoothing presents mathematical control challenges due to introduced nonlinear errors. End-effector-space smoothing comprises: global smoothing using parametric curve approximation, and angle smoothing employing transition angle insertion. Global curve fitting methods exhibit high computational complexity as they require exact interpolation through all specified points. These methods lack real-time capability and offer limited curve
+This work was supported by the National Natural Science Foundation of China (No.62303142 and 62563008), Hainan S&T Program (No. ZDYF2025GXJS183), Hainan Provincial "South China Sea Rising Star" Industrial Innovation Talent Project (No. 202309004).
+
+adjustability[2]. Consequently, angle smoothing methods are typically preferred for real-time applications. The complete path is discretized into segments with transitions implemented using linear, circular arc, or spline interpolations. These transition techniques have found widespread adoption in path smoothing applications. Sun[3] developed a real-time lookahead interpolation algorithm employing cubic B-splines for dynamic local transitions between path segments. Wang et al. [4]introduced a global angle smoothing algorithm utilizing cubic NURBS interpolation to ensure G2 continuity along linear paths. Huang[5] designed a seven-control-point B-spline transition curve to guarantee smooth path continuity. Liu [6]implemented a lead-point-fitted B-spline compression algorithm for continuous micro-segment paths, enhanced by quintic B-splines to improve inter-segment continuity.
+The second major challenge in 6D path smoothing involves posture synchronization, as robotic and machine tool path points incorporate both position and orientation data Numerous-path smoothing studies have addressed posture synchronization requirements. Yang[7] developed an analytical method for 6R robots that mathematically guarantees synchronization between positional and orientational trajectories. Wan[8] utilized the arc-length analytical properties of asymmetric PH splines to synchronize positional and directional variations. Li et al. [9] employed dual NURBS curves for linear path smoothing and optimization, with experimental validation of the method's superiority. Following G2-continuous path construction through spline-integrated discrete micro-segments, trajectory planning becomes essential to maintain acceleration and jerk within robotic limits[10]. Common trajectory planning acceleration/deceleration algorithms comprise polynomial, trapezoidal, and S-curve profiles[11][12]. To optimize time efficiency and mitigate motion-induced vibration and overcutting, forward planning
+
+979-8-3315-5792-8/25/$31.00 ©2025 IEEE
+
+312
+
+Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:16:22 UTC from IEEE Xplore. Restrictions apply.
+
+methods calculate kinematic-derived speed limits for each path segment[13].
+This study proposes a novel method for curve transition between micro-line segments with guaranteed position-attitude synchronization. It resolves the Euler angle singularity issue[14] while introducing a look-ahead trajectory planning algorithm featuring continuous jerk and adaptive velocity adjustment. Section 2 introduces a quintic Bezier curve transition method, and Section 3 describes a quaternion-based virtual attitude synchronization technique. Section 4 develops a real-time lookahead planning method using seven-segment quintic polynomials with continuous jerk. The complete algorithm is validated through simulations in Section 5, with concluding remarks provided.
+
+II. TRANSITION CURVE DESIGN
+A. Bezier Curve Selection
+A quintic Bezier curve is inserted at the junction of adjacent linear segments to establish a linear-curve-linear transition. The quintic Bezier curve, defined by six control points, exhibits the geometric configuration illustrated in Figure 1, with control points positioned as follows: The control points
+pi (i = 0,1, 5) of the quintic Bezier curve are determined by the curve, u is the parameter of the Bezier curve. This
+formulation can be expressed as:
+
+5
+B(u) =  C5iui (1 − u)5−i Pi i=0
+
+= (1 − u)5 P0 + 5u(1 − u)4 P1 + 10u2 (1 − u)3 P2
+
++ 10u3 (1 − u)2 P3 + 5u4 (1 − u)P4
+
++ u5 P5 , u  0,1
+
+(1)
+
+Fig. 1. Quintic Bezier Curve
+Let Ps 、 Pm and Pe be endpoints and M the arc-length midpoint of the quintic Bezier curve(The curve's reflection
+symmetry ensures its parametric midpoint ( u =0.5) coincides
+with the geometric arc-length midpoints), with qs 、 qe as unit tangent vectors at endpoints.
+First and second derivatives of Bezier curves:
+
+Bu = dB (u)
+du
+= 5 (1− u)4 ( p1 − p0 ) + 20u (1− u)3 ( p2 − p1 )
++ 30u2 ( p3 − p2 ) + 20u3 (1− u) ( p4 − p3 )
++ 5u4 ( p5 − p4 ) , (2)
+d2B (u)
+Buu = du 2
+= 20u (1− u )3 ( p2 − 2 p1 + p0 )
++ 60u (1− u )2 ( p3 − 4 p4 + p5 ) . (3)
+(3) The endpoints p0 and ps of the Bezier curve are connected to the line segment, ensuring G0 continuity. To ensure G1 continuity, the tangent direction of the curve at its endpoint must be parallel to the direction of the line segment. According to Equation (2), the first-order derivative of the curve at the endpoint lies along the line defined by the control points. Similarly, the intermediate control point lies between the endpoint and the adjacent control point. The first derivative of
+the curve at the endpoint is 5( p1 − p0 ) , that is p1 is located on
+Ps Pm , Similarly, p4 is located on Pm Pe . To achieve G2 continuity, the curvature of the curve at the endpoint must also be 0, as the curvature of a straight line is 0. Therefore, a relationship among the control points can be derived to satisfy this continuity condition.
+
+ p2 − p1 = p1 − p0 ,
+
+
+
+(4)
+
+ p5 − p4 = p4 − p3 .
+
+(4)
+
+Based on the established G2 continuity conditions, assume that the spacing between the control points on either side is c
+
+and the distance between the inflection point Pm and the
+
+adjacent control point is d , as illustrated in Figure 1. Once the
+
+values of c and d are determined, the positions of the control
+
+points are also determined. Three main criteria should be considered when choosing c and d : The maximum error
+
+between the transition curve and the original straight line is less than the maximum allowable error  , that is, the maximum
+
+distance between the midpoint M of the curve and the corner
+
+Pm is less than or equal to  . The length of the line fitted by
+
+the curve should be at most half of the length of the original line
+
+to ensure that there is enough distance to fit the next corner. The
+
+curvature of the curve should be as small as possible so that the
+
+car can pass through the corner at a faster speed. The control point distance parameters c and d influence only the scale of
+
+the curve, whereas their ratio determines the curve’s shape. Let
+
+the ratio:
+
+k= c. d
+
+Once the parameters are determined, the Bezier curve and
+
+its maximum curvature are determined. Simple power
+
+regression[15] is applied to reduce the maximum curvature and obtain the optimal curvature value for the rotation angle  :
+
+313
+Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:16:22 UTC from IEEE Xplore. Restrictions apply.
+
+k ( ) = 1  0.9927 , (5)
+2.0769
+ is the turning error between the midpoint of the transition
+curve and the intersection of the adjacent line segments. The smaller the turning error, the closer to the original trajectory, and the better the processing effect. To meet the above conditions, the solution formula for the control point parameters c and d can be obtained.
+
+
+
+ min (Ps Pm , Pe Pm )
+
+32 max
+
+
+
+d = min 
+
+,
+
+ ,
+
+
+
+
+
+2 (2k +1)
+
+(7k+6) qs + qe  (6)
+
+
+
+
+
+c = kd.
+
+B. Adaptive Interpolation Design
+After path smoothing with a quintic Bezier curve, the original path initially composed of discrete line segments is transformed into a G2 continuous trajectory consisting of both straight and curved segments. An adaptive interpolation algorithm is proposed to accurately compute interpolation points along the motion trajectory, ensuring both smoothness and positional accuracy during machining.
+For a straight-line segment in the path, the interpolation point can be directly computed using the linear interpolation formula, given the segment’s start point Pk and end point Pk+1 :
+
+Pcurrent =（1− scurrent )Pk + scurrent Pk +1. (7)
+
+sk
+
+sk
+
+Among them, sk is the length of the line segment and
+
+sscurrent is the current displacement.
+
+For Bezier curve segments, since the curve parameter is nonlinearly related to the arc length, a second-order Taylor expansion-based compensation algorithm is employed to achieve accurate interpolation:
+
+du 1 d 2u 2
+u(tk+1 ) = u(tk ) + t=tk t + 2 t=tk t + o(h). (8)
+
+dt
+
+2 dt
+
+Among them, the acceleration a and the curve derivative can
+
+be calculated to obtain:
+
+ du = v(tk ) ,
+
+
+
+dt ds / du
+
+2
+
+2
+
+(9)
+
+ d u = (a(tk ) − 2 d s  ( v(tk ) )2 ) / ( ds ）,
+
+ dt2
+
+du ds / du du
+
+based on this, the next interpolation point u(tk+1 ) can be
+
+predicted, however, a parameter-stage error o(h) is introduced.
+
+If this error is ignored, the resulting interpolation points are not real points, potentially causing abrupt changes in velocity, acceleration, and jerk. Assuming u(tk+1 ) = u(tk+1 ) , ignore
+
+parameter truncation error, Equation (8) can be rewritten as:
+
+u(tk+1 ) = u(tk+1 ) + . (10)
+The error compensation is solved by kinematic constraints, and the velocity constraint equation is:
+
+ X (u(tk+1)) − X (u(tk ))2 + Y (u(tk+1)) − Y (u(tk ))2 + Z(u(tk+1)) − Z(u(tk ))2
+
+v(tk +1) =
+
+. (11)
+
+t
+
+Among them, X (u(tk+1 )), Y (u (tk+1 )) and Z (u(tk+1 )) are the
+
+X coordinate, Y coordinate and Z coordinate of the point on the curve, which can be expressed as:
+
+ X (u(tk+1 )) = X (u(tk+1 ) +  ) = X (u(tk+1 )) + dX (u(tk+1 ))  ,
+
+
+
+du
+
+
+
+dY (u(tk+1 ))
+
+ Y (u(tk+1 )) = Y (u(tk+1 ) +  ) = Y (u(tk+1 )) +
+
+, (12)
+
+
+
+du
+
+ Z (u(tk+1 )) = Z (u(tk+1 ) +  ) = Z (u(tk+1 )) + dZ (u(tk+1 ))  ,
+
+
+
+du
+
+assuming that:
+
+ X (u(tk +1 )) = X (u (tk +1 )) − X (u(tk )), 
+Y (u(tk+1 )) = Y (u (tk+1 )) − Y (u(tk )), (13)
+Z (u(tk +1 )) = Z (u(tk +1 )) − Z (u(tk )),
+
+by substituting this equation and Equation (12) into Equation (11), and multiplying both sides by ∆t, Equation (11) can be rewritten as:
+
+v(u(tk +1))t =
+
+2
+
+
+
+dX (u(tk +1)) 
+
+ X (u(tk +1)) +
+
+
+
+
+
+du
+
+
+
+2
+
+2
+
+
+
+dY (u(tk +1))  
+
+dZ (u(tk +1)) 
+
++ Y (u(tk +1)) +
+
+  +  Z (u(tk +1)) +
+
+  . (14)
+
+
+
+du
+
+
+
+du
+
+
+
+Therefore, the quadratic equation in terms of  can be
+
+expressed as:
+
+among this,
+
+A 2 + B + c = 0, (15)
+
+A = ( dX (u(tk +1)))2 + (dY (u(tk +1)))2 + (dY (u(tk +1)))2, (16)
+
+du
+
+du
+
+du
+
+B = 2 X(u(tk +1)) dX (u(tk +1)) + Y (u(tk +1)) dY (u(tk +1)) + Z(u(tk +1))  dZ (u(tk +1))  , (17)
+
+
+
+du
+
+du
+
+du 
+
+C = (X(u(tk +1)))2 + ( Y (u(tk +1)))2 + ( Z (u(tk +1)))2 − v2 (u(tk +1))t2. (18)
+By solving this equation, the parameter truncation error 
+
+can be obtained. When B2 − 4AC  0 , equation (15) has no
+
+real roots, when B2 − 4AC  0 , the equation has two real roots:
+
+−B + B2 − 4AC
+
+−B − B2 − 4AC
+
+1 =
+
+,2 =
+
+.
+
+2A
+
+2A
+
+From Equation (16), A  0 , it can be seen that C depends
+
+on the displacement accuracy of the Taylor series prediction.
+
+To achieve more accurate compensation during interpolation,
+
+the root with the minimum absolute value is selected, that is:
+
+ = arg min  .
+ 1, 2 
+This strategy adaptively addresses both under-prediction and over-prediction scenarios, ensuring that the compensated parameters u(tk+1 ) consistently converge to the true solution.
+
+III. POSE SYNCHRONIZATION METHOD During path smoothing, it is necessary to fit the position and
+
+314
+Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:16:22 UTC from IEEE Xplore. Restrictions apply.
+
+posture at the corners to obtain a double spline curve. Position fitting is to connect two straight line segments using a 5thdegree Bezier curve in three-dimensional space. For attitude fitting, quaternions are preferred over Euler angles—which suffer from gimbal lock—and rotation matrices—which may compromise orthogonality—due to their high computational efficiency and absence of singularities. By applying logarithmic mapping to the quaternion, the resulting attitude values can be represented as equivalent points in a threedimensional coordinate system analogous to that of position values. Within this coordinate system, a fifth-order Bezier curve is employed for the transition, enabling comprehensive utilization of the entire corner to achieve synchronized posture interpolation.
+As shown in Figure 2, let the position coordinates of the path points in three-dimensional space be Pi , and their
+corresponding attitude coordinates be Qi .These three path
+points form a corner. Let Pi−1Pi = L1 , Pi Pi+1 = L2 ,
+Qi−1Qi = L3 and Qi Qi+1 = L4 . Perform local fitting on half of the original line segment, and use the resulting straight line– curve–straight line sequence as a motion unit. Let the total position arc length and total attitude arc length of the motion unit be denoted as Lp,i and Lq,i , respectively, followed by
+synchronization of the position and attitude within the motion unit.
+
+determined as follows:
+
+qvsi = L3 ,
+
+
+
+L1
+
+ L4 (19)
+
+qvei = L .
+
+
+
+2
+
+Apply kinematic constraints and assume that the attitude
+
+LP ,i velocity at time is qvmi , The acceleration before and after
+2 this moment is constant for both motion segments. The total
+
+time is denoted as TP,i and the equation for velocity qvmi is
+
+calculated as follows:
+
+( ) ( ) TP,i
+
+TP,i
+
+qvmi + qvsi +
+
+qvmi + qvei = Lq,i .
+
+4
+
+4
+
+(20)
+
+It can be observed that qvsi , qvei and qvmi exhibit opposite
+
+trends in their variations. By adjusting qvsi and qvei , the peak
+
+values of qvei , qvei and qvmi are reduced throughout the motion
+
+path.
+
+B. Virtual Synchronization Curve
+To achieve posture synchronization, as illustrated in the figure, two one-dimensional linear synchronization curves,
+F (u) and G (u) , based on the quintic Bezier curve, are
+designed. The two synchronization curves correspond to the position and posture path lengths of the motion unit, respectively. The interpolation points on the synchronization curves correspond to the actual movement distance of the motion unit.
+
+Fig. 2. Motion Unit
+A. Attitude Synchronization Speed Determination Assume the position velocity is 1. The initial and final
+attitude velocities for each motion unit are denoted as qvsi and qvei . Based on the length ratio between the position line and the attitude line, the initial qvsi and final qvei of the motion unit are
+
+Fig. 3. Virtual Synchronization Curve
+
+Therefore, the derivative of the arc length s of the attitude
+synchronization curve G (u) at the endpoint is given by:
+
+ dG 
+
+= c7 , dG
+
+= c8 ,
+
+ ds u=0 c5 ds u=1 c6
+
+2
+
+2
+
+(21)
+
+ d G = 0, 2 d G = 0.
+
+ ds2
+
+
+
+u=0
+
+ds u=1
+
+Since each motion unit involves different postures, the
+
+above equation can be expressed as:
+
+315
+Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:16:22 UTC from IEEE Xplore. Restrictions apply.
+
+ dGij 
+
+ ds   CGij 
+
+
+
+ui   
+
+ G =  d 2Gij
+
+ =  CFij  .  
+
+2
+
+ ds 
+
+ui 
+
+0
+
+( 22 )
+
+The moving distance of a point on the synchronization curve must match the actual path, meaning the derivatives of the attitude synchronization curve and the actual attitude curve with respect to arc length s are identical. Let the actual
+
+position curve of each motion unit be denoted as Ri , and the
+
+attitude curve as Si , as follows:
+
+ dG   dSi 
+
+  G =  ds u=0    =  ds 0  = q vsi  . (23)
+
+ dG 
+
+    dS  qvei 
+
+ ds u=1   ds 1 
+
+Assuming the control point distance parameter does not exceed 1/6 of the total curve length, the constraint equation for the control point parameter can be derived as follows:
+
+  1 1 LQ,i 
+
+min  Lp,i , 
+
+
+
+c5  
+
+6 
+
+
+
+6 QVsi  
+
+c6    1 1 LQ,i 
+
+cm =  = min  Lp,i ,   . (24)
+
+c7 
+
+ 6 6 QVe 
+
+  
+
+i 
+
+c8   QVsi  c5 
+
+ 
+
+QVei  c6
+
+ 
+
+The control point parameter d are also determined:
+
+1  2 Lp,i − 2cm , if m = 5, 6,
+
+dm = 
+
+(25)
+
+ 1  2 Lq,i − 2cm , if m = 7, 8.
+
+Based on equations (24) and (25), all control points of the
+
+synchronization curves F (u) and G (u) can be derived.
+
+Using the obtained posture synchronization curves F (u) and G (u) , synchronized motion of the motion unit can be
+achieved. When the motion position reaches Pcurrent in the motion unit, the position displacement is Sp . From the
+synchronization curve, the parameter value u0 corresponding
+to a displacement of Sp from the starting point is determined.
+By locating the point G (u0 ) with the corresponding parameter
+value on the posture curve and calculating the distance Sq from this point to the starting point of the posture synchronization curve, the posture point Qcurrent with a displacement of can be identified on the actual motion unit.
+
+IV. LOOK-AHEAD TRAJECTORY PLANNING
+A. Seven-segment Quintic Polynomial
+To achieve smooth start-stop motion, each motion unit employs a seven-segment quintic polynomial trajectory planning, ensuring jerk continuity and the configuration of multi-segment boundary conditions. The displacement is expressed as follows:
+
+x(t) = at5 + bt4 + ct3 + dt2 + et + f ,
+
+
+
+4
+
+3
+
+2
+
+v(t) = 5at + 4bt + 3ct + 2dt + e,
+
+
+
+3
+
+2
+
+( 26 )
+
+a(t) = 20at +12bt + 6ct + 2d,
+
+ 
+
+j(t)
+
+=
+
+60at 2
+
++
+
+24bt
+
++
+
+6c,
+
+where x(t)、v(t)、a(t) and j(t) represent displacement,
+
+velocity, acceleration, and jerk, respectively. During the jerk phase, the displacement at the starting point is 0, the velocity is
+
+v0 , and both acceleration and jerk are 0. At time t1 , the jerk
+2 reaches its maximum value, and the parameter is calculated as follows:
+
+a = − 3 jmax ,
+
+
+
+15t1
+
+ jmax b = 2 ,  6t1
+
+c = d = f = 0,  e = v0 .
+
+Therefore, the motion equations for the acceleration phase, constant acceleration phase, and deceleration phase can be derived, and the segment time of the acceleration region, subject to boundary velocity constraints, can be calculated as follows:
+
+3amax 2
+
+When vmax − v0 
+
+,
+
+2 jmax
+
+3amax
+
+vmax − v0 − 3amax 2 / 2 jmax
+
+t1= t3 =
+
+, t2 =
+
+.
+
+2 jmax
+
+amax
+
+3amax 2
+
+When vmax − v0 
+
+, t1= t3 =
+
+2 jmax
+
+3 vmax − v0 , t2 = 0. 2 jmax
+
+The interval 0  t  t1 corresponds to the acceleration phase, from t1  t  t2 corresponds to the uniform acceleration phase, and from t2  t  t3 corresponds to the deceleration phase. During the uniform velocity phase, the speed is maintained at the maximum value vmax . In the deceleration phase, the motion parameters and time calculation procedure are identical to those in the acceleration phase.
+B. Bidirectional Scanning
+A real-time bidirectional scanning algorithm is used to calculate the velocity limits at each trajectory planning segment point based on the trajectory planning method. The maximum normal acceleration, maximum jerk, and curvature are key
+
+316
+Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:16:22 UTC from IEEE Xplore. Restrictions apply.
+
+factors that constrain the velocity, and they can be expressed as follows:
+
+vlim it (a) =
+
+amax , vlim it ( j) = 2 3 jmax .
+
+k
+
+k
+
+Therefore, the velocity limit of the moving segment can be expressed as follows:
+
+vlim it (i) = min(vlim it (a) , vlim it ( j) , vmax ). (27)
+
+(27)
+
+The global preflight module generates a dynamically
+
+feasible velocity profile through bidirectional scanning that
+
+propagates and refines speed constraints. The process begins
+
+with a forward scan, initialized with a zero starting velocity. At
+
+each segment between waypoints 𝑖 and 𝑖 + 1 , the module
+
+checks if the desired speed violates the system's kinematic
+
+limits. A violation triggers an update of the velocity constraint
+
+at waypoint 𝑖 + 1 to the maximum achievable value, which is
+
+then backward-propagated to preceding points to ensure
+
+consistent deceleration. However, this forward pass typically
+
+results in a non-zero final velocity. To enforce a safe stop, a
+
+reverse scan is subsequently executed, initializing the endpoint
+
+with a zero-velocity constraint and repeating the same
+
+adjustment logic in reverse. This bidirectional process
+
+iteratively tightens the velocity profile, guaranteeing a
+
+trajectory that is globally feasible and adheres to the boundary
+
+conditions of zero initial and final velocity.
+
+V. CONCLUSION
+The aforementioned path-smoothing algorithm, which incorporates a look-ahead function, was validated on a threeaxis motion platform. A three-dimensional path comprising a five-pointed star and a semicircle was generated. Data simulations were then conducted to plot the corresponding velocity, acceleration, and jerk profiles. Subsequently, the quaternion-based pose synchronization method for the virtual attitude trajectory was independently validated and compared against a method utilizing spherical linear interpolation. The irregular composite path, consisting of a five-pointed star and a semicircle, was discretized into 75 linear segments with an average length of 1 mm. The experimental setup and resultant path are illustrated in Figure 4. The velocity, acceleration, and jerk limits were set to 2.0×10³ mm/s, 4.0×10⁴ mm/s², and 1.8×10⁷ mm/s³, respectively. As shown in Figure 5, the lookahead algorithm prevented the velocity from dropping to zero at the start of each segment. Velocity decreased significantly at only three points along the entire path, thereby enhancing time efficiency and avoiding excessive jerk. Furthermore, both the acceleration and jerk profiles remain continuous throughout the motion.
+
+Fig. 4. Experimental Results
+
+Fig. 5. Changes in Three-Dimensional Velocity
+To validate the pose synchronization algorithm, we compared it with the commonly used spherical linear interpolation method, setting a small displacement and large pose to test the extreme case. The specific settings for the path points are provided in Table I. The changes in angular velocity and angular acceleration for the fourth motion unit were extracted. Under the extreme condition of a pose change greater than 60 degrees at a spatial distance of 0.15 mm, the results of our proposed method are shown in Figure 6, while those of the spherical linear interpolation method are shown in Figure 7. These results demonstrate that our proposed method effectively mitigates sudden changes in angular acceleration and angular jerk during synchronization.
+
+X 1 0.500 2 0.550 3 0.650 4 0.680 5 0.600 6 0.500
+
+TABLE I . Waypoint Coordinates
+
+Y 0.100 0.150 0.200 0.250 0.160 0.150
+
+Z 0.300 0.350 0.400 0.500 0.600 0.600
+
+qw 0.707 0.707 0.707 0.600 0.707 0.707
+
+qx 0.707 0.650 0.707 0.500 0.500 0.707
+
+qy 0.000 0.050 0.000 0.400 0.500 0.000
+
+qz 0.000 0.000 0.000 0.400 0.000 0.000
+
+317
+Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:16:22 UTC from IEEE Xplore. Restrictions apply.
+
+Fig. 6.Changes in Normal Angular Velocity of the Virtual Curve
+
+Fig. 7. Changes in Angular Velocity Using the SLERP Method
+
+TABLE II. Performance Metrics of Trajectory Algorithms
+
+Maximum RMS Trajectory
+
+Peak
+
+Angular Angular Smoothness Angular
+
+Variation Variation
+
+Acceleration
+
+Proposed
+
+0.6698
+
+0.2644
+
+0.7670
+
+2.0270
+
+SLERP
+
+1.4791
+
+0.8781
+
+0.5050
+
+23.2343
+
+As shown in the Table II, the proposed method outperforms
+
+the traditional SLERP method in key performance metrics. In
+
+terms of motion accuracy, the proposed method reduces the
+
+maximum angular error and RMS angular error by
+
+approximately 55% and 70%, respectively. For motion
+
+smoothness, the proposed method improves the smoothness
+
+index by approximately 52% and reduces the peak angular
+
+acceleration by over 90% compared to SLERP. Consequently,
+
+the proposed method effectively mitigates severe motion jitter
+
+and yields more stable and smooth trajectories. Collectively,
+
+these results demonstrate the method's capability to achieve
+
+high accuracy and smoothness simultaneously.
+
+In summary, compared to previous methods, the algorithm
+
+proposed in this paper offers the following advantages:
+(1) G2 continuity is achieved, and both line segments and curves are incorporated.
+(2) Quaternions are used to represent posture, thus avoiding the issue of Euler angle singularity.
+(3) The virtual posture curve fitting method enables the independent design of position and posture curves.
+(4) The seven-segment quintic polynomial acceleration and deceleration trajectory planning enhances the flexibility of motion planning.
+REFERENCES
+[1] K. C. Yao, D. C. Chen, C. H. Pan, et al., "The development trends of computer numerical control (CNC) machine tool technology," Mathematics, vol. 12, no. 13, pp. 1923, 2024.
+[2] S. Gao, H. M. Zhang, J. Z. Yang, et al., "A Five-Axis Toolpath CornerSmoothing Method Based on the Space of Master–Slave Movement," Machines, vol. 12, no. 12, pp. 834, 2024.
+[3] S. J. Sun, H. Lin, L. M. Zheng, et al., "A real-time and look-ahead interpolation methodology with dynamic B-spline transition scheme for CNC machining of short line segments," The International Journal of Advanced Manufacturing Technology, vol. 84, no. 5, pp. 1359-1370, 2016.
+[4] S. Wang, B. R. Li, H. Zhang, et al., "A global smoothing method with geometric continuity conditions of piecewise curve fitting for toolpath of massive micro-line segments in CNC," The International Journal of Advanced Manufacturing Technology, vol. 133, no. 5, pp. 2841-2859, 2024.
+[5] N. D. Huang, H. Li, X. Huang, et al., "B-spline-based corner smoothing method to decrease the maximum curvature of the transition curve," Journal of Manufacturing Science and Engineering, vol. 144, no. 5, pp. 054503, 2022.
+[6] D. Liu, J. Xu, Y. Li, et al., "Research on B-spline smoothing compression and G2-continuous blending algorithm for continuous short line segment tool paths," International Conference on Electrical Engineering and Mechatronics Technology (ICEEMT), pp. 253-259, 2024.
+[7] X. F. Li, H. Zhao, X. M. He, et al., "A novel cartesian trajectory planning method by using triple NURBS curves for industrial robots," Robotics and Computer-Integrated Manufacturing, vol. 83, pp. 102576, 2023.
+[8] M. Wan, X. B. Qin, Q. B. Xiao, et al., "Asymmetrical pythagoreanhodograph (PH) spline-based C3 continuous corner smoothing algorithm for five-axis tool paths with short segments," Journal of Manufacturing Processes, vol. 64, pp. 1387-1411, 2021.
+[9] D. D. Li, W. M. Zhang, W. Zhou, et al., "Dual NURBS path smoothing for 5-axis linear path of flank milling," International Journal of Precision Engineering and Manufacturing, vol. 19, no. 12, pp. 1811-1820, 2018.
+[10] Ö. Ekrem, and B. Aksoy, "Trajectory planning for a 6-axis robotic arm with particle swarm optimization algorithm," Engineering Applications of Artificial Intelligence, vol. 122, pp. 106099, 2023.
+[11] C. J. Han, K. R. Song, and U. R. Rim, "An asymmetric S-curve trajectory planning based on an improved jerk profile," Robotica, vol. 42, no. 7, pp. 2184-2208, 2024.
+[12] G. L. Wu, and N. Zhang, "Kinematically Constrained Jerk–Continuous SCurve Trajectory Planning in Joint Space for Industrial Robots," Electronics, vol. 12, no. 5, pp. 1135, 2023.
+[13] Y. Y. Liang, C. Z. Yao, W. Wu, et al., "Design and implementation of multi-axis real-time synchronous look-ahead trajectory planning algorithm," The International Journal of Advanced Manufacturing Technology, vol. 119, no. 7, pp. 4991-5009, 2022.
+[14] E. Bernardes, and S. Viollet, "Quaternion to Euler angles conversion: A direct, general and computationally efficient method," Plos one, vol. 17, no. 11, pp. e0276302, 2022.
+[15] Sencer, Burak, Kosuke Ishizaki, and Eiji Shamoto. "A curvature optimal sharp corner smoothing algorithm for high-speed feed motion generation of NC systems along linear tool paths." The International Journal of Advanced Manufacturing Technology 76.9 (2015): 1977-1992.
+
+318
+Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:16:22 UTC from IEEE Xplore. Restrictions apply.
+
+

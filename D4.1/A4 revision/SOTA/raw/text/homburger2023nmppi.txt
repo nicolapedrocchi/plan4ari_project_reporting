@@ -1,0 +1,684 @@
+2023 European Control Conference (ECC) June 13-16, 2023. Bucharest, Romania
+
+Efficient Nonlinear Model Predictive Path Integral Control for Stochastic Systems considering Input Constraints
+Hannes Homburger1, Stefan Wirtensohn1 and Johannes Reuter1
+
+Abstract— This paper compares novel methods to efficiently include input constraints using the nonlinear Model Predictive Path Integral (MPPI) approach. The MPPI algorithm solves stochastic optimal control problems and is based on sampled trajectories. MPPI results from the physical path integral framework. Sample-based algorithms are characterized by the fact that they can be computed in parallel and offer the possibility to handle discontinuous dynamics and cost functions. However, using standard MPPI the input costs in the Lagrange term have to be chosen quadratic. This fact is unfavorable for various real applications. Further, in standard nonlinear model predictive control (NMPC) approaches hard box constraints on the control input trajectory can be treated directly. In this contribution, novel architectures based on integrator action are compared. The investigated input constraint MPPI controllers were tested on an autonomous self-balancing vehicle. Therefore both, simulation and real-world experiments are presented. This paper addresses the question of how the MPPI algorithm can be further developed to consider input box constraints. Videos of the self-balancing vehicle are available at: https://tinyurl.com/mvn8j7vf
+I. INTRODUCTION
+NMPC is an optimal feedback-control strategy based on repetitively online computing the optimal control input trajectory subject to the recent system state [1]. The first element of this optimal control sequence is applied to the system. Recently, a sample-based NMPC algorithm [2] was published, which is based on the physical framework of path integrals [3]. In this approach, the path integral over sampled trajectories is used to compute the optimal control input trajectory, providing an optimal solution concerning an input signal perturbed by additive white Gaussian noise (AWGN). Because in real controllers only a finite number of trajectories can be sampled, their information content is responsible for the optimizer’s, and thus the controller’s performance [4]. Recently, different methods, such as [5], [6], and [7] have been published to increase the information content of the drawn trajectories. However, using the standard MPPI algorithm, control input trajectory constraints are considered by either using an explicit quadratic cost [8] expression, implicitly by adding integrator action and a penalty term in the Lagrange cost function [9], or by clamping with Savitsky–Galoy filtering [2]. In this paper, novel methods are compared to consider input constraints using integrator action. In section II, the basics of the path integral control framework and the MPPI control algorithm are presented. In section III, the MPPI extensions to consider input constraints
+1 Institute of System Dynamics, HTWG Konstanz - University of Applied Sciences, 78462 Konstanz, Germany {hhomburg, stwirten, jreuter} @htwg-konstanz.de
+
+efficiently are shown. To compare the algorithms, a control task is described in section IV. Section V presents the results of the MPPI control in both, simulation and full-scale experiment. Finally, section VI concludes the results of this paper and presents ideas for future work.
+
+II. PATH INTEGRAL CONTROL
+For a special class of stochastic optimal control problems (OCPs), the corresponding nonlinear Hamilton-JacobiBellman (HJB) equation can be transformed into a linear second-order partial differential equation [3]. This enables the application of the Feynman-Kac lemma [10] which states that the value function solving the HJB is equal to a special forward diffusion process, that can be simulated by drawing samples of stochastic trajectories. Beside policy iteration-based optimal control approaches [11], [12], and [13] in the field of reinforcement learning (RL), recently, the framework of path integrals has been used to solve stochastic OCPs online in NMPC applications [2], [8], and [9]. In the following the basics of the MPPI algorithm according to [2] are described briefly.
+
+A. Solution of Stochastic Optimal Control Problems based on Path Integrals
+Considering the nonlinear discrete-time dynamics
+
+xk+1 = F (xk, vk),
+
+(1)
+
+where the nonlinear transition function F maps the system state at time instance k denoted by xk ∈ Rnx and the input to the system at time instance k denoted by vk ∈ Rnu to the system state at the next time instance. The input to the system is given by
+vk ∼ N (uk, Σ),
+
+where N (uk, Σ) denotes a Gaussian distribution with expectation value uk = (u1, u2, ..., unu )⊤ ∈ Rnu and covariance matrix Σ ∈ Rnu×nu . By defining uk as the desired system input, we assume that the desired system input is disturbed
+with AWGN before it is applied to the dynamical system
+(1). The desired control input sequence over an N ∈ N step horizon is given by
+
+U = (u0, u1, ..., uN−1)
+
+and a sequence of disturbed inputs is given by
+
+V = (v0, v1, ..., vN−1),
+
+978-3-907144-08-4 ©2023 EUCA
+
+1
+
+Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:21:45 UTC from IEEE Xplore. Restrictions apply.
+
+that is a random sequence with the corresponding probability density function
+
+q(V |U , Σ) = ∏ [(2π)nu |Σ|] N−1 − 21 exp − 1 ε ⊤k Σ−1ε k ,
+
+k=0
+
+2
+
+where ε k = vk − uk denotes the sampled input disturbance at
+
+time instance k. Analogous to the approach of direct single
+
+shooting according to [1], an initial state x0 and a sequence
+
+of disturbed inputs V are deterministically mapped to a state
+
+trajectory by applying (1) recursively
+
+
+
+
+
+
+
+
+
+x˜0(x0,V )
+
+x0
+
+ 
+
+x˜1(x0,V )
+
+ 
+
+ 
+
+F (x˜0, v0)
+
+ 
+
+ ..  = X (x0,V ) = 
+
+..
+
+,
+
+.
+
+
+
+.
+
+
+
+x˜N (x0,V )
+
+F (x˜N−1, vN−1)
+
+where X : Rnx × Rnu×N → Rnx×(N+1) denotes the operator describing the recursive simulation. Note that each element
+x˜k is only dependent on the first k elements in V . The discrete time stochastic OCP is defined by
+
+N−1
+min EV ∼QU,Σ ∑ L(x˜k(x0,V ), uk) + E(x˜N (x0,V )) , (2)
+U k=0
+where L : Rnx × Rnu → R+ denotes the Lagrange term, E : Rnx → R+ denotes the Mayer term, and EQ denotes the expectation operator with
+
+EV∼QU,Σ [φ (V ,U , Σ)] = φ (V ,U , Σ)q(V |U , Σ)dV , (3)
+
+where φ denotes a scalar function. Using the path integral framework, the Lagrange cost term
+L(x˜k(x0,V ), uk) = l(x˜k(x0,V )) + 1 uk⊤Ruk (4) 2
+consists of two terms, l : Rnx → R+ denotes state costs which are only dependent on the system state, and the other term is a quadratic function of the control inputs, penalized with R := λ Σ−1, where λ ∈ R+ is called the inverse temperature. This restriction is necessary to apply the path integral framework. For further information, the reader is referred to [2] and [14]. Summing up all state-dependent costs of a trajectory yields the composition
+
+N−1
+S(x0,V ) = ∑ l(x˜k(x0,V )) + E(x˜N(x0,V ))
+k=0
+
+called the path costs. Using these expressions [2] shows that
+
+each element of the optimal input control sequence (2) is
+
+given by
+
+u∗k = EV ∼QUˆ ,Σ [ω(V )vk],
+
+(5)
+
+where Uˆ = (uˆ 0, uˆ 1, ..., uˆ N−1) denotes a guess of the minimizer of (2) and the importance weighting is given by
+
+ω(V ) = 1 exp − 1
+
+η
+
+λ
+
+S(x0,V ) + 1 ∑ (2vk − uˆ k) N−1 ⊤ Ruˆ k
+2 k=0
+
+with the normalization constant
+
+η = exp − 1 S(x 1 N−1 0,V ) + ∑ (2vk − uˆ k)⊤ Ruˆ k dV
+
+λ
+
+2 k=0
+
+used to ensure ω(V )dV = 1. To compute the optimal control, (5) is approximated using the Monte-Carlo estimation
+
+M
+
+uˆ ∗k
+
+=
+
+∑
+
+ω
+
+(V
+
+m
+
+)v
+
+m k
+
+(6)
+
+m=1
+
+of the sampled disturbed input sequences
+
+V m = (vm0 , vm1 , ..., vmN−1), m = 1, 2, ..., M.
+
+Note, for M → ∞ (6) converges to (5). Further, the definition vmk := uˆ k + ε mk is given for k = 0, ..., N − 1. In algorithm 1 the resulting path integral control optimizer is presented.
+
+Algorithm 1 Path Integral Optimizer (PIO)
+
+Input: F : System dynamics;
+
+M: Number of sampled trajectories;
+
+N: Length of prediction horizon; U I: Initial control sequence;
+
+x0: Recent system state; l, E: State costs and Mayer term;
+
+Σ, λ : Covariance and inverse temperature; Output: U O: Optimized control sequence
+
+S: Average costs;
+
+1: for m ∈ {1, 2, ..., M} do
+
+2: x˜m0 ← x0; 3: Sample {ε m0 , ε m1 , ..., ε mN−1};
+
+4: Sm ← 0;
+
+5: for k ∈ 0, 1, ..., N − 1 do
+
+6:
+
+x˜mk+1 ← F (x˜mk , uIk + ε mk );
+
+7:
+
+Sm+
+
+=
+
+l(x˜mk )
+
++
+
+λ 2
+
+uIk + 2ε m ⊤ k Σ−1uIk;
+
+8: end for
+
+9: Sm ← Sm + E(x˜mN );
+
+10: end for
+
+11: η ← ∑m=1 M exp(− λ1 Sm); 12: for m ∈ {1, 2, ..., M} do
+
+13:
+
+ωm
+
+←
+
+1 η
+
+exp(− λ1
+
+Sm);
+
+14: end for
+
+15: for k ∈ {0, 1, ..., N − 1} do 16: uOk ← ∑m=1 M ωmvmk ; 17: end for 18: return U O = {uO0 , uO1 , ..., uOT −1}
+
+B. Information-Theoretic Model Predictive Control
+In the following the MPPI algorithm is described which is a stochastic NMPC algorithm based on the introduced path integral optimizer. Due to Bellman’s curse of dimensions and the representation problem, only in special cases, it is possible to represent and compute the optimal control law u∗k(xk) offline. However, due to the independence of the for-loop iterations in algorithm 1 lines 1-10, it can efficiently be computed in parallel tasks. Due to model-plant mismatch and unexpected disturbances the optimal control
+
+2 Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:21:45 UTC from IEEE Xplore. Restrictions apply.
+
+input sequence is calculated repetitively in the NMPC framework. The only difference between the stochastic OCPs to be solved repetitively is the recent system state x0. Therefore, the controller’s performance can be significantly increased by shifting the control sequence and warm-starting. Those are well known methods to get a good proposal density q(V |Uˆ , Σ) [4]. Thus, the MPPI algorithm can be described as the following four steps, which are repeated cyclically:
+1) Get recent system state x0 2) Optimize U ←PIO(U ) using algorithm 1 3) Apply the first element u0 4) Shift U by uk ← uk+1 , k = 0, 1, ..., N − 2
+Recently, different full-scale applications have shown that this control approach is real-time capable and can handle nonlinear stochastic systems and discontinuous cost functions e.g. to drive aggressively with an autonomous model car [2] or to autodock a vessel [9]. In most standard NMPC approaches, input constraints can be considered directly within the transcription and added to the resulting nonlinear problem as inequality constraints on the decision variables. However, using the standard MPPI algorithm according to [2], it is only permitted to penalize high control input values with quadratic input costs used in (4). In the next section, we present and compare different approaches to consider input constraints in the MPPI scheme.
+
+III. INPUT CONSTRAINED MPPI CONTROL
+
+The stochastic OCP we want to solve using input constrained MPPI control is defined as
+
+∗ N−1
+
+U = argmin EV∼QU,Σ ∑ L(x˜k(V ), uk) + E(x˜N ) , (7)
+
+U ∈U
+
+k=0
+
+where U denotes the feasible set of the control input sequences. The definition
+
+U = {U |u− ≤ uk ≤ u+, ∀k ∈ {1, ..., N}},
+
+where the inequalities are evaluated element-wise, the input control vector’s lower bound is denoted by u− ∈ Rnu , and the control input vector’s upper bound is denoted by u+ ∈ Rnu with element-wise u− ≤ u+, enables to treat box constraints on the control input sequence. The validity of the path integral framework is based on quadratic input costs (4) and no restrictions on the feasible control set. Thus, we can use the idea of applying integrator action with the extension of the state space
+xk = xk , wk
+where wk ∈ Rnu are the states of the integrator at time instance k, thus the extended dynamics is given by
+xk+1 = F (xk, vk) = F (xk, wk) I (w , k, vk)
+where I denotes a discrete time integrator of the dimension nu. Thus, the control input vector of the real system has become part of the state vector of an expanded system. Regarding the expanded system dynamics, the following two
+
+properties of the path integral framework described in [2] can be exploited to solve (7):
+1) The state costs l in (4) can be chosen arbitrarily, thus the input box constraints can be considered by adding a nonlinear penalty term.
+2) The dynamics F defined in (1) can be discontinuous, thus we can saturate the integrator state wk due to its artificial nature.
+These two methods will be explained in the following.
+
+A. Input Constrained MPPI Control using Penalty Terms
+Similar to merit functions, known for globalization in standard NMPC approaches we can define the state-dependent costs as
+
+u l(xk) = l(xk) + σ ( −≤uˆ≤u min + ||wk − uˆ ||1), (8)
+where σ ∈ R+ denotes the penalty coefficient. Note, if and only if u− ≤ wk ≤ u+ holds, the box constraints are satisfied and the penalty term vanishes. For implementation due to the convexity of the minimization, an element-wise comparison causes only low computational effort. This approach is called penalty term (PT) in the rest of the paper.
+
+B. Input Constrained MPPI Control using Saturation
+
+According to [15], another method to consider input in-
+
+equality constraints using MPPI control is to use the saturated
+
+integrator structure substituting I(wk, vk) by
+
+
+
+
+
+I1(w1,k, v1,k)
+
+ wk+1 = I (wk, vk) =  I  2(w2,k, v2,k)  .  , (9)
+
+
+
+..
+
+
+
+Inu (wnu,k, vnu,k)
+
+with the n ∈ {1, 2, ..., nu} saturated scalar integrators
+
+
+
+
+
+u+
+n
+
+if
+
+wn
+
++ hvn
+
+>
+
+u+
+n
+
+In(wn, vn) =  u−n
+
+if
+
+wn
+
++
+
+hvn
+
+<
+
+u−
+n
+
+,
+
+wn + hvn else
+
+where
+
+wn,
+
+vn,
+
+u+n ,
+
+and
+
+u−
+n
+
+denote
+
+the
+
+n-th
+
+element
+
+of
+
+the
+
+cor-
+
+responding vectors, and h > 0 denotes the sample time of the
+
+system. This approach is called saturated integrator (SI) in
+
+the rest of the paper. Note that this integrator is the saturated
+
+version of the integrator with elements In(wn, vn) = wn + hvn
+
+used in the PT approach. While using the PT approach, the
+
+input constraints can be violated. Using the SI approach, the
+
+input inequality constraints are satisfied securely. Since the
+
+computational cost of solving the minimization problem in
+
+(8) and considering the saturation in the integrator (9) require
+
+negligible computational effort, the two approaches do not
+
+differ in computational complexity.
+
+IV. APPLICATION EXAMPLE
+The advantages and disadvantages of the presented methods are investigated using experiments in an application scenario. Specifically, positioning control of a self-balancing vehicle is considered. In this application, due to safety reasons the desired velocity has to be limited strictly thus
+
+3 Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:21:45 UTC from IEEE Xplore. Restrictions apply.
+
+TABLE I MODEL PARAMETERS OF SELF-BALANCING VEHICLE
+
+P
+
+Value
+
+a -0.32 (rad/s)−1
+
+Ω
+
+0.89 rad/s
+
+P Value ζ 0.92 Te 2 s
+
+P Value vdes + 0.5 m/s vdes − 0 m/s
+
+Fig. 1. Photography of the self-balancing test vehicle MonoChair2 in fullscale at the forum of the HTWG Konstanz - University of Applied Sciences.
+
+standard quadratic penalty is not possible. The self-balancing vehicle is shown in Fig. 1. In this section, the dynamics, the inequality input constraints, the cost functions, and the information-theoretic parameters are presented which are combined to formulate an input constraint stochastic OCP in the form of (7). It should be noted that linear controllers have already been implemented for the balancing task, the velocity control, and the yaw control. These simplify the model and reduce the influence of unpredictable disturbances.
+
+A. Vehicle Dynamics
+The state of the controlled self-balancing vehicle is given by
+x = (x, y, γ, c, r)⊤,
+
+where x, y, and γ denote the generalized local east-north-up pose, and the body-fixed surge velocity is given by v = ar +c. Note that r and c represent the internal states of the closed velocity control loop (10) given by
+
+as + 1 Ω Gv(s) = 12 s2 + Ω2ζ s + 1 , (10)
+
+where s denotes the complex frequency variable, a < 0 denotes a constant, that is related to the non-minimum phase zero of the system, Ω > 0 denotes the radial frequency, and the damping of the system is denoted by ζ > 0. The transfer model of the closed yaw control loop is modeled using the first-order transfer function
+
+1
+
+Gγ (s) =
+
+,
+
+Tes + 1
+
+where Te > 0 denotes the equivalent time constant. Defining the reference values of the subordinated control loops yields
+
+the system input
+
+u = vdes γdes
+
+and the nonlinear continuous time system dynamics
+
+
+
+
+
+c cos γ + ar cos γ
+
+ 
+
+c sin γ + ar sin γ
+
+ 
+
+x˙
+
+=
+
+f
+
+(x, u)
+
+=
+
+ 
+
+− T1e γ + T1e γdes
+
+ 
+
+(11)
+
+
+
+r
+
+
+
+−Ω2c − 2ζ Ωr + Ω2vdes
+
+in the state space representation. The nonlinear time continuous system dynamics can be transformed into the nonlinear discrete time solution map given in (1). Therefore, the Runge-Kutta 4th order method (RK4) with step size hRK > 0 is applied. The parameters of the used system model are shown in Table I. Because the input variables enter linearly the dynamics of the velocity and the yaw angle, stochastic uncertainties corresponding to these states due to unmodeled effects (e.g. the cobblestones shown in Figure 1) can be modeled by the uncertainty of the input variables. As an assumption, these effects are modeled with Gaussian noise.
+
+B. Inequality Input Constraints
+As already mentioned, for safety reasons the desired velocity has to be limited to the range
+vdes − ≤ vdes(t) ≤ v+des, t ∈ [0, T ],
+where T > 0 denotes the prediction horizon. Due to the zero-order hold property, the defined input constraints can be checked by checking all elements of the control input sequence for compliance with
+v−des ≤ vdes k ≤ v+des, k ∈ {0, 1, ..., N − 1},
+where vdes k = vdes(kh), N = ⌊T /h⌋, and k = 0 denote the initialization of the MPC iteration. Note, this limitation defines the feasible set U used in (7). It is not necessary to limit the desired yaw orientation, because the modulo property γdes = γdes + 2nπ, n ∈ Z holds for this state. In the next part, the definition of the cost functions for the positioning control task is given.
+
+C. Cost Functions and Information-Theoretic Parameters
+Using MPPI control only the state-dependent term l of the Lagrange costs (4) can be defined to achieve the desired behavior. Acc. to [9] first linguistic quality criteria are defined, then translated into math terms, which are summed up to get the state-dependent cost function. In our task we only need to define one linguistic quality criterion: It is
+
+4 Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:21:45 UTC from IEEE Xplore. Restrictions apply.
+
+TABLE II MPPI CONTROL AND COST PARAMETERS
+
+P Value P Value P
+
+Value
+
+P Value
+
+h 0.5 s xdes 10 m al 1000 m−1 σv 0.005
+
+hRK 0.1 s ydes 5 m aE 1000 m−1 σγ 0.0035
+
+T 10 s λ
+
+1
+
+Σ diag(σv2, σγ2) σ 50000
+
+considered good to be next to the 2d position (xdes, ydes). While there are a lot of different methods to penalize the residual to this desired pose, the easiest approach is to use the L1-norm
+
+l(x) = al||(xdes, ydes)⊤ − (x, y)⊤||1,
+
+(12)
+
+where al > 0 denotes a weighting coefficient. Because no further criteria were defined, the Mayer term with E(xN) = aE ||(xdes, ydes)⊤ − (xN , yN )⊤||1, where aE > 0 is chosen similar to the state-dependent cost function of the Lagrange term.
+After defining the system dynamics, the input constraints,
+and the cost functions, only the definition of the informationtheoretic parameters given by the covariance matrix Σ and the inverse temperature λ must be selected concerning the experiments. Remember, the product λ Σ−1 provides the weighting of the quadratic control costs denoted by R in
+the path integral control framework [3].
+
+V. RESULTS
+In this section, the results of the experiments are shown that have been performed in simulation and full-scale to compare the performances of the different input constrained MPPI approaches presented in Section 3.
+
+A. Simulation Results
+To test the performances in simulation, the controllers and the dynamic model (11) are embedded in a simulation environment. The used values of the controller parameters (P) are given in Table II for reproducibility. To simulate the
+
+7
+
+6
+
+5
+
+4
+
+3
+
+2
+
+1
+
+0
+
+-1
+
+0
+
+2
+
+4
+
+6
+
+8
+
+10
+
+12
+
+Fig. 3. Generalized pose at the time instances kδ T with k ∈ 0, 1, ..., 6 and δ T = 5 s of the PT approach with M = 106 (black), M = 2000 (green) and the SI approaches with M = 106 (blue), M = 2000 (red) in simulation.
+
+time continuous system an RK4 with a step size of 5 ms is used. The initial state is given by x0 = 0. The simulation time is set to 30 s, which is appropriate for the given task. To obtain a benchmark, both methods are applied with M = 106 trajectories. In addition, M = 2000 trajectories are applied, which is a real-time capable setting in full-scale. Due to the high computational effort, this setting is only applicable in simulation. The resulting generalized positions are shown in Fig. 3. Note, the orientation is important because it affects the dynamics (11). Using the SI setup for both tests independent of the number of drawn trajectories the autonomous vehicle reaches the desired position and brakes as required. Using the PT setup only in the experiment with the high number of drawn trajectories the aim position is reached. In the progress of the simulation, the PT setup with M = 2000 does not steer enough and is slower than the other setups. The steering behavior is an interesting effect because the different setups do not change the yaw control loop directly. However, the exploration of the state space by sampling trajectories is done
+
+0.6 0.5 0.4 0.3 0.2 0.1
+0 0
+
+5
+
+10
+
+15
+
+20
+
+25
+
+30
+
+0.6 0.5 0.4 0.3 0.2 0.1
+0 -0.1
+0
+
+5
+
+10
+
+15
+
+20
+
+25
+
+30
+
+Fig. 2. Sequences of the desired velocity in simulation experiments with different setups.
+
+Fig. 4. Sequences of the limited desired velocity in full-scale experiments using the different methods.
+
+5 Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:21:45 UTC from IEEE Xplore. Restrictions apply.
+
+7
+
+the simulation and in the full-scale experiments, the con-
+
+trolled system shows excellent performance even under the 6 influence of model-plant-mismatch and disturbances. While
+
+5
+
+both methods can consider the input inequality constraints
+
+4
+
+by drawing M = 106 trajectories in the benchmark, in ap-
+
+plications the SI method is recommended. Concerning other 3 NMPC approaches, the MPPI control algorithm is charac-
+
+2
+
+terized by very good parallelizability and the possibility to
+
+1
+
+handle non-differentiable dynamics and cost functions. In
+
+future work, it would be interesting to proof the stability
+0
+of systems using the SI MPPI approach and apply it to solve
+
+-1
+
+stochastic OCPs representing more complex tasks.
+
+0
+
+2
+
+4
+
+6
+
+8
+
+10
+
+12
+
+Fig. 5. Generalized pose at the time instances kδ T with k ∈ 0, 1, ..., 6 and δ T = 5 s of the PT approach with M = 2000 (green) and the SI approach with M = 2000 (red) in full–scale experiments.
+
+ACKNOWLEDGMENT
+Special thanks to Matthias Albrecht for supporting the fullscale experiments.
+
+simultaneously for both system inputs. Thus, trajectories having good steering behavior but violating the velocity constraints are penalized and have only a minimal effect on the path integral solution (6). Figure 2 shows the sequence of applied desired velocities. While the SI methods consider the inequality constraints excellently at all time instances, the PT methods overshoot at some time instances. Further, the PT methods do not use the whole feasible set and are oscillating around some value next to vdes + for 2.5 s < t < 24 s. This is a direct result of the PT method’s design to avoid high cost states.
+B. Full-Scale Results
+To test the performance of the MPPI controller in the full-scale experiment, the MPPI controller is applied on the self-balancing test vehicle MonoChair2 shown in Fig. 1. For this purpose, the MPPI controller is implemented on the NVIDIA® Jetson Nano™ Developer Kit and connected to the system with Ethernet. Then, the same experiments as in the previous section are conducted, although only M = 2000 can be drawn due to the computational effort. While Fig. 5 shows the generalized pose during the experiments, the corresponding desired velocity sequences are shown in Fig. 4. The SI approach in full-scale shows similar behavior as in simulation in both, the evolution of the generalized pose and the sequence of desired velocities. Due to the plant-model mismatch, the PT approach brakes at t = 11.5 s. This further deteriorates the behavior. An appropriate criterion to compare the performances quantitatively is the accumulated Lagrange cost (12) over 30 s. This yields JPT,sim = 478, JSI,sim = 418.7 JPT,full = 522.8 and JSI,full = 425.3, showing that SI is the recommended approach because it performs better in both scenarios.
+VI. CONCLUSION AND FUTURE WORK
+This paper presents and compares two novel methods considering input constraints using MPPI control. In both methods, the control sequence is low-pass filtered by the expanded integrators, leading to a comfortable behavior. In
+
+REFERENCES
+[1] J. B. Rawlings, D. Q. Mayne, and M. M. Diehl, Model Predictive Control: Theory, Computation, and Design, 2nd ed. Santa Barbara, CA, USA: Nob Hill, 2017.
+[2] G. Williams, P. Drews, B. Goldfain, J. M. Rehg, and E. A. Theodorou, Information-Theoretic Model Predictive Control: Theory and Applications to Autonomous Driving. IEEE Transactions on Robotics, vol. 34, no. 6, 2018, pp. 1603–1622.
+[3] H. J. Kappen, Path integrals and symmetry breaking for optimal control theory, In J. Statist. Mech., Theory Exp., vol. 2005, no. 11, 2005, Art. no. P11011.
+[4] S. Thijssen and H. J. Kappen, Path Integral Control and State Dependent Feedback. In Phys. Rev. E 91, 032104, 2015.
+[5] I. M. Balci, E. Bakolas, B. Vlahov and E. A. Theodorou, Constrained Covariance Steering Based Tube-MPPI. In Proc. of the ACC 2022 American Control Conference (ACC), Atlanta, USA.
+[6] H. Homburger, S. Wirtensohn, M. Diehl and J. Reuter, Feature-Based Proposal Density Optimization for Nonlinear Model Predictive Path Integral Control. In Proc. of the 6th IEEE Conference on Control Technology and Application (CCTA), Trieste, Italy, 2022.
+[7] R. Kusumoto, L. Palmieri, M. Spies, A. Csiszar and K. O. Arras, Informed Information Theoretic Model Predictive Control. In Proceedings of IEEE 2019 International Conference on Robotics and Automation (ICRA), Montreal, Canada, 2019, pp. 2047-–2053.
+[8] V. Gomez, S. Thijssen, A. Symington, S. Hailes and H. J. Kappen, Real-Time Stochastic Optimal Control for Multi-agent Quadrotor Systems. In 26th International Conference on Automated Planning and Scheduling (ICAPS 16), London, Great Britain, 2015.
+[9] H. Homburger, S. Wirtensohn and J. Reuter, Docking Control of a Fully-Actuated Autonomous Vessel using Model Predictive Path Integral Control. In Proc. of the 20th European Control Conference (ECC), London, Great Britain, 2022, pp. 755–760.
+[10] M. Kac, On distributions of certain Wiener functionals, Transactions of the American Mathematical Society, vol. 65, 1949, no. 1, pp. 1-–13.
+[11] E. A. Theodorou, J. Buchli und S. Schaal, A Generalized Path Integral Control Approach to Reinforcement Learning. In Journal of Machine Learning Research, Vol. 11, 2010, pp. 3137–3181.
+[12] H. J. Kappen and H. C. Ruiz, Adaptive Importance Sampling for Control and Inference. In Journal of Statistical Physics, vol. 162, 2016, pp. 1244—1266.
+[13] T. Lefebvre and G. Crevecoeur, Path Integral Policy Improvement with Differential Dynamic Programming. In Proc. of the 2019 IEEE/ASME International Conference on Advanced Intelligent Mechatronics Hong Kong, China, July 8-12, 2019, pp. 739–745.
+[14] E. A. Theodorou, Nonlinear stochastic control and information theoretic dualities: Connections, interdependencies and thermodynamic interpretations, Entropy, vol. 17, no. 5, 2015, pp. 3352-–3375.
+[15] T. Kim, G. Park, K. Kwak, J. Bae, and W. Lee, Smooth Model Predictive Path Integral Control Without Smoothing, IEEE Robotics and Automation Letters, vol. 7, no. 4, 2022, pp. 10406—10413.
+
+6 Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:21:45 UTC from IEEE Xplore. Restrictions apply.
+
+

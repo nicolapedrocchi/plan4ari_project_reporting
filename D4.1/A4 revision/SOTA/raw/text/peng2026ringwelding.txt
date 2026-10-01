@@ -1,0 +1,2466 @@
+Preprin t not p eer rev iewed
+
+Research on Welding-obstacle Avoidance Collaborative Path Planning Method for Ring-welding Robot of Main Arch Segment of Large-Span Arch Bridge
+Shuangqian Peng1 ,2, Xiaolu Cui1*, Jianting Zhou3,4，Hong Zhang3,4, Bo Huang3 1School of Mechatronics and Vehicle Engineering, Chongqing Jiaotong University, Chongqing 400074, China;
+2School of Mechanical Engineering, Southwest Jiaotong University, Chengdu, Sichuan 611756, China
+3State Key Laboratory of Mountain Bridge and Tunnel Engineering, Chongqing Jiaotong University, Chongqing 400074, China
+4School of Civil Engineering, Chongqing Jiaotong University, Chongqing 400074, China
+Correspondence information: Xiaolu Cui, Chongqing Jiaotong University, Chongqing, 400074, China, cui_xiaolu@foxmail.com
+1
+This preprint research paper has not been peer reviewed. Electronic copy available at: https://ssrn.com/abstract=6636646
+
+Preprin t not p eer rev iewed
+
+1 Abstract
+
+2
+
+Long-span arch bridges are widely adopted in mountainous areas of western China,
+
+3 yet the rapid construction requirements of main arch segments under complex working
+
+4 conditions are barely satisfied by conventional manual welding. To address this
+
+5 technical gap, the dedicated ring-welding robot for main arch segments and its
+
+6 collaborative obstacle-avoidance welding path planning method are proposed. Point
+
+7 cloud, kinematic and planning offset models of the robot and target arch segments are
+
+8 established, and multi-objective collaborative path planning under multi-obstacle
+
+9 scenarios is realized by integrating preset ring-welding paths and rib plate obstacle-
+
+10 avoidance paths. Numerical simulations and experimental validation results show that
+
+11 the proposed method satisfies all collision safety and welding posture requirements,
+
+12 and guarantees smooth motion in both joint and task spaces, with a 35 mm minimum
+
+13 safe clearance and torch inclination controlled between -7.156° and 28.075°. It also
+
+14 achieves the sub-millimeter Grade E end-effector positioning accuracy and uniform
+
+15 defect-free coating formation.
+
+16 Keywords:
+
+17
+
+Long-span arch bridge; Main arch welding; Ring-welding robot; Path planning;
+
+18 Obstacle-avoidance algorithm
+
+19
+
+20 1 Introduction
+
+21
+
+Long-span arch bridge is widely adopted in the mountainous regions of estern
+
+2
+
+This preprint research paper has not been peer reviewed. Electronic copy available at: https://ssrn.com/abstract=6636646
+
+Preprin t not p eer rev iewed
+
+1 China due to its superior adaptability to complex terrain [1,2]. The ring-welding quality
+
+2 of segmental arch ribs is critical to the structural integrity and long-term safety of the
+
+3 long-span arch bridge [3-5]. Currently, the connection of main arch segments primarily
+
+4 relies on manual welding at height. However, due to environmental constraints and the
+
+5 demand for rapid construction, there is an urgent need to develop ring-welding robots
+
+6 capable of autonomous and intelligent welding robots [6-8].
+
+7
+
+The core challenge in developing the ring-welding robot for arch ribs is to plan
+
+8 paths simultaneously on variable-curved surfaces and in multi-obstacle scenarios. The
+
+9 difficulties for collaborative path planning for welding-obstacle avoidance is shown in
+
+10 Figure 1. Firstly, the variable curvature arises because segment radius, axis shape and
+
+11 cross-section differ along the long-span [9-11]. Secondly, the ring-welding target needs
+
+12 to consider the different welding gun positions as the welding path changes around the
+
+13 ring. Thirdly, the multi-obstacle scenarios are caused by various types of temporary
+
+14 connecting rib plates being set between the main arch segments. In summary, the path
+
+15 planning method for ring-welding robot of large-span arch bridge must ensure both the
+
+16 position and orientation of the ring-welding target, as well as the obstacle avoidance
+
+17 target[12].
+
+3 This preprint research paper has not been peer reviewed. Electronic copy available at: https://ssrn.com/abstract=6636646
+
+Preprin t not p eer rev iewed
+
+Multi-obstacle scenarios
+
+Variable-curved surfaces
+Different structure
+Different diameter
+
+Different arch axis
+
+Ring-welding target
+Welding seam path
+
+Welding gun position
+
+Collaboration Obstacle-avoidance target
+
+Avoidance
+
+Crossing
+
+1
+
+2 Fig.1. Difficulties in path planning for the ring-welding robot of the main arch segments of long-
+
+3
+
+span arch bridges.
+
+4
+
+Firstly, for the path planning requirements of variable-curved surfaces, it is
+
+5 necessary to construct the environmental model of the main arch segment and the
+
+6 kinematic model of the robot. Among them, the environmental modelling for welding
+
+7 includes three methods: the geometric, the raster and the point-cloud approach [1315-16].
+
+8 Besides, the parallel work on robot kinematics routinely employs the D-H parameter,
+
+9 the geometric-algebra, or the data-driven formulation [17-18]. However, the weld seam
+
+10 of long-span arch demands higher geometric fidelity than the rib itself, and kinematic
+
+11 maps that treat the joint angle as the sole variable cannot compensate for the
+
+12 continuously varying curvature and diameter. Therefore, the existing single-precision
+
+13 and variable-planning models cannot be directly applied to the welding of variable-
+
+14 curved surface segments in long-span arch bridge.
+
+15
+
+Secondly, for the ring-welding target, the mapping relationship between the end
+
+4
+
+This preprint research paper has not been peer reviewed. Electronic copy available at: https://ssrn.com/abstract=6636646
+
+Preprin t not p eer rev iewed
+
+1 position of the welding torch and the joint rotation angles of the ring-welding robot is
+
+2 established. In the current research on ring-weld path planning, Liu et al. [19,20]
+
+3 employed spline interpolation and genetic algorithm optimization to approximate
+
+4 discrete path points, thereby achieving effective trajectory generation for welding tasks
+
+5 . For robots with special kinematic pairs, Ghariblu et al. [21] proposed a redundant
+
+6 welding system with over 6 degrees of freedom, which optimized the path planning
+
+7 effect of the welding robot's welding target. In all these works the weld seam is treated
+
+8 as the sole planning objective and obstacle constraints are ignored, so the resulting
+
+9 trajectories cannot be executed inside the narrow clearances between arch-rib plates.
+
+10
+
+Finally, for the obstacle-avoidance target, it is necessary to consider obstacle-
+
+11 avoidance paths that account for multiple obstacles based on the annular welding path.
+
+12 The mainstream algorithms for obstacle-avoidance path planning are the sampling
+
+13 method and the potential field method. Hippolitus et al. [22,23-24] improved the sampling
+
+14 method of RRT by using backpropagation and bidirectional search, and thus achieve
+
+15 rapid path planning for robot obstacle avoidance. Zucker et al. [25] constructed the
+
+16 objective function by combining the potential field cost and the smoothness cost, and
+
+17 they then quantify and optimize the path, achieving a smoother obstacle-avoidance path
+
+18 for the robot. The path planning method that focuses on the single obstacle-avoidance
+
+19 target cannot be applied directly to the welding tasks encountered in the multi-obstacle
+
+20 scenarios of long-span arch bridge.
+
+21
+
+In summary, the current path planning models and methods are not applicable for
+
+5
+
+This preprint research paper has not been peer reviewed. Electronic copy available at: https://ssrn.com/abstract=6636646
+
+Preprin t not p eer rev iewed
+
+1 the multi-objective collaborative path planning requirements of the main arch segments
+
+2 of long-span arch bridges with variable-curvature arch segments and multiple obstacles.
+
+3 Therefore, it is urgent to establish serious of models for the ring-welding robot for the
+
+4 main arch segments of long-span arch bridge, based on the construction process of the
+
+5 ring-welding of the main arch segments. Focusing on the ring-welding and obstacle-
+
+6 avoidance path planning targets, the path planning method for the ring-welding robot
+
+7 in the main arch segment of the long-span arch bridge is proposed by the numerical
+
+8 simulation and experimental verification.
+
+9 2 Ring-welding and planning process for main arch segments
+
+10
+
+During the construction process, the main arch segments of long-span arch bridge
+
+11 are usually lifted separately and then connected together [26]. The overall construction
+
+12 process mainly includes the segment pre-assembly, hoisting and alignment, and
+
+13 circumferential welding and closure, as shown in Figure 2(a). Step 1: The processed
+
+14 main arch segments are transported from the factory to the construction site for pre-
+
+15 assembly. The structural dimensions and processing quality of the main arch segments
+
+16 are checked. Step 2: As per the construction drawings, lift and align the main arch rib
+
+17 segment, then complete the initial assembly by bolting the matching connection gusset
+
+18 plates. Step 3: Ring-welding between each main arch segment is performed sequentially.
+
+19 The assembly and closure of the main arch segments of the long-span arch bridge are
+
+20 completed. Moreover, the manual welding is replaced by the self-developed ring-
+
+21 welding robot, with complete the ring-welding between the main arch segments. The
+6
+
+This preprint research paper has not been peer reviewed. Electronic copy available at: https://ssrn.com/abstract=6636646
+
+Preprin t not p eer rev iewed
+
+1 mechanical structure design of the ring-welding robot is shown in Figure 2(b). Its
+
+2 structure mainly consists of the bottom rail, the welding robot, and the welder. The
+
+3 construction processes of the ring-welding robot are as follows. Step 1: The flexible
+
+4 track is fixed on one side of the connection seam in the main arch segment. Step 2: The
+
+5 base wheel and bottom rail of the ring-welding robot are assembled to complete the
+
+6 installation. Step 3: The welding wire is conveyed by the welder, and the planned path
+
+7 is executed by the ring-welding robot. In summary, the ring-welding of the main arch
+
+8 segments of the long-span arch bridge is achieved.
+
+(a) Independent transportation
+
+Assembling
+
+Connecting
+
+(b)
+
+Welding of the main arch connection segments
+
+Welder
+
+Main arch
+
+Bottom rail
+
+Rotate
+
+Welding Move & Rotate
+
+Ring-welding robot Connecting rib plate
+9
+
+10
+
+Fig.2. Construction process of the ring-welding robot system for long-span arch bridges: (a)
+
+11
+
+Construction method of main arch segment; (b) Application procedure of ring-welding robot
+
+12
+
+system
+
+13
+
+The path planning for the ring-welding robot in main arch segments of long-span
+
+7
+
+This preprint research paper has not been peer reviewed. Electronic copy available at: https://ssrn.com/abstract=6636646
+
+Preprin t not p eer rev iewed
+
+1 arch bridges must account for the concurrent requirements posed by variable-curved
+
+2 surfaces and multi-obstacle scenarios. Based on the application method of the self-
+
+3 developed ring-welding robot, the corresponding process is shown in Figure 3.
+
+4
+
+Firstly, the path planning model for ring-welding in variable-curved surfaces is
+
+5 established. In this model, the distinct structures, diameters, and arch-axis geometries
+
+6 of the main arch segments are explicitly incorporated into the ring-welding path-
+
+7 planning formulation. Both the main arch segments and the ring-welding robot, across
+
+8 their structural variations, are represented as non-uniform-density point-cloud models.
+
+9 Main arch segments of different diameters are accommodated by an alterable robot
+
+10 model that employs dynamic D-H parameters. Subsequently, the ring-welding path is
+
+11 refined through the vector-offset model, thereby ensuring adaptation to the local
+
+12 curvature variations along the arch axis. Secondly, the path-planning method dedicated
+
+13 to obstacle-avoidance in multi-obstacle scenarios is proposed. Diverse postures of the
+
+14 ring-welding path and differentiated obstacle-avoidance strategies are systematically
+
+15 considered. In accordance with the welding-process requirements, the ring-welding
+
+16 sequence and the welding postures at various positions are clearly defined. On this basis,
+
+17 the obstacle-avoidance welding of the ring-welding robot is realised by leveraging the
+
+18 CHOMP obstacle-avoidance algorithm. Finally, the path-planning model for ring-
+
+19 welding and the path-planning method for obstacle-avoidance are jointly integrated.
+
+20 The ring-welding robot executes the consolidated path, accomplishing the ring-welding
+
+21 of the long-span arch bridge.
+8
+
+This preprint research paper has not been peer reviewed. Electronic copy available at: https://ssrn.com/abstract=6636646
+
+Preprin t not p eer rev iewed
+
+(a)
+General Modeling
+
+Variable-curved surfaces
+
+Robot Base CS
+-+
+Axis 1
+Base CS
+
+-+
+Diameter
+
+General Offset
+
+Automatically adapt to different structure.
+Different structure
+(b)
+1 Welding path
+
+Automatically adapt to different diameter.
+Different diameter
+Multi-obstacle scenarios
+
+Automatically adapt to different arch axis.
+Different arch axis
+2 Avoidance path
+
+2
+
+Automatically generate overall circular path.
+
+1
+Automatic avoidance near obstacles.
+
+Automatic crossing of the obstacles at both ends.
+
+Ring welding
+
+Collaboration
+
+Obstacle avoidance
+
+1
+
+2 Fig.3. Path planning process for ring-welding robot: (a) Variable-curved surface path planning; (b)
+
+3
+
+Multi-objective path planning method
+
+4 2.1 Point cloud model of main arch segment
+
+5
+
+The variable-curved main arch segments of the long-span arch bridge have
+
+6 different structural characteristics. The structural and distribution characteristics of the
+
+7 main arch segments can be clearly depicted through non-uniformly dense point cloud
+
+8 models, as shown in Figure 4[27].
+
+9
+
+This preprint research paper has not been peer reviewed. Electronic copy available at: https://ssrn.com/abstract=6636646
+
+Preprin t not p eer rev iewed
+
+Low-densityArch rib High-density welds seam
+
+Connecting rib plate
+
+Arch rib
+
+Arch rib
+
+Welding backing
+
+Discretization in the middle surface
+
+Geometry
+
+Point cloud
+
+1
+
+2
+
+Fig.4. The modeling method of arch rib and weld seam.
+
+3
+
+Firstly, the modeling of the main arch segments mainly adopts the discrete
+
+4 modeling method along the axis of the long-span arch bridge. The model ignores the
+
+5 internal hollow structure of the main arch segments. This method can efficiently express
+
+6 the characteristics of the main arch while accurately representing its circular cross-
+
+7 section [28,29]. Subsequently, the weld-region point cloud is locally refined, and the
+
+8 welding backing is represented as the sequence of spherical point-cloud elements
+
+9 distributed along the arch axis. Finally, the connecting rib plate is the geometric
+
+10 structure of the rectangular shape. The connecting rib plate is discretely divided into
+
+11 spherical point clouds on the middle surface of the rectangular thin sheet.
+
+12
+
+Additionally, the ring-welding robot is also modeled via the point-cloud approach,
+
+13 but the modeling process is more complicated due to the intricacy structure, as shown
+
+14 in Figure 5. Firstly, the ring-welding robot is divided into six parts based on its
+
+15 kinematic pairs. The main components include the moving part on the bottom rail, four
+
+16 rotatable execution parts, and the welding torch. Then, based on the original model of
+
+17 the ring-welding robot, the complex structure is simplified into the single basic convex
+10
+
+This preprint research paper has not been peer reviewed. Electronic copy available at: https://ssrn.com/abstract=6636646
+
+Preprin t not p eer rev iewed
+
+1 polyhedron using the V-HACD method [30]. Secondly, the cross-section is selected 2 along the longest vector of the single polyhedron intersection, and capsules are 3 generated by enveloping this cross-section [31]. Finally, the capsules are discretized into 4 the point cloud of spherical shapes based on the set density.
+
+Original model
+
+Discrete sphere
+
+Simple polyhedron
+
+Encapsulated capsule
+
+5 Refined model of welding robot
+
+Obstacle model of welding robot
+
+6
+
+Fig.5. Modeling method of common obstacles.
+
+7 2.2 Kinematic model of the ring-welding robot
+
+8
+
+The variable-curved main arch segments of the long-span arch bridge have
+
+9 different diameters. Consequently, the kinematic models of the ring-welding robot are
+
+10 established for each diameter class by means of dynamic D-H parameters. Each model
+
+11 explicitly maps the Cartesian coordinates of the welding-torch tip to the joint
+
+12 coordinates of the robot, thereby enabling precise positioning through regulation of
+
+13 individual joint angles.
+
+14
+
+Firstly, the six rotational degrees of freedom are assigned as follows: the
+
+15 circumferential carriage on the bottom rail constitutes the first joint, the four actuator 16 modules of the execution arm correspond to joints 2–5, and the welding-torch rotation
+
+17 is designated as the sixth joint, as shown in Figure 6 (a). Then, the relative coordinate
+11
+
+This preprint research paper has not been peer reviewed. Electronic copy available at: https://ssrn.com/abstract=6636646
+
+Preprin t not p eer rev iewed
+
+1 frames of these components are constructed with the Z-axis aligned along each
+
+2 rotational axis, as shown in Figure 6 (b). Finally, the standard D-H parameter method
+
+3 was selected to establish the D-H parameter model of the ring-welding robot for the
+
+4 large-span arch bridge. When installing the main arch segment with diameter of Da,
+
+5 the length of the first axis of the robot is Da + 117 mm. The specific parameters of the
+
+6 model are shown in Table 1.
+(a) R3 R5 (b) Welding robot
+R4 R6
+Bottom rail
+R2
+
+Z5
+
+Z3 X3 X4
+
+X5 Z4 Z6 X6
+
+X2
+
+Z2
+
+R1
+Main arch 7
+
+First axis X1 Da of robot
+Z1 O
+
+Reference point of robot
+
+Zn Rotation axis n
+
+8
+
+Fig.6. The ring-welding robot: (a) Structure model; (b) Kinematic model.
+
+9 Table 1
+
+10 D-H parameters for ring-welding robot of long-span arch bridges.
+
+Link i 1 2 3 4
+
+Joint angle/° 0 -90
+180 0
+
+Link offset/mm 0 0 0
+-222.63
+
+Link length/mm Da+117 305 0 0
+
+Twist angle/° pi/2 0 pi/2 -pi/2
+
+12
+
+This preprint research paper has not been peer reviewed. Electronic copy available at: https://ssrn.com/abstract=6636646
+
+Preprin t not p eer rev iewed
+
+5
+
+0
+
+6
+
+0
+
+0 -36.25
+
+0
+
+pi/2
+
+0
+
+0
+
+1
+
+Furthermore, the inverse kinematics method is employed to calculate the joint
+
+2 angles corresponding to the robot's end-effector [32]. The end-effector pose of the robot
+
+3 is expressed by the matrix T. The transformation matrix Ti corresponding to the 6-joint
+
+4 of the ring-welding robot is in the following equal relationship with the matrix T:
+
+5
+
+T T1·T2·T3·T4·T5·T6
+
+(1)
+
+6
+
+Then, by applying the inverse function f −1 to the pose function T, the solution is
+
+7 obtained as follows:
+
+ 1
+
+8
+
+q  f (T)
+
+(2)
+
+
+
+9
+
+Among them, q is the vector composed of 6 joint angles. The LM numerical
+
+10 iteration method is employed to calculate the corresponding joint angles to the end-
+
+11 effector pose of the robot[33]. However, the welding torch is connected to the end of the
+
+12 robot through an external fixture. The end of the welding torch has the fixed geometric
+
+13 offset relationship with the end of the robot, as shown in Figure 7.
+
+Fixture Welding touch
+
+Original end coordinates
+
+Transformed end coordinates
+
+Z1 P
+
+Z0
+
+PA
+
+PB Y1
+
+O1
+
+O1 Y0 X1
+14 X0
+
+15
+
+Fig.7. Relationship between the Robot and welding torch end-effector coordinate system
+
+13
+
+This preprint research paper has not been peer reviewed. Electronic copy available at: https://ssrn.com/abstract=6636646
+
+Preprin t not p eer rev iewed
+
+1
+
+Based on the structural dimensions of the external fixture and the ring-welding
+
+2 equipment, the robot-welding torch pose transformation matrix G is constructed. The
+
+3 relationship between the robot coordinate system C and the welding torch coordinate
+
+4 system C' is:
+
+5
+
+C' GC
+
+(3)
+
+6
+
+The expressions of the two coordinate systems are as follows:
+
+ x1 y1 z1 ox 
+
+
+
+
+
+ X Y Z o  x2 y2 z2 oy 
+
+C
+
+
+
+ 0 0 0 1  x3 y3 z3 oz 
+
+
+
+
+
+7
+
+0 0 0 1
+
+(4)
+
+8
+
+Among them, X = [x1,x2,x3]T, Y = [y1,y2,y3]T, and Z = [z1,z2,z3]T represent the
+
+9 direction vectors of the X-axis, Y-axis, and Z-axis of the coordinate system respectively.
+
+10 The mapping of the relationship between the robot joint parameters and the welding
+
+11 position is realized with the transformation from the welding torch end - the robot end
+
+12 - the robot joints.
+
+13 2.3 Offset model of ring-welding path and bottom-rail path
+
+14
+
+The variable-curved surface main arch segments of the long-span arch bridge have
+
+15 different arch axis. To accommodate these variations, the offset model that relates the
+
+16 bottom-rail path to the ring-welding path is employed. The model numerically
+
+17 generates weld path that faithfully follow the instantaneous arch axis. By continuously
+
+18 adjusting the relative pose between the rail and the weld seam, the approach guarantees
+
+19 that the ring-welding robot remains universally applicable to every main-arch segment
+
+14
+
+This preprint research paper has not been peer reviewed. Electronic copy available at: https://ssrn.com/abstract=6636646
+
+Preprin t not p eer rev iewed
+
+1 within long-span arch bridges.
+
+2
+
+Firstly, the centers of the ring-welding path and the bottom-rail path are
+
+3 respectively set as the origin. The tangential vector of the arch axis is set to the Y-axis.
+
+4 The coordinate systems CSr and CSw for the ring-welding path and the bottom-rail path
+
+5 is established, as shown in Figure 8.
+
+Main arch
+
+Yr CSw Z X r r
+
+Yr
+CSr Xr
+Rail path Zr Welding path Arch axis
+6
+
+7
+
+Fig.8. Offset relationship between main arch segment welding path and robot bottom rail path
+
+8
+
+Then, takeing the main arch segment with the parabolic arch axis as an example,
+
+9 the equation of this arch axis line is expressed as:
+
+10
+
+y  ax2 bxc
+
+(5)
+
+11
+
+Among them, a, b and c are the parameters determined during the design of the
+
+12 long-span arch bridge. The coordinate of the center of the bottom-rail on the arch axis
+
+13 is set as (xr, yr, 0). The coordinates of the ring-welding path on the arch axis is set as
+
+14 (xw, yw, 0). The offset vector between the two coordinates is:
+
+2
+
+15
+
+V  (xw  xr , (axw  bxw  c)  yr , 0)
+
+(6)
+
+16
+
+Convert the above vector into the pose transformation matrix:
+
+15
+
+This preprint research paper has not been peer reviewed. Electronic copy available at: https://ssrn.com/abstract=6636646
+
+Preprin t not p eer rev iewed
+
+  xw2  bxw  c  yr
+
+xw  xr
+
+
+
+
+
+
+
+
+
+0
+
+xw  xr
+
+
+
+
+
+‖d‖
+
+‖d‖
+
+
+
+
+
+xw  xr
+
+ xw2  bxw  c  yr
+
+2
+
+
+
+1
+
+Trw  
+
+
+
+
+
+0  xw  bxw  c  yr  (7)
+
+
+
+‖d‖
+
+‖d‖
+
+
+
+
+
+0
+
+0
+
+1
+
+0
+
+
+
+
+
+
+
+
+
+0
+
+0
+
+0
+
+1
+
+
+
+2
+
+Finally, the pose matrix of the orbital path coordinate system is transformed with
+
+3 the pose transformation matrix. The ring-welding path points after adjustment is
+
+4 obtained.
+
+5
+
+Overall, in order to solve the problem of segment planning for variable-curved
+
+6 surfaces, the aforementioned path planning model is established. The path planning
+
+7 model dynamically adapts to the different structures, diameters and arch axis. The path
+
+8 planning model lays the foundation for subsequent multi-obstacle path planning.
+
+9 3 Path planning method of ring-welding and obstacle-avoidance
+
+10 3.1 Planning of ring-welding in the main arch segments
+
+11
+
+The planning of the ring-welding path for the main arch segments is to ensure the
+
+12 two welding processes of the main arch segments from bottom to top. The adjustment
+
+13 of different welding torch pose is achieved simultaneously, and the planning method is
+
+14 shown in Figure 9.
+
+15
+
+Firstly, the angle between the welding point and the main arch center line is set as
+
+16 α, with express the current welding progress. During welding, α increases from 0 to π
+
+17 on the left and right sides of the two ends of the main arch segment, as shown in Figure
+
+18 9 (a). Then, the angle β of the welding torch pose along the cross-section of the arch
+16
+
+This preprint research paper has not been peer reviewed. Electronic copy available at: https://ssrn.com/abstract=6636646
+
+Preprin t not p eer rev iewed
+
+1 axis is set, which observe the quality of the weld seam. The angle θ of the welding torch
+
+2 on the main arch section is set to ensure the quality of the welding pool formation under
+
+3 the influence of gravity, as shown in Figure 9 (b). Finally, the ring-welding path is
+
+4 offset by the bias model of Section 3.3. Besides, the discrete calculation points are set
+
+5 along the ring-welding path, with improving the calculation efficiency of path planning,
+
+6 as shown in Figure 9 (c).
+(a) End point of welding
+
+α
+
+Arch rib
+
+α
+
+section
+
+(b) Arch axis
+
+Arch rib section
+
+(c)
+α
+
+Starting point
+7 of welding θ
+
+8
+
+Fig.9. Global planning of collision-free arch rib welding: (a) Welding sequence;
+
+9
+
+(b) The offset of welding torch; (c) The offset of welding torch in global planning.
+
+10 3.2 Planning of collaborative ring-welding and obstacle-avoidance
+
+11
+
+The collaborative path-planning method adjusts the nominal ring-welding
+
+12 trajectory and subsequently performs fine correction of the torch pose in the vicinity of
+
+13 obstacles. Because the arch axis is long compared with its height, the curvature of the
+
+14 main-arch segment is small. Therefore, the segment is approximated as the cylindrical
+
+15 surface during collaborative planning, while the offset induced by the remaining
+
+16 curvature is compensated by the model given in Section 2.2
+
+17
+
+Firstly, based on the spatial distribution characteristics of the connecting rib plate,
+
+17
+
+This preprint research paper has not been peer reviewed. Electronic copy available at: https://ssrn.com/abstract=6636646
+
+Preprin t not p eer rev iewed
+
+1 two planes are respectively defined, as shown in Figure 10. Among them, the horizontal 2 plane is the circular section along the weld. The rib plates connecting the main arch 3 segments are the main obstacles in the transverse plane. The vertical plane is the plane 4 where the arch axis is located. The connecting rib plate directly welded to the main arch 5 is its main obstacle.
+
+6
+
+7
+
+Fig.10. Horizontal and vertical plane definitions in collaborative planning of ring-welding and
+
+8
+
+obstacle-avoidance
+
+9 3.2.1 Horizontal plane planning method
+
+10
+
+Secondly, the horizontal plane collaborative path planning is carried out. The
+
+11 baseline ring-welding path and the torch pose parameters α, θ and β are taken from
+
+12 Section 3.1. However, the initial circumferential weld path results in collisions between
+
+13 the welding torch and the connecting rib plates during the welding process. Therefore,
+
+14 the welding torch's angular parameter θ is dynamically adjusted within permissible
+
+15 limits, so that avoid collisions with rib plates, as show in Figure 12. In addition, when
+
+18
+
+This preprint research paper has not been peer reviewed. Electronic copy available at: https://ssrn.com/abstract=6636646
+
+Preprin t not p eer rev iewed
+
+1 the ring-welding robot continues to weld through the connecting rib plate, the continued
+
+2 welding point Pw needs to be ground.
+
+(a)
+
+(b)
+
+To
+
+Obstacle avoidance path
+
+Obstacle D
+
+The decision line for circular obstacle
+
+The decision lines for rectangular obstacles
+
+Welding joint Pm Welding torch Side view Top view
+Polished
+
+Arch rib A
+
+Continuous welding spot Pw
+
+Obstacle
+Welding torch Arch rib
+
+O
+3P
+4 Fig.11. Horizontal plane collaborative planning method: (a) Definition of variables; (b) Treatment
+
+5
+
+of welding joints.
+
+6
+
+Then, the relationship between a, b, and c is calculated from the side length of the
+
+7 triangle OCD as follows.
+
+To sin(   )
+
+ 
+
+T
+
+8 Ld  22  Pm sin(  )  d sin 2 sin( 2  )  o   Lw (8)
+
+2sin(  )
+
+2
+
+9
+
+Ld——The closest distance between the welding torch and the main arch segment
+
+10 (mm);
+
+11
+
+To——The width of the obstacle in the main arch circle section (mm);
+
+12
+
+Pm——The closest distance from the bottom of the obstacle to the main arch
+
+13 section circle (mm);
+
+14
+
+d——The diameter of section circle (mm);
+
+19
+
+This preprint research paper has not been peer reviewed. Electronic copy available at: https://ssrn.com/abstract=6636646
+
+Preprin t not p eer rev iewed
+
+1
+
+Tw——Diameter of the welding torch (mm);
+
+2
+
+θ——The angle between the welding torch and the cross-section of the main arch
+
+3 (°);
+
+4
+
+φ——The angle between the welding point on the section circle and the middle
+
+5 axis of the obstacle (°);
+
+6
+
+Moreover, the variable α gradually increases during the ring-welding process. The
+
+7 variables Ld, Lc, and θ mapped by variable are computed. The planning flowchart is
+
+8 formulated based on the relationships between the aforementioned variables and their
+
+9 defined thresholds, as show in Figure 12.
+
+1
+Obstacle
+
+2
+
+α
+
+3
+Tangent circle method
+T0
+
+Arch rib
+
+Welding torch
+
+Ld
+θ
+
+Lsd Constant tangent
+
+Ld > Lsd Lc > Lsc
+θ = θ0 4
+Projected
+
+Oc Welding torch
+
+Lc
+Ld
+θ
+
+Ld = Lsd Lc > Lsc θ ∊ [θ0, θmax)
+
+5
+
+6
+
+Sliding wall method
+
+θ Lc
+
+Hypothetical wall Lsc T0
+Constant length
+
+Ld = Lsd Lc > Lsc
+10 θ ∊ [θmin , θ0)
+
+θ Ld ≥ Lsd Lc = Lsc
+θ ∊ [θmin , θ0)
+
+α+(i·2π)/d
+Obstacle avoidance
+path
+Ld = Lsd Lc > Lsc θ = θmax
+Lc
+Ld ≥ Lsd Lc > Lsc θ = θ0
+
+11
+
+Fig.12. Horizontal plane collaborative planning flowchart.
+
+12
+
+(1) Initial welding phase: the welding torch gradually approaches the obstacle
+
+13 while maintaining the angle θ = θ0. Proceed to the next step when length Ld = Lsd.
+
+14
+
+(2) Circular–guided tangency phase: gradually increase the angle θ to θmax, based
+
+20
+
+This preprint research paper has not been peer reviewed. Electronic copy available at: https://ssrn.com/abstract=6636646
+
+Preprin t not p eer rev iewed
+
+1 on the circular–guided tangency method.
+
+2
+
+(3) Obstacle-avoidance phase: pause the current welding and traverse the obstacle
+
+3 along the subsequently planned obstacle avoidance trajectory.
+
+4
+
+(4) Reverse circular–guided tangency phase: gradually decrease the angle θ to θmax,
+
+5 based on the circular–guided tangency method. Proceed to the next step when length Lc
+
+6 = Lsc.
+
+7
+
+(5) Wall-guided sliding phase: gradually decrease θ to θ0 to complete the pose
+
+8 correction, based on the wall-guided sliding method.
+
+9
+
+(6) Resumption welding phase: move away from obstacles while resuming
+
+10 standard welding posture. Initiate the recycle upon encountering the next obstacle, and
+
+11 continue until the half-lap welding is completed.
+
+12
+
+The core methods of cooperative path planning are circular-guided tangency and
+
+13 wall-guided sliding methods. Both methods concurrently fulfills both the ring-welding
+
+14 objective and the obstacle-avoidance objective.
+
+15
+
+Among them, the circular–guided tangency method constructs the virtual circle
+
+16 centered at the nearest corner point of the obstacle. It calculates the pose vector of the
+
+17 welding torch from the tangency constraint between virtual circles, as shown in Figure
+
+18 13(a). The wall-guided sliding method establishes the virtual wall at distance Lsc from
+
+19 the obstacle. It calculates the pose vector of the welding torch from the constraint that
+
+20 the fixed-length line segment remains in close contact with the wall, as shown in Figure
+
+21 13(b).
+21
+
+This preprint research paper has not been peer reviewed. Electronic copy available at: https://ssrn.com/abstract=6636646
+
+Preprin t not p eer rev iewed
+
+(a)
+
+(b)
+
+Connecting
+
+Ld
+
+rib plate
+
+Maintain
+
+length
+
+Ld
+
+Connecting rib plate
+
+Maintain tangency
+1
+
+Main arch
+
+Main arch
+
+2
+
+Fig.13. Horizontal plane collaborative planning method:
+
+3
+
+(a) Circular–guided tangency method; (b) Wall-guided sliding method.
+
+4 3.2.2 Vertical plane planning method
+
+5
+
+Finally, the vertical plane collaborative path planning work is carried out.
+
+6 Similarly, it is necessary to comprehensively ensure the variables α, θ and β that
+
+7 guarantee the posture of the welding torch. The collision risks exist in the specific ring-
+
+8 welding path adjacent to the connecting rib plate. The variable β is configured at 0° to
+
+9 maintain compliance with on-site welding construction process while achieving
+
+10 minimal collision probability. On the vertical plane, interference most likely originates
+
+11 from the three connecting rib plates on one side of the robot and from both sides of the
+
+12 welding bevel. The connecting rib plates are accordingly simplified to three rectangles
+
+13 of identical height and thickness.
+
+14
+
+In its vertical plane projection, the ring-welding robot simplifies to the 3-DOF
+
+15 planar connecting rod. The welding torch fixture is specified as an L-shaped structural
+
+16 component of a specific length, holding the welding torch at the designated pose while
+
+22
+
+This preprint research paper has not been peer reviewed. Electronic copy available at: https://ssrn.com/abstract=6636646
+
+Preprin t not p eer rev iewed
+
+1 satisfying the preset geometric constraints, as shown in Fig 14. The correspondence
+
+2 between connecting rod joints (Jc) and robot joints (Jr) is as follows: Jc1 - Jr2, Jc2 - Jr3,
+
+3 Jc3 - Jr5. Connecting rod lengths and rotation angle ranges depend on the joint
+
+4 parameters of the ring-welding robot. The connecting rod reference origin is determined
+
+5 by the relative offset between the fixed base and bottom rail of the ring-welding robot.
+
+Robot axis 2
+Joint 1 Bottom movement structure
+
+Robot axis 3 Joint 2
+Robot axis 5 Joint 3
+xe
+
+Lf1 External fixture Ds2 Welding gun
+Lf2
+Welding groove ye
+Main arch segment
+
+Robot side Proximal groove Distal groove
+
+rib plate
+
+rib plate
+
+rib plate
+
+6
+
+7
+
+Fig.14. Vertical plane collaborative planning method
+
+8
+
+Furthermore, the connecting rod has origin O = (Ox, Oy), link lengths L1, L2, and
+
+9 L3, and joint angles θ1, θ2, and θ3. The connecting rib plates are defined as Rectangle
+
+10 1, Rectangle 2, and Rectangle 3 according to their distance from the robot. Suppose the
+
+11 upper-left corner coordinates of the three rectangles are:
+
+12
+
+Rn  (Rnx, Rny )
+
+(9)
+
+13
+
+The vector from vector link 1 origin to the upper-left corner of rectangle 1 is
+
+14 defined as VOR1:
+
+15
+
+VOR1 R1 O
+
+(10)
+
+16
+
+The minimum distance Dr1 between joint 1 and rectangle is obtained by
+
+23
+
+This preprint research paper has not been peer reviewed. Electronic copy available at: https://ssrn.com/abstract=6636646
+
+Preprin t not p eer rev iewed
+
+1 calculating the modulus length ||VOR1||. The process is as follows: 2 Dr1  VOR1  ( R1x  Ox )2  ( R1 y  O y )2 (11)
+
+3
+
+Calculate the vertical unit vector VOR1⊥ of VOR1 as follows:
+
+（ VOR1y ,VOR1x )
+
+4
+
+VOR1⊥ 
+
+(12)
+
+VOR1
+
+5
+
+Define the angle between the connecting rod joint and the vector OR1 as ρ:
+
+6
+
+  arcsin( DR1 )
+
+(13)
+
+VOR1
+
+7
+
+Then the direction vector V1 of joint 1 is solved as follows:
+
+8
+
+V1  cos()VOR1  sin()v⊥  VOR1
+
+(14)
+
+9
+
+The Angle θ1 of joint 1 is solved as follows:
+
+10 1  arctan( YV1 ) (15) XV1
+
+11
+
+After specifying the angles of joint 1, the rotation angles of joints 2 and 3 satisfying
+
+12 the above constraints are calculated. The y-coordinate value of the end effector of the
+
+13 robot is as follows:
+
+14 ye  H  DS  T3 (16) 2
+
+15
+
+The variable H is the height of the obstacle rectangle 3 and the variable T3 is the
+
+16 thickness of the projection of link 3 along the longitudinal plane. The angle θ2 of joint
+
+17 2 under the constraints is calculated as follows: 18 2  arcsin( y4  (Oy  L1 sin(1)) (17)
+L2
+
+19
+
+The joint rotation angles under the above constraints determine the required fixture
+
+24
+
+This preprint research paper has not been peer reviewed. Electronic copy available at: https://ssrn.com/abstract=6636646
+
+Preprin t not p eer rev iewed
+
+1 parameters, giving the length Lf1 of fixture link 1 as:
+
+2
+
+Lf 1  xe  (Ox  L1 cos(1))  L2 cos(1 2)  L3
+
+(18)
+
+3
+
+The length Lf2 of fixture link 2 is as follows:
+
+4
+
+Lf 2  (Oy  L1 sin(1))  L2 sin(1  2 )  ye
+
+(19)
+
+5
+
+The lengths of the two connecting rods are substituted into Formula 4 (Section
+
+6 2.2) and integrated with the kinematic model of the ring-welding robot to enable
+
+7 coordinate transformation from the torch-end coordinate system to the robot joint space.
+
+8 3.3 Planning of obstacle-avoidance in connecting rib plates
+
+9
+
+The obstacle-avoidance path planning for the connecting rib plate focuses on
+
+10 enabling smooth collision-free transitions for the ring-welding robot across the
+
+11 connection interface. The detailed implementation is illustrated in Figure 15.
+
+Field
+Available paths
+
+qn,3 qn,2 qn,1 qn,0
+
+qn,t-3 qn,t-2 qn,t-1
+qn,t
+
+12 Initial path
+
+13
+
+Fig.15. Diagram of the iterative process by CHOMP algorithm.
+
+14
+
+Firstly, it is necessary to clarify the collision relationship between the robot and
+
+15 the environment. The BPS dataset utilizes the Signed Distance Field (SDF) method for
+
+16 precise collision detection in robotic welding environments [25]. The Euclidean Distance
+
+25
+
+This preprint research paper has not been peer reviewed. Electronic copy available at: https://ssrn.com/abstract=6636646
+
+Preprin t not p eer rev iewed
+
+1 Transform (EDT) quantifies the spatial separation between the ring-welding robot and
+
+2 obstacles in three-dimensional workspace [34]. The spatial separation between any robot
+
+3 BPS point x and its nearest obstacle surface is formulated through the following
+
+4 mathematical expression:
+
+5
+
+D(x)  d(x)d(x)
+
+(20)
+
+6
+
+The spatial separation between point x and obstacles is quantified through the
+
+7 function d(x), while its complementary metric d-(x) measures the spatial interval from
+
+8 point x to the obstacle-free zone.
+
+9
+
+When D(x) > Rx + Ls, it is considered that there is no collision between point x and
+
+10 the connecting stiffener. The radius Rx is defined for point x within the BPS framework
+
+11 of the selected robot, and the safety distance x is predetermined as the threshold
+
+12 parameter. Throughout the entire welding process of main arch segments by the ring-
+
+13 welding robot, the spatial separation D(x) between all robot BPS and the connecting rib
+
+14 plate must exceed the predetermined threshold, ensuring continuous collision-free
+
+15 operation of the robotic system.
+
+16
+
+Then, the collision-free smooth path is established for the connecting rib plate
+
+17 interface between the ring-welding robot and main arch connection section, considering
+
+18 constraints during welding operations. The CHOMP (Covariant Hamiltonian
+
+19 Optimization for Motion Planning) algorithm [25], characterized by motion smoothing,
+
+20 environmental adaptability, and computational efficiency, is adopted in the section. The
+
+21 path in the n-DOF robot joint space is discretized into t sequential points, and the
+26
+
+This preprint research paper has not been peer reviewed. Electronic copy available at: https://ssrn.com/abstract=6636646
+
+Preprin t not p eer rev iewed
+
+1 resulting trajectory function Q is formulated as follows:
+
+ q1,t  q1,t 
+
+
+
+
+
+Nq
+
+2
+
+Qt       , qt,n  R
+
+(21)
+
+ 
+
+ 
+
+qn
+
+,1
+
+
+
+qn,t
+
+ 
+
+3
+
+Further establish the objective function:
+
+4
+
+U(Q) UC(Q)UL(Q)
+
+(22)
+
+5
+
+The variable λ serves as the weight parameter to balance the contribution of the
+
+6 cost function to the objective function. The function UC(Q) is the collision cost function,
+
+7 quantifying the distance between the path and the obstacle to prevent collisions between
+
+8 the robot and the connecting rib plate. By combining the point cloud model of the main
+
+9 arch segment and the ring-welding robot, and solving the minimization of the objective
+
+10 function using the gradient descent method, it is possible to obtain the overall collision-
+
+11 free and relatively smooth target path for the robot. Overall, the above-mentioned path
+
+12 planning methods have formed the closed loop of ring-welding and obstacle-avoidance
+
+13 path planning for the main arch segments
+
+14 4 Path planning results of the main arch segments
+
+15 4.1 Simulation results of the path planning for ring-welding and obstacle-
+
+16 avoidance
+
+17
+
+The section exemplifies the main arch segment with 1200 mm diameter,
+
+18 employing typical rectangular connecting rib plates to join segments. The variable β is
+
+19 fixed at 0°, and the deflection angle is set to 10° in the anti-gravity direction. Path
+
+20 positions are defined by points, and path directions are defined by vectors. The initial
+27
+
+This preprint research paper has not been peer reviewed. Electronic copy available at: https://ssrn.com/abstract=6636646
+
+Preprin t not p eer rev iewed
+
+1 ring-welding path at the circular section of the main arch is shown in Figure 16.
+
+(a)
+β = 0°
+2
+
+θ = 10°
+
+(b) Welding path position
+600
+
+Welding path direction
+
+400
+
+200
+
+0
+
+The center of the
+
+-200
+
+main arch section
+
+-400
+
+-600 600 -400 -200 0 200 400 600
+
+3
+
+Fig.16. Illustration of circular welding path planning:
+
+4
+
+(a) Definition of welding posture; (b) Plan view of path planning
+
+5
+
+Then, the collaborative path planning corrects the ring-welding path. Three
+
+6 rectangular connecting rib plate centers are positioned in the horizontal plane at
+
+7 coordinates (368, 586), (668, 181), and (668, -181). Refining the ring-welding path
+
+8 adjacent to obstacles enhances collaborative path planning accuracy. Following Steps
+
+9 1–6 of the proposed transverse-plane coordinated planning method, the original girth
+
+10 welding path orientation was corrected to satisfy the preset 20 mm safe working
+
+11 distance. The planning results of the transverse-plane coordinated path are shown in
+
+12 Figure 17(a), and the welding torch offset at each welding position is presented in
+
+13 Figure 17(b).
+
+28 This preprint research paper has not been peer reviewed. Electronic copy available at: https://ssrn.com/abstract=6636646
+
+Y-axis (mm)
+θ (°)
+Y-axis (mm)
+review ed
+
+(a) 600
+400 200
+
+Obstacle 3 Obstacle 2
+
+Welding path position Welding path direction The rib plate Tangential circular edge Sliding wall surface
+
+-50
+
+-100
+
+Step 4
+
+-150 Step 2
+
+-200
+
+Step 6/1 (Welding Path )
+Step 5
+
+0 -250
+
+Step 3
+
+-200
+
+-300
+
+Step 1
+
+(Avoidance Path )
+
+Obstacle 1 -350 (Welding Path )
+
+-400
+
+0
+
+200
+
+400
+
+600
+
+800 1000 1200
+
+1 X-axis (mm)
+
+500
+
+600
+
+700
+
+800
+
+900
+
+X-axis (mm)
+
+(b)
+Main arch
+
+β (°) 90 75 30 20 10 0 -10 -20
+(-6.289)
+(-6.667)
+(-7.156)
+
+60 45
+(27.984) 30 (28.075)
+15
+(27.354) 0
+
+β
+
+-15
+
+-20 torch Welding -10 -30
+0
+
+θ 10
+
+-45
+
+20
+
+30 -60
+
+2
+
+-90 -75
+
+p θ (°) e e r
+
+3
+
+Fig.17. Result diagram of the coordinated path planning in the horizontal plane:
+
+not
+
+4
+
+(a) The situation of the welding torch vector; (b) The situation of the welding torch angle
+
+5
+
+Moreover, three rectangular connecting rib plates are positioned at coordinates
+
+6 (246, 145), (681, 145), and (874, 145) in the longitudinal plane. According to the
+
+7 proposed vertical plane collaborative planning method, the lengths of two links of the
+
+8 external fixture are calculated, and the longitudinal plane collaborative path planning
+
+9 result is shown in Figure 18.
+
+Preprin t
+
+29 This preprint research paper has not been peer reviewed. Electronic copy available at: https://ssrn.com/abstract=6636646
+
+ed
+
+view
+
+800
+
+Link 2
+
+Link 3
+
+Link 5
+
+700
+
+Fixture Link 1
+
+Fixture Link 2
+
+600
+
+Y-Ya-axixiss(mm)
+
+500
+
+400 255.48 mm
+300
+
+230.00 mm
+
+200
+
+100
+
+0 0 100 200 300 400 500 600 700 800 900 1000
+1 Z-axXis-a(xmism)
+
+2
+
+Fig.18. Result diagram of coordinated path planning in the longitudinal plane
+
+r re
+
+3
+
+Furthermore, based on the collaborative planning results in the horizontal, vertical
+
+ee
+
+4 planes, and the offset model of the ring-welding path of the main arch segments and the
+
+5 ring-welding robot bottom-rail, the set of coordinate systems at the end of the welding
+
+tp
+
+6 torch is established. The length of the first axis of the robot is determined to 717 mm
+
+7 based on the diameter of the main arch segment, and the parameters are brought into
+
+no
+
+8 the kinematic model of the main arch segment ring-welding robot. The collaborative
+
+9 planning path in the joint space is obtained through the inverse kinematics method.
+
+10
+
+Finally, the obstacle-avoidance path planning corrected the excess path segments
+
+rint
+
+11 at obstacle boundaries. Joint spatial paths between three obstacles are employed as
+
+12 solution targets using the main arch segment point cloud model and ring-welding robot.
+
+13 The CHOMP algorithm framework generated obstacle avoidance paths at both ends of
+
+14 the obstacles, which are inserted into the existing planning results, producing the
+
+15 complete ring welding-obstacle avoidance path planning results, as shown in Figure 19.
+
+30
+
+Prep
+
+This preprint research paper has not been peer reviewed. Electronic copy available at: https://ssrn.com/abstract=6636646
+
+Preprin t not p eer rev iewed
+
+1
+
+The above cooperative path planning results show that: the horizontal plane
+
+2 planning cooperative method precisely regulated the welding torch attitude near the
+
+3 connecting rib plates, with the torch inclination angle achieving the smooth transition
+
+4 within the range of -7.156° to 28.075°. This inclination range corresponds to a torch
+
+5 angle variation within ±30°, which aligns with the recommended setting range for gas
+
+6 metal arc welding (GMAW)[35]. GMAW is one of the dominant welding processes
+
+7 adopted for the main arch rib segments of long-span arch bridges.
+
+8
+
+During the girth welding process, the minimum distance between the welding
+
+9 torch and the connecting rib plates was stably maintained at 20 mm, which effectively
+
+10 ensured the stability and standard compliance of the welding operation. The vertical
+
+11 plane collaborative planning accurately calculates the joint postures for joints 2, 3, and
+
+12 5 under predetermined constraints, resulting in final joint lengths of 255.48 mm and
+
+13 230.00 mm, respectively. The complete obstacle-avoidance paths are generated at both
+
+14 ends of the obstacles, achieving comprehensive ring-welding and obstacle-avoidance
+
+15 path planning for the main arch segment of the long-span arch bridge. The planning 16 path transition was smooth, with maximum angle differences of 2.516 ° (Joint 1) and 17 2.032° (Joint 2) observed between adjacent control steps in joint space.
+
+31 This preprint research paper has not been peer reviewed. Electronic copy available at: https://ssrn.com/abstract=6636646
+
+Preprin t no Angle(°) tp eer re view ed
+
+(a)
+1
+
+(b) 135
+
+Joint 1 Joint 2 Joint 3 Joint 4 Joint 5 Joint 6
+
+90
+
+45
+
+0
+
+-45
+-90 0
+
+Welding Path Collaboration Path Avoidance Path
+20 40 60 80 100 120 140 160 180 200 220 240 260 280 300 320 Step
+
+2
+
+Fig.19. Result diagram of collaborative path planning for circumferential welding and obstacle
+
+3
+
+avoidance: (a) Partial robot postures; (b) Joint angles
+
+4
+
+The proposed method achieves coordinated ring-welding and obstacle avoidance
+
+5 path planning, with smooth joint transitions ensuring continuous, stable robot motion.
+
+6 4.2 Experimental verification of the path planning for ring-welding
+
+7
+
+The experimental verification of the path planning for the ring-welding robot in
+
+8 main arch segments of long-span arch bridge is carried out using the proportional test
+
+9 rig of the main arch segments, ring-welding robot, displacement sensors, and simulation
+
+10 coating equipment. Firstly, based on the planning path method of main arch segment ,
+
+11 discrete control points are reordered temporally, and the simulated welding speed is set
+
+12 to 5 mm/s. The maximum angular jerk of the six joints at this moment is 3.0392 rad/s3,
+
+13 well below the 25 rad/s3 minimum joint jerk constraint for industrial robots, which
+
+14 guarantees the smooth motion of the robot in welding and obstacle avoidance
+
+15 operations [36]. The above path planning method is verified through the laser
+
+16 displacement sensor and coating tests.
+32
+
+This preprint research paper has not been peer reviewed. Electronic copy available at: https://ssrn.com/abstract=6636646
+
+Preprin t not p eer rev iewed
+
+1
+
+In the displacement sensor test, the weld and the reflective plate are taken as
+
+2 ranging objects by the sensor to reflect the relative position relationship between the
+
+3 end effector and the main arch, as show in Fig 20. In the test process, the path of the
+
+4 end-effector are aligned with the planning expectations. The predetermined weld
+
+5 position is accurately illuminated by the sensor laser. Furthermore, the feedback
+
+6 parameters of the displacement sensor are extracted from the process to verify the
+
+7 dynamic performance of the ring-welding robot. The results from the displacement
+
+8 sensor are presented in Fig 22. The maximum radial deviation of the end-effector is
+
+9 measured as 0.835 mm and the maximum longitudinal deviation is found to be 0.360
+
+10 mm, with both deviations maintained at the sub-millimeter level, thereby ensuring the
+
+11 consistency and stability of the welding quality.
+
+33 This preprint research paper has not been peer reviewed. Electronic copy available at: https://ssrn.com/abstract=6636646
+
+d
+
+we
+
+Distance (mm)
+
+Angle (°)
+
+(a) 135 90 45 0 -45 0
+(b) 400
+300
+200
+100
+0 0
+1s
+
+Joint 1 Joint 2 Joint 3 Joint 4 Joint 5 Joint 6
+
+Obstacle 2
+
+Obstacle 3
+
+20
+
+40
+
+60
+
+80 100 120 140 160
+
+Time (s)
+
+Radial direction Axial direction
+
+revie
+
+e r
+
+Obstacle 2
+
+Obstacle 3
+
+20
+
+40
+
+60
+
+80 100 120 140 160
+
+Time (s)
+
+102 s
+
+138 s
+
+pe
+
+o t
+
+Preprin
+
+tn
+
+1 2 Fig.20. Experimental verification results of displacement sensor test for girth welding and obstacle 3 avoidance path: (a) Joint rotation angle parameters; (b) Multi-directional displacement parameters
+
+4
+
+In the simulated welding test, coating equipment was externally mounted at the
+
+5 end of the ring welding robot to carry out experimental verification of the welding effect.
+
+6 The pose of the coating device and the weld filling effect are shown in Figure 21.
+
+7 During the ring-welding phase, the robot maintained high-accuracy pose regulation of
+
+8 the coating equipment, achieving excellent docking performance between the robot end
+34
+
+This preprint research paper has not been peer reviewed. Electronic copy available at: https://ssrn.com/abstract=6636646
+
+Preprin t not p eer rev iewed
+
+1 and the target accumulation position of the weld seam. The minimum distance between 2 the welding torch and the workpiece surface was consistent with the preset safety 3 threshold and stably maintained at 20 mm. The final weld seam featured uniform and 4 full forming with complete filling, free from typical forming defects including missing 5 coating and material accumulation. During the obstacle-avoidance phase, the robot 6 completed the preset full-process obstacle avoidance for weld seam occlusion from the 7 connecting rib plate, with the operation sequence of welding shutdown, torch tilting, 8 lifting for avoidance, pose resetting and welding restart. The welding torch maintained 9 a safe working distance from the workpiece throughout the process with smooth motion 10 and no severe jitter, and the robot quickly reset to the working pose to resume welding 11 after avoidance. These results further confirm the spatiotemporal effectiveness of the 12 proposed path planning method and the operational accuracy of the robot equipment.
+35 This preprint research paper has not been peer reviewed. Electronic copy available at: https://ssrn.com/abstract=6636646
+
+Preprin t not p eer rev iewed
+
+Pose accuracy Step 1 (During welding)
+
+Connect properly
+
+(b) Filled completely
+
+20 mm 35 mm
+1 Step 2 (Tilt welding torch) Step 3 (Stop welding) Step 4 (Raise welding torch) Step 5 (Start welding)
+
+2
+
+Fig.21. Experimental verification results of coating test for girth welding and obstacle
+
+3
+
+avoidance path
+
+4
+
+The completed tests detailed above have fulfilled the closed-loop planning
+
+5 verification of the ring welding-obstacle avoidance path. The end displacement
+
+6 deviation meets the Class E accuracy requirements of GB/T 19804-2005 with favorable
+
+7 coating test performance, which verifies the effectiveness of the proposed welding-
+
+8 obstacle avoidance path planning for the ring welding robot.
+
+9 5. Conclusion
+
+10
+
+The multi-stage dimensions of the main arch segments of long-span arch bridges
+
+11 and the ring-welding robot in variable-curved surface are considered based on the
+
+12 design of the 6-DOF ring-welding robot. The path planning method for ring-welding
+36
+
+This preprint research paper has not been peer reviewed. Electronic copy available at: https://ssrn.com/abstract=6636646
+
+Preprin t not p eer rev iewed
+
+1 and obstacle-avoidance coordination adapted to multi-obstacle and Variable-curved
+
+2 scenarios is propose. The following conclusions are derived through simulation and
+
+3 experimental verification:
+
+4
+
+(1) Full-process obstacle avoidance planning for the ring welding operation of
+
+5 main arch segments is achieved through the integration of the cooperative path planning
+
+6 method and the planning model for the ring welding robot of main arch segments of
+
+7 long-span arch bridges. Both obstacle avoidance constraints and welding requirements
+
+8 are satisfied by the proposed planning method, and the lengths of the end fixture
+
+9 meeting the obstacle avoidance constraints are calculated as 255.48 mm and 230.00
+
+10 mm. Under this condition, the inclination angle of the welding torch during welding is
+
+11 controlled within the range of -7.156° to 28.075°, which conforms to the standard
+
+12 setting range of the welding torch angle for GMAW.
+
+13
+
+(2) The motion stability of the ring welding operation for main arch segments is
+
+14 effectively improved based on the proposed welding-obstacle avoidance collaborative
+
+15 planning method for the ring welding robot of main arch segments of long-span arch
+
+16 bridges. The smoothness of both the welding torch pose and joint rotation angle is
+
+17 guaranteed by the proposed planning method. For the planned path, the maximum
+
+18 angular difference between adjacent control steps in the joint space is 2.516°, and the
+
+19 maximum joint angular jerk is 3.0392 rad/s³, which fully meets the angular jerk
+
+20 requirements for industrial robots.
+
+21
+
+(3) Coating tests are conducted with a scale test rig of a typical main arch segment
+
+37
+
+This preprint research paper has not been peer reviewed. Electronic copy available at: https://ssrn.com/abstract=6636646
+
+Preprin t not p eer rev iewed
+
+1 to verify the proposed planning method for the ring welding robot of main arch
+
+2 segments of long-span arch bridges. During the validation process, stable overall
+
+3 motion is exhibited by the robot, and a minimum clearance of 35 mm is maintained
+
+4 during obstacle avoidance. The positioning accuracy of the end effector during welding
+
+5 operations is achieved at the submillimeter level, with maximum radial and longitudinal
+
+6 deviations being 0.835 mm and 0.360 mm, respectively, which are met the specified
+
+7 Class E accuracy requirements. Uniform formation of the final coating is obtained with
+
+8 no obvious forming defects.
+
+9
+
+10 CRediT authorship contribution statement
+
+11
+
+Shuangqian Peng: Methodology, Algorithm, Experiment, Validation, Writing -
+
+12 original draft. Xiaolu Cui: Methodology, Validation, Writing – review & editing.
+
+13 Jianting Zhou: Resources, Investigation. Hong Zhang: Resources, Data Curation. Bo
+
+14 Huang: Resources, Investigation.
+
+15
+
+16 Declaration of competing interest
+
+17
+
+The authors declare that they have no known competing financial interests or
+
+18 personal relationships that could have appeared to influence the work reported in this
+
+19 study.
+
+20
+
+21 Acknowledgments
+38
+
+This preprint research paper has not been peer reviewed. Electronic copy available at: https://ssrn.com/abstract=6636646
+
+Preprin t not p eer rev iewed
+
+1
+
+The authors are grateful for the support of this research by the National Key R&D
+
+2 Program Subproject: Large-span railway arch bridge rapid arching automatic ring
+
+3 welding intelligent equipment (2022YFB2302505);
+
+4
+
+39 This preprint research paper has not been peer reviewed. Electronic copy available at: https://ssrn.com/abstract=6636646
+
+Preprin t not p eer rev iewed
+
+1 References:
+[1] X. Zhou, X. Zhang, Thoughts on the Development of Bridge Technology in China, Engineering, 5 (6) (2019) 1120-1130. DOI:10.1016/j.eng.2019.10.001.
+[2] Z. Zhang, E. C. Leong, W. Gong, G. Dai, J. Li. Foundation design of single-span arch bridges in China. J. Case Studies in Construction Materials. 19 (1) (2023) e02239. https://doi.org/10.1016/j.cscm.2023.e02239.
+[3] J. Zheng, J. Wang. Concrete-Filled Steel Tube Arch Bridges in China. J. Engineering. 4 (1) (2017) 143-155. https://doi.org/10.1016/j.eng.2017.12.003.
+[4] P. Zampieri, C. D. Tetougueni, E. Maiorana, C. Pellegrino. Post-buckling of network arch bridges subjected to vertical loads. Structure and Infrastructure Engineering: Maintenance, Management, Life-Cycle Design and Performance. 17 (7) (2021) 17. https://doi.org/10.1080/15732479.2020.1778742.
+[5] Y. Fan, J. Xin, L. Yang, J. Zhou, C. Luo, Y. Zhou, H. Zhang, Optimization method for the length of the outsourcing concrete working plane on the main arch rib of a rigid-frame arch bridge based on the NSGA-II algorithm, Structures, 2024 59 (2024) 105767. https://doi.org/10.1016/j.istruc.2023.105767
+[6] X. Liu, C. Qiu, Q. Zeng, A. Li, N. Xie. Time-energy Optimal Trajectory Planning for Collaborative Welding Robot with Multiple Manipulators. J. Procedia Manufacturing. 43 (1) (2020) 527-534. https://doi.org/10.1016/j.promfg.2020. 02.174.
+[7] C. Loukas, V. Warner, R. Jones, C. Macleod, M. Vasilev. A sensor enabled robotic strategy for automated Defect-Free Multi-Pass High-Integrity welding. J. Materials & Design. 216 (1) (2022) 111424. https://doi.org/10.1016/j.matdes.2022. 111424.
+[8] C. Cheng, J. Yu, Z. Xiang, S. Wang, H. Cai. Real-time in-tube concrete level tracking during concrete-filled steel tubular arch bridge construction using infrared thermography and computer vision. J. Automation in Construction. 175 (1) (2025) 106227. https://doi.org/10.1016/j.autcon.2025.106227.
+[9] A. D. Danciu, S. I. Guiu, C. Moga, M. L. Dragomir, M. Ciotlu. A Review of the Network Arch Bridge. J. Applied Sciences-Basel. 13 (19) (2023) 10966. https://doi.org/10.3390/app131910966.
+[10] N. Galustanian, M. T. Elshazli, H. Kaur, A. Elsisi, S. Orton. The Development of
+40
+This preprint research paper has not been peer reviewed. Electronic copy available at: https://ssrn.com/abstract=6636646
+
+Preprin t not p eer rev iewed
+
+Continuous Connections for Multi-Span Precast Prestressed Girder Bridges: A Review. J. CivilEng. 6 (2) (2025) 0016. https://doi.org/10.3390/civileng6020016. [11] Z. Liu, J. Zhou, J. Xin, Y. Zhuang, Y. Fan. In-plane bearing capacity analysis of concrete catenary arch with rigid skeleton: test and simulation. J. Advances in Bridge Engineering. 6 (1) (2025) 0158. https://doi.org/10.1186/s43251-02500158-4. [12] P. Yang, D. Li, S. Ling. Study on Optimization of External Flange Connection Structure in Concrete Arch Bridge with Embedded Framework. International Conference on Arch Bridges. 33 (1) (2025) 10. https://doi.org/10.1007/978-3-03186719-4_10. [13] P. Yang, F. Shen, D. Xu, B. Chen, R. Liu. An obstacle-avoidance inverse kinematics method for robotic manipulator in overhead multi-line environment. J. Engineering Science and Technology, an International Journal. 53 (1) (2024) 101686. https://doi.org/10.1016/j.jestch.2024.101686. [14] B. K. Patle, A. Pandey, A. Jagadeesh, D. R. Parhi. Path planning in uncertain environment by using firefly algorithm. J. Defence Technology. 14 (1) (2018) 004. https://doi.org/10.1016/j.dt.2018.06.004. [15] Y. Jiang, M. Li, D. Guo, W. Wu, R. Y. Zhong. Digital twin-enabled smart modular integrated construction system for on-site assembly. J. Computers in Industry. 136 (6) (2022) 103594. https://doi.org/10.1016/j.compind.2021.103594. [16] Y. He, Z. Huang, H. Liu, J. Ye, Y. Lu. Self-adaptive seam detection framework for unmanned structural steel welding robots in unstructured environments. J. Automation in Construction. 175 (1) (2025) 106221. https://doi.org/10.1016/j. autcon.2025.106221. [17] I. Zaplana, H. Hadfield, J. Lasenby. Closed-form solutions for the inverse kinematics of serial robots using conformal geometric algebra. J. Mechanism and Machine Theory. 173 (1) (2022) 104835. https://doi.org/10.1016/j. mechmachtheory.2022.104835. [18] C. Balaguer. A Review on Inverse Kinematics, Control and Planning for Robotic Manipulators With and Without Obstacles via Deep Neural Networks. J. Algorithms. 18 (1) (2025) 0023. https://doi.org/10.3390/a18010023. [19] X. Liu, C. Qiu, Q. Zeng, A. Li, N. Xie, Time-energy Optimal Trajectory Planning
+41
+This preprint research paper has not been peer reviewed. Electronic copy available at: https://ssrn.com/abstract=6636646
+
+Preprin t not p eer rev iewed
+
+for Collaborative Welding Robot with Multiple Manipulators, Procedia Manufacturing, 43 (2) (2020) 527-534. https://doi.org/10.1016/j.promfg.2020.02. 174 [20] H. Ghariblu, M. Shahabi. Path Planning of Complex Pipe Joints Welding with Redundant Robotic Systems. J. Robotica. 37 (6) (2019) 1020-1032. https://doi.org/10.1017/S0263574718001418. [21] Y. Liu, Q. Tang, X. Tian, S. Yang. A novel offline programming approach of robot welding for multi-pipe intersection structures based on NSGA-II and measured 3D point-clouds. J. Robotics and Computer Integrated Manufacturing. 83 (1) (2023) 102549. https://doi.org/10.1016/j.rcim.2023.102549. [22] A.J. Hippolitus, R. Senthilnathan. Quicker Path planning of a collaborative dualarm robot using Modified BP-RRT* algorithm. J. International Journal of Computers, Communications & Control. 19 (3) (2024) 6379. https://doi.org/10.15837/ijccc.2024.3.6379. [23] T. Rybus, J. Prokopczuk, M. Wojtunik, K. Aleksiejuk, J. Musia. Application of bidirectional rapidly exploring random trees (BiRRT) algorithm for collision-free trajectory planning of free-floating space manipulator. J. Robotica. 40 (1) (2022) 4326-4357. https://doi.org/10.1017/S0263574722000935. [24] S. Hou, M. Wu, B. Wu, Y. Ding, J. Zhang. Welding Path Planning for Steel Box Bridge Panel Unit with Multiple Ribs Based on Improved RRT Algorithm. J. Journal of Computing in Civil Engineering. 39 (6) (2010) 15. https://doi.org/ 10.1061/JCCEE5.CPENG-6449. [25] M. Zucker, N. Ratliff, A. D. Dragan, M. Pivtoraiko, M. Klingensmith. CHOMP: Covariant Hamiltonian optimization for motion planning. J. The International journal of robotics research. 32 (9-10) (2013) 1164-1193. https://doi.org/10.1177/ 0278364913488805. [26] Z. Tian, Z. Zhang, W. Peng, Y. Dai, Y. Cai, B. Xu, Research on the Method of Temporary Prestressing to Regulate the Stress in the Section during the Construction of the Main Arch Ring of the Cantilever Cast Arch Bridge, Applied Sciences-Basel, 12 (9) (2022) 10070. https://doi.org/10.3390/app121910070 [27] X. Jin, X. Kong, H. Tang, L. Wang. Weld seam extraction and path generation for robotic welding of steel structures based on 3D vision, Automation in Construction.
+42
+This preprint research paper has not been peer reviewed. Electronic copy available at: https://ssrn.com/abstract=6636646
+
+Preprin t not p eer rev iewed
+
+183 (2026) 106792. https://doi.org/10.1016/j.autcon.2026.106792 [28] P. Savino, F. Tondolo, M. Gherlone, A. Tessler. Application of Inverse Finite
+Element Method to Shape Sensing of Curved Beams. J. Sensors. 20 (24) (2020) 7012. https://doi.org/10.3390/s20247012. [29] Z. Tang, W. Zhang, J. Yu, S. Pospíil. Prediction of the elastoplastic in-plane buckling of parabolic steel arch bridges. J. Journal of Constructional Steel Research. 168 (1) (2020) 105988. https://doi.org/10.1016/j.jcsr.2020.105988. [30] J. M. Lien, N. M. Amato. Approximate convex decomposition of polygons. J. Computational Geometry. 43 (1) (2006) 005. https://doi.org/10.1016/j.comgeo. 2005.10.005. [31] N. Wu, D. Zhang, Z. Deng, X. Jin. Variational Mannequin Approximation Using Spheres and Capsules. J. IEEE Access. 6 (1) (2018) 1. https://doi.org/10.1109/ ACCESS.2018.2837013. [32] A. V. S. S. Somasundar, G. Yedukondalu. Robotic path planning and simulation by jacobian inverse for industrial applications. J. Procedia Computer Science. 133 (1) (2018) 338-347. https://doi.org/10.1016/j.procs.2018.07.042. [33] T. Sugihara. Solvability-Unconcerned Inverse Kinematics by the Levenberg– Marquardt Method. J. IEEE Transactions on Robotics. 27 (1) (2011) 2148230. https://doi.org/10.1109/TRO.2011.2148230. [34] P. F. Felzenszwalb, D. P. Huttenlocher. Distance Transforms of Sampled Functions. J. Theory of Computing. 8 (19) (2004) 415-428. https://doi.org/10.4086/ toc.2012.v008a019. [35] K. V. Rao, S. Parimi, L. S. Raju, G. Suresh. Modelling and optimization of weld bead geometry in robotic gas metal arc-based additive manufacturing using machine learning, finite-element modelling and graph theory and matrix approach. J. Soft Computing. 26 (7) (2022) 3385-3399. https://doi.org/10.1007/s00500-02206749-x. [36] G. Wu, N. Zhang. Kinematically Constrained Jerk–Continuous S-Curve Trajectory Planning in Joint Space for Industrial Robots. J. Electronics. 12 (5) (2023) 1135. https://doi.org/10.3390/electronics12051135.
+43
+This preprint research paper has not been peer reviewed. Electronic copy available at: https://ssrn.com/abstract=6636646
+
+reviewed peer t not reprin P
+
+reviewed peer t not reprin P
+
+reviewed peer t not reprin P
+
+reviewed peer t not reprin P
+
+reviewed peer t not reprin P
+
+reviewed peer t not reprin P
+
+reviewed peer t not reprin P
+
+reviewed peer t not reprin P
+
+reviewed peer t not reprin P
+
+reviewed peer t not reprin P
+
+reviewed peer t not reprin P
+
+reviewed peer t not reprin P
+
+reviewed peer t not reprin P
+
+reviewed peer t not reprin P
+
+reviewed peer t not reprin P
+
+reviewed peer t not reprin P
+
+reviewed peer t not reprin P
+
+reviewed peer t not reprin P
+
+reviewed peer t not reprin P
+
+reviewed peer t not reprin P
+
+reviewed peer t not reprin P
+
+reviewed peer t not reprin P
+
+

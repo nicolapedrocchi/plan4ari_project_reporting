@@ -1,0 +1,14 @@
+\section{Model predictive control and MPPI for trajectory generation}\label{sec:mpc}
+
+This section reports the state of the art on Model Predictive Path Integral (MPPI) control and its relation to MPC, then the industrial look-ahead and path-following methods relevant for the Core-IPC micro-interpolator.
+
+% --- MPPI state of the art, shared with the standalone SOTA note (../SOTA/latex/sota_body.tex)
+\begingroup
+\let\section\subsection
+\let\subsection\subsubsection
+\renewcommand{\paragraph}[1]{\par\runin{#1}}
+\input{sota_body}
+\endgroup
+
+\subsection{Industrial look-ahead, path following and micro-interpolation}
+Industrial controllers adapt the speed along a buffered path under kinematic limits. A path-accurate online trajectory generator modifies only the time law of a sampled joint path under velocity, acceleration and jerk limits at 250\,Hz on an industrial controller~\cite{lange2016pathaccurate}; CNC-style Cartesian look-ahead blends corners and scans speed limits bidirectionally~\cite{ma2025lookahead}. Model predictive path-following control treats the path parameter as a virtual state and was solved in at most 0.48\,ms at 1\,kHz on an industrial arm~\cite{faulwasser2017pathfollowing}. Predictive inverse kinematics with task scaling and predictive joint trajectory scaling~\cite{faroni2019pik,faroni2020scaling} and null-space NMPC~\cite{sun2024nullspacempc} are the deterministic counterparts of the MPPI look-ahead. Together they define the path--velocity layer of the Core IPC (Section~\ref{sec:arch}): the joint path is fixed upstream, the time law is optimised within the process speed band under hard limits, and band violations are reported upstream instead of producing unplanned stops.

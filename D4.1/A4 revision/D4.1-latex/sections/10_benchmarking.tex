@@ -1,0 +1,36 @@
+\section{Benchmarking and evaluation plan (Task 4.7)}\label{sec:bench}
+
+\begin{planbox}
+The methods are evaluated on a broad catalogue of industrial applications sharing the structure ``under-constrained task + speed requirements + possible base/axis redundancy + dynamic, human-shared scene''. \textbf{Arc welding of large structures is the only application validated on real hardware} (reference demonstrator); \textbf{all other applications are benchmarked in simulation}, on digital twins (COMAU virtualisation tools and open simulators), across several robot kinematic classes (R7).
+\end{planbox}
+
+\subsection{Application catalogue}
+{\small\renewcommand{\arraystretch}{1.25}
+\begin{longtable}{|L{2.8cm}|L{4.4cm}|L{2.9cm}|L{2.6cm}|L{1.2cm}|}
+\caption{Application catalogue for Task 4.7 (R = real hardware, S = simulation).}\label{tab:apps}\\ \hline
+\planheadrow \thead{Application} & \thead{Task structure / redundancy} & \thead{Platform} & \thead{Key metrics} & \thead{Eval.} \\ \hline\endfirsthead
+\hline\planheadrow \thead{Application} & \thead{Task structure / redundancy} & \thead{Platform} & \thead{Key metrics} & \thead{Eval.} \\ \hline\endhead
+Arc welding of large structures & 5-DoF seam, cone, free roll, constant speed $\pm10\%$, reconfigurations & 6-axis arm on AGV, optional rail & restarts, speed band, angles & \textbf{R} + S \\ \hline
+Multi-robot welding & synchronous / ordered seams, shared workspace~\cite{tang2023dualrobotweld} & 2+ arms, AGVs & cycle time, waiting, collisions & S \\ \hline
+Spray painting / coating & 5-DoF, free roll about nozzle, stand-off band~\cite{weingartshofer2023pathframework} & arm, rail & coverage, speed band & S \\ \hline
+Cold / thermal spray & 5-DoF toolpath, functional redundancy~\cite{razjigaev2025functional} & arm & joint travel, speed & S \\ \hline
+Sealing / gluing / dispensing & 5-DoF, constant speed, corners & arm, AGV & speed band, path error & S \\ \hline
+Deburring / grinding / sanding & 5-DoF, contact force, large parts~\cite{zhao2021mobilemachining} & mobile manipulator & path error, force, stations & S \\ \hline
+Milling / trimming / machining & 5-DoF, stiffness, smooth tool axis~\cite{yang2024toolpathsmoothing,lu2022toolorientation} & arm, positioner, dual arm~\cite{ye2026nullspacemultirobot} & error, jerk, cycle time & S \\ \hline
+Polishing & 5-DoF, contact, cone & arm & speed, force & S \\ \hline
+Laser cutting / laser welding & 5-DoF, tight speed tolerance & arm, gantry & speed band, error & S \\ \hline
+Drilling / riveting (aerospace) & point targets with tool axis, many stations~\cite{nguyen2023taskclustering} & mobile manipulator & stations, cycle time & S \\ \hline
+Ultrasound / NDT inspection & surface following with bounded offsets~\cite{yin2024dprealtime} & arm, AGV & coverage, offsets & S \\ \hline
+Wire-arc additive manufacturing & 5-DoF layers, free roll~\cite{dharmawan2018functional} & arm, positioner & speed, joint travel & S \\ \hline
+Fibre / tape placement & tool normal to surface, redundant cell~\cite{farzanehkaloorazi2018pathplacement} & arm, positioner, axes & singularity margin, time & S \\ \hline
+Pick-and-place / palletising & free-space transfers, base placement~\cite{wachter2024tcpbase} & arm, AGV & cycle time, success & S \\ \hline
+Machine tending / assembly & transfers in clutter, human access & cobot, AGV & success, latency, idle time & S \\ \hline
+Collaborative operations near humans & ISO/TS 15066 SSM/PFL~\cite{faroni2022safetyaware,gursoy2026cosmik} & cobot & idle time ($-30\%$ target), safety stops & S \\ \hline
+Intralogistics / AMR fleets & navigation in crowds~\cite{trevisan2025drampi,macenski2023nav2survey} & AMRs, mobile manipulators & success, freezing, time & S \\ \hline
+\end{longtable}}
+
+\subsection{Protocol and KPIs}
+In line with the proposal: at least 50 application scenarios drawn from Table~\ref{tab:apps}, computation time averaged over more than 100 contexts, OMPL planners as baseline for the sampling-based layer; GPU-based variants reported in a separate track. Additional baselines per layer as in Table~\ref{tab:methods}. Metrics: success rate; planning and replanning latency; number of stations, restarts and reconfigurations; deviation from the speed band; task-tolerance usage (work/travel angles); joint-limit and singularity margins; path accuracy; cycle time; safety-induced idle time and safety stops; smoothness (jerk); CPU/memory load; repeatability across runs. The welding benchmark extends an existing welding motion-planning benchmark framework (weld segments plus transitions)~\cite{demaeyer2021weldbenchmark}. Ablations: with/without MPPI look-ahead, with/without P2 optimisation, horizon length (5/10/20\,cm), number of goals, CPU vs GPU.
+
+\subsection{Benchmark repository}
+Scenarios, robot models, task descriptions, baselines and evaluation scripts will be collected in a version-controlled repository (to be set up within T4.6/T4.7), so that results are reproducible and comparable across partners.

@@ -1,0 +1,121 @@
+\usepackage{iftex}
+\ifPDFTeX%
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  % Times-compatible fallback for pdfLaTeX.
+  \usepackage{newtxtext,newtxmath}
+\else
+  \usepackage{fontspec}
+  % Prefer one of the reference fonts named in the official template.
+  \IfFontExistsTF{Times New Roman}{%
+    \setmainfont{Times New Roman}
+  }{%
+    \IfFontExistsTF{Nimbus Roman No9 L}{%
+      \setmainfont{Nimbus Roman No9 L}
+    }{%
+      \IfFontExistsTF{Nimbus Roman}{%
+        \setmainfont{Nimbus Roman}
+      }{%
+        % Metric-compatible Times-style fallback; verify against the official template before submission.
+        \setmainfont{TeX Gyre Termes}
+      }%
+    }%
+  }
+\fi
+\usepackage{lmodern}
+\usepackage{graphicx}
+\usepackage{microtype}
+\usepackage{ragged2e}
+
+\usepackage{amsmath,amssymb}
+\usepackage{tikz}
+\usetikzlibrary{arrows,positioning,shapes.geometric,fit,calc,matrix,shadows.blur}
+\usepackage{pgfgantt}
+\usepackage[table]{xcolor}
+\makeatletter
+\def\input@path{{./styles/}}
+\makeatother
+\usepackage{plan4ari_theme}
+\hypersetup{colorlinks=true,linkcolor=planblue,urlcolor=planblue,citecolor=planblue}
+
+\usepackage[
+    backend=biber,
+    style=verbose,
+    autocite=footnote,
+    doi=true,
+    url=false
+]{biblatex}
+
+
+\usepackage[marginal]{footmisc}
+
+
+% ---------- Tables, figures, lists ----------
+\usepackage{booktabs,tabularx,array,multirow}
+\usepackage{longtable}
+\usepackage{makecell}
+\usepackage{subcaption}
+\usepackage{caption}
+\captionsetup{labelfont=bf}
+
+
+% ---------- Header/footer and page-count warning ----------
+\usepackage{empheq}
+\usepackage[most]{tcolorbox}
+\tcbuselibrary{breakable}
+
+\usepackage[normalem]{ulem}
+
+\usepackage{xparse}
+
+\usepackage{xltabular}
+\keepXColumns
+
+% Compatibility for longtable v4.24 and older: its output routine used
+% infinitely shrinkable \vss glue, which LuaTeX reports when a long table splits.
+\makeatletter
+\@ifpackagelater{longtable}{2026/05/31}{}{%
+  \ExplSyntaxOn
+  \def\LT@output{%
+    \ifnum\outputpenalty <-\@Mi
+      \ifnum\outputpenalty > -\LT@end@pen
+        \LT@err{floats~ and~ marginpars~ not~ allowed~ in~ a~ longtable}\@ehc
+      \else
+        \setbox\z@\vbox{\unvbox\@cclv}%
+        \ifdim \ht\LT@lastfoot>\ht\LT@foot
+          \dimen@\pagegoal
+          \advance\dimen@\ht\LT@foot
+          \advance\dimen@-\ht\LT@lastfoot
+          \ifdim\dimen@<\ht\z@
+            \setbox\@cclv\vbox{%
+              \unvbox\z@\copy\LT@foot
+              \vskip 0pt plus \maxdimen minus \normalbaselineskip
+            }%
+            \@makecol
+            \@expl@@@mark@update@singlecol@structures@@
+            \@outputpage
+            \global\vsize\@colroom
+            \setbox\z@\vbox{\box\LT@head}%
+          \fi
+        \fi
+        \unvbox\z@\box\ifvoid\LT@lastfoot\LT@foot\else\LT@lastfoot\fi
+        \UseTaggingSocket{tbl/longtable/foot}%
+      \fi
+    \else
+      \setbox\@cclv\vbox{%
+        \unvbox\@cclv\copy\LT@foot
+        \vskip 0pt plus \maxdimen minus \normalbaselineskip
+      }%
+      \UseTaggingSocket{tbl/longtable/foot}%
+      \@makecol
+      \@expl@@@mark@update@singlecol@structures@@
+      \@outputpage
+      \global\vsize\@colroom
+      \copy\LT@head\nobreak
+    \fi}%
+  \ExplSyntaxOff
+}
+\makeatother
+
+\usepackage{mdframed}
+\usepackage{wrapfig}

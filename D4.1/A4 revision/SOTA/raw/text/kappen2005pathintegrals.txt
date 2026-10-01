@@ -1,0 +1,1267 @@
+arXiv:physics/0505066v4 [physics.gen-ph] 7 Oct 2005
+
+Path integrals and symmetry breaking for optimal control theory
+H.J. Kappen Radboud University, Nijmegen, the Netherlands
+November 26, 2024
+Abstract
+This paper considers linear-quadratic control of a non-linear dynamical system subject to arbitrary cost. I show that for this class of stochastic control problems the non-linear Hamilton-Jacobi-Bellman equation can be transformed into a linear equation. The transformation is similar to the transformation used to relate the classical Hamilton-Jacobi equation to the Schr¨odinger equation. As a result of the linearity, the usual backward computation can be replaced by a forward diﬀusion process, that can be computed by stochastic integration or by the evaluation of a path integral. It is shown, how in the deterministic limit the PMP formalism is recovered. The signiﬁcance of the path integral approach is that it forms the basis for a number of eﬃcient computational methods, such as MC sampling, the Laplace approximation and the variational approximation. We show the eﬀectiveness of the ﬁrst two methods in number of examples. Examples are given that show the qualitative diﬀerence between stochastic and deterministic control and the occurrence of symmetry breaking as a function of the noise.
+1 Introduction
+The problem of optimal control of non-linear systems in the presence of noise occurs in many areas of science and engineering. Examples are the control of movement in biological systems, robotics, and ﬁnancial investment policies.
+In the absence of noise, the optimal control problem can be solved in two ways: using the Pontryagin Minimum Principle (PMP) [1] which is a pair of ordinary diﬀerential equations that are similar to the Hamilton equations of motion or the Hamilton-Jacobi-Bellman (HJB) equation which is a partial diﬀerential equation [2].
+In the presence of Wiener noise, the PMP formalism can be generalized and yields a set of coupled stochastic diﬀerential equations, but they become diﬃcult to solve due to the boundary conditions at initial and ﬁnal time (see however [3]). In contrast, the inclusion of noise in the HJB framework is mathematically quite straight-forward. However, the numerical solution of either the deterministic or stochastic HJB equation is in general diﬃcult due to the curse of dimensionality. Therefore, one is interested in eﬃcient methods for solving the HJB equation. The class of problems considered below allows for such eﬃcient methods.
+In section 3.1, we consider the control of an arbitrary non-linear dynamical system with arbitrary cost, but with the restriction, that the control acts linearly on the dynamics and the cost of the control
+1
+
+Figure 1: The drunken spider. In the absence of noise (alcohol in this case), the optimal trajectory for the spider is to walk over the bridge. When noise is present, there is a signiﬁcant probability to fall oﬀ the bridge, incurring a large cost. Thus, the optimal noisy control is to walk around the lake.
+is quadratic. For this class of problems, the non-linear Hamilton-Jacobi-Bellman equation can be transformed into a linear equation by a log transformation of the cost-to-go. The transformation stems back to the early days of quantum mechanics and was ﬁrst used by Schr¨odinger to relate the Hamilton-Jacobi formalism to the Schr¨odinger equation. See section 7 for a further discussion on this point. The log transform was ﬁrst used in the context of control theory by [4] (see also [5]).
+Due to the linear description, the usual backward integration in time of the HJB equation can be replaced by computing expectation values under a forward diﬀusion process. This is treated in section 3.2. The computation of the expectation value requires a stochastic integration over trajectories that can be described by a path integral (section 3.3). This is an integral over all trajectories starting at x, t, weighted by exp(−S/ν), where S is the cost of the path (also know as the Action) and ν is the size of the noise. It has the characteristic form of a partition sum and one should therefore expect that for diﬀerent values of the noise ν the control is qualitatively diﬀerent, and that symmetry breaking occurs below a critical value of ν.
+In general, control problems may have several solutions, corresponding to the diﬀerent local minima of S. The case is illustrated in ﬁg. 1. A spider wants to go home, by either crossing a bridge or by going around the lake. In the absence of noise, the route over the bridge is optimal since it is shorter. However, the spider just came out of the local bar, where it had been drinking heavily with its friends. He is not quite sure about the outcome of its actions: any of its movements may be accompanied by a random sway to the left or right. Since the bridge is rather narrow, and spiders don’t like swimming, the optimal trajectory is now to walk around the lake. Thus, we see that the optimal control in the presence of noise can be quantitatively diﬀerent from the deterministic control.
+2
+
+In addition to which path to chose, the spider also has the problem when to make that decision. Far away from the lake, he is in no position to chose for the bridge or the detour, as he is still uncertain of where his random swaying may bring him. In other words, why would he spend control eﬀort now to move left or right when there is a 50 % change that he may wander there by chance? He decides to delay his choice until he is closer to the lake. The question is, when should he make his decision to move left or right?
+It is in these multi-modal examples, that the diﬀerence between deterministic and stochastic control becomes most apparent. They are not only of concern to spiders, but occur quite general in obstacle avoidance for autonomous systems, diﬀerential games, and predator-prey scenarios. Current eﬃcient approaches to control are essentially restricted to unimodal situations and therefore cannot address these issues. The aim of the present paper is to introduce a class of multimodal control problems that can be eﬃciently solved using path integral methods.
+The path integral formulation is well-known in statistical physics and quantum mechanics, and several methods exist to compute them approximately. The Laplace approximation approximates the integral by the path of minimal S and is treated in section 4. This approximation is exact in the limit of ν → 0, and the deterministic control law is recovered. The formalism is illustrated for the linear quadratic case in section 4.2. Further reﬁnements to the Laplace approximation can be made by considering the quadratic ﬂuctuations around the deterministic solution (also know as the semi-classical approximation), but I believe that this correction has a small eﬀect on the control (it does strongly aﬀect the value of J but not its gradient). The semi-classical approximation is not treated in this paper.
+As is shown in section 4.3, in the Laplace approximation the optimal stochastic control becomes a mixture of deterministic control strategies, weighted by exp(−S/ν) and can be computed eﬃciently, The path integral displays a symmetry breaking at a critical value of ν: For large ν, the optimal control is the average of the deterministic controls. For small ν, one of the deterministic controls is chosen. In section 6.1.2 we give the example of the delayed choice problem that displays such symmetry breaking as a function of the time to reach the target.
+In general, the Laplace approximation may not be suﬃciently accurate. Possibly the simplest alternative is Monte Carlo (MC) sampling. The naive sampling procedure proposed by the theory is presented in section 5.1, but is shown to be rather ineﬃcient in the double slit example in section 6.1. It is not diﬃcult to devise more eﬃcient samplers. In section 5.2, we propose an importance sampling scheme, where the sampling distribution is a (mixture of) diﬀusion processes with drift given by the Laplace deterministic trajectories. The importance sampling method is compared with the exact results for the double slit problem in section 6.1.1. In section 6.2, we compute the optimal control for the drunken spider for low noise using the Laplace approximation and for high noise using MC importance sampling.
+We begin our story with a brief derivation of the HJB equation for stochastic optimal control, which is treated in depth in many good textbooks (see for instance [6, 5, 3]).
+
+2 Stochastic optimal control
+
+Consider the stochastic diﬀerential equation
+
+dx = b(x(t), u(t), t)dt + dξ.
+
+(1)
+
+x, b, dξ and dx are n-dimensional vectors and u is an m-dimensional vector of controls. dξ is a Wiener processes with dξkdξl = νkl(x, u, t)dt. The initial state of x is ﬁxed: x(ti) = xi and the state at ﬁnal
+
+3
+
+time tf is free. The problem is to ﬁnd a control trajectory u(t), ti < t < tf , such that
+
+tf
+
+C(xi, ti, u(·)) = φ(x(tf )) + dtf0(x(t), u(t), t)
+
+(2)
+
+ti
+
+xi
+
+is minimal. The subscript xi on the expectation value is to remind us that the expectation is over all stochastic trajectories that start in xi.
+The standard construction of the solution for this problem is to set up a partial diﬀerential equation
+that is to be solved for all times in the interval ti to tf and for all x. For this purpose, we deﬁne the optimal cost-to-go function from any intermediate time t and state x:
+
+J(x, t) = min C(x, t, u(t → tf ))
+
+(3)
+
+u(t→tf )
+
+where u(t → tf ) denotes the sequence of controls u(·) on the time interval [t, tf ]. For any intermediate time t′, t < t′ < tf we can write a recursive formula for J in the following way:
+
+t′ tf
+
+J(x, t) = min φ(x(tf )) + dtf0(x(t), u(t), t) + dtf0(x(t), u(t), t)
+
+u(t→tf )
+
+t
+
+t′ x
+
+t′ tf
+
+= min
+u(t→t′ )
+
+dtf0(x(t), u(t), t) + min φ(x(tf )) + dtf0(x(t), u(t), t)
+t u(t′→tf ) t′ x(t′) x
+
+t′
+
+= min
+
+dtf0(x(t), u(t), t) + J(x(t′), t′)
+
+(4)
+
+u(t→t′) t x
+
+The ﬁrst line is just the deﬁnition of J. In the second line, we split the minimization over two intervals. These are not independent, because the second minimization is conditioned on the starting value x(t′),
+which depends on the outcome of the ﬁrst minimization. The last line uses again the deﬁnition of J. Setting t′ = t + dt we can Taylor expand J(x(t′), t′) around t. This expansion takes place within the
+expectation value and need to be performed to ﬁrst order in dt and second order in dx, since dx2 =
+O(dt). This is the standard Itoˆ calculus argument. Thus,
+
+J(x(t + dt), t + dt) x = J(x, t) + ∂tJ(x, t)dt + (∂xJ(x, t))T dx + 12 Tr ∂x2J(x, t)dx2
+
+T
+
+1
+
+2
+
+= J(x, t) + ∂tJ(x, t)dt + (∂xJ(x, t)) b(x, u, t)dt + Tr ∂xJ(x, t)ν(x, u, t) dt
+
+2
+
+In this expression, ∂t and ∂x denotes partial diﬀerentiation with respect to t and x, respectively. Similarly, ∂x2J is the matrix of second derivatives of J and Tr(ν∂x2J ) = ij νij ∂xi∂xj ∂2J . Substituting this into Eq. 4, dividing both sides by dt and taking the limit of dt → 0 yields
+
+T
+
+1
+
+2
+
+− ∂tJ(x, t) = min f0(x, u, t) + b(x, u, t) ∂xJ(x, t) + Tr ν(x, u, t)∂xJ(x, t) , ∀t, x (5)
+
+u
+
+2
+
+which is the Stochastic Hamilton-Jacobi-Bellman Equation with boundary condition J(x, tf ) = φ(x).
+
+4
+
+Eq. 5 reduces to the deterministic HJB equation in the limit ν → 0. In that case, an alternative approach to solving the control problem is the Pontryagin Maximum principle (PMP), which requires the solution of 2n ordinary diﬀerential equations. These equations need to be solved with multi-point boundary conditions at both ti and tf . Solving 2n ordinary diﬀerential equations may be more eﬃcient than solving the n-dimensional partial diﬀerential equation, using shooting methods (see for instance [7]), but may be unstable in some cases.
+In the stochastic case, there does not exist a generic alternative to solving the pde (see however [3] for stochastic versions of the PMP approach). Thus, for stochastic control one needs to solve the HJB equation, which suﬀers from the curse of dimensionality.
+A notable exception is when b is linear in x and u and f0 is quadratic in x and u. This is called the linear-quadratic (LQ) control problem. In that case, it can be shown that the solution for J(x, t) is quadratic in x with time-varying coeﬃcients. These coeﬃcients satisfy coupled ordinary diﬀerential (Ricatti) equations that can be solved eﬃciently [6].
+
+3 A path integral formulation for control
+
+3.1 A linear HJB equation
+
+Consider the special case of Eqs. 1 and 2 where the dynamic is linear in u and the cost is quadratic in u:
+
+dx = (b(x, t) + Bu)dt + dξ
+
+(6)
+
+C(xi, ti, u(·)) = φ(x(tf )) + dt u(t) tf 1 T Ru(t) + V (x(t), t) (7)
+
+ti
+
+2
+
+xi
+
+with B an n × m matrix and R an m × m matrix. B, R and ν are independent of x, u, t. b and V are arbitrary functions of x and t and φ is an arbitrary function of x. In other words, the system to be controlled can be arbitrary complex and subject to arbitrary complex costs. The control instead, is restricted to the simple LQ form.
+The stochastic HJB equation 5 becomes
+
+1T
+
+T
+
+1
+
+2
+
+−∂tJ = min u Ru + V + (b + Bu) ∂xJ + Tr ν∂xJ
+
+u2
+
+2
+
+Minimization with respect to u yields:
+
+u = −R−1BT ∂xJ (x, t)
+
+(8)
+
+which deﬁnes the optimal control u for each x, t. The HJB equation becomes
+
+1
+
+T −1 T
+
+T
+
+1
+
+2
+
+−∂tJ = − (∂xJ ) BR B ∂xJ + V + b ∂xJ + Tr ν∂xJ
+
+2
+
+2
+
+This partial diﬀerential equation must be solved with boundary condition J(x, tf ) = φ(x). Note, that after performing the minimization with respect to to u, the HJB equation has become non-linear in J.
+We can remove the non-linearity and this will turn out to greatly help us to solve the HJB equation. Deﬁne ψ(x, t) through J(x, t) = −λ log ψ(x, t), with λ a constant to be deﬁned. Then
+
+1
+
+T −1 T
+
+1
+
+2
+
+− (∂xJ ) BR B ∂xJ + Tr ν∂xJ
+
+2
+
+2
+
+5
+
+λ2 =− 2
+
+(∂xψ)i(BR−1BT )ij (∂xψ)j + 2 λ
+
+νij (∂xψ)i(∂xψ)j − λ
+
+∂2ψ νij
+
+2ψ ij
+
+2ψ ij
+
+2ψ ij ∂xi∂xj
+
+The terms quadratic in ψ vanish if and only if there exists a scalar λ such that
+
+ν = λBR−1BT
+
+(9)
+
+In other words, the matrices ν and BR−1BT must be proportional to each other with proportionality constant λ. In the one dimensional case, such a λ always exists, and Eq. 9 is not a restriction. In the higher dimensional case, Eq. 9 restricts the possible choices for the matrices R and ν. To get an intuition for this restriction, consider the case that u and x have the same dimension, B is the identity matrix and both R and ν are diagonal matrices. Then Eq. 9 states R ∝ ν−1. In a direction with low noise, control is expensive (Rii large) and only small control steps are permitted. In the limiting case of no noise, we deduce that u should be set to zero: no control is allowed in noiseless directions. In noisy directions the reverse is true: control is cheap and large control values are permitted. Loosely speaking, Eq. 9 states that noise and control should operate in the same dimensions. 1
+When Eq. 9 holds, the quadratic terms in the HJB equation cancel and the HJB becomes
+
+∂tψ =
+
+VT
+
+1
+
+2
+
+− b ∂x − Tr(ν∂x) ψ
+
+λ
+
+2
+
+= −Hψ
+
+(10)
+
+with H a linear operator acting on the function ψ. Eq. 10 must be solved backwards in time with ψ(x, tf ) = exp(−φ(x)/λ). However, the linearity allows us to reverse the direction of computation, replacing it by a diﬀusion process, as we will explain in the next section.
+To simplify the exposure in the subsequent sections, we assume the control dimension m = n and B the unit matrix.
+
+3.2 Forward diﬀusion
+For real functions ρ and ψ, deﬁne the inner product ρ|ψ = dxρ(x, t)ψ(x, t). Then we can deﬁne H†, the Hermitian conjugate of the operator H, with respect to this inner product as follows.
+
+
+
+
+
+H†ρ|ψ = ρ|Hψ = dxρ(x, t) − V (x, t) + b(x, t)∂x + 1
+
+∂2
+
+νij
+
+ ψ(x, t)
+
+λ 2 ij ∂xi∂xj
+
+1 As a natural example, consider a one-dimensional second order system subject to additive control θ¨ = f (θ, t) + u. The ﬁrst order formulation is obtained by setting x1 = θ and x2 = θ˙. Then
+
+dxi = (bi(x, t) + Biu)dt, i = 1, 2 with b1(x, t) = x2, b2(x, t) = f (x1, t) and B = (0, 1)T . Since u is one-dimensional, R is a scalar and
+
+BR−1BT = 1 R
+
+00 01
+
+Condition Eq. 9 states that the stochastic dynamics must have the noise restricted to the second component only:
+
+dxi = (bi(x, t) + Biu)dt + dξδi,2, i = 1, 2
+
+with dξ2 = νdt and λ = νR.
+
+6
+
+
+
+
+
+V (x, t)
+
+1
+
+∂2
+
+= dx −
+
+ρ(x, t) − ∂x(b(x, t)ρ(x, t)) +
+
+νij
+
+ρ(x, t) ψ(x, t)
+
+λ 2 ij ∂xi∂xj
+
+where we have performed integration by parts and assume that ρ vanishes at |x| → ∞. Thus,
+
+H†ρ = − V (x, t) ρ(x, t) − ∂x(b(x, t)ρ(x, t)) + 1
+
+∂2
+
+νij
+
+ρ(x, t).
+
+λ 2 ij ∂xi∂xj
+
+Let ρ(y, τ |x, t) be a probability density, initialized at t, x, that evolves forward in time according to the
+
+diﬀusion process
+
+∂tρ = H†ρ
+
+(11)
+
+with drift b(x, t)dt and diﬀusion dξ, and with an extra term due to the potential V . Whereas the other two terms conserve probability density, the potential term takes out probability density at a rate V (x, t)dt/λ. Therefore, the stochastic simulation of Eq. 11 is a diﬀusion that runs in parallel with the annihilation process:
+
+dx = b(x, t)dt + dξ
+
+x = x + dx, with probability 1 − V (x, t)dt/λ
+
+xi = †, with probability V (x, t)dt/λ
+
+(12)
+
+where † denotes that the particle is taken out of the simulation. Note that when V = 0 this diﬀusion process is identical to the original control dynamics Eq. 6 in the absence of control (u = 0).
+Since ψ evolves backwards in time according to H and ρ evolves forwards in time according to H† the inner product dyρ(y, τ |x, t)ψ(y, τ ) is time invariant (independent of τ ). Since ρ(y, t|x, t) = δ(y − x), it immediately follows that
+
+ψ(x, t) = dyρ(y, tf |x, t)ψ(y, tf )
+
+(13)
+
+We arrive at the important conclusion that ψ(x, t) can be computed either by backward integration using Eq. 10 or by forward integration of a diﬀusion process given by Eq. 11. The optimal cost-to-go is ﬁnally given by
+
+J(x, t) = −λ log dyρ(y, tf |x, t) exp(−φ(y)/λ)
+
+(14)
+
+with ρ(y, tf |x, t) given by the stochastic process Eq. 12. The optimal control is given by Eq. 8. See section 4.2 for a simple Gaussian example that illustrate these ideas.
+
+3.3 The path integral formulation
+
+In this section, we will write the diﬀusion kernel ρ(y, tf |x, t) in Eq. 14 as a path integral. For an inﬁnitesimal time step ǫ, we can write the probability to go from x to y as an integral over all noise realizations. The probability of the Wiener is Gaussian with mean zero and variance νǫ. The particle annihilation destroys probability with rate V (x, t)ǫ/λ. Combining annihilation with diﬀusion, we obtain
+
+ǫ 1 y−x
+
+T y−x
+
+ρ(y, t + ǫ|x, t) ∝ exp − λ 2 ǫ − b(x, t) R ǫ − b(x, t) + V (x, t)
+
+7
+
+where we have used ν−1 = R/λ. We can write the transition probability as a product of n inﬁnitesimal transition probabilities:
+
+ρ(y, tf |x, t) ∝ dx1 . . . dxn−1
+
+ǫ n−1 1 exp − λ 2
+i=0
+
+xi+1 − xi T − b(xi, ti) R ǫ
+
+xi+1 − xi − b(xi, ti) ǫ
+
++ V (xi, ti)
+
+In the limit of ǫ → 0, the sum in the exponent becomes an integral: ǫ formally write
+
+i=0 n−1 → ttf dτ and thus we can
+
+ρ(y, tf |x, t) = Spath(x(t → tf )) =
+
+y
+
+1
+
+[dx]x exp − Spath(x(t → tf ))
+
+(15)
+
+λ
+
+tf
+
+1 dx(τ )
+
+T dx(τ )
+
+t dτ 2 dτ − b(x(τ ), τ ) R dτ − b(x(τ ), τ ) + V (x(τ ), τ ) (16)
+
+with x(t → tf ) a path with x(τ = t) = x, x(τ = tf ) = y, [dx]yx an integral over paths that start at x and end at y. 2
+Substituting Eq. 15 in Eq. 14 we can absorb the integration over y in the path integral and ﬁnd
+
+J(x, t) = −λ log [dx]x exp − 1 S(x(t → tf )) (17) λ
+
+where the path integral [dx]x is over all trajectories starting at x and
+
+S(x(t → tf )) = φ(x(tf )) + Spath(x(t → tf ))
+
+(18)
+
+is the Action associated with a path. The path integral Eq. 17 is a log partition sum and therefore can be interpreted as a free energy.
+The partition sum is not over conﬁgurations, but over trajectories. S(x(t → tf )) plays the role of the energy of a trajectory and λ is the temperature. This link between stochastic optimal control and a free energy has two immediate consequences. 1) Phenomena that allow for a free energy description, typically display phase transitions and spontaneous symmetry breaking. What is the meaning of these phenomena for optimal control? 2) Since the path integral appears in other branches of physics, such as statistical mechanics and quantum mechanics, we can borrow approximation methods from those ﬁelds to compute the optimal control approximately. First we discuss the small noise limit, where we can use the Laplace approximation to recover the PMP formalism for deterministic control. Also, the path integral shows us how we can obtain a number of approximate methods: 1) one can combine multiple deterministic trajectories to compute the optimal stochastic control 2) one can use a variational method, replacing the intractable sum by a tractable sum over a variational distribution and 3) one can design improvements to the naive MC sampling.
+2 The paths are continuous but non-diﬀerential and there are diﬀerent forward are backward derivatives [8, 9]. Therefore, the continuous time description of the path integral and in particular x˙ are best viewed as a shorthand for its ﬁnite n description.
+
+8
+
+4 The Laplace approximation
+
+4.1 The Laplace approximation
+When λ is small (i.e. ν is small), we can expand an arbitrary path x˜(τ ) around the classical path:
+
+x˜(τ ) = x(τ ) + δ(τ ), t < τ < tf
+
+where x(τ ) is the classical path that we need to determine, and δ(τ ) is an independent ﬂuctuation of the path at time τ . Fluctuations are also allowed at τ = t and τ = tf . The Action Eq. 18 can be expanded to ﬁrst order in δ(τ ) as
+
+S(x˜(t → tf )) = S(x(t → tf )) + δi(tf )∂iφ(x(tf ))
+
+tf d
+
++
+
+dτ (x˙ (τ ) − b(x, τ ))iRij δj(τ ) − δk(τ )∂kbj(x, τ ) + δi(τ )∂iV (x(τ ), τ )
+
+t
+
+dτ
+
+= S(x(t → tf )) + δi(tf ) (∂iφ(x(tf )) + pj(tf )) − pj(t)δj(t)
+
+tf d
+
+−
+
+dτ δk(τ ) pk(τ ) + pj(τ )∂kbj(x, τ ) − ∂kV (x(τ ), τ )
+
+(19)
+
+t
+
+dτ
+
+where ∂k means partial diﬀerentiation with respect to xk, repeated indices are summed over and p is
+
+deﬁned as
+
+pk(t) = (x˙ (t) − b(x, t))j Rjk
+
+(20)
+
+The term proportional to δk(τ ) under the integral must be zero and deﬁnes an ODE for the classical trajectory:
+
+d pk(t) + ∂ (pj(t)bj(x, t) − V (x, t)) = 0 (21)
+
+dt
+
+∂xk
+
+Eq. 20 can be seen as a deﬁnition of p, but also as a dynamical equation for x that must be solved together with the dynamical equation for p, Eq. 21. These equations must be solved with boundary conditions. The boundary condition for x is given at initial time and the term proportional to δi(tf ) deﬁnes the boundary condition for p(t) at t = tf :
+
+xi(t) = x, pj(tf ) = − ∂φ(x(tf )) (22) ∂xj
+
+Deﬁne the Hamiltonian,
+
+H(x, p, t) = 1 pT R−1p + pT b(x, t) − V (x, t)
+
+(23)
+
+2
+
+Then, Eqs. 20 and 21 can be written as
+
+dx = ∂H(x, p, t) , dp = − ∂H(x, p, t) (24)
+
+dt
+
+∂p
+
+dt
+
+∂x
+
+The Hamiltonian system Eqs. 24 with the mixed boundary conditions Eqs. 22 are the well-known ordinary diﬀerential equations of the Pontryagin Maximum Principle.
+
+9
+
+In the Laplace approximation, the path integral Eq. 17 is replaced by the classical trajectory only. Thus,
+
+J(t, x) ≈ S(x(t → tf ))
+
+since ﬂuctuations at initial time are zero: δi(t) = 0. The optimal control is given by
+
+u = −R−1∂xJ ≈ −R−1 δS(x(t → tf )) = R−1p(t) = x˙ (t) − b(x(t), t) (25) δx(t)
+
+where we have used δx(t) δS(x(t→tf )) = −p(t) from Eq. 19. The intuition of the Laplace approximation is that
+
+one needs to solve the deterministic equations for the whole interval [t, tf ], starting at the current place
+
+x. In particular, the end boundary condition (the location of the target) will aﬀect the location of the
+
+optimal path for all [t → tf ]. The control is then given by the value of the pseudo-gradient x˙ (t)− b(x(t), t)
+
+on this trajectory.
+
+Note the minus sign in front of V in Eq. 23, which has the opposite sign from a normal classical
+
+mechanical system. The term 12 pT R−1p can be interpreted as the kinetic energy of the system. Thus, the ’energy’ H is not the sum, but the diﬀerence of kinetic and potential energy. When H does not
+
+explicitly depend on time (b(x, t) = b(x) and V (x, t) = V (x)), H is conserved under the deterministic
+
+control dynamics:
+
+dH = ∂H dx + ∂H dp = 0 dt ∂x dt ∂p dt
+
+because of Eqs. 24. To understand this behavior, consider b = 0. Then along the trajectory:
+
+1 uT Ru = V (x) + H 2
+
+with H independent of time. This relation states that the optimal trajectory is such that much control is spent in areas of large cost and little control is spent in areas of low cost.
+Note, that the optimal control is independent of the noise ν as we expect from the Laplace approximation. Numerically, we can compute the classical trajectory by discretizing xcl(τ ) = x1, . . . , xn and minimizing S(xcl) = S(x1, . . . , xn) using a standard minimization method.
+
+4.2 The linear quadratic case
+
+To build a bit of intuition for the diﬀusion process, the path integral and Laplace approximation, we consider in this section some simple one-dimensional linear quadratic examples.
+First consider the simplest case of free diﬀusion:
+
+V (x, t) = 0, b(x, t) = 0, φ(x) = 1 αx2 2
+In this case, the forward diﬀusion described by Eq. 11 and 12 can be solved in closed form and is given by a Gaussian with variance σ2 = ν(tf − t):
+
+1
+
+(y − x)2
+
+ρ(y, tf |x, t) = √ exp − 2
+
+(26)
+
+2πσ
+
+2σ
+
+10
+
+Since the end cost is quadratic, the optimal cost-to-go Eq. 14 can be computed exactly as well. The result is
+
+σ
+
+1
+
+σ2
+1
+
+2
+
+J(x, t) = νR log
+
++ 2 αx
+
+(27)
+
+σ1 2 σ
+
+with 1/σ12 = 1/σ2 + α/νR. The optimal control is computed from Eq. 8:
+
+2
+
+−1
+
+−1 σ1
+
+αx
+
+u = −R ∂xJ = −R 2 αx = −
+
+σ
+
+R + α(tf − t)
+
+We see that the control attracts x to the origin with a force that increases with t getting closer to tf .
+Note, that the optimal control is independent of the noise ν. This is a general property of LQ control. As an extension, we now add a quadratic potential to the above problem: V (x) = 12 µx2. We now
+compute the optimal control in the Laplace approximation. The Hamiltonian is given by Eq. 23
+
+H(x, p) = 1 R−1p2 − 1 µx2
+
+2
+
+2
+
+and the equations of motion and boundary conditions are given by Eqs. 24 and 22:
+
+x˙ = p/R p˙ = µx x(t) = x p(tf ) = −αx(tf )
+
+We can write this as the second order system in terms of x only:
+
+x¨ = µx/R, x(t) = x x˙ (tf ) = −αx(tf )/R
+
+The solution for t < τ < tf is
+
+√
+
+√
+
+x(τ ) = Ae µ/R(τ −t) + Be− µ/R(τ −t)
+
+T√he boundary conditions become A + B = x and Aγ( µ/R + α/R) = B/γ( µ/R − α/R), γ = e µ/R(tf −t) from which we can solve A and B. The classical Action Eq. 18 is computed by substi-
+
+tuting the solution for x :
+
+√
+
+1 2 1 tf 2
+
+γ2 − √µR−α
+
+2
+
+1
+
+2
+
+µR+α
+
+S(x(t → tf )) = 2 αx(tf ) + 2 t dτ (Rx˙ (τ ) + µx (τ )) = 2 2 µRx
+
+√ √µR−α
+
+γ+
+
+µR+α
+
+which is equal to the cost-to-go in the Laplace approximation. The optimal control is minus the gradient of the cost-to-go. Note, that the classical trajectory as well as the minimal action only depends on the initial condition x and the time-to-go tf − t. For pure diﬀusion (µ → 0) the classical Action reduces to
+
+S(x(t → tf )) = 1 αRx2 2 R + α(tf − t)
+
+which is identical to the exact expression Eq. 27 except for the volume factor (which does not aﬀect the control, since it does not depend on x).
+
+11
+
+4.3 The multi-modal Laplace approximation
+The Action S in Eq. 17 may have more than one local minimum. This is typical for control problems, where ”many roads lead to Rome”. Let xα(t → tf ), α = 1, . . . denote the diﬀerent optimal deterministic trajectories that we compute by minimizing the Action:
+
+xα(t → tf ) = argminx(t→tf )S(x(t → tf )), α = 1, . . .
+These trajectories all start at the same value x. In our drunken spider example, there are two trajectories: one is over the bridge and the other is around the lake. Then, in the Laplace approximation the path integral Eq. 17 is approximated by these local minima contributions only:
+
+J(x, t) ≈ −λ log exp(−S(xα(t → tf )/λ)
+
+(28)
+
+α
+
+The Laplace approximation ignores all ﬂuctuations around the mode. Although these ﬂuctuations can be quite big, their x dependence is typically quite weak and must come from beyond Gaussian corrections. This can be seen from the pure LQ case when the Gaussian ﬂuctuation term in Eq. 27 is independent of x. In the LQ case, the Laplace approximation for the control (not for the cost-to-go) coincides with the exact solution. Therefore, for unimodal problems (S has only one minimum) one can often safely ignore the contribution of ﬂuctuations to the control. However, for multi-modal problems these ﬂuctuation terms may have a strong α dependence (they have in the spider problem) and therefore play an important role when weighting the diﬀerent contributions in Eq. 28.
+The optimal control becomes a soft-max of deterministic strategies
+
+u(x, t) = −R−1 wα∂xS(xα(t → tf )
+
+α
+
+wα =
+
+e−S(xα(t→tf )/λ β e−S(xβ(t→tf )/λ
+
+where ν plays the role of the temperature.
+
+5 MC sampling
+A natural method for computing the optimal control is by stochastic sampling. However, as is often the case with MC sampling, a naive sampler such as the one based directly on Eqs. 12 may be very ineﬃcient. In this section, we show how this naive sampler works and how it can be improved using importance sampling.
+
+5.1 Naive MC sampling
+
+The stochastic evaluation of Eq. 13 consists of running N times the diﬀusion process Eq. 12 from t to tf
+
+initialized each time at x(t) = x. Denote these N trajectories by xi(t → tf ), i = 1, . . . , N . Then, ψ(x, t)
+
+is estimated by
+
+ψˆ(x, t) =
+
+wi, wi = 1 exp(−φ(xi(tf ))/λ)
+
+(29)
+
+i∈alive N
+
+12
+
+where ’alive’ denotes the subset of trajectories that do not get killed along the way by the † operation. Note that, although the sum is typically over less than N trajectories, the normalization 1/N includes all trajectories in order to take the annihilation process properly into account.
+The computation of u requires the gradient of ψ(x, t) instead of ψ itself. First note, that when we vary the initial point of a path x(t → tf ) from Eq. 19 and 20 we obtain
+
+δS(x(t → tf )) = (x˙ (t) − b(x, t))R δx(t)
+
+Thus combining Eq. 8 and Eq. 17, we obtain
+
+u= 1 ψ(x, t)
+
+[dx]x(x˙ (t) − b(x, t)) exp(−S/λ)
+
+Note, that we can sample u by the same batch of (naive) trajectories. For each trajectory, the quantity x˙ (t) − b(x, t) is proportional to the realisation of the noise in the initial time t: x˙ (t) − b(x, t) = dξi(t)/dt. Therefore,
+
+1N uˆdt = ψˆ(x, t) i∈alive widξi(t) (30)
+
+with wi given by Eq. 29. This expression has a particular intuitive form. The optimal control at time t is obtained by averaging the initial noise directions of the trajectories dξi(t), weighted by their success wi at the ﬁnal time tf .
+
+5.2 Importance sampling
+The sampling procedure as described by Eqs. 12 and 29 gives an unbiased estimate of ψ(x, t) but can be quite ineﬃcient. The problem is is well known, and one of the simplest procedures for improving the sampling is by importance sampling. For path integrals this works as follows. We replace the diﬀusion process that yields ρ(y, tf |x, t) with Action Spath (Eqs. 15 and 16) by another diﬀusion process, that will yield ρ′(y, tf |x, t) with corresponding Action S′path . Then,
+
+ψ(x, t) = [dx]x exp (−Spath/λ) exp (−φ/λ)
+
+= [dx]x exp −Sp′ ath/λ exp −(φ + Spath − Sp′ ath)/λ
+
+The idea is to chose the diﬀusion process ρ′ such as to make the sampling of the path integral as eﬃcient
+as possible.
+A suggestion that comes to mind immediately is to use the Laplace approximation to compute a deterministic control trajectory x∗(t → tf ). From this, compute its derivative x˙ ∗(t → tf ) and deﬁne a stochastic process to sample ρ′ according to
+
+dx = x˙ ∗(t)dt + dξ
+
+x = x + dx, with probability 1 − V (x, t)dt/λ
+
+xi = †, with probability V (x, t)dt/λ
+
+(31)
+
+13
+
+The Action S′path for the Laplace-guided diﬀusion is given by Eq. 16 with b(x(τ ), τ ) = x∗(τ ), t < τ < tf . The estimators for ψ and u are given again by Eqs. 29 and 30, with the diﬀerence that
+wi = 1N exp − φ(xi(tf )) + Spath(xi(t → tf )) − Spath ′ (xi(t → tf )) /λ (32)
+and xi(t → tf ) is a trajectory from the sampling process Eq. 31 instead of Eq. 12. We will illustrate the eﬀectiveness of this approach in section 6.1.
+
+6 Numerical examples
+In this section, we introduce some simple one-dimensional examples to illustrate the methods introduced in this paper. The ﬁrst example is a double slit, and is suﬃciently simple that we can compute the optimal control by forward diﬀusion in closed form. We use this example to compare the Monte Carlo and Laplace approximations to the exact result. Using the double slit example, we show how the optimal cost-to-go undergoes symmetry breaking as a function of the noise and/or some other characteristics of the problem (in this case the time-to-go). When the targets are still far in the future, the optimal control is to ’steer for the middle’ and delay the choice to a later time.
+The second example is similar to the ﬁrst, except that the slit is now of ﬁnite thickness, allowing the particle to get lost in one of the holes. When one hole is narrow and the other wide, this illustrates the drunken spider problem. We use both the Laplace approximation and the the Monte Carlo importance sampling to compute the optimal control strategy, for diﬀerent noise levels.
+
+6.1 The double slit
+Consider a stochastic particle that moves with constant velocity from t to tf in the horizontal direction and where there is deﬂecting noise in the x direction:
+
+dx = udt + dξ
+
+The cost is given by Eq. 7 with φ(x) = 12 x2 and V (x, t1) implements a slit at an intermediate time t1, t < t1 < tf :
+
+V (x, t1) = 0, a < x < b, c < x < d = ∞, else
+
+The problem is illustrated in Fig. 2a where the constant motion is in the t direction and the noise and control is in the x direction perpendicular to it.
+Eq. 9 becomes λ = νR and the linear HJB becomes:
+
+∂tψ =
+
+V ν2 − ∂x ψ
+λ2
+
+which we must solve with end condition ψ(x, tf ) = e−φ(x)/λ. Solving this equation by means of the forward computation using Eq. 13 can be done in closed form.
+First consider the easiest case for times t > t1 where we do not have to consider the slits. This is the case we have considered before in section 4.2 and the solution is given by Eq. 27 with α = 1.
+
+14
+
+x J
+
+8 5 t=0
+
+6
+
+t=0.99
+
+4
+
+t=1.01
+
+4
+
+t=2
+
+2
+
+3
+
+0 2
+−2
+
+−4
+
+1
+
+−6
+
+0
+
+0
+
+0.5
+
+1
+
+1.5
+
+2
+
+−10
+
+−5
+
+0
+
+5
+
+10
+
+t
+
+x
+
+(a) The double slit
+
+(b) Cost-to-go J(x, t)
+
+Figure 2: (a) The particle moves horizontally with constant velocity from t = 0 to tf = 2 and is deﬂected up or down by noise and control. The end cost φ(x) = x2/2. A double slit is placed at t1 = 1 with openings at −6 < x < −4 and 6 < x < 8. Also shown are two example trajectories under optimal control. (b)
+J(x, t) as a function of x for t = 0, 0.99, 1.01, 2 as computed from Eq. 27 and 33. R = 0.1, ν = 1, dt = 0.02.
+
+Secondly, consider t < t1. ρ(y, tf |x, t) can be written as a diﬀusion from t to t1, times a diﬀusion from t1 to tf integrating over all x in the slits. Substitution in Eq. 13 we obtain
+
+ψ(x, t) =
+
+b
+
+d
+
+dy
+
++
+
+dx1 exp(−y2/2λ)ρ(y, tf |x1, t1)ρ(x1, t1|x, t)
+
+a
+
+c
+
+ρ(y, tf |x1, t1) is Gaussian and given by Eq. 26. Therefore, we can perform the integration over y in closed form. We are left with an integral over x1 that can be expressed in terms of Error functions. The result is
+
+σ
+
+1
+
+σ2
+1
+
+2
+
+1
+
+J(x, t) = νR log
+
++ 2 x − νR log (F (b, x) − F (a, x) + F (d, x) − F (c, x)) (33)
+
+σ1 2 σ
+
+2
+
+with F (x0, x) = Erf 2νA (x0 − A B(x) ) , A = t1−t 1 + R+tf −t1 1 and B(x) = t1−t x . Eqs. 27 and 33 together provide the solution for the control problem in terms of J and we can compute the optimal control from Eq. 8.
+A numerical example for the solution for J(x, t) is shown in ﬁg. 2b. The two parts of the solution (compare t = 0.99 and t = 1.01) are smooth at t = t1 for x in the slits, but discontinuous at t = t1 outside the slits. For t = 0, the cost-to-go J is higher around the right slit than around the left slit, because the right slit is further removed from the optimal target x = 0 and thus requires more control u and/or its expected target cost φ is higher.
+
+15
+
+10
+
+5
+
+0
+
+−5
+
+−10
+
+0
+
+0.5
+
+1
+
+1.5
+
+2
+
+(a) Sample trajectories
+
+J
+
+10
+
+MC
+
+8
+
+Exact
+
+6
+
+4
+
+2
+
+0
+
+−10
+
+−5
+
+0
+
+x
+
+5
+
+10
+
+(b) MC sampling estimate of J(x, 0)
+
+Figure 3: Monte Carlo sampling of J(x, t = 0) with ψ from Eq. 12 for the double slit problem. The parameters are as in ﬁg. 2. (a) Sample of trajectories that start at x to estimate J(x, t). Only trajectories that pass through a slit contribute to the estimate. (b) MC estimate of J(x, t) = 0 with N = 100000 trajectories for each x.
+6.1.1 MC sampling
+We assess the quality of the naive MC sampling scheme, as given by Eqs. 12 and 29 in ﬁg. 3, where we compare J(x, 0) as given by Eq. 33 with the MC estimate Eq. 29. The left ﬁgure shows the trajectories of the sampling procedure for one particular value of x. Note, the ineﬃciency of the sampler because most of the trajectories are killed at the inﬁnite potential at t = t1. The right ﬁgure shows the accuracy of the estimate of J(x, 0) for all x between −10 and 10 using N = 100000 trajectories. Note, that the number of trajectories that are required to obtain accurate results, strongly depends on the value of x and λ due to the factor exp(−φ(x)/λ) in Eq. 12. For high λ or low φ , few samples are required (see the estimates around x = −4). For small noise or high φ the estimate is strongly determined by the trajectory with minimal φ(x(tf )) and many samples may be required to reach this x. In other words, sampling becomes more accurate for high noise, which is a well-known general feature of sampling. Also, low values of the cost-to-go are more easy to sample accurately than high values. This is in a sense fortunate, since the objective of the control is to move the particle to lower values of J so that subsequent estimates become easier.
+The sampling is of course particularly diﬃcult in this example because of the inﬁnite potential that annihilates most of the trajectories. However, similar eﬀects should be observed in general due to the multi-modality of the Action.
+We can improve the sampling procedure using the importance sampling procedure outlined in section 5.2, using the Laplace approximation. The Laplace approximation to J requires the computation of the optimal deterministic trajectories. In general, one must use some numerical method to compute the Laplace approximation, for instance minimizing the Action Eq. 18 using a time-discretized version of the path. In this particular example, however, we can just write down the classical trajectories ’by hand’. For each x, there are two trajectories, each being piecewise linear. The Action for each trajectory
+16
+
+J
+
+3
+
+2.5
+
+2
+
+1.5
+
+1
+
+0.5
+
+−10
+
+−5
+
+0
+
+5
+
+10
+
+x
+
+Figure 4: Comparison of Laplace approximation (dotted line) and Monte Carlo importance sampling (solid jagged line) of J(x, t = 0) with exact result Eq. 33 (solid smooth line) for the double slit problem. The importance sampler used N = 100 trajectories for each x. The parameters are as in ﬁg. 2.
+
+is simply
+
+12
+
+2R
+
+2 R2
+
+Si(x) = R dtx˙i(t) = (ai − x) + ai ,
+
+20
+
+2
+
+2
+
+i = 1, 2
+
+since φ(x(tf )) = V (x(t1), t1) = 0 by construction. ai = 6 and −4 for the two trajectories, respectively. The cost-to-go in the Laplace approximation is given by Eq. 28:
+
+JLaplace(x, 0) = −νR log exp − S1(x) + exp − S2(x)
+
+λ
+
+λ
+
+For each x, we randomly choose one of the two Laplace approximations with equal probability. We then sample according to Eq. 31 with x∗ the selected Laplace approximation and estimate ψ using Eq. 29 and weights Eq. 32. The Laplace approximation and the results of the importance sampler are given in ﬁg. 4. We see that the Laplace approximation is quite good for this example, in particular when one takes into account that a constant shift in J does not aﬀect the optimal control. The MC importance sampler dramatically improves over the naive MC results in ﬁg. 3, in particular since 1000 times less samples are used and is also signiﬁcantly better than the Laplace approximation.
+
+6.1.2 The delayed choice
+
+Finally, we show an example how optimal stochastic control exhibits spontaneous symmetry breaking. To simplify the mathematics, consider the double slit problem, when the size of the slits becomes inﬁnitesimally small. Eq. 33, with a = 1, b = 1 + ǫ, c = −1 − ǫ, d = −1 becomes to lowest order in ǫ:
+
+J(x, t) = R 1 x2 − νT log 2 cosh x + const.
+
+T2
+
+νT
+
+where the constant diverges as O(log ǫ) independent of x and T = t1 − t the time to reach the slits. The expression between brackets is a typical free energy with inverse temperature β = 1/νT . It displays a
+
+17
+
+J(x,t)
+
+1.8
+
+stochastic 2
+
+deterministic 2
+
+1.6
+
+T=2
+
+1
+
+1
+
+1.4 1.2
+1
+
+T=1 T=0.5
+
+0
+
+−1
+
+−2
+
+0
+
+0.5
+
+1
+
+1.5
+
+2
+
+0
+
+−1
+
+−2
+
+0
+
+0.5
+
+1
+
+1.5
+
+2
+
+2
+
+2
+
+0.8
+
+1
+
+1
+
+0.6
+
+0
+
+0
+
+0.4 −1 −1
+
+−2
+
+−1
+
+0
+
+1
+
+2
+
+x
+
+−2
+
+−2
+
+0
+
+0.5
+
+1
+
+1.5
+
+2
+
+0
+
+0.5
+
+1
+
+1.5
+
+2
+
+(a) Optimal cost-to-go at diﬀerent T .
+
+(b) Sample paths
+
+Figure 5: (a) Symmetry breaking in J as a function of T implies a ’delayed choice’ mechanism for optimal stochastic control. When the target is far in the future, the optimal policy is to steer between the targets. Only when T < 1/ν should one aim for one of the targets. ν = R = 1. (b) Sample trajectories (top row) and controls (bottom row) under stochastic control Eq. 34 (left column) and deterministic control Eq. 34 with ν = 0 (right column), using identical initial conditions x(t = 0) = 0 and noise realization.
+
+symmetry breaking at νT = 1 (ﬁg. 5a). For T > 1/ν (far in the past) it is best to steer towards x = 0 (between the targets) and delay the choice which slit to aim for until later. The reason why this is optimal is that from that position the expected diﬀusion alone of size νT is likely to reach any of the slits without control (although it is not clear yet which slit). Only suﬃciently late in time (T < 1/ν) should one make a choice. The optimal control is given by the gradient of J:
+
+u = 1 tanh x − x (34)
+
+T
+
+νT
+
+Figure 5b depicts two trajectories and their controls under stochastic and deterministic optimal control, using the same realization of the noise. Note, that at early times the deterministic control drives x away from zero whereas in the stochastic control drives x towards zero and smaller in size. The stochastic control maintains x around zero and delays the choice for which slit to aim until T ≈ 1.
+The fact that symmetry breaking occurs in terms of the value of νT , is due to the fact that S ∝ 1/T , which in turn is due to the fact that u ∝ 1/T . Clearly, this will not be true in general. For an arbitrary control problem, S does not need to be monotonic in T , which means that in principle control can be shifting back and forth several times between the symmetric and the broken mode as T decreases to zero.
+
+6.2 The drunken spider
+In order to illustrate the drunken spider problem, we change the potential of the double slit problem so that it has a ﬁnite thickness: V (x, t) = 0 for all t < t1 and t > t2 and for t1 < t < t2:
+V (x, t) = 0, a < x < b, c < x < d
+
+18
+
+= ∞, else
+
+(35)
+
+The problem is illustrated in Fig. 6 and the parameter values are given in the caption. The cost-to-go in the Laplace approximation is given by Eq. 28, with S(x(α(t → tf )), α = 1, 2 the
+cost of getting home over the bridge or around the lake, respectively. It is plotted as a function of the current position x as the solid line in ﬁg. 6c, for both ν = 0.001 and ν = 0.1 (these two curves coincide for these values of ν, since S/ν is so large that the softmax is basically a max).
+In addition, we compute J using importance sampling as outlined in section 5.2. For each x, we run m = 1000 trajectories. For each trajectory, we select randomly one of the two Laplace trajectories with equal probability, which we denote by x∗(t → tf ). The stochastic trajectory x(t → tf ) is then computed from Eq. 31. It contributes to the partition sum Eq. 29 with a weight that is computed by Eq. 32, where Spath(x(t → tf )) and Sp′ ath(x(t → tf )) are given by Eq. 16 with b(x(τ ), τ ) = 0 and b(x(τ ), τ ) = x∗(τ ), respectively.
+The results of the MC importance sampling for various x for low noise (ν = 0.001) and high noise (ν = 0.1) are also shown in ﬁg. 6c. The dots are the results of the MC importance sampling at low noise and closely follow the Laplace results. Note the discontinuous change in slope at x = −6, which implies a discontinuous change in the optimal control value u at that point: For x > −6 the spider steers for the bridge, which requires a larger control value than for x < −6 when the optimal trajectory is around the lake. Thus, the optimal path is simply given by the shortest path and noise is ignored in these considerations.
+The MC estimates for ν = 0.1 are indicated by the stars in ﬁg. 6c. Since noise is large, the Laplace approximation is not valid, and indeed are very diﬀerent from the MC estimate. The Laplace approximation ignores the eﬀect of deviations from the deterministic trajectory on the Actions . Thus, it does not take into account that the spider may wander oﬀ the bridge and drowns, which at this level of noise will happen with almost probability one and makes Sbridge much larger than Slake. The MC importance sampling is guided by trajectories around the lake, that likely survive and by trajectories over the bridge, that will likely drown and thus will not contribute to Eq. 29. The estimate for J is thus dominated by trajectories around the lake and the cost-to-go increases with increasing x. Also note, that the MC estimate puts the minimum of J not at x = −6 but safely away from the lake, so that spider is not likely to fall in the lake on the low side either, and will have a safe journey home.
+
+7 Discussion
+In this paper, we have addressed the problem of computing stochastic optimal control. The direct solution of the HJB equation requires a discretization of space and time. This computation naturally becomes intractable in both memory requirement and cpu time in high dimensions. We have shown, that for a certain class of problems the control can be computed by a path integral. The class of problems includes arbitrary dynamical systems, but with a limited control mechanism. It includes LQ control as a special case. The path integral approach has the advantage that the n-dimensional x-space integration of the HJB equation is replaced by an n-dimensional sampling problem. For high-dimensional problems, a stochastic integration method is expected to be much more eﬃcient than numerical integration of the HJB equation directly, which scales exponentially in n.
+The obvious approximation methods to use are the Laplace approximation, the variational approximation and MC sampling. The Laplace approximation is very eﬃcient. The deterministic trajectories are found by minimizing the action, which can be done by standard numerical methods. It typically requires
+
+19
+
+x J
+x
+
+2
+
+2
+
+0
+
+0
+
+−2
+
+−2
+
+−4
+
+−4
+
+−6
+
+−6
+
+−8
+
+−8
+
+−10
+
+−10
+
+−1
+
+0
+
+1
+
+2
+
+3
+
+4
+
+5
+
+−1
+
+0
+
+1
+
+2
+
+3
+
+4
+
+5
+
+t
+
+t
+
+(a) Sample paths for ν = 0.001
+
+(b) Sample paths for ν = 0.1
+
+50
+
+40
+
+30
+
+20
+
+10
+
+0
+
+−10
+
+−5
+
+0
+
+5
+
+x
+
+(c) J(x, t = −1)
+
+Figure 6: The drunken spider problem. A spider located at x and t = −1 wants to arrive home (x = 0) at time tf . The lake is indicated by the white square area, interrupted by a narrow bridge. The lake is modelled by the inﬁnite potential given by Eq. 35 with −a = b = 0.1, c = −∞ and d = −6. t1 = 0, t2 = 4, tf = 5 and R = 1. The cost-to-go is computed by forward importance sampling as outlined in section 5.2. The guiding Laplace approximations are the deterministic trajectories over the bridge and around the lake. Time discretization dt = 0.012. (a) Some stochastic trajectories used to compute J for ν = 0.001. (b) Some stochastic trajectories used to compute J for ν = 0.1. (c) The optimal cost-to-go J(x, t) in the Laplace approximation for ν = 0.001 and ν = 0.1 solid line (these two curves coincide). The MC importance sampling estimates are based on 1000 trajectories per x for ν = 0.001 (dots) and for ν = 0.1 (stars).
+
+20
+
+O(n2k2) operations, where n is the dimension of the problem and k is the number of time discretizations. We have seen that the multi-modal Laplace approximation gives non-trivial solutions involving symmetry breaking.
+Computing the path integral by MC sampling is clearly a very generic approach, that for many practical control applications may well be the best way to go. Naive sampling should be replaced by more advanced sampling schemes. I have only considered one simple improvement using importance sampling. Other possible improvements could be a Gibbs sampler or a Metropolis-Hasting sampler. Clearly, more work in this direction must be done.
+In this paper we have numerically computed the path integrals using the most simple discretization strategy: short time averaging [10]. The computation can be made much more eﬃcient using Fourier discretization [11, 12] or other subspace approximations (compact splines or wavelets) [13]. In each of these methods the path integral is reduced to a high (but ﬁnite) dimensional Riemann integral, which is approximated using a Monte Carlo method. These more advanced discretizations can be combined with any of the mentioned MC methods.
+I have not discussed the variational approximation in this paper. This approach to approximating the path integral is also known as variational perturbation theory and gives an expansion of the path integral in terms of the anharmonic interaction terms and a variational function that is to be optimized [14]. The lowest term in the expansion is similar to what is known as the variational approximation in machine learning using the Jensen’s bound [15], but one can also consider higher order terms. The expansion is around a tractable dynamics, such as for instance the harmonic oscillator, whose variational parameters are optimized such as to best approximate the path integral. The application of this method to optimal control would be the topic of another paper. A complication of such an analytic treatment is the presence of topological constraints, such as walls and obstacles.
+There exist other ﬁelds of research that use path integrals and where dedicated numerical methods have been developed to solve them. For instance, in chemical physics path integrals are used to describe conformational changes in molecules over large time scales. The problem is similar to an optimal control problem such as navigating a maze: The begin and end positions are known, and one or more path of minimal cost needs to be found. A prominent method in this ﬁeld is transition path sampling [16], which can be viewed as a Metropolis-Hasting sampling scheme in path space, where a new path is sampled by changing part of the current path and accepting the new path with a probability. This approach is probably also suitable for optimal control.
+There is a superﬁcial relation between the work presented in this paper and the body of work that seeks to ﬁnd a particle interpretation of quantum mechanics. In fact, the log transformation was motivated
+√ from that work. Madelung [17] observed that if Ψ = ρ exp(iJ/¯h) is the wave function that satisﬁes the Schr¨odinger equation, ρ and J satisfy two coupled equations. One equation describes the dynamics of ρ as a Fokker -Planck equation. The other equation is a Hamilton-Jacobi equation for J with an additional term, called the quantum-mechanical potential which involves ρ. Nelson showed that these equations describe a stochastic dynamics in a force ﬁeld given by the ∇J, where the noise is proportional to h¯ [8, 18].
+Comparing this to the relation Ψ = exp(−J/λ) used in this paper, we see that λ plays the role of h¯ as in the QM case. However, the big diﬀerence is that there is only one real valued equation, and not two as in the quantum mechanical case. In the control case, ρ is computed as an alternative to computing the HJB equation. In the QM case, the dynamics of ρ and J are computed together. The QM density evolution is non-linear in ρ because the drift force that enters the Fokker-Planck equation depends on ρ through J as computed from the HJ equation.
+21
+
+Acknowledgement
+I would like to thank Hans Maassen for useful discussions. I would like to thank Michael Jordan, Peter Bartlett and Stuart Russell to host my sabbatical at UC Berkeley, which gave me the time to write this paper. This work is sponsored in part by the Miller Institute for Basic Research in Science of the University of California at Berkeley and the ICIS project, grant number BSIK03024.
+References
+[1] L.S. Pontryagin, V.G. Boltyanskii, R.V. Gamkrelidze, and E.F. Mishchenko. The mathematical theory of optimal processes. Interscience, 1962.
+[2] R. Bellman and R. Kalaba. Selected papers on mathematical trends in control theory. Dover, 1964. [3] J Yong and X.Y. Zhou. Stochastic controls. Hamiltonian Systems and HJB Equations. Springer, 1999. [4] W.H. Fleming. Exit probabilties and optimal stochastic control. Applied Math. Optim., 4:329–346, 1978. [5] W.H. Fleming and H.M. Soner. Controlled Markove Processes and Viscosity solutions. Springer Verlag, 1992. [6] R. Stengel. Optimal control and estimation. Dover publications, New York, 1993. [7] L.F. Shampine, I. Gladwell, and S. Thompson. Solving ODEs with MATLAB. Cambridge University Press,
+2003. [8] E. Nelson. Dynamical Theories of Brownian Motion. Princeton University Press, Princeton, 1967. [9] F. Guerra. Introduction to nelson stochastic mechanics as a model for quantum mechanics. In The Foundation
+of Quantum Mechanics, Amsterdam, 1995. Kluwer. [10] K.S. Schweizer, R.M. Stratt, D. Chandler, and P.G. Wolynes. Convenient and accurate discretized path
+integral methods for equilibrium quantum mechanical calculations. J.Chem. Phys., 75:1347–1364, 1981. [11] W.H. Miller. Path integral representation of the reaction rate constant in quantum mechanical transition
+state theory. J.Chem. Phys., 63:1166–1172, 1975. [12] D.L. Freeman and J.D. Doll. A monte carlo method for quantum boltzmann statistical mechanics using
+fourier representations of path integrals. J.Chem. Phys., 80:5709–5718, 1984. [13] S.D. Bond, B.B. Laird, and B.J. Leimkuhler. On the approximation of feynman-kac path integrals. Journal
+of Computational Physics, 185:472–483, 2003. [14] H. Kleinert. Path integrals in quantum mechanics, statistics,polymer physics and ﬁnancial markets. MIT
+Press, 2004. Third edition. [15] R.P. Feynman and H. Kleinert. Eﬀective classical partition functions. Physical Review A, 34:5080–5084,
+1986. [16] P.G. Bolhuis, D. Chandler, Ch. Dellago, and P.L. Geissler. Transition path sampling: Throwing ropes over
+rough mountain passes, in the dark. Annu. Rev. Phys. Chem., 53:291–318, 2002. [17] E. Madelung. Z. Physik, 40:322, 1926. [18] F. Guerra. Structural aspects of stochastic mechanics and stochastic ﬁeld theory. Physics Reports, 77:263–
+312, 1981.
+22
+
+

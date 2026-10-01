@@ -1,0 +1,107 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{plan4ari_theme}[2026/06/19 Polished Plan4ARI Beamer style]
+
+% --- Colour palette ---------------------------------------------------------
+\definecolor{planblue}{RGB}{18,83,145}
+\definecolor{plandeepblue}{RGB}{9,42,78}
+\definecolor{planorange}{RGB}{222,129,38}
+\definecolor{plandark}{RGB}{30,36,44}
+\definecolor{planmid}{RGB}{92,105,122}
+\definecolor{planlight}{RGB}{246,248,252}
+\definecolor{planline}{RGB}{219,226,235}
+
+\mode<presentation>{
+  \usetheme{Madrid}
+  \usecolortheme{default}
+  \usefonttheme{professionalfonts}
+  \setbeamertemplate{navigation symbols}{}
+  \setbeamertemplate{items}[circle]
+  \setbeamertemplate{sections/subsections in toc}[circle]
+
+  \setbeamercolor{normal text}{fg=plandark,bg=white}
+  \setbeamercolor{structure}{fg=planblue}
+  \setbeamercolor{frametitle}{fg=white,bg=planblue}
+  \setbeamercolor{title}{fg=white,bg=planblue}
+  \setbeamercolor{subtitle}{fg=white}
+  \setbeamercolor{author}{fg=plandark}
+  \setbeamercolor{institute}{fg=planmid}
+  \setbeamercolor{date}{fg=planmid}
+  \setbeamercolor{block title}{fg=white,bg=planblue}
+  \setbeamercolor{block body}{fg=plandark,bg=planlight}
+  \setbeamercolor{alertblock title}{fg=white,bg=planorange}
+  \setbeamercolor{alertblock body}{fg=plandark,bg=orange!8}
+  \setbeamercolor{exampleblock title}{fg=white,bg=plandeepblue}
+  \setbeamercolor{exampleblock body}{fg=plandark,bg=blue!4}
+  \setbeamercolor{footline}{fg=white,bg=plandark}
+  \setbeamercolor{section in toc}{fg=planblue}
+
+  \setbeamerfont{title}{series=\bfseries,size=\Large}
+  \setbeamerfont{subtitle}{size=\normalsize}
+  \setbeamerfont{frametitle}{series=\bfseries,size=\large}
+  \setbeamerfont{block title}{series=\bfseries,size=\normalsize}
+  \setbeamerfont{footline}{size=\scriptsize}
+}
+
+\setbeamersize{text margin left=0.62cm,text margin right=0.62cm}
+\setlength{\leftmargini}{1.15em}
+\setlength{\leftmarginii}{1.05em}
+
+% --- Frame title ------------------------------------------------------------
+\setbeamertemplate{frametitle}{%
+  \nointerlineskip%
+  \begin{beamercolorbox}[wd=\paperwidth,ht=3.0ex,dp=1.0ex,leftskip=0.62cm,rightskip=0.62cm]{frametitle}%
+    \insertframetitle\hfill{\normalsize\insertframesubtitle}%
+  \end{beamercolorbox}%
+}
+
+% --- Footer -----------------------------------------------------------------
+\setbeamertemplate{footline}{%
+  \leavevmode%
+  \hbox{%
+    \begin{beamercolorbox}[wd=.70\paperwidth,ht=2.7ex,dp=1ex,leftskip=.62cm]{footline}%
+      \insertshorttitle
+    \end{beamercolorbox}%
+    \begin{beamercolorbox}[wd=.22\paperwidth,ht=2.7ex,dp=1ex,center]{footline}%
+      \insertsectionhead
+    \end{beamercolorbox}%
+    \begin{beamercolorbox}[wd=.08\paperwidth,ht=2.7ex,dp=1ex,rightskip=.62cm plus1fil]{footline}%
+      \insertframenumber/\inserttotalframenumber
+    \end{beamercolorbox}}%
+  \vskip0pt%
+}
+
+% --- Title page -------------------------------------------------------------
+\setbeamertemplate{title page}{%
+  \begin{tikzpicture}[remember picture,overlay]
+    \fill[planblue] (current page.north west) rectangle ([yshift=-0.40\paperheight]current page.north east);
+    \fill[plandeepblue] (current page.north west) rectangle ([xshift=0.022\paperwidth]current page.south west);
+    \fill[planorange] ([xshift=0.022\paperwidth,yshift=-0.40\paperheight]current page.north west) rectangle ([xshift=0.032\paperwidth]current page.south west);
+  \end{tikzpicture}%
+  \vspace*{0.18\paperheight}
+  {\usebeamercolor[fg]{title}\usebeamerfont{title}\inserttitle\par}
+  \vspace{0.8em}
+  {\usebeamercolor[fg]{subtitle}\usebeamerfont{subtitle}\insertsubtitle\par}
+  \vfill
+  {\usebeamerfont{author}\insertauthor\par}
+  \vspace{0.2em}
+  {\usebeamerfont{institute}\insertinstitute\par}
+  \vspace{1.2em}
+  {\usebeamerfont{date}\insertdate\par}
+}
+
+% --- Section divider --------------------------------------------------------
+\AtBeginSection[]{%
+  \begin{frame}[plain,noframenumbering]
+    \begin{tikzpicture}[remember picture,overlay]
+      \fill[planblue] (current page.north west) rectangle (current page.south east);
+      \fill[planorange] (current page.south west) rectangle ([yshift=0.035\paperheight]current page.south east);
+    \end{tikzpicture}
+    \vfill
+    {\color{white}\Huge\bfseries\insertsectionhead\par}
+    \vfill
+  \end{frame}
+}
+
+% Compact, safe source notes. The \par avoids the Beamer error produced by a
+% forced line break when the command appears at the start of vertical mode.
+\newcommand{\refs}[1]{\par\vspace{0.25em}{\raggedleft\tiny\color{planmid}#1\par}}

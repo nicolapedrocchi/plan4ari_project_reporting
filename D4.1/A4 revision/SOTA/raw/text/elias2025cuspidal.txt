@@ -1,0 +1,482 @@
+Alexander J. Elias1
+email: eliasa3@rpi.edu
+John T. Wen
+email: wenj@rpi.edu
+Department of Electrical, Computer, and Systems Engineering,
+Rensselaer Polytechnic Institute, Troy, NY 12180, USA
+
+Path Planning and Optimization for Cuspidal 6R Manipulators
+A cuspidal robot can move from one inverse kinematics (IK) solution to another without crossing a singularity. Multiple industrial robots are cuspidal. They tend to have a beautiful mechanical design, but they pose path planning challenges. A task-space path may have a valid IK solution for each point along the path, but a continuous joint-space path may depend on the choice of the IK solution or even be infeasible. This paper presents new analysis, path planning, and optimization methods to enhance the utility of cuspidal robots. We first demonstrate an efficient method to identify cuspidal robots and show, for the first time, that the ABB GoFa and certain robots with three parallel joint axes are cuspidal. We then propose a new path planning method for cuspidal robots by finding all IK solutions for each point along a task-space path and constructing a graph to connect each vertex corresponding to an IK solution. Graph edges have a weight based on the optimization metric, such as minimizing joint velocity. The optimal feasible path is the shortest path in the graph. This method can find non-singular paths as well as smooth paths which pass through singularities. Finally, we incorporate this path planning method into a path optimization algorithm. Given a fixed workspace toolpath, we optimize the offset of the toolpath in the robot base frame while ensuring continuous joint motion. Code examples are available in a publicly accessible repository.
+Keywords: Kinematics, Dynamics, and Control of Mechanical Systems; Mechanism Synthesis and Analysis; Mechanisms and Robots; Theoretical and Computational Kinematics
+
+arXiv:2501.18505v2 [cs.RO] 29 Apr 2025
+
+1 Introduction
+The growing ubiquity of robotic manipulators has resulted in new kinematic designs with different sets of intersecting or parallel joint axes. This has led to the unexpected problem that classical path planning algorithms fail on certain classes of robots due to a property called cuspidality.
+The most common design for large industrial robot arms features a spherical wrist and two parallel axes. Examples include the ABB IRB 6640 [1] and the YASKAWA Motoman MA2010A0 [2]. Cobots designed for collaborative tasks such as the UR5 [3] or Techman TM5-700 [4] feature three parallel axes plus other intersecting axes. In either case, a given end effector pose has up to eight inverse kinematics (IK) solutions which correspond to the solutions of a series of quadratic equations. The IK solutions have intuitive labels and are separated by singularities.
+Recently, cobots such as the FANUC CRX-10iA/L [5] (Fig. 1(a)) and Kinova Link 6 [6] (Fig. 1(b)) have come to market. These robots have an offset wrist and do not have three parallel axes. This means IK cannot be solved only with quadratics, and there may be more than eight IK solutions. Practitioners have pointed out notable difficulties with path planning and IK for these robots [7]. The reason for this difficulty is because robots such as the CRX and Link 6 are cuspidal.
+Cuspidal robots can travel between IK solutions without encountering a singularity. They have IK that cannot be solved with quadratics and have certain constraints on kinematic parameters such as link lengths. For a long time, this property was thought to be impossible. An incorrect proof of this impossibility was published [8], but this proof was later proven wrong [9]. Even today, robot cuspidality is rarely considered [7] but a robot with a randomly chosen geometry is almost surely cuspidal [10]. It appears manufacturers and practitioners are building and using cuspidal robots without realizing they are cuspidal or fully appreciating the resulting path planning challenges.
+Although there is limited research in this field, there has been a recent resurgence in interest because cuspidal manipulators are
+1Corresponding Author.
+
+(a)
+
+(b)
+
+(c)
+
+Fig. 1 Industrial cuspidal robots. (a) FANUC CRX-10iA/L. (b) Kinova Link 6. (c) ABB GoFa CRB 15000 5 kg.
+
+becoming commercially widespread for the first time. Most research discusses issues arising from manipulators being cuspidal, and many papers conclude cuspidal robots should be avoided. For example, [11] argued cuspidal robots should be avoided in collaborative applications, and [7] argued it is reasonable to avoid designing cuspidal robots.
+The following example illustrates a case where cuspidality can cause path planning issues. Consider the case of robotic welding, which is an advertised use case for many industrial cuspidal robots. A robot operator may program a closed path for a welding operation, and there may be no apparent problem because the robot can perform the entire weld. However, since the robot is cuspidal, the robot can perform a nonsingular change of solution during the welding operation. This means when the robot executes the weld for a second time, the robot may get stuck at a singularity. Moreover, if the first command in the program is a joint-motion command, the robot may produce unexpected large motion to return to the original configuration!
+For practitioners who are only used to non-cuspidal robots, their
+
+1
+
+existence and many of their properties are nonintuitive. It is difficult to give meaningful names to IK solutions (e.g., elbow up / down) because a robot may move between these solutions with a nonsingular path (meaning they are in the same aspect). Furthermore, there may be smooth task-space paths such as straight-line Cartesian MoveL commands with IK solutions entirely in one aspect that cannot be smoothly followed. This is because local boundary singularities prevent end effector movement within the workspace. In general, these singularities form surfaces that cannot be avoided with small path deviations, unlike, say, a wrist singularity in a conventional industrial robot with a spherical wrist. In some cases, a closed Cartesian path can be followed once, but attempting to follow the path a second time results in the robot getting stuck at a singularity because following the path causes the robot to switch IK solutions.
+Cuspidal robots highlight the importance of considering all IK solutions during path planning and demonstrate the need for IK solvers which can find all IK solutions. Missing IK solutions is problematic because feasible paths may be missed, resulting in a failure to connect two points or picking a suboptimal path. (In fact, finding all IK solutions is important for path planning even for noncuspidal robots as certain paths may be non-optimal or even infeasible depending on the choice of initial IK solution.) Many IK solvers are Jacobian-based iterative solvers, and these do not return all IK solutions.
+IK solvers used by industrial robots which return multiple solutions may have problems. ROBOGUIDE, the software used by FANUC to control their CRX line of robots, only provides up to eight IK solutions even though the CRX has up to sixteen in general [10]. Furthermore, ROBOGUIDE labels IK solutions using shoulder/elbow/wrist configuration parameters, but these descriptions may not correctly match the configuration of the arm and may not change when changing IK solutions. In fact, we can find end effector poses for the CRX with sixteen IK solutions but only two aspects [11]. In Section 2.2, we show very similar issues for the ABB GoFa (Fig. 1(c)) for the first time.
+In this paper, we use our IK solver IK-Geo [12] to efficiently find all IK solutions. IK-Geo also finds continuous approximate solutions to provide robust IK solutions at singularities. The HustyPfurner IK algorithm [13] is a common choice in literature because it performs well on generic robots with no simplifying cases of intersecting or parallel axes. However, all industrial robots have some intersecting or parallel axes, and IK-Geo efficiently solves the IK problem by exploiting these simplifications.
+By leveraging the efficient and complete IK solutions from IKGeo, the goal of this paper is to identify cuspidal robots and perform path planning and path optimization for these robots. Path planning algorithms for noncuspidal robots may not work correctly for cuspidal robots because they may not consider all IK solutions, may not check for changes of solutions for closed task-space paths, or may check for connectivity based on aspect or the presence of IK solutions throughout the path. Although there exist algorithms for noncuspidal robots for optimizing the rigid-body transformation of a task-space path, no optimization algorithms have been proposed specifically for cuspidal robots before now.
+The contributions of this paper are the following:
+• We demonstrate identifying cuspidal robots using IK-Geo. We show the ABB GoFa is cuspidal for the first time. We also show robots with three parallel axes may be cuspidal for the first time.
+• We develop a joint-space path planning framework compatible with cuspidal robots by reducing the problem to a graph search. For a given task-space path, the path planner finds all feasible joint-space paths represented as a weighted directed graph. The optimal joint-space path is found by solving the shortest path problem.
+• We demonstrate path optimization using the graph-based path planning framework. For a given task-space path, we effi-
+
+(a)
+
+(b)
+
+(c)
+
+(d )
+
+Fig. 2 Cuspidal 3R manipulator with an infeasible path (straight line in task space) and a nonsingular change of solution (straight line in joint space). (a) 3D view using cylindrical coordinates (ρ, φ, z ). Points with singularities are marked for the φ = 0, ρ > 0 half-plane. (b) All solutions for joint angle 1 over the infeasible path. Line width corresponds to which aspect the IK solution is in. (c) One aspect in joint space bounded by singularities. Nonsingular change of solution is shown. (d) Forward kinematics mapping of one aspect to task space. Also shown are the infeasible path and the nonsingular change of solution.
+
+ciently find the optimal rigid-body transformation of the entire path to minimize a user-defined optimization metric while ensuring feasibility.
+The remainder of this paper is structured as follows. We explain our notation for robot kinematics, provide definitions, give an overview of cuspidal path planning challenges, and discuss related literature in Section 2. We identify cuspidal robots in in Section 3. We develop and demonstrate path planning method in Section 4 and use it for path optimization in Section 5. We conclude in Section 6.
+Code is available in a publicly accessible repository.2
+
+2 Background
+The configuration of a serial revolute robot manipulator is determined by the joint angle vector
+
+𝑞 = [𝑞1 𝑞2 . . . 𝑞6]𝑇 ∈ R6,
+
+(1)
+
+where in this case the robot has six degrees of freedom. A 6-DOF revolute manipulator is denoted 6R, and a 3-DOF revolute manipulator is denoted 3R. We will consider nonredundant manipulators
+
+2 https://github.com/rpiRobotics/cuspidal- path- planning
+
+2
+
+in this paper, meaning the joint space and task space have the same
+dimension. If we consider joint angles 𝑞𝑖 and 𝑞𝑖 + 2𝜋 equivalent, such as
+when there are no joint limits, then we can model the joint space as a torus, that is, 𝑞 ∈ 𝑆6 and 𝑞𝑖 ∈ [−𝜋, 𝜋].
+Forward kinematics 𝑓0𝑇 is the mapping from joint space to task space:
+
+𝜒0𝑇 = (𝑅0𝑇 , 𝑝0𝑇 ) = 𝑓0𝑇 (𝑞),
+
+(2)
+
+where 𝜒0𝑇 ∈ SE(3) is the pose of the task (end effector) frame in the robot base frame. This consists of the end effector orientation 𝑅0𝑇 ∈ SO(3) and Cartesian end effector position 𝑝0𝑇 ∈ R3. For a 3-DOF robot, the end effector pose only consists of the position. In addition to using Cartesian coordinates (𝑥, 𝑦, 𝑧), we may
+also represent the end effector position using cylindrical coordinates (𝜌, 𝜙, 𝑧), where 𝜌 = (𝑥2 + 𝑦2)1/2 and 𝜙 = ATAN2(𝑦, 𝑥).
+Inverse kinematics (IK) is the mapping from a given end effector
+pose to its preimage, which is the set of all joint angle vectors
+achieving that end effector pose:
+
+𝑓0−𝑇1 ( 𝜒0𝑇 ) = {𝑞 ∈ R6 | 𝑓0𝑇 (𝑞) = 𝜒0𝑇 }.
+
+(3)
+
+There may be multiple IK solutions or even a continuum of solutions for a given end effector pose.
+The kinematic Jacobian 𝐽, which is a function of 𝑞, defines the linear mapping from joint velocity to task velocity:
+
+𝜈0𝑇 = [𝓋0𝑇 𝜔0𝑇 ]𝑇 = 𝐽 (𝑞)𝑞̇ ,
+
+(4)
+
+where 𝜈0𝑇 ∈ R6 ≅ 𝔰𝔢(3) is the end effector spatial velocity composed of the linear velocity 𝓋0𝑇 ∈ R3 and the angular velocity 𝜔0𝑇 ∈ R3. For a 3-DOF robot, the end effector velocity is just the linear velocity.
+A kinematic singularity occurs when 𝐽 (𝑞) loses rank, which occurs when det(𝐽) = 0. At a singular configuration, there is some spacial velocity direction which cannot be achieved, and there is some direction in joint space which results in zero spatial velocity (perhaps only instantaneously). This internal robot motion without moving the end effector is called self-motion.
+A task-space path 𝜒0𝑇 (𝜆) is a mapping from a path variable 𝜆 ∈ R to an end effector pose. A joint-space path 𝑞(𝜆) is
+defined similarly. Whereas paths are indexed by the path variable 𝜆, trajectories are indexed by time 𝑡.
+
+2.1 Definitions. The following definitions apply to nonredundant serial manipulators.
+
+Cuspidal manipulator. A cuspidal manipulator can move between unique IK solutions without encountering a singularity. In other words, a manipulator is cuspidal if it has several IK solutions in an aspect [7].
+
+Aspect. An aspect is a largest connected region in the robot joint space free of singularities [7]. Aspects are bounded not just by singularities but also by joint limits when they exist. Joint limits can convert a cuspidal robot into a noncuspidal robot [7].
+
+Characteristic surface. Points in the characteristic surface of an aspect (in joint space) correspond to end effector poses that have a singular solution bounding same aspect. Noncuspidal robots have no characteristic surfaces.
+
+Feasible path. A workspace path is feasible if it corresponds to a continuous joint-space path. Most other literature only considers singularity-free paths, but a path can be continuous and pass through a singularity.
+
+Repeatable path. A closed workspace path is repeatable if it is feasible and can be repeated arbitrarily many times. A nonrepeatible path can only be followed a finite number of times. A regular repeatable path returns to the same IK solution after each taskspace cycle. Non-regular repeatable paths have a different cycle period and switch IK solutions during each workspace cycle. In noncuspidal robots, if a closed path is feasible then it is also repeatable. For cuspidal 3R robots, nonsingular changes of solutions are necessarily nonrepeatable. For cuspidal 6R robots, there are repeatable paths that are not regular [11].
+Parallel robots can also be cuspidal [7, 14–17], but the roles of the forward and inverse kinematics mapping are reversed. Cuspidal parallel robots have closed active-joint-space paths with different beginning and ending end effector poses.
+2.2 Cuspidal Robot Path Planning Challenge. It is imperative that practitioners know when a robot is cuspidal and how the cuspidality can make path planning more challenging. For example, the ABB IRB 6400C was a cuspidal manipulator that was pulled from commercialization one year after being launched in 1996 perhaps because of path planning difficulties [18].
+The workspace of cuspidal manipulators is divided into regions of different numbers of IK solutions. At the boundary of these regions, multiple IK solutions converge and terminate at a boundary singularity. However, in the case of cuspidal robots, a single aspect can have IK solutions on both sides of a boundary. Some path planners may cause a sudden jump in joint angles if the IK solution switches from one of the terminating solutions to the other solution in the same aspect [19]. Sometimes, choosing a different initial IK solution makes the path feasible. Other times, no initial IK solution works.
+Graphically, robot cuspidality can be understood by considering the forward kinematics mapping of one aspect in joint space to its image in task space. The product of exponentials kinematic parameters for the canonical cuspidal 3R manipulator (Fig. 2), which was perhaps first described in [9], are
+𝑝01 = 0, 𝑝12 = 𝑒𝑥 , 𝑝23 = 2𝑒𝑥 + 𝑒𝑦, 𝑝3𝑇 = 1.5𝑒𝑥 , (5)
+ℎ1 = ℎ3 = 𝑒𝑧, ℎ2 = 𝑒𝑦.
+In the product of exponentials convention (which is further described in [12]), 𝑝01 is the position of the first link frame in the base frame, 𝑝𝑖−1,𝑖 is the position of link frame 𝑖 in the 𝑖 − 1 frame, and 𝑝𝑖,𝑇 is the position of the end effector task frame in the 𝑖 frame. The joint axis direction for joint 𝑖 represented in the 𝑖 − 1 frame is denoted by ℎ𝑖. The Cartesian unit vectors are denoted by 𝑒𝑥 , 𝑒𝑦, and 𝑒𝑧.
+In Fig. 2(c) and 2(d), we see the mapping of one aspect overlaps with itself in the center, meaning there are two IK solutions for a single end effector pose within this aspect. This permits a nonsingular path between two IK solutions. A 3R serial manipulator is cuspidal if and only if it has a cusp point in the forward kinematics mapping of the locus of singular points. Graphically, the cusp point is the point about which the grid lines change directions to allow the mapping to overlap with itself. When crossing between task-space regions with different numbers of IK solutions, the joint-space path may be feasible only for certain IK solutions. For a task-space path with multiple crossings, there may be no feasible joint-space path regardless of the initial IK solution. We show such an infeasible path in Fig. 2(b) and 2(d), where a straightline path passing from the two-solution region to the four-solution region and back to the two-solution region has no feasible paths. Interestingly, we can find an arbitrarily short infeasible path by moving it closer to a cusp point.
+Although plotting the forward kinematic mapping is straightforward for 3R robots and 6R robots with spherical wrists, this becomes more challenging for other robots with singularities that depend on the end effector orientation.
+
+3
+
+Fig. 3 MoveL path for the ABB GoFa which is feasible depending on the initial pose. In this case, there are eight initial and ten final IK solutions but only six feasible paths.
+
+Fig. 4 MoveL path for the FANUC CRX-10iA/L with eight initial and final IK solutions, up to twelve intermediate solutions, and only two feasible paths.
+
+In commonly-used industrial robot software, when the robot encounters a singularity when performing a primitive task-space move such as a straight-line Cartesian move (MoveL), there is no way to determine which of the following two cases is true:
+(1) The path is feasible but the wrong initial IK solution was picked, or
+(2) The path is infeasible regardless of the choice of initial IK solution.
+We demonstrate cuspidal path planning issues for the ABB GoFa in RobotStudio and the FANUC CRX-10iA/L in ROBOGUIDE. These are two newer robots from large manufacturers. This means the simulators are highly realistic, as they use virtual controllers which match the behavior of the real robot. This also means there is a practical application since these robots are currently in production. As neither robot has three intersecting or parallel joint axes, their IK is not solved in closed form, making them both interesting and challenging examples.
+For the ABB GoFa, it is easy to find examples of MoveL paths that are entirely infeasible or feasible only for certain choices of initial IK solution (Fig. 3). For feasible paths, the configuration label may change between the start and end, so feasibility cannot be determined simply by comparing the configuration labels at the beginning and end of the path. During motion, the ConfL \Off command must sometimes be used so the robot controller allows passing between configuration parameters, even though the robot does not encounter a singularity. This is the first time cuspidal behavior has been shown for the GoFa in the literature.
+We also raise the concern for the first time that RobotStudio does not find all IK solutions for the GoFa. The robot has up to 16 solutions, but RobotStudio returns only up to 8 solutions. That the solutions are labeled from 0 to 7 is explicitly called out for the GoFa in the programming manual [20, Sec. 3.16].
+A similar example of a challenging path for the CRX-10iA/L is shown in Fig. 4. In searching the workspace for random MoveL paths, it appears the CRX is more likely than the GoFa to have paths that are feasible depending on the choice of IK solution or entirely infeasible paths.
+There are similar path planning challenges in noncuspidal robots which perhaps have not been fully appreciated in the literature or by practitioners. Even for noncuspidal robots, having the path entirely in the workspace does not guarantee the path is feasible. This is because each aspect may have a different shape in task space. Any path that passes through both a region covered only by one aspect and a region only covered by another aspect will be infeasible for those IK solutions. An example of a path for the ABB IRB 6640 which is entirely in the workspace but is infeasible is shown in Fig. 5. (In practice, the joint limits prevent this from being a problem.) Similarly, noncuspidal robots may have paths that are feasible only for certain initial IK solutions.
+
+Fig. 5 Path for the noncuspidal ABB IRB 6640 which is entirely in the workspace but is infeasible. The blue annulus centered at ρ < 0 shows the task space reachable by shoulder back configurations. The black annulus centered at ρ > 0 shows the task space reachable by shoulder forward configurations. The path shown passes through the hole in the black annulus and also leaves the outer boundary of the blue annulus. Therefore, neither configuration can achieve the entirety of the desired path.
+Even for noncuspidal manipulators, labeling the configuration is difficult in some cases. For example, robots with three intersecting or parallel axes but no other simplifications have their IK solved with a quartic equation, and depending on the remaining kinematics parameters, they may be noncuspidal. In these cases, labels given to each aspect may have no clear geometric meaning to the robot operator.
+2.3 Related Literature. There have been some important recent developments in the identification and path planning for cuspidal manipulators. There is also some important precedent for path optimization, but only for noncuspidal manipulators.
+2.3.1 Identification of Cuspidal Manipulators. There are several ways to prove that a serial robot is cuspidal or noncuspidal.
+If the robot can be solved without using polynomials of degree three or higher, then the robot is not cuspidal, or, equivalently, if the determinant det(𝐽) factors into three terms, then the robot is noncuspidal. A list of noncuspidal 6R robots with this property is found in [11]. Many kinematic simplifications result in a polynomial of degree two [21]. Two common cases for revolute manipulators to be solved with only quadratics is to have a spherical wrist or three parallel axes plus two other intersecting or parallel axes [12]. If a 6R robot has a spherical wrist, then it is cuspidal if and only if the 3R robot formed by the first three links is cuspidal.
+A 3R robot is cuspidal if and only if it has a cusp point in the locus of singular points in the workspace, which is equiva-
+
+4
+
+lently a triple point with exactly three solutions. The IK problem for a 3R manipulator (Subproblem 5 in [12]) can be solved as the intersection of two ellipses, and the singularities correspond to tangencies between ellipses [22]. A cusp point corresponds to osculating contact between two ellipses. Necessary and sufficient kinematic conditions for cuspidality have been found for 3R orthogonal manipulators [7]. Researchers have only recently proven that a general 3R manipulator is cuspidal if and only if it has a cusp point [23].
+It is unknown if 6R manipulators are cuspidal if and only if they have a cusp point, and this condition is false for parallel manipulators. In parallel manipulators, a nonsingular change of solution does not require encircling a cusp point and can instead occur due to encircling an 𝛼-curve [16, 22]. Unfortunately, the name “cuspidal" appears to be a misnomer as cusp points are not necessary in general for a manipulator to be cuspidal.
+Even 2-DOF manipulators can be cuspidal. In particular, planar 2-X manipulators can be cuspidal [24]. These are tensegrity structures with two X-mechanisms, which have variable instantaneous centers of rotation, connected in series.
+Cuspidality can be proven or disproven by analyzing singularities. For example, the Kinova Link 6 has been proven to be cuspidal by identifying that all singularities require at least two specific joint angles [25].
+A certified algorithm for deciding cuspidality of serial revolute manipulators based on real algebraic geometry was proposed in [26]. However, this method is computationally complex, very hard to implement, not currently implemented for 6R robots, and not able to handle collision constraints [11].
+The problem of identifying if a 6R manipulator is cuspidal has been reduced to a path planning problem: A robot is cuspidal if a path planner can find a nonsingular path between two different IK solutions of the same end effector pose. We discuss the path planning problem further in Section 2.3.2. One proposed identification method [19] used linear joint-space MoveJ paths as the initial guess for a path optimization algorithm that adjusted the path to avoid singularities. A subsequent study [10] identified cuspidal robots by formulating the path planning problem as an optimization problem and solving it with a multiple shooting approach. If a nonsingular path between IK solutions is found, this proves the robot is cuspidal. Conversely, failing to find such a path suggests the robot is likely noncuspidal, though this does not constitute a formal proof.
+2.3.2 Path Planning for Cuspidal Manipulators. Path planning for cuspidal robots is not well studied [11]. There are several different path planning problems for cuspidal manipulators.
+The point-to-point path planning problem prescribes the starting and ending pose of the robot but not the intermediate path of the end effector. A special case is to find a feasible closed path between different IK solutions. Finding such a path which is nonsingular proves the robot is cuspidal.
+A singularity-free time-optimal point-to-point trajectory planning algorithm for cuspidal robots was presented in [27]. The algorithm minimizes the weighted sum of terminal time and the 𝐿2 norm of jerk (for regularization) subject to constraints on joint angles, velocities, accelerations, jerk, and torque, as well as to a constraint on distance to singularities. The solution method uses a multiple shooting approach for a given pair of initial and final IK solution candidates with the same sign(det(𝐽)). The optimization is done for all candidate pairs, also accounting for possible ±2𝜋 offsets by considering the interval [−2𝜋, 2𝜋] for each joint angle. Demonstrations were presented for the canonical cuspidal 3R manipulator and the FANUC CRX-10iA/L.
+A different path planning problem is finding a feasible jointspace path for a given task-space path. This can be for open paths or closed paths. This is the problem we will solve in Section 4. To the best of our knowledge, there has only been one path planning algorithm proposed for cuspidal robots following a prescribed taskspace path presented in [10, 11] (the algorithms, presented as flow
+
+charts, are slightly different between [10] and [11] in the case that the path doesn’t cross a characteristic surface.) The algorithm is:
+(1) Pick one IK solution along the path with the smallest number of IK solutions.
+(2) If the path crosses a characteristic surface, check the connectivity of the point to the initial and final IK solutions. If the path is closed, also check if the path is regular, or if it exhibits a nonsingular change of solution in which case it needs to be determined if the path is repeatable.
+(3) If the path does not cross a characteristic surface, check if the path is continuous.
+The algorithm description does not specify if all possible initial and final IK solutions should be evaluated.
+Although a similar problem is solved in this paper, there are several key differences between the algorithm presented in [10, 11] and our proposed algorithm:
+• We evaluate not just the feasibility but also the cost of each possible joint-space path.
+• We reduce the problem to a graph search over a weighted directed acyclic graph (DAG). There are many existing software tools to efficiently perform this search.
+• We demonstrate incorporating least-squares and continuous approximate IK solutions. Although our algorithm can avoid singularities, it also allows for paths that go through singularities.
+• The path planning algorithm is fast enough to be used inside an optimization loop thanks to the computational efficiency of IK-Geo.
+• Whereas the algorithm in [10, 11] is presented using a highlevel description, our algorithm is presented using a particular graph-based implementation with publicly available code examples.
+The Descartes path planning algorithm [28] is part of ROS industrial and also solves the path planning problem using a graph method. However, this algorithm does not account for problems specific to cuspidal manipulators.
+2.3.3 Path Optimization for Cuspidal Manipulators. Proposed path-planning algorithms for non-cuspidal robots are often related to machining tasks such as drilling or milling where robot stiffness must be optimized. These tasks are commonly achieved using robots with spherical wrists [29–33] or with a UR robot [34, 35]. Optimization was done for a Stewart platform in [36]. Some literature resolves the redundant degree of freedom about a spinning tool [31, 32]. In [33], the relative path of two robots was optimized, which required resolving six redundant degrees of freedom. Many algorithms used optimization strategies like particle swarm optimization (PSO) [30, 32] or genetic algorithms [36]. Objective functions included optimizing joint velocities [29, 35], cycle time [33], joint torque and manipulability [34], stiffness [32, 36], contour accuracy (by considering cutting forces and stiffness) [30, 31], and power consumed [36]. Tool offset was optimized in addition to base position in [29]. Furthermore, [29] proposed a path planner similar to ours (it is implicitly a graph search) that can go through singularities. Rather than optimizing over six degrees of freedom, [35] optimized only over the three degrees of freedom in the placement of a workpiece on a table. Euler angles were used for parameterization in [32, 36], but the representation singularity problem was not addressed.
+3 Cuspidal Robot Identification
+In this section, we describe an efficient method to determine if a robot is cuspidal. Using this general method, we show the ABB GoFa and a robot with three parallel joint axes are cuspidal.
+
+5
+
+3.1 Problem Formulation. Given a serial nonredundant manipulator, determine if it is cuspidal.
+
+3.2 Solution Method. If this procedure terminates, the robot is cuspidal:
+(1) Pick a random end effector pose. This can be done by finding the forward kinematics of a random joint angle vector.
+(2) Find all IK solutions for that pose. (3) Find all pairs of solutions with the same sign(det(𝐽)). (4) For each pair, find a path by linearly interpolating in joint
+space and find det(𝐽) along the path. If there is a path that never crosses zero then the robot is cuspidal. Else, restart.
+Unlike [27], we only consider 𝑞𝑖 ∈ [−𝜋, 𝜋] rather than considering both increasing and decreasing joint paths. Unlike [19] we did not optimize any singular paths to avoid a singularity. Despite the simplicity of our algorithm, we were able to quickly prove cuspidality for many robots within a few iterations.
+In [10], the authors determined if a robot was cuspidal by finding all IK solutions using the Husty-Pfurner algorithm and then connecting them using a multiple shooting approach. Finding all IK solutions took on average 10 ms per end effector pose, and the multiple shooting approach took 8.52 sec. In contrast, IK for a single end effector pose using IK-Geo takes under 1 ms for robots with at least one pair of intersecting or parallel axes.
+
+3.3 ABB GoFa CRB 15000 is Cuspidal. The ABB GoFa [37] is a new line of cobots with three kinematic variants: 5 kg, 10 kg, and 12 kg. The 5 kg and 12 kg variants have intersecting axes (1, 2). All variants have parallel axes (2, 3), intersecting axes (4, 5), and nonconsecutive intersecting axes (4, 6). We found examples of non-singular changes of IK solutions for all three variants. To the best of our knowledge, we are the first to report that the GoFa is a cuspidal manipulator.
+One example nonsingular change of solution for the GoFa 5 kg is shown in Fig. 6, which is a MoveJ path between
+
+⎡⎢−0.8000⎤ ⎢ 0.5900⎥⎥
+
+⎡⎢ 2.2599⎤ ⎢ 2.1999⎥⎥
+
+⎢
+
+⎥
+
+⎢
+
+⎥
+
+⎢ 2.3400⎥
+
+⎢ 2.6677⎥
+
+𝑞𝐴 = ⎢ ⎢
+
+2.7200⎥⎥ ,
+
+𝑞𝐵 = ⎢ ⎢
+
+2.5298⎥⎥ .
+
+(6)
+
+⎢ ⎢
+
+1.0600⎥⎥
+
+⎢⎢−2.5286⎥⎥
+
+⎢⎣−1.8400⎥⎦
+
+⎢ ⎣
+
+0.4831⎥⎦
+
+Although this example exceeds the robot joint limits, we can also find other examples within the joint limits and verify the motion in RobotStudio.
+
+3.4 Robots with Three Parallel Axes May Be Cuspidal. Others have mentioned that robots with three parallel axes are noncuspidal [7]. Although this is true for common robots such UR cobots which have other intersecting axes and can be solved with a series of quadratics, this is false in general. One can easily find a counterexample by searching through random robots and poses and testing if any MoveJ path is nonsingular. For example, the robot with kinematic parameters
+
+𝑝01 = 0, 𝑝12 = 0.1𝑒𝑥 + 0.7𝑒𝑦, 𝑝23 = 𝑝34 = 𝑝45 = 0.7𝑒𝑧,
+
+𝑝56 = 0.3𝑒𝑧 + 0.9𝑒𝑧, 𝑝6𝑇 = 0.5𝑒𝑦
+
+(7)
+
+ℎ1 = 𝑒𝑧, ℎ2 = ℎ3 = ℎ4 = ℎ6 = 𝑒𝑦, ℎ5 = 𝑒𝑥.
+
+has a nonsingular change of solution (Fig. 7) with a linear joint move between
+
+⎡⎢−2.4000⎤⎥
+
+⎡ ⎢
+
+0.9940⎤⎥
+
+⎢−0.9000⎥
+
+⎢−1.4391⎥
+
+⎢
+
+⎥
+
+⎢
+
+⎥
+
+⎢ 1.1000⎥
+
+⎢ 0.9530⎥
+
+𝑞𝐴 = ⎢⎢−0.8000⎥⎥ ,
+
+𝑞𝐵 = ⎢ ⎢
+
+1.2368⎥⎥ .
+
+(8)
+
+⎢ ⎢
+
+2.3000⎥⎥
+
+⎢ ⎢
+
+1.0004⎥⎥
+
+⎢⎣−1.3000⎥⎦
+
+⎢ ⎣
+
+1.5942⎥⎦
+
+Fig. 6 Nonsingular change of solution for the GoFa 5 kg using a linear joint move from qA (left, blue) to qB (right, green).
+
+4 Path Planning Using Graph Method
+Robot operations such as welding may include a prescribed taskspace path with the 6-DOF end effector pose fully specified for each point along the path. The path planning problem is to find all possible robot joint-space paths that achieve this task-space path and pick the best one according to some optimization metric.
+While the IK problem finds the joint angles for a single end effector pose, the path planning problem extends this to find the entire joint path for an end effector path. Applying IK to each point in the end effector path is not sufficient because the joint path must be continuous and may have other constraints, and the IK problem admits multiple solutions.
+Many IK solvers including IK-Geo, which we use in our path planning algorithm, and even the Husty-Pfurner method may not perfectly solve the IK problem. For example, IK-Geo may miss an IK solution for robots that are solved with a 1D search if the sampling is not sufficiently dense, and the Husty-Pfurner method may miss a solution if some joint angle is close to ±𝜋 due to the singularity of tan(𝑞𝑖/2). Therefore, the path planning method should be robust to occasional missed IK solutions.
+
+4.1 Problem Formulation. Denote an end effector path 𝜒0𝑇 (𝜆) with path index 𝜆 ∈ [0, 𝐿], and denote a point along the path by 𝜒0𝑇 (𝜆). The goal of the path planning problem is to find the optimal continuous corresponding joint-space path 𝑞(𝜆).
+If desired, the path can be indexed to time with a trajectory 𝜆(𝑡), where 𝑡 ∈ [0, 𝑇]. We can discretize the path into 𝐾 + 1 evenly spaced points so that 𝐿 = 𝐾Δ𝜆. Define the discrete path index 𝑘 ∈ {0, 1, . . . , 𝐾 } so that 𝜒0𝑇 [𝑘] = 𝜒0𝑇 (𝑘Δ𝜆). Similarly, we can represent the joint-space solutions using the discretized path 𝑞 [𝑘].
+The optimization metric 𝐶 (·) is the sum over the squared finite
+differences in joint position divided by each time interval:
+
+𝐾∑−︂1
+
+𝐶 (𝑞[𝑘]) = 𝑐(𝑞[𝑘 + 1], 𝑞[𝑘]),
+
+(9)
+
+𝑘=0
+
+𝑐(𝑞 ∥wrapToPi(𝑞 2, 𝑞1) = 2 − 𝑞1) ∥2 , (10) Δ𝜆
+
+6
+
+• Repeatability: If the prescribed task-space path is closed, then it may be desirable to constrain the joint-space paths to be repeatable or also regular.
+Hard constraints are realized by changing the graph construction as detailed in the next section.
+
+Fig. 7 Nonsingular change of solution for a robot with three
+parallel axes using a linear joint move from qA (right, blue) to qB (left, green).
+
+where wrapToPi(Δ𝑞) wraps each element of Δ𝑞 to the range [−𝜋, 𝜋]. In the limit as Δ𝜆 → 0 the metric becomes the squared 𝐿2 norm of the joint derivative with respect to 𝜆:
+
+∥ 𝐶 (𝑞(𝜆)) = ∥︁∥︁ ∥ ︁𝑞′ (𝜆)∥︁∥︁︁2 ∫ 𝐿 ∥ = ∥︁∥︁ 𝑑𝑞(𝜆) ∥∥︁︁2 ∥︁︁ ∥∥︁︁ 𝑑𝜆. (11)
+
+20
+
+𝑑𝜆
+
+If 𝜆 is the path length measured in m, then (𝐶 (𝑞(𝜆))/𝐿)1/2 is the
+RMS average of joint movement over path length with units rad/m. Soft constraints can be included by adding terms to the opti-
+mization metric. They may be particularly useful compared to hard constraints when the path planner is used inside an optimization loop as in Section 5. Options include:
+• Joint limits: A barrier function can be included for penalizing 𝑞 close to some boundary. If 𝜆(𝑡) is given, then costs can be included for the finite difference approximations of joint velocity or acceleration. (Otherwise, 𝜆(𝑡) can be determined later to ensure any velocity or acceleration constraints are satisfied.)
+
+• Singu√l︁arity avoidance: The kinematic manipulability measure 𝜇 = det(𝐽𝑊 𝐽𝑇 ) [38] can be included for each time step, where 𝑊 is a joint-space weight matrix.
+Options for hard constraints on 𝑞(𝜆) include:
+
+• Bounds on manipulability, position, or velocity: Similarly to the soft constraint options, bounds may be placed on 𝜇 or 𝑞,
+and bounds may be placed on joint velocity or acceleration if 𝜆(𝑡) is given.
+
+• Nonsingularity: If this constraint is not enforced, a path can be smooth and pass through a singularity because at the singularity large joint motion occurs only if the robot moves in a singular direction.
+
+4.2 Graph Method. For a 6-DOF manipulator, the task-space pose 𝜒0𝑇 [𝑘] = (𝑅0𝑇 [𝑘], 𝑝0𝑇 [𝑘]) consists of the orientation and position of the end effector task frame in the robot base frame. For each 𝜒0𝑇 [𝑘] the IK solutions are 𝑞1 [𝑘], 𝑞2 [𝑘], . . . , 𝑞𝑀 [𝑘] [𝑘], where 𝑀 [𝑘] is the number of IK solutions for 𝜒0𝑇 [𝑘]. (A special case is when the IK solutions include a solution at an internal singularity, in which case self-motion is possible at that solution.) We construct a weighted directed acyclic graph in the following manner:
+• Each IK solution 𝑞𝑚 [𝑘] is a represented by a graph vertex 𝑉𝑘,𝑚. There are also two special vertices: the start vertex 𝑆 and the finish vertex 𝐹.
+• Each IK solution vertex 𝑉𝑘,𝑚 has a weighted edge to 𝑉𝑘+1,𝑙 if the metric 𝑐(𝑞𝑙 [𝑘 +1], 𝑞𝑚 [𝑘])) is less than some user-defined 𝜖 = Δ𝜆𝜖0. If the optimization metric is (9) and 𝑞̇ 𝑚𝑎𝑥 is the maximum desired joint velocity, then the threshold 𝜖0 can be set according to 𝜖0 ≈ ∥𝑞̇ 𝑚𝑎𝑥 ∥2.
+• Vertex 𝑆 is connected to each 𝑉0,𝑚, and vertex 𝐹 is connected to each 𝑉𝐾,𝑚 with edges of weight 0 directed from 𝑆 and to 𝐹.
+The optimal joint-space path is the shortest graph path between vertices 𝑆 and 𝐹. The weight of the shortest path is the optimal metric.
+Some care must be taken to properly tune the sampling density Δ𝜆 and the metric threshold 𝜖0. There must be enough samples to reasonably approximate the joint-space paths as piecewise linear approximations, and the threshold must be set to correctly discriminate between connected and disconnected IK solutions.
+Joint Limits. Limits on certain joint angles means that we need to take into account the total number of turns rather than only considering 𝑞𝑖 ∈ [−𝜋, 𝜋]. Care must be taken for cyclical paths so that repeating the path does not cause the joint to exceed the joint limit. Velocity or acceleration constraints can be used to determine if two vertices are connected with an edge (hard constraint) or they can be incorporated into the cost of each edge (soft constraint).
+Singular and Nonsingular Paths. A joint-space path encounters a singularity if det(𝐽) = 0 for some point along the path. If edges are not made between vertices with different sign(det(𝐽)) then the path planner avoids returning singular paths.
+Repeatable or Regular Paths. By finding all connections between nodes at 𝑘 = 0 and 𝑘 = 𝐾 (which represent the same IK solutions), we can make a new directed graph showing connections between IK solutions. Then, we must find graph cycles starting and ending at the same IK solution.
+Alternatively, rather than constructing a new graph, we can instead connect each 𝑉0,𝑚 to the corresponding 𝑉𝐾,𝑚 and find minimum-weight cycles directly.
+Robustness to Missed IK Solutions. To account for missed IK solutions, also connect vertex 𝑉𝑘,𝑚 to vertex 𝑉𝑘+2,𝑙 if the metric
+∥∥︁︁wrapToPi(𝑞𝑙 [𝑘 + 2] − 𝑞𝑚 [𝑘])∥∥︁︁2 2Δ𝜆 (12)
+is less than 𝜖. Similarly, 𝑆 and 𝐹 should be connected to 𝑉1,𝑚 and 𝑉𝐾 −1,𝑚. If desired, nodes more than 2 timesteps away may be connected similarly.
+
+7
+
+Fig. 8 Graph path planning for the FANUC CRX-10iA/L. To find the optimal feasible path, all IK solutions are considered. Vertices representing IK solutions are connected with directed edges weighted by the cost for that movement. Start and finish vertices are also connected to the IK solutions at the beginning and end of the path. The optimal path is found by finding the minimum graph path between the start and finish vertices. An edge crosses the entire graph between k = 2 and k = 3 because each qi is on a torus.
+Due to the triangle inequality, paths with fewer edges and with larger Δ𝜆 will have a smaller weight than paths between the same vertices with more edges and with smaller Δ𝜆. To reduce the error in calculating the total path cost, edges should be added to the graph in multiple passes. First, only connect vertices with distance Δ𝜆. Then, connected vertices with distance 2Δ𝜆 only if they are not already connected.
+Another strategy to prevent missed IK solutions when using IKGeo is to utilize continuous approximate solutions. This allows for Cartesian paths at or even through boundary singularities. This means paths can be at the edge of the workspace or can switch between aspects. Care should be taken to ensure the task-space path deviation is not excessive when using these solutions. Continuous approximate solutions are also useful as part of IK based on 1D search. In this case, continuous approximate solutions may occur when the error function has a zero at the edge of its branch, which is where the error becomes vertical. These continuous approximate solutions at the edge of the error function branch are usually not singular IK solutions.
+4.3 Evaluation. An example of the graph method for planning a straight-line Cartesian move for the FANUC CRX-10iA/L is shown in Fig. 8. This example uses 10 equally-spaced sample points to make the graph easy to see, but in practice, the density of sample points should be higher. The subtle gray background plot in Fig. 8 was created using a higher density of 100 sample points.
+The plots shown in Figs. 2, 3, and 4 were constructed using the graph method. All three examples are for straight-line MoveL paths. There are 100 sample points in Fig. 2(b) and 200 sample points in Figs. 3 and 4.
+In Section 5, we will also demonstrate using the graph method inside an optimization loop. Rather than a simple straight-line path, these examples will use more complicated helical paths each with 500 equally-spaced samples.
+5 Path Optimization
+Robots commonly perform operations such as welding where there is freedom in how to fixture the workpiece with respect to the robot, either by moving the workpiece or by moving the robot. In such a scenario, a natural problem to solve is how to find the optimal pose of the workpiece based on some optimization metric.
+5.1 Problem Formulation. Denote a 6-DOF toolpath defined in the workpiece frame as 𝜒𝑃𝑇 [𝑘], where 𝜒𝑃𝑇 [𝑘] =
+
+(𝑅𝑃𝑇 [𝑘], 𝑝𝑃𝑇 [𝑘]), and denote the pose of the workpiece frame in the base frame as 𝜒0𝑃 = (𝑅0𝑃, 𝑝0𝑃). The path of the end effector in the base frame is found according to
+𝑅0𝑇 [𝑘] = 𝑅0𝑃 𝑅𝑃𝑇 [𝑘], 𝑝0𝑇 [𝑘] = 𝑝0𝑃 + 𝑅0𝑃 𝑝𝑃𝑇 [𝑘]. (13)
+Given an optimization metric 𝐶 (·), find the optimal workpiece frame pose 𝜒0𝑃. This is equivalent to optimizing the pose of the robot base while fixing the toolpath in space.
+For 3R robots, 𝜒0𝑇 [𝑘] includes only the position of the end effector, but the workpiece frame pose 𝜒0𝑃 still includes both position and orientation.
+In Section 4, no soft or hard constraints were placed on the end effector path because it was constant. For path optimization, a hard constraint may be placed on 𝜒0𝑇 , or a soft constraint can be added to the optimization metric using a barrier function. If 𝜆(𝑡) is known then constraints can be placed on end effector velocity or acceleration. These task-space constraints can be calculated before finding 𝑞(𝜆).
+
+5.2 Solution Method. A locally optimal workpiece frame pose 𝜒0𝑃 can be found using an optimization method such as fminsearch() in MATLAB [39], which is a derivative-free local
+optimizer. To find a feasible starting point, randomly search over SO(3) and R3 based on the robot workspace until the graph-based path planner finds a feasible 𝑞 [𝑘]. Then, optimization is performed
+with the graph-based path planner running at each iteration. If de-
+sired, the global minimum can be found with high probability if the
+optimization is performed with multiple random starting points. Represent the rotation 𝑅0𝑃 by a unit quaternion with scalar part
+cos(𝜃/2) and vector part 𝑘 sin(𝜃/2), where 𝑘 is the axis of rotation and 𝜃 is the rotation angle. During optimization, the unit-length
+constraint does not need to be enforced and the quaternion can
+be normalized before use. However, it should be verified after
+optimization that the norm does not become too small or large.
+Quaternions are used for optimization because they avoid the
+representation singularities of other parameterizations. To prevent convergence issues, we require a representation of SO(3) where for any point in the representation nearby rotations in SO(3) are also nearby in the representation. In contrast, 𝑥–𝑦–𝑧 Euler angles have a representation singularity at 𝜃𝑦 = ±𝜋/2, and the axis times angle representation 𝜃𝑘 has a singularity at 𝜃 = 2𝜋.
+
+Eliminating Solution Null Space. If there are no joint limits or position constraints that depend on the first joint angle 𝑞1 then rotating the path about the first joint axis ℎ1 does not change the optimization.
+Assume without loss of generality that ℎ1 = 𝑒𝑧 and 𝑝01, the offset from the base frame to the first link frame, is only in the 𝑧 direction. Write 𝑅0𝑃 = 𝑅𝑧 𝑅˜ and 𝑝0𝑃 = 𝑅𝑧 𝑅˜ 𝑝˜ so we can rewrite (13) as
+𝑅0𝑇 [𝑘] = 𝑅𝑧 𝑅˜𝑅𝑃𝑇 [𝑘], 𝑝0𝑇 [𝑘] = 𝑅𝑧 𝑅˜ ( 𝑝˜ + 𝑝𝑃𝑇 [𝑘]). (14)
+
+The rotation is applied after the position offset, and the extra rotation 𝑅𝑧 does not affect the optimization and can be set to any angle. Optimizing over (𝑅˜, 𝑝˜) and setting the 𝑧 component of the rotation axis of 𝑅˜ to zero reduces the optimization by one degree
+of freedom.
+For the above analysis to be valid, we must show that any rotation 𝑅 can be represented as a rotation about a vector in the 𝑥𝑦 plane followed by a rotation about 𝑧, that is 𝑅 = 𝑅𝑧 𝑅𝑥𝑦. Decompose the rotation into 𝑧–𝑥–𝑧 Euler angles:
+
+𝑅 = 𝑅𝑧,2𝑅𝑥 𝑅𝑧,1.
+
+(15)
+
+Using 𝑅𝑧,1 𝑅𝑇𝑧,1 = 𝐼, rewrite as
+
+𝑅 = 𝑅𝑧,2 𝑅𝑧,1 𝑅𝑇𝑧,1 𝑅𝑥 𝑅𝑧,1.
+
+(16)
+
+8
+
+(a)
+
+(b)
+
+(a)
+
+Fig. 9 Initial guesses and locally optimized helix paths. (a) Cuspidal 3R manipulator. (b) FANUC CRX-10iA/L. For the CRX, only the workspace envelope is plotted as singularities inside the envelope depend on end effector orientation.
+
+The rotations 𝑅𝑧,2 𝑅𝑧,1 equal a pure 𝑧 rotation 𝑅𝑧. The remaining rotations 𝑅𝑇𝑧,1 𝑅𝑥 𝑅𝑧,1 are a rotation about 𝑅𝑇𝑧,1𝑒𝑥 and therefore a rotation about an axis in the 𝑥𝑦 plane, 𝑅𝑥𝑦.
+
+5.3 Evaluation. Optimization was performed for both a 3R and 6R robot using a helical toolpath consisting of 500 equallyspaced sample points for the path variable 𝜆. The optimization metric was the 𝐿2 joint velocity norm approximation (9) without any other constraints.
+A spatial helical toolpath was generated and optimization was performed for the canonical cuspidal 3R manipulator using two initial guesses. Results are plotted in Figs. 9(a), 10(a), and 11(a). The RMS joint velocity average over path length decreased from 0.8209 rad/m to 0.3874 rad/m for one initial guess where the optimized pose was near 𝜌 = 2 and from 0.5690 rad/m to 0.3149 rad/m for a different initial guess where the optimized pose was near 𝜌 = 4.
+Optimization was also performed for the FANUC CRX-10iA/L with a 6-DOF helical toolpath and two initial guesses. Results are shown in Figs. 9(b), 10(b), and 11(b). RMS joint velocity over path length decreased from 13.9328 rad/m to 10.0447 rad/m for the optimized pose near 𝑧 = 0.75 and decreased from 13.1054 rad/m to 9.9929 rad/m for the optimized pose near 𝑧 = −0.5.
+In both the 3R and 6R cases, there were multiple local minima, demonstrating the importance of using multiple initial guesses.
+6 Conclusion
+Most robot practitioners are unaware of cuspidal robots, and many of those who are aware suggest cuspidal robots should be avoided. Our suggestion is that cuspidal robots are difficult to use not because of an inherent problem with the kinematics but because there is a current lack of effective IK and path planning algorithms to control them. Indeed, cuspidal robots offer certain advantages. Wrist offsets may lead to simpler mechanical designs and better dynamical performance. Such designs even allow for the upper arm to swing past the lower arm, such as for some models in the CRX line. Having multiple IK solutions available in a single aspect can be beneficial because one IK solution may be preferred over another for obstacle or singularity avoidance, and switching between solutions does not require passing through a singularity. Therefore, it is important not to dismiss cuspidal robots due to their path planning issues but instead to develop new path planning tools so that cuspidal robots can be used to their full potential.
+The work presented in this paper is one of the few first steps in improving the path planning capabilities of cuspidal robots. We have shown how to identify cuspidal robots, how to perform path
+
+(b)
+Fig. 10 Optimization error vs iteration. (a) Cuspidal 3R manipulator. (b) FANUC CRX-10iA/L.
+planning given a task-space path, and how to perform path optimization. For the first time, we have shown the ABB GoFa and certain robots with three parallel joint axes are cuspidal. In practice, the identification algorithm can be used to identify the cuspidality of more existing robots and to aid in the design of new robots. The algorithms presented underscore the importance of IK solvers which can efficiently find all IK solutions, such as IK-Geo. In contrast, we showed RobotStudio does not find all solutions for the ABB GoFa. We demonstrated the path planning and optimization algorithms on both straight-line paths as well as more complicated helix paths. The path planning and optimization algorithms have many practical applications for tasks where the entire toolpath is known and the workpiece or robot base can be moved. This includes subtractive processes such as grinding, sanding, and polishing, and additive processes such as welding, spraying, and 3D printing.
+Future work in improving the path planning and optimization algorithms can include increasing computational efficiency. Path planning efficiency may be increased by using nonuniform sampling along the path to decrease the number of IK solutions evaluated. Path optimization efficiency may be increased by using an analytical gradient of the optimization objective with respect to the toolpath offset.
+Future improvements can also focus on new capabilities. The path planning algorithm can include collision avoidance constraints which must consider not only the pose of the end effector but also the pose of each link in the kinematic chain. The optimization algorithm can be extended to solve different optimization problems such as solving the optimal time problem.
+We also raise several general questions about cuspidal manipulators that would be interesting to answer:
+• What are the cuspidality conditions for robots with three parallel axes? (Conditions have been found for orthogonal robots
+
+9
+
+(a)
+(b)
+Fig. 11 Joint-space paths before (thin line) and after (thick line) optimization. (a) Cuspidal 3R manipulator. (b) FANUC CRX-10iA/L joint 5.
+with three intersecting axes.) • What is a good metric for the “degree of cuspidality" for a
+robot? Different robots have different proportions of random poses with non-singular MoveJ changes of IK solution (I.e., the algorithm in Section 3.2 may have a different expected iteration count) and different proportions of random MoveL paths that are infeasible. Such a metric may even be useful for noncuspidal robots. We hope such a metric can help influence the design or selection of robots to prevent cases of infeasible or nonrepeatible paths. • Can we efficiently identify and label the reduced aspect a robot is in? (A reduced aspect is bounded by singularities and characteristic surfaces.) Can we identify how the reduced aspects are connected? This would make path planning even more efficient as we would only have to check the labels along the path, similar to how turn numbers work in configuration parameters for noncuspidal robots. • Can we apply cuspidality analysis to 7-DOF manipulators? Preliminary testing shows that some redundant serial robot arms parameterized by either one joint angle or by the Shoulder-Elbow-Wrist (SEW) angle are cuspidal. This work in identification, path planning, and path optimization addresses critical theoretical challenges of cuspidal robots while improving their practical viability. Advancing these methods and addressing the open questions we raise will further unlock the full potential of cuspidal manipulators.
+References
+[1] ABB, 2020, Product Specification - IRB 6640, https://library.abb.com/d/ 3HAC028284- 001
+
+[2] Yaskawa, 2018, Motoman-MA2010 Instructions, https://www.motoman.com/ en- us/service- training/product- documentation
+[3] Universal Robots, 2021, User Manual UR5/CB3, https://www. universal- robots.com/download/manuals- cb- series/user/ur5/315/ user- manual- ur5- cb- series- sw315- english- international- en/
+[4] Techman Robot, 2018, TM5 Guide Book, https://www.tm-robot.com/en/ download- center/
+[5] FANUC, 2020, FANUC Robot CRX-10iA, CRX-10iA/L Mechanical Unit Operator’s Manual.
+[6] Kinova, 2024, Link 6 User Guide, https://www.kinovarobotics.com/product/ link- 6- cobot
+[7] Wenger, P. and Chablat, D., 2023, “A Review of Cuspidal Serial and Parallel Manipulators,” ASME J. Mech. Rob., 15(4), 040801.
+[8] Borrel, P. and Liégeois, A., 1986, “A Study of Multiple Manipulator Inverse Kinematic Solutions with Applications to Trajectory Planning and Workspace Determination,” Proc. Int. Conf. Robot. Autom. (ICRA), Vol. 3, IEEE, San Francisco, CA, April 7–10, pp. 1180–1185, doi: 10.1109/ROBOT.1986.1087554.
+[9] Wenger, P., 1992, “A New General Formalism for the Kinematic Analysis of All Nonredundant Manipulators,” Proc. Int. Conf. Robot. Autom. (ICRA), IEEE, Nice, France, May 12–14, pp. 442–447, doi: 10.1109/ROBOT.1992.220300.
+[10] Salunkhe, D. H., Marauli, T., Müller, A., Chablat, D., and Wenger, P., 2024, “Kinematic Issues in 6R Cuspidal Robots, Guidelines for Path Planning and Deciding Cuspidality,” Int. J. Robot. Res., 02783649241293481.
+[11] Salunkhe, D. H., 2023, “Cuspidal Robots: Theoretical Study, Classification, and Application to Commercial Robots,” Ph.D. thesis, École centrale de Nantes, https://theses.hal.science/tel- 04520763v1
+[12] Elias, A. J. and Wen, J. T., 2025, “IK-Geo: Unified robot inverse kinematics using subproblem decomposition,” Mechanism and Machine Theory, 209, p. 105971.
+[13] Husty, M. L., Pfurner, M., and Schröcker, H.-P., 2007, “A New and Efficient Algorithm for the Inverse Kinematics of a General Serial 6R Manipulator,” Mech. Mach. Theory, 42(1), pp. 66–81.
+[14] Macho, E., Petuya, V., Altuzarra, O., and Hernandez, A., 2012, “Planning Nonsingular Transitions Between Solutions of the Direct Kinematic Problem From the Joint Space,” ASME J. Mech. Rob., 4(4), 041005.
+[15] Coste, M., 2012, “A Simple Proof That Generic 3-RPR Manipulators Have Two Aspects,” ASME J. Mech. Rob., 4(1), 011008.
+[16] Bamberger, H., Wolf, A., and Shoham, M., 2008, “Assembly Mode Changing in Parallel Mechanisms,” IEEE Trans. Robot, 24(4), pp. 765–772.
+[17] Manubens, M., Moroz, G., Chablat, D., Wenger, P., and Rouillier, F., 2012, “Cusp Points in the Parameter Space of Degenerate 3-RPR Planar Parallel Manipulators,” ASME J. Mech. Rob., 4(4), 041003.
+[18] Wenger, P., 2007, “Cuspidal and Noncuspidal Robot Manipulators,” Robotica, 25(6), pp. 677–689.
+[19] Salunkhe, D. H., Chablat, D., and Wenger, P., 2023, “Trajectory Planning Issues in Cuspidal Commercial Robots,” Proc. Int. Conf. Robot. Autom. (ICRA), IEEE, London, United Kingdom, May 29 – June 2, pp. 7426–7432, doi: 10.1109/ICRA48891.2023.10161444.
+[20] ABB, 2024, Technical Reference Manual - RAPID Instructions, Functions, and Datatypes RW 7, https://library.abb.com/d/3HAC065038-001
+[21] Mavroidis, C. and Roth, B., 1994, “Structural Parameters Which Reduce the Number of Manipulator Configurations,” ASME J. Mech. Des., 116(1), pp. 3–10.
+[22] Thomas, F., 2016, “A distance geometry approach to the singularity analysis of 3R robots,” ASME J. Mech. Rob., 8(1), 011001.
+[23] Salunkhe, D. H., Spartalis, C., Capco, J., Chablat, D., and Wenger, P., 2022, “Necessary and Sufficient Condition for a Generic 3R Serial Manipulator to Be Cuspidal,” Mech. Mach. Theory, 171, 104729.
+[24] Furet, M. and Wenger, P., 2019, “Kinetostatic Analysis and Actuation Strategy of a Planar Tensegrity 2-X Manipulator,” ASME J. Mech. Rob., 11(6), 060904.
+[25] Asgari, M., Bonev, I. A., and Gosselin, C., 2024, “Singularity Analysis of Kinova’s Link 6 Robot Arm via Grassmann Line Geometry,” Proc. Int. Conf. Robot. Autom. (ICRA), IEEE, Yokohama, Japan, May 13–18, pp. 8814–8820, doi: 10.1109/ICRA57147.2024.10610252.
+[26] Chablat, D., Prébet, R., Safey El Din, M., Salunkhe, D. H., and Wenger, P., 2022, “Deciding Cuspidality of Manipulators Through Computer Algebra and Algorithms in Real Algebraic Geometry,” Proc. Int. Symp. Symbolic Algebraic Comput. (ISSAC), Lille, France, July 4–7, pp. 439–448, doi: 10.1145/3476446.3535477.
+[27] Marauli, T., Salunkhe, D. H., Gattringer, H., Müller, A., Chablat, D., and Wenger, P., 2023, “Time-Optimal Point-To-Point Motion Planning and Assembly Mode Change of Cuspidal Manipulators: Application to 3R and 6R Robots,” Proc. Int. Conf. Intell. Robots Syst. (IROS), IEEE, Detroit, MI, October 1–5, pp. 10014–10019, doi: 10.1109/IROS55552.2023.10341420.
+[28] De Maeyer, J., Moyaers, B., and Demeester, E., 2017, “Cartesian Path Planning for Arc Welding Robots: Evaluation of the Descartes Algorithm,” Proc. Int. Conf. Emerg. Technol. Factory Autom. (ETFA), IEEE, Limassol, Cyprus, September 12–15, pp. 1–8, doi: 10.1109/ETFA.2017.8247616.
+[29] Weingartshofer, T., Hartl-Nesic, C., and Kugi, A., 2021, “Optimal TCP and Robot Base Placement for a Set of Complex Continuous Paths,” Proc. Int. Conf. Robot. Autom. (ICRA), IEEE, Xi’an, China, May 30 – June 05, pp. 9659–9665, doi: 10.1109/ICRA48506.2021.9561900.
+[30] Ye, C., Yang, J., Zhao, H., and Ding, H., 2021, “Task-Dependent Workpiece Placement Optimization for Minimizing Contour Errors Induced by the Low Posture-Dependent Stiffness of Robotic Milling,” Int. J. Mech. Sci., 205, p. 106601.
+
+10
+
+[31] Dumas, C., Caro, S., Garnier, S., and Furet, B., 2012, “Workpiece Placement Optimization of Six-Revolute Industrial Serial Robots for Machining Operations,” ASME Proc. Eng. Syst. Des. Anal., Vol. 44854, ASME, Nantes, France, July 2–4, pp. 419–428, doi: 10.1115/ESDA2012-82559.
+[32] Liao, Z.-Y., Wang, Q.-H., Xie, H.-L., Li, J.-R., Zhou, X.-F., and Pan, T.-H., 2021, “Optimization of Robot Posture and Workpiece Setup in Robotic Milling with Stiffness Threshold,” IEEE/ASME Trans. Mechatron., 27(1), pp. 582–593.
+[33] He, H., Lu, C.-l., Saunders, G., Wason, J., Yang, P., Schoonover, J., Ajdelsztajn, L., Paternain, S., Julius, A., and Wen, J. T., 2024, “Fast and Accurate Relative Motion Tracking for Dual Industrial Robots,” IEEE Robot. Autom. Lett., 9, pp. 10153–10160.
+[34] Balci, B., Donovan, J., Roberts, J., and Corke, P., 2023, “Optimal Workpiece Placement Based on Robot Reach, Manipulability and Joint Torques,” Proc. Int. Conf. Robot. Autom. (ICRA), IEEE, London, United Kingdom, May 29 – June 2, pp. 12302–12308, doi: 10.1109/ICRA48891.2023.10161031.
+
+[35] Stradovnik, S. and Hace, A., 2024, “Workpiece Placement Optimization for Robot Machining Based on the Evaluation of Feasible Kinematic Directional Capabilities,” Appl. Sci., 14(4), p. 1531.
+[36] Lopes, A. M. and Pires, E. J. S., 2011, “Optimization of the Workpiece Location in a Machining Robotic Cell,” Int. J. Adv. Robot. Syst., 8(6), p. 73.
+[37] ABB, 2024, Product Specification - CRB 15000, https://library.abb.com/d/ 3HAC077390- 001
+[38] Yoshikawa, T., 1985, “Manipulability of Robotic Mechanisms,” Int. J. Robot. Res., 4(2), pp. 3–9.
+[39] The MathWorks Inc., 2024, “Optimization Toolbox Version: 24.2 (R2024b),” https://www.mathworks.com/help/optim/index.html
+
+11
+
+

@@ -1,0 +1,343 @@
+2024 6th International Symposium on Robotics & Intelligent Manufacturing Technology (ISRIMT) | 979-8-3315-2894-2/24/$31.00 ©2024 IEEE | DOI: 10.1109/ISRIMT63979.2024.10875295
+
+2024 6th International Symposium on Robotics & Intelligent Manufacturing Technology (ISRIMT)
+
+Tool Path Optimization for 7-DOF Robot Machining Based on Sampling Motion Planning Algorithm
+
+Haijun Bai 1st School of Mechanical and Electrical Engineering
+Soochow University Suzhou, China
+20235229057@stu.suda.edu.cn
+Zhentao Zhang 3rd School of Mechanical and Electrical Engineering
+Soochow University Suzhou, China
+zztandjack@163.com
+Lei Lu 5th, * School of Mechanical and Electrical Engineering
+Soochow University Suzhou, China
+* Corresponding author: lulei@suda.edu.cn
+
+Guangde Bi 2nd School of Mechanical and Electrical Engineering
+Soochow University Suzhou, China
+20225229001@stu.suda.edu.cn
+Guoqin Lei 4th School of Mechanical and Electrical Engineering
+Soochow University Suzhou, China
+20225229046@stu.suda.edu.cn
+Lining Sun 6th School of Mechanical and Electrical Engineering
+Soochow University Suzhou, China
+lnsun@hit.edu.cn
+
+Abstract—Milling or grinding complex curved parts with multi-DOF (degree of freedom) robots has the flexibility advantage of flexible obstacle avoidance and consistent attitude machining. However, in surface machining, only a few degrees of freedom are usually required, such as 3-DOF in ball end milling, and 4-DOF are usually required in side milling. There are redundant degrees of freedom in machining with multi-degrees of freedom robots, and redundant degrees of freedom also provide optimization space for machining process trajectory planning. A 7-DOF robot machining system is composed of a rotating worktable and a 6-DOF robot. This paper proposes an optimization method for complex surface machining joint trajectories using 7-DOF robots, based on a sampling motion planning algorithm. According to machining process requirements, the tool point was constrained to the established machining trajectory, the tool axis vector is limited to a specific area. Finally, using the sampled motion planning method in the Open Motion Planning Library (OMPL) to derive and generate a trajectory that meets the task requirements, the total joint rotation is reduced by 12.4% compared to traditional trajectory planning methods.
+Keywords-complex surface machining, redundant degree of freedom, motion planning, trajectory optimization
+I. INTRODUCTION
+With the development of product personalization and flexible technology, the application scenarios of industrial robots have increased significantly [1]. When the robot is used for spraying [2], polishing [3] and other operations, by combining the rotation of the spindle and the movement of the other five joints, the task can be completed with high efficiency and precise control. However, the redundant degrees of
+
+freedom allows robots to have greater adaptability and flexibility [4]. Lu et al. [5] proposed a tool path optimization method for 6-DOF robot surface machining based on sampling motion planning algorithm to minimize the motion distance of all joints. Weingartshofer et al. [6] introduce a path planning framework that incorporates tolerances and redundancy to precisely optimize joint paths with specific goals and constraint designs. Liu et al. [7] designed a 6-axis robot with a 3-axis actuator for hub polishing. We propose an automatic joint motion planning method for a nine-axis industrial robot to achieve the shortest processing time.
+When dealing with motion planning problems of highdimensional robots, sample-based motion planning is an effective method. There are two types of planners: graph-based planners [8] and tree-based planners [9]. Although when the number of samples increases without limit, the probability of finding a solution converges to 1 [10], in the case of multiple solutions, finding the optimal solution has become a necessary consideration. Karaman [11] introduced two new algorithms, PRM* and RRT*, which have been verified to have asymptotic optimality, that is, the solution cost they generate gradually approaches the optimal value over time.
+In this paper, a rotating worktable is combined with a 6DOF robot to increase redundant degrees of freedom, and the tool tip point is successively restricted to the machining trajectory point, and the tool axis vector is restricted to a specific area. Finally, PRM* algorithm is used to process the trajectory points that meet the task requirements.
+
+979-8-3315-2894-2/24/$31.00 ©2024 IEEE
+
+124
+
+Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:18:48 UTC from IEEE Xplore. Restrictions apply.
+
+II. KINEMATICS MODEL AND EVALUATION FUNCTIONS
+
+A. Establishing 7-DOF Kinematics Model As shown in Figure 1, a system combining a rotating
+worktable and a 6-DOF robot is established to improve the flexibility of machining by utilizing redundant DOF. The transformation matrix of the rotating worktable is as follows:
+
+cos(r) -sin(r) 0 550
+
+w sin(r) cos(r) 0 -240
+
+
+
+0T=
+
+(1)
+
+0
+
+0 1 -240
+
+0
+
+0 01
+
+Where, 𝑟 represents the joint angle of the rotating worktable. Set the six joints of the robot as J1, J2, J3, J4, J5, J6, then the pose matrix of the end of the robot relative to the workpiece coordinate system is a 4×4 matrix containing seven joint angle variables, as shown in equation (2).
+
+w w0
+
+1
+
+2
+
+3
+
+4
+
+5
+
+
+
+7T= 0T1T(J1)2T(J2) T(J3)4T(J4)5T(J5)6T(J6)
+
+(2)
+
+3
+
+However, since 7-DOF are involved, it is impossible to directly solve the inverse kinematics, so when the target attitude is known, the joint angle of the rotating worktable is given, and then the inverse solution is carried out to find the value of the remaining six joint angles.
+
+III. TOOL PATH CONSTRAINTS FOR SURFACE MACHINING During the machining process, the tool moves along a
+certain attitude series. Tool posture is composed of the position of the tool tip and the attitude of the tool.
+
+
+
+Pw x, y, z 
+
+(4)
+
+
+
+Aw b,c 　
+
+(5)
+
+Pwis the position of the tool point in the workpiece space, Aw is the direction of the tool axis in the workpiece space, with b and c being the angles between the tool axis vector and the workpiece coordinate z. Set the tip curve to:
+
+
+
+Pw=C(k)
+
+(6)
+
+Where C(k) is the tool path curve function. During the machining process, collision and cutting forces not only affect the positioning of the tool, but also significantly affect the machining quality [12]. As shown in Figure 2, the axial direction and feed direction of the tool determine the direction of cutting force. In order to reduce tool offset caused by cutting force, the tool axis is limited to a specific area, ensuring that the direction of cutting force is within the high stiffness area of the spindle. Therefore, the range of the tool axis is set to:
+
+
+
+bmin ≤ b ≤ bmax
+
+(7)
+
+
+
+cmin ≤ c ≤ cmax
+
+(8)
+
+Where bmin, bmax, cmin, cmaxand are respectively the lower limit and upper limit of the tool shaft Angle.
+
+Figure 1. 7-DOF robot machining system
+
+B. Establishing Evaluation Functions When the trajectory function is determined, the joint Angle
+values of the starting point and the ending point can be obtained by combining the collision function and constraints. Considering that the constraint problem exists in a highdimensional space, multiple effective paths will be planned. In order to minimize the time in the entire machining process, it can be converted into the shortest motion distance of all joints of the robot. Thus, the optimization evaluation function for the entire motion planning issue is defined as follows:
+
+lsum=l(r)+l(J1)+l(J2)+l(J3)+l(J4)+l(J5)+l(J6)
+
+(3)
+
+Where l(Ji) is the total stroke of the whole i joint during the trajectory machining.
+
+Figure 2. Schematic diagram of Angle b and c of tool shaft
+
+IV. EXPERIMENTS In the experiment, the spiral curve shown in Figure 3 is planned as the tool track, and the curve parameter function is as follows:
+
+50 * cos(k)
+
+
+
+C(k)= 50 * sin(k)
+
+
+
+(9)
+
+50 * k * tan(15°)
+
+Where k is the tool path parameter, in the local coordinate system of the tool, limits the angles b and c to a predetermined region:
+
+125 Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:18:48 UTC from IEEE Xplore. Restrictions apply.
+
+
+
+0.2618 ≤ b ≤ 1.047
+
+(10)
+
+0 ≤ c ≤ 1.571
+
+(11)
+
+TABLE I. THE TOOL-TIP PATH PARAMETER AND TOOL AXIS ORIENTATION FOR THE START AND END STATES
+
+Initial state
+End state
+
+Tool-tip path parameter k(rad)
+0
+4π
+
+Tilt angle b(rad) 0.5236
+0.5236
+
+Tilt angle c(rad) 1.0472
+1.0472
+
+Table I provides the start and end parameters of the test track. Table II lists the initial and termination positions of each joint and turntable of the robot. The RPM* algorithm in OMPL library is used to plan the predetermined trajectory of the redundant DOF robot machining system, and hundreds of discrete path states are generated in the joint space. To verify the effectiveness of the method, 7-DOF tool paths with fixed attitude (relative to rotating table) and 6-DOF tool paths with variable attitude were set as control groups. The planned tool path is shown in Figure 4. For local magnification in the figure, the path planned on the surface of the fixed and variable attitude trajectories follows the constraint of the knife-tip curve. Figure 5 and Table III show that the total joint Angle travel of 7-DOF tool path optimized based on sampling (Variable attitude 7-DOF tool path) is reduced by 0.3735rad compared with 7-DOF tool path with fixed attitude, and the total joint Angle travel of 6-DOF tool path optimized based on sampling (Variable attitude 6-DOF tool path) is reduced by 0.9114rad compared with that of 6-DOF tool path optimized based on sampling. In order to further improve the optimization effect, a weight coefficient is added to the initial Angle and end Angle of each joint, which reduces the total angular travel of the joint by 12% compared with the traditional trajectory planning method.
+
+Figure 3. Tool path trajectory Figure 4. The planned tool path and the comparison group
+
+TABLE II. THE JOINTS POSITION FOR THE START AND END STATES
+
+Initial state
+End state
+
+r 0 -1.5067
+
+J1 -0.676
+0.8307
+
+J2 0.8296
+0.6799
+
+J3 -1.2802
+-1.179
+
+J4 0.3565
+0.4172
+
+J5 -2.0219
+-2.2546
+
+J6 2.3167
+2.4287
+
+TABLE III.
+
+Fixed attitude 7-DOF tool path
+Variable attitude 6DOF tool path
+Variable attitude 7DOF tool path
+Weight - Variable attitude 7-DOF tool
+path
+
+r 1.5067
+0 1.5628
+1.5067
+
+THE PATH DISTANCE FOR THE SAMPLING-BASED METHOD AND THE COMPARISON GROUP
+
+J1
+
+J2
+
+J3
+
+J4
+
+J5
+
+J6
+
+1.5067
+
+0.88057
+
+1.5225
+
+0.48734
+
+0.64634
+
+0.59086
+
+0.59523
+
+0.85412
+
+1.7004
+
+1.6613
+
+1.0042
+
+1.8637
+
+1.6623
+
+0.41329
+
+0.87224
+
+0.99141
+
+0.52452
+
+0.74102
+
+1.5067
+
+0.40198
+
+0.90823
+
+0.47476
+
+0.90407
+
+0.55281
+
+sum 7.141 7.6789 6.7675
+6.25525
+
+126 Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:18:48 UTC from IEEE Xplore. Restrictions apply.
+
+Figure 5. The joints path of the optimizing result and the comparison group
+V. CONCLUSIONS In this paper, a motion model combining rotating worktable and 6-DOF robot is established. The spiral trajectory is taken as the tool trajectory, the constraint of the tool tip on the trajectory point is transformed into an equality function, the rotation
+
+range of the tool axis is transformed into an inequality constraint, and the joint movement distance is taken as the optimization objective. The sampling based path planning method was used to optimize the machining process. On the basis of the obtained optimization results, the corresponding weight coefficients were added to the initial position and end position of each joint Angle, which further improved the optimization effect. The total motion length of the seven joints was reduced from 7.141rad to 6.25525rad, which was reduced by 12.4% compared with the traditional planning method.
+
+ACKNOWLEDGMENT This research was supported by the Innovation and Entrepreneurship Training Program for College Students of Soochow University in 2024 (Grant No. 202410285063Z) and the Natural Science Research Project of Jiangsu Province (Grant No. 22KJB460034).
+
+REFERENCES
+
+[1] International Federation of Robotics, World robotics 2020 report, 2020, URL http://reparti.free.fr/robotics2000.pdf, Accessed on 1st July 2022.
+
+[2] Y. Li and Y. Zhang, "The Research on Spray Trajectory Planning Issues Digest," 2023 2nd International Conference on Automation, Robotics and Computer Engineering (ICARCE), Wuhan, China, 2023, pp. 1-4, doi: 10.1109/ICARCE59252.2024.10492485.
+
+[3] Xi Z, Guangyi Z, Zhuohan G, et al. Surface polishing by industrial robots: a review [J]. The International Journal of Advanced Manufacturing Technology, 2023, 125(9-10):3981-4012.
+
+[4] Yang, J., Qi, Q., Adili, A., Ding, H. (2024). An analytical tool path
+
+smoothing algorithm for robotic machining with consideration of
+
+redundant kinematics. Robotics and Computer-Integrated Manufacturing,
+
+Volume
+
+89,
+
+102768.
+
+ISSN
+
+0736-5845.
+
+https://doi.org/10.1016/j.rcim.2024.102768.
+
+[5] Lu, L., Zhang, J., Tian, X., Han, J., and Wang, H. (October 1, 2020). "Tool Path Optimization for Robotic Surface Machining by Using Sampling-Based Motion Planning Algorithms." ASME. J. Manuf. Sci. Eng. January 2021; 143(1): 011002. https://doi.org/10.1115/1.4047734.
+
+[6] Weingartshofer, T., Bischof, B., Meiringer, M., Hartl-Nesic, C., and Kugi, A. (2023). "Optimization-based Path Planning Framework for Industrial Manufacturing Processes with Complex Continuous Paths." Robotics and Computer-Integrated Manufacturing. January 2023; 82: 102516. https://doi.org/10.1016/j.rcim.2022.102516.
+
+[7] Liu, Z., Li, R., Zhao, L., Xia, Y., Qin, Z., Zhu, K. (2023). Automatic joint motion planning of 9-DOF robot based on redundancy optimization for wheel hub polishing. Robotics and Computer-Integrated Manufacturing, Volume 81, 102500. ISSN 0736-5845. https://doi.org/10.1016/j.rcim.2022.102500.
+
+[8] Feng Ao, Yang Jinyu, Xie Yuyang, et al. Robot Path Planning Based on Improved PRM Algorithm [J]. Journal of Computer Technology and Development, 2024,34(02):127-133. (in Chinese).
+
+[9] Feng, B., Jiang, X., Li, B., Zhou, Q., Bi, Y. (2024). An adaptive multiRRT approach for robot motion planning. Expert Systems with Applications, Volume 252, Part B, 124281. ISSN 0957-4174. https://doi.org/10.1016/j.eswa.2024.124281.
+
+[10] Barraquand, J., Kavraki, L., Latombe, J.-C., Motwani, R., Li, T.-Y., and Raghavan, P., 1997, “A Random Sampling Scheme for Path Planning,” Int. J. Rob. Res., 16(6), pp. 759–774.
+
+[11] Karaman, S., and Frazzoli, E., 2011, “Sampling-Based Algorithms for Optimal Motion Planning,” Int. J. Rob. Res., 30(7), pp. 846–894.
+
+[12] Sun, Y., Jia, J., Xu, J., Chen, M., & Niu, J. (2022). Path, feedrate and trajectory planning for free-form surface machining: A state-of-the-art review. *Chinese Journal of Aeronautics*, 35(8), 12-29. https://doi.org/10.1016/j.cja.2021.06.011.
+
+127 Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:18:48 UTC from IEEE Xplore. Restrictions apply.
+
+

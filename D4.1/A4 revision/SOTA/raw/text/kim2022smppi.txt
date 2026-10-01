@@ -1,0 +1,522 @@
+IEEE ROBOTICS AND AUTOMATION LETTERS. PREPRINT VERSION. ACCEPTED JULY, 2022
+
+1
+
+Smooth Model Predictive Path Integral Control without Smoothing
+Taekyung Kim, Gyuhyun Park, Kiho Kwak, Jihwan Bae, and Wonsuk Lee
+
+arXiv:2112.09988v8 [cs.RO] 13 Oct 2025
+
+Abstract—We present a sampling-based control approach that can generate smooth actions for general nonlinear systems without external smoothing algorithms. Model Predictive Path Integral (MPPI) control has been utilized in numerous robotic applications due to its appealing characteristics to solve nonconvex optimization problems. However, the stochastic nature of sampling-based methods can cause significant chattering in the resulting commands. Chattering becomes more prominent in cases where the environment changes rapidly, possibly even causing the MPPI to diverge. To address this issue, we propose a method that seamlessly combines MPPI with an input-lifting strategy. In addition, we introduce a new action cost to smooth control sequence during trajectory rollouts while preserving the information theoretic interpretation of MPPI, which was derived from non-affine dynamics. We validate our method in two nonlinear control tasks with neural network dynamics: a pendulum swing-up task and a challenging autonomous driving task. The experimental results demonstrate that our method outperforms the MPPI baselines with additionally applied smoothing algorithms.
+Index Terms—Optimization and optimal control, planning under uncertainty, model learning for control, autonomous vehicle navigation, field robots.
+
+Fig. 1. A simplified representation of the MPPI algorithm during each optimization iteration. For clarity, we only visualize one sampled trajectory (in green). (a) Amount of changes between previously computed control sequence and the next control sequence (along the “i-axis”). (b) Amount of changes in control values during MPPI rollouts (along the “t-axis”), which are hard to be minimized by the MPPI baseline.
+
+I. INTRODUCTION
+C ONTROLLING an autonomous vehicle in complex environments is a challenging problem. When the vehicle drives on a structured road, it can be modeled as a linear or a kinematic system that is easy to solve. However, the nature of the real world dictates non-linearity and this characteristic is highlighted more at high vehicle speeds and low road surface friction levels. The majority of autonomous driving research has been focused on normal driving conditions, while areas of aggressive maneuvering in highly nonlinear environments have not been fully addressed by prior work.
+Gradient-based Model Predictive Control (MPC) methods have been introduced as powerful solutions for solving the problems of nonlinear control systems [1], [2]. Despite the fact that there have been successful real-world applications with these methods [3], [4], they still possess the limitation that the
+Manuscript received: February 24, 2022; Revised: June 4, 2022; Accepted: July 14, 2022. This paper was recommended for publication by Editor H. Kurniawati upon evaluation of the Associate Editor and Reviewers’ comments. (Corresponding author: Wonsuk Lee.)
+Taekyung Kim, Kiho Kwak, Jihwan Bae, and Wonsuk Lee are with the Ground Technology Research Institute, Agency for Defense Development, Daejeon 34186, Republic of Korea (e-mail: ktk1501@add.re.kr; khkwak@add.re.kr; jihan1008@add.re.kr; wsblues@add.re.kr).
+Gyuhyun Park is with the Department of Mechanical Engineering, Seoul National University, Seoul 08826, Republic of Korea and also with the Ground Technology Research Institute, Agency for Defense Development, Daejeon 34186, Republic of Korea (e-mail: khpark@add.re.kr).
+Digital Object Identifier (DOI): 10.1109/LRA.2022.3192800
+
+cost function has to be differentiable. Sampling-based Model Predictive Path Integral (MPPI) control has been proposed to optimize both convex and non-convex objectives [5] and has benefitted greatly from recent advances in Graphics Processing Units (GPUs), as a large number of samples can be computed in parallel to achieve better real-time performance.
+While MPPI presents general performances in various situations, it may encounter chattering when implemented on an actual platform, which is a common characteristic of samplingbased methods [6]. Rapid changes in action commands are widely known to burden the actuators and cause the system to become unstable. Meanwhile, the key property of MPPI for achieving high-level control performance is to draw samples upon the previously optimized control sequence. However, this property can instead hinder the entire sequence from converging quickly to the optimal distribution when the environment changes too rapidly [7]. Under such circumstances, in particular, chattering becomes more prominent.
+Therefore, a smoothing algorithm is often employed to smooth the control sequence in practice. However, because the optimization procedure and this external smoothing mechanism are completely decoupled, the smoothed sequence may unintentionally lose its optimality. In addition, it may present a significant problem if the algorithm behaves incorrectly, even if it is tuned to perform well in most situations. In the worst case, the resulting sequence may violate the physical constraints or diverge.
+
+2
+
+IEEE ROBOTICS AND AUTOMATION LETTERS. PREPRINT VERSION. ACCEPTED JULY, 2022
+
+In this paper, we propose the Smooth Model Predictive Path Integral (SMPPI) control method that combines MPPI with an input-lifting strategy to generate smooth actions without any additional smoothing algorithms. We include derivative actions as control inputs, in which this technique is commonly used to smooth jerky commands in control studies [8], [9]. To the best of our knowledge, we seamlessly apply this idea in the MPPI framework for the first time while preserving the information theoretic interpretation of optimal control. Additionally, our method offers a new smoothing mechanism which is ineligible in the MPPI baseline. The smoothing effects of our approach are twofold. First, it smooths the gap between the control sequences of previous and current iterations. We refer to this as smoothing along the “i-axis.” Second, it smooths the optimized control sequence during trajectory rollouts. We refer to this as smoothing along the “t-axis.” The amount of changes in the control values of each axis that can be reduced by our method are depicted in Fig. 1. Unlike MPPI, where efforts to realize smoothing along both axes would obstruct its ability to adapt to rapidly changing environments, SMPPI can achieve both smoothness and agility. We conduct experiments to compare our method with different smoothing methods in a classical control benchmark. We also demonstrate our idea in a challenging autonomous driving task. 1
+
+II. BACKGROUND
+This section provides a brief overview of the MPPI algorithm. The benefit of the sampling-based method is that it does not require a gradient of the objective function and the cost function [10]. Recent works including MPPI have integrated a sampling-based approach with MPC formulations to solve non-convex optimization problems [5], [6]. They combine information theoretic control and stochastic optimal control using free energy and the KL divergence to derive an optimal control distribution with importance sampling [11].
+Consider a discrete time dynamic system with a state xt ∈ Rn and a control input vt ∈ Rm. We applied the general noise assumption that holds that we could not directly control the system over vt, but could over the mean ut of the density function of noise ϵt:
+
+vt ∼ N (ut, Σ).
+
+Noise is simply defined as vt = ut + ϵt. Given a sequence of inputs V = {v0, v1, . . . vT −1} and mean input variables U = {u0, u1, . . . uT −1} along a finite time horizon t ∈ {0, 1, . . . T −1}, we can define the probability density function q(V ) as:
+
+T −1
+q(V ) = Z−1 exp
+t=0
+
+− 1 (vt − ut)TΣ−1(vt − ut) 2
+
+, (1)
+
+where Z = ((2π)m|Σ|) 2 .1 Similarly, we can also define the uncontrolled density function p(V ) where U is usually 0:
+
+T −1
+
+1 T −1
+
+p(V ) = Z−1 exp − 2 vt Σ vt . (2)
+
+t=0
+
+1Our video can be found at: https://youtu.be/fyngK8PCoyM
+
+These two density functions correspond to the distributions of
+Q and P, respectively. Here, we define an optimal density function using the free energy of the system [11], which corresponds to the optimal distribution Q∗:
+
+q∗(V ) = 1 exp − 1 S(V ) p(V ), (3)
+
+η
+
+λ
+
+where η denotes the normalizing constant and S(V ) denotes the state-dependent cost. The input sequence in state cost is iteratively transformed into state values x through the nonaffine system dynamics F [6]:
+
+T −1
+
+S(V ; F) = ϕ(xT ) + c(xt),
+
+(4)
+
+t=0
+
+xt+1 = F(xt, vt).
+
+As proposed in [6], we can now derive the optimal control input by minimizing the KL divergence between Q and Q∗:
+
+EQ∗ [vt] = q∗(V )vtdV.
+
+(5)
+
+Here, the best solution of (5) is to draw samples directly over Q∗, but this is not possible. Importance sampling is therefore employed to compute the integral over the known distribution
+Q:
+
+EQ∗ [vt] = w(V )q(V )vtdV
+
+= EQU,Σ [w(V )vt],
+
+(6)
+
+where the importance weighting term is:
+
+q∗(V ) w(V ) =
+p(V )
+
+p(V ) q(V )
+
+1
+
+1
+
+T −1
+
+1
+
+T −1
+
+= η exp − λ S(V ) + 2 λ ut Σ (ut + 2ϵt) .
+
+t=0
+
+(7)
+
+Let E be a noise sequence {ϵ0, ϵ1, . . . ϵT −1} and K be the number of trajectory samples. Finally, we have the iterative optimal control update law to compute the weights when the sampled trajectory cost {C(V 0), C(V 1), . . . C(V K−1)} is given:
+
+K−1
+
+uti+1 = uti +
+
+w(E k)ϵkt
+
+(8)
+
+k=0
+
+w(Ek) = 1 exp − 1 C(V k) − β , (9)
+
+η
+
+λ
+
+where we subtract the minimum state cost β to ensure that at least one sample has a numerically non-zero importance sampling weight. The trajectory cost in (9) is then simplified as follows:
+
+T −1
+
+C(V k) = S(V k) + λ utTΣ−1ϵtk.
+
+(10)
+
+t=0
+
+KIM et al.: SMOOTH MODEL PREDICTIVE PATH INTEGRAL CONTROL WITHOUT SMOOTHING
+
+3
+
+III. SMOOTH MODEL PREDICTIVE PATH INTEGRAL CONTROL
+A. Limitations of External Smoothing Algorithms
+The sampling-based approach of the MPPI algorithm makes possible the consideration of involving non-convex objectives in optimization problems. However, the stochastic nature of this method can cause significant chattering in the resulting commands. Due to the unique property by which perturbed trajectories are sampled around the previously optimized mean control sequence U , MPPI cannot respond effectively when the optimal control distribution greatly deviates from the previous iteration. Undesirable chattering effects stand out more in the scenarios mentioned above.
+A common approach to mitigate such a problem is to smooth the resulting control sequence using, for instance, sliding window smoothing methods or filtering based methods [12], [13]. It was suggested that a Savitzky-Golay filter (SGF) [14] would be an effective solution for this control method [6]. It smooths the subsets of adjacent data by fitting the local polynomial approximations in a convolutional manner.
+However, this type of approach can have negative effects, as external manipulations of control values are not considered in the optimization process. Consider a general state-action system dynamics with clamping function gu for handling control constraints:
+
+xt+1 = F (xt, gu(vt)) .
+
+(11)
+
+Because the perturbed control vt is bounded by the physical
+
+limits of the actuators, the sampled noise should be bounded
+
+as follows:
+
+ϵ¯t = gu(vt) − ut.
+
+(12)
+
+Two possible ways exist to apply the SGF in the control sequence.
+1) Smoothing weighted noise sequence: First, we can apply smoothing to the weighted noise sequence:
+
+K −1
+
+uti+1 = uti + SGF
+
+w(E¯k)ϵ¯kt .
+
+(13)
+
+k=0
+
+This makes data points smoother while compensating for the
+
+noise, which changes considerably along the time horizon.
+
+During this procedure, the control variable u may violate
+
+the constraint conditions given that the bounded noises are
+
+manipulated by the filter. On the other hand, the nature of
+
+this process makes it vulnerable to phase distortion [15].
+
+In addition to violating the given constraints, the control
+
+sequence will diverge if the noises are overlapped repeatedly
+
+and amplified over time. We describe this phenomenon further
+
+in Section V-D.
+
+2) Smoothing control sequence: Second, we can apply the
+
+SGF after the control sequence is updated using the weighted
+
+noise:
+K −1
+
+uti+1 = SGF uti + w(E¯k)ϵ¯kt .
+
+(14)
+
+k=0
+
+Although this method guarantees that the control variables are meeting the bounded condition, it can cause a delay in the
+
+system response. It is common to provide history values as they are required in the convolution-based smoothing method. The early values in the control sequence are then affected by the history, which means that polynomial approximation hinders the controlled distribution from rapidly shifting to an optimal distribution [16]. Note that the first control action is the key value in the MPC problem.
+B. Decoupling Control Space and Action Space
+In the original MPPI, the running control cost in (10) only plays a role in reducing the distance between control values of the current and previous iterations [17]. Chattering innately occurs because the control trajectory is sampled randomly, and the variance along the “t-axis” in the new control trajectory is not taken into account during optimization. To this end, it is possible to impose an additional cost in terms of the variation of the input, i.e., chattering on the “t-axis.” [18] suggested an additional running cost for variation of the inputs, but it cannot be applied generally, as it assumes that the dynamics are affine in control under special conditions. We intend to expand the MPPI baseline [6], which is likely to be adopted more extensively, but arbitrary modifications for the additional cost associated with input sequences violate the theoretical derivation of MPPI as the control cost is determined inherently through the importance sampling scheme.
+In order to handle such an issue while preserving the MPPI framework, therefore, we suggest the lifting of the control variables as derivative actions. This strategy can mitigate the chattering problem in terms of two points of view.
+1) Smoothing along the “i-axis”: Henceforth, let us decouple the control space and action space by defining action sequence A = {a0, a1, . . . aT −1}. Noisy sampling is performed on a higher order control space U . Then, the resulting control sequence is integrated to become a smoother action sequence. The control distribution is hereby distinguished from the MPPI baseline. The variance of the injected noise is adjusted according to the physical limit of the input rate of change. This in turn reduces the variation along the “i-axis” and consequently mitigates damage to the actuator.
+Note that one can attempt to smooth resulting actions in the MPPI framework by reducing the variance in the same manner as described above. In this setting, however, MPPI would be unable to respond to rapidly changing environments. On the other hand, increasing the variance to cover a wider action range would not only be physically implausible but would also eventually result in chattering. The method proposed here is free from this trade-off, as its new search space U can be handled adaptively depending on the environment.
+2) Smoothing along the “t-axis”: In contrast to MPPI, our control distribution corresponds to derivative action, allowing action variables to be treated as augmented state elements and hence making them independent of the control cost. Variation of action can now be easily included in the state cost such that chattering with regard to the “t-axis” can be minimized. Here, we introduce an extra action cost Ω to smooth the action sequence along the “t-axis” by minimizing the variance of A
+
+4
+
+IEEE ROBOTICS AND AUTOMATION LETTERS. PREPRINT VERSION. ACCEPTED JULY, 2022
+
+Algorithm 1: SMPPI
+
+Given: F: Dynamics model;
+
+K, T : Number of samples, timesteps;
+
+(u0, u1, ... uT −1): Initial control sequence;
+
+(a0, a1, ... aT −1): Initial action sequence;
+
+Σ, λ, ϕ, c, Ω: Control parameters and cost functions;
+
+for i ← 0 to maximum iterations do
+
+x0 ← SubscribeState();
+
+for k ← 0 to K − 1 do
+
+x ← x0;
+
+Sample Ek =
+
+ϵk
+0
+
+.
+
+.
+
+.
+
+ϵkT
+
+−1
+
+,
+
+ϵk
+t
+
+∈ N (0, Σ);
+
+for t ← 0 to T − 1 do
+
+vk
+t
+
+=
+
+ut
+
++
+
+ϵkt ;
+
+ak
+t
+
+=
+
+at
+
++
+
+vtk ∆t;
+
+x ← F(x, akt );
+
+Ck += c(x) + λuTt Σ−1ϵkt ;
+
+Ck += ϕ(x) + Ω(ak0 , ak1 , . . . akT −1);
+
+wk ← ComputeWeights(C0, C1, . . . Ck−1); for t ← 0 to T − 1 do
+
+U i+1 ← U i + k=0 K−1 wkT E k ; Ai+1 ← Ai + U i+1∆t;
+
+SendToController(a0); for t ← 1 to T − 1 do
+ut−1, at−1 ← ut, at;
+
+uT −1, aT −1 ← Initialize(uT −1, aT −1);
+
+without violating the information theoretic interpretation of MPPI:
+
+T −1
+
+Ω(A) = (at − at−1)Tω (at − at−1),
+
+(15)
+
+t=1
+
+where ω is the weighting parameter in the form of a diagonal matrix.
+Finally, we obtain the following action sequence update law:
+
+K −1
+
+uti+1 = uti + w(E k)ϵkt ,
+
+(16)
+
+k=0
+
+ati+1 = ati + uti+1∆t,
+
+(17)
+
+and the trajectory cost (10) now takes the form:
+
+T −1
+C(V k, A) = S(V k)+Ω(A+V k∆t)+λ utTΣ−1ϵtk. (18)
+t=0
+Afterwards, we apply clamping function ga to the action commands to impose box constraints on the vehicle’s physical limits. The overall algorithm of SMPPI is shown in Alg. 1.
+
+IV. EXPERIMENTS ON AN INVERTED PENDULUM
+We tested MPPI and SMPPI in a simulated inverted pendulum swing-up task. One of the important characteristics of the pendulum swing-up task is that the available torque is insufficient to push the pendulum to reach an upright position in a single rotation. The controller should swing the pendulum
+
+Fig. 2. Average state costs during optimization procedures with different control methods. Each iteration consists of 20 time steps. Note that we apply logarithmic scaling to the y-axis and that the costs are clamped to a minimum of 0.01.
+
+multiple times to gather energy, and during this process, the optimal control sequence changes rapidly. Consequently, it is a simple yet effective benchmark for evaluating our method. To exploit the fact that our idea is generalized to allow non-affine dynamics, we used a neural network to learn the dynamics model in this experiment.
+We designed the dynamics model with two fully-connected hidden layers, each with 32 neurons. The state-action dataset was repeatedly collected during the control procedure and the model was trained with the dataset every 50 time steps. No bootstrap dataset was used because the dimensionality of the inverted pendulum system is sufficiently low. The running state cost function c(x) in (4) is formulated as follows:
+
+c(x ≡ [θ, θ˙]T) = θ2 + 0.1θ˙2.
+
+(19)
+
+We compared five different methods: i) the original MPPI without smoothing (abbreviated as “MPPI baseline”), ii) applying an additional action cost for smoothing on MPPI, iii) applying the SGF on the noise sequence (abbreviated as “MPPI (SGF(ϵ))”), iv) applying the SGF on the control sequence (abbreviated as “MPPI (SGF(U ))”), and v) SMPPI. In this task, control parameter λ was set to 10. For SMPPI, the action sequence cost parameter ω was set to 1. They were tested with seven different initial angular velocities (θ˙ ∈ {−3, −2, . . . 3}) starting from the initial position vertically downward. We fixed the random seed for a fair comparison. The state costs (19) during online optimization are shown in Fig. 2.
+The results show that only SMPPI successfully stabilized the pendulum in the upright position in all cases. As seen in our video, the other methods showed similar results. They continually failed to push the pendulum to the upright position because they did not apply enough torque during the swinging motions. In the case of MPPI baseline i), it was vulnerable to chattering and could not converge into an optimal control sequence when the optimal distribution changed rapidly. Imposing an additional action cost ii), which was employed to alleviate chattering, also failed because this strategy violates
+
+KIM et al.: SMOOTH MODEL PREDICTIVE PATH INTEGRAL CONTROL WITHOUT SMOOTHING
+
+5
+
+Fig. 3. Trajectory of our proposed method with a reference speed of 60 km/h.
+the information theoretic interpretation of MPPI while using non-affine dynamics. Methods using external smoothing algorithms iii)−iv) failed due to the negative effects of external smoothing. We discuss these issues further in Section V-D.
+V. EXPERIMENTS ON A VEHICLE SIMULATOR
+A. Experimental Setup
+Our research goal is to perform high-speed driving successfully under challenging conditions, including those with unknown friction surfaces and sharp corners. The performance of the model-based control policy is highly dependent on the accuracy of the model [19], [20]. The vehicle model should be trained with all possible maneuvers to minimize any model bias. Because the control sequence update is processed by evaluating the perturbed control trajectories with sampling, situations in which control values change significantly over time that make the vehicle unstable should be included in the training dataset. Obtaining such data from an actual vehicle would be dangerous. Therefore, we used CarMaker to collect driving data and to evaluate the control performances. This is a widely used, high-fidelity vehicle simulator that precisely solves nonlinear dynamics in real time.
+We built a race track modeled after an actual kart circuit known as “KART 2000” in Kirchlengern, Germany (see Fig. 3). The length of the track was 1016 m and it had two moderate curves and four sharp curves. Note that when the vehicle reaches the entry of sharp corners, the controller should reduce the vehicle’s speed and apply a large steering angle quickly. Otherwise, the vehicle will understeer and collide with the track boundary.
+In some prior research on autonomous driving on race tracks, electric vehicles without transmissions were used [4], [6], [8]. Unlike these vehicles, the majority of current vehicles use an automatic transmission to shift gears. The dynamic characteristics of the vehicle will definitely change as a gear shifts. Therefore, throttle control is not feasible for use in common vehicles. Here, we simply overcome this issue by taking desired speed (vdes) as the feedforward command of MPPI. A low-level feedback controller then manages the throttle and brake via a Proportional-Integral (PI) loop. A Volvo XC90 was used as the control vehicle.
+
+B. Training the Neural Network Vehicle Model
+There are two main characteristics that make the vehicle dynamics challenging to model: First, vehicle motions under unknown friction are difficult to predict. In particular, the lateral tire forces will slip into the nonlinear region on low friction corners [21]. Second, the automatic gear shifting mechanism is highly complex to model explicitly. We propose to model such complex and nonlinear dynamics using a neural network with state-action history, which enables the network to capture time-varying behavior [22]. The overall structure of our vehicle model, which is a feedforward fully-connected neural network, is shown in Table I. The terms |x| and |a| denote correspondingly the size of the state and the action space, and h represents the number of state-action pairs in the previous history. A Rectified Linear Unit (ReLU) is used for the activation of hidden layers. The Mean Squared Error (MSE) loss was used as the loss function and the Adam optimization was used for mini-batch gradient descent.
+
+TABLE I OVERALL ARCHITECTURE OF THE VEHICLE MODEL
+
+Input Hidden Layer 1 Hidden Layer 2 Hidden Layer 3 Hidden Layer 4
+Output
+
+Size (|x| + |a|) × h 2×Input Size 4×Input Size 6×Input Size 2×Input Size
+|x|
+
+Activation -
+ReLU ReLU ReLU Linear
+-
+
+We collected a human-controlled driving dataset in a manner similar to that utilized in our prior work on the training of a dynamics model [23]. The vehicle state is defined as x = [vx, vy, r]T, where vx and vy are the longitudinal and lateral velocities, and r is the yaw rate. The action command is defined as a = [δ, vdes]T, where δ is the steering angle command. We carefully selected three distinct maneuvers:
+i) Zig-zag driving at low speeds (20 − 25 km/h) on the race track.
+ii) High-speed driving on the race track while trying to maintain a speed of 40 km/h as much as possible.
+iii) Sliding maneuvers during combinations of acceleration and deceleration with small, medium, and large steering angles. Subsequently, we controlled the vehicle with rapidly changing commands for random movements, representing the sampled noisy trajectories of MPPI. These maneuvers were performed on flat ground in both the left and right directions.
+Each maneuver was done with multiple road friction coefficients µ ∈ {0.4, 0.5, . . . 1.0}. The maneuvers on the race track were done in both clockwise and counter-clockwise directions. Each one was logged for two minutes. We collected a total of 35 maneuvers, which amounted to 70 minutes of driving. The dataset was split into two portions: 70% for training and 30% for testing. To evaluate the generalization performance of the trained model, the validation dataset was collected on the same race track while the friction coefficients were modified. From Corner #1 to Corner #6 (depicted in Fig. 3), the friction coefficients were assigned with values that were not included
+
+6
+
+IEEE ROBOTICS AND AUTOMATION LETTERS. PREPRINT VERSION. ACCEPTED JULY, 2022
+
+Fig. 4. Estimation results on the validation dataset.
+
+in the training dataset: [0.95, 0.85, 0.75, 0.65, 0.55, 0.45], respectively. The other regions were assigned values of µ = 0.8.
+The test and validation errors after training are shown in Table II. The results show that our trained model can precisely represent the vehicle system dynamics regardless of the road friction. The estimation results on the validation data are visualized in Fig. 4. The Root Mean Square Error (RMSE) is denoted as ERMS and the max error is denoted as Emax.
+
+TABLE II TRAINING RESULTS OF THE NEURAL NETWORK VEHICLE MODEL.
+
+vx [m/s]
+
+vy [m/s]
+
+r [rad/s]
+
+ERMS Emax ERMS Emax ERMS Emax
+
+Test 0.0311 0.5530 0.0216 0.4723 0.0175 0.2506
+
+Val. 0.0252 0.3744 0.0136 0.1500 0.0123 0.1400
+
+samples which are estimated to have a larger sideslip angle than 0.2 rad (approximately 11.46◦) in the future:
+
+Slip(x) = σ2 + 10000I ({|σ| > 0.2})
+
+(23)
+
+σ = −arctan vy , ∥vx∥
+
+where I is an indicator function. We conducted a grid search for each controller to identify
+the best control parameters exhibiting the most successful performance. The sampling variance was adjusted to cover most of the control range of each controller. MPPI used Σ = Diag(4.0, 3.0) for the action noise and SMPPI used Σ = Diag(0.7, 0.4) for the derivative action noise. The feedforward control frequency was 10 Hz and the controllers used a time horizon of 4 s. The control parameters K and λ were correspondingly set to 10000 and 15.0 during the experiments. For SMPPI, it used ω = Diag(0.8, 0.8).
+
+D. Experimental Results
+We conducted an ablation study for our framework. The track used in these experiments is identical to that used to collect the validation data. We measured the average lap time taken by the vehicle to traverse each corner during five laps around the track, where the reference speed was set to 40 km/h. If the vehicle went outside a boundary, it was placed at the start point and had to start a new lap. The same pre-trained vehicle model was used and there was no extra training during experiments. The results are shown in Table III.
+TABLE III AVERAGE LAP TIMES (IN [S]) ON SIX CORNERS WITH DIFFERENT CONTROL METHODS. FOR SMPPI WITH Ω, THE MINIMUM SPEED (IN [KM/H]) AND THE MAXIMUM SLIP ANGLE (IN [◦ ]) WHILE PASSING
+THROUGH EACH CORNER ARE ALSO ANALYZED BELOW.
+
+C. Cost Function and Other Parameters
+Following prior work [6], we designed a state-dependent cost function c(x), which consisted of three components:
+
+c(x) = α1Track(x) + α2Speed(x) + α3Slip(x). (20)
+
+The track cost indicates whether the vehicle is inside the track or outside of the given boundary. The states of the sampled trajectories are transformed into global positions (px, py) and they lookup the values of a two-dimensional cost map M, which represents the area of the outer boundary as 1 and the area of the inner boundary as 0. Our sampling-based controller allows this impulse-like cost function:
+
+Track(x) = (0.9)t 10000M(px, py).
+
+(21)
+
+The speed cost is the quadratic cost to achieve the reference vehicle speed:
+
+Speed(x) = (vx − vref )2.
+
+(22)
+
+The slip cost penalizes the sideslip angle to plan a stable future trajectory. Additionally, it imposes a hard cost to reject
+
+Lap time [s] Original MPPI MPPI (SGF(ϵ)) MPPI (SGF(U )) SMPPI w/o Ω SMPPI w/ Ω
+Min. Speed [km/h] Max. Slip [◦]
+
+#1 11.08 11.75 7.82 8.39 7.36
+24.71 5.34
+
+#2 9.60 9.90 N/A 7.71 7.66
+20.37 11.09
+
+#3 N/A N/A N/A 11.64 10.83
+23.30 9.64
+
+#4 N/A N/A N/A 8.77 8.47
+36.51 2.91
+
+#5 N/A N/A N/A 9.86 9.39
+28.24 5.32
+
+#6 N/A N/A N/A 13.11 12.86
+29.77 4.94
+
+While all methods showed promising results on straight roads and on Corner #1, MPPI with different control update laws (8), (13), (14) failed to complete Corner #2 and Corner #3, which are the sharpest corners of the track. The vehicles collided with the boundary or lost control after entering these turns. In contrast, both of the proposed methods successfully controlled the vehicle to traverse all of the laps at high speeds. One notable finding is that SMPPI with the additional action cost Ω showed faster lap times in all corners than SMPPI without an action cost. This suggests that reducing chattering along the “t-axis” can improve the control performance on the MPPI structure. Clearly, reducing the unnecessary noise in the steering and throttle commands is strongly related to
+
+KIM et al.: SMOOTH MODEL PREDICTIVE PATH INTEGRAL CONTROL WITHOUT SMOOTHING
+
+7
+
+of SMPPI.
+
+VI. CONCLUSION
+We presented the Smooth Model Predictive Path Integral algorithm, which is designed to generate smooth control commands within the MPPI algorithm. Our method can attenuate chattering, which is a natural problem of sampling-based algorithms, without the need to design external smoothing filters. In particular, our method outperforms the MPPI baseline in cases in which the environment changes rapidly. In addition, our proposed method is not confined to employing action smoothing cost, as the control domain is shifted to the derivative action distribution. We showed that SMPPI can improve the general performance when it is applied to autonomous driving tasks. SMPPI was demonstrated to be capable of controlling an autonomous vehicle with agility on sharp and slippery corners. Furthermore, this chatteringfree controller is also beneficial in reducing damage to the actuators.
+
+Fig. 5. Visualization of trajectories of the compared controllers. The friction coefficient of corner #2 (in gray) is 0.85 and that of corner #3 (in brown) is 0.75.
+increasing the speed of the vehicle. The trajectories taken by the three controllers are shown in Fig. 5.
+Finally, we examined in more detail the actual optimization procedure of each method to verify our idea. The sequences computed by the four controllers right after taking Corner #2 are visualized in Fig. 6. While passing through this sharp corner, the neural network was able to estimate that the vehicle would slide off the track if it did not slow down due to the friction limits. Therefore, the controller was required to apply the brakes and a large positive steering angle to make an appropriate right turn. During this procedure, the gap between the optimal and the current control sequence increased in an instant. The control sequence in the MPPI baseline attempted to respond to the rapidly changing optimal distribution. However, chattering occurred (see Fig. 6a) and caused the vehicle to lose its stability (see Fig. 5). This is because perturbed samples incorporating high-frequency noise survived after importance sampling, to minimize the impulselike state cost despite the chattering. In the case of “MPPI (SGF(ϵ))”, the external smoothing filter distorted the phase of the weighted noise. The noise sequence then escalated the chattering into the control sequence and finally led to divergence (see Fig. 6b). On the other hand, smoothing was suitably applied in “MPPI (SGF(U ))”, but this rather hindered the controller from quickly generating the correct command (see Fig. 6c). This behavior is also well illustrated in Fig. 5. In contrast, SMPPI successfully responded to the environment and generated a smooth action sequence without the need for an additional smoothing filter. The derivative action sequence still possessed inevitable chattering, but it was integrated to become a smoother action sequence. The actual commands applied to the vehicle were also shown to be stable (along the “i-axis”), an achievement realized due to the strong benefits
+
+APPENDIX
+We also demonstrated our method on a more aggressive driving task. The reference speed was set to 60 km/h. We collected an extra training dataset of high-speed maneuvers on the race track, following the strategy described in Section V. Then, we trained the vehicle model with the augmented dataset. Finally, the SMPPI controller was deployed on the validation race track. From Corner #1 to Corner #6 (depicted in Fig. 3), the friction coefficients were assigned the following corresponding values: [1.0, 0.95, 0.9, 0.85, 0.8, 0.75]. The other regions were set such that µ = 0.9. All five laps were completed at high speeds on challenging roads with varying amounts of friction. The trajectory taken by the vehicle is visualized in Fig. 3. We were able to observe the controller taking “out-in-out” trajectories on sharp corners because this is the best way to preserve high speeds and prevent large slip angles according to the predictions of the neural network model. We encourage readers to watch our supplementary video, where all of our experiments are shown in detail.
+REFERENCES
+[1] W. Li and E. Todorov, “Iterative linear quadratic regulator design for nonlinear biological movement systems.” in ICINCO. Citeseer, 2004, pp. 222–229.
+[2] Y. Tassa, N. Mansard, and E. Todorov, “Control-limited differential dynamic programming,” in IEEE International Conference on Robotics and Automation (ICRA). IEEE, 2014, pp. 1168–1175.
+[3] U. Rosolia and F. Borrelli, “Learning how to autonomously race a car: A predictive control approach,” IEEE Transactions on Control Systems Technology, vol. 28, no. 6, pp. 2713–2719, 2020.
+[4] J. Kabzan, M. I. Valls, V. J. Reijgwart, H. F. Hendrikx, C. Ehmke, M. Prajapat, A. Bu¨hler, N. Gosala, M. Gupta, R. Sivanesan et al., “Amz driverless: The full autonomous racing system,” Journal of Field Robotics, vol. 37, no. 7, pp. 1267–1294, 2020.
+[5] G. Williams, N. Wagener, B. Goldfain, P. Drews, J. M. Rehg, B. Boots, and E. A. Theodorou, “Information theoretic mpc for model-based reinforcement learning,” in IEEE International Conference on Robotics and Automation (ICRA). IEEE, 2017, pp. 1714–1721.
+[6] G. Williams, P. Drews, B. Goldfain, J. M. Rehg, and E. A. Theodorou, “Information-theoretic model predictive control: Theory and applications to autonomous driving,” IEEE Transactions on Robotics, vol. 34, no. 6, pp. 1603–1622, 2018.
+
+8
+
+IEEE ROBOTICS AND AUTOMATION LETTERS. PREPRINT VERSION. ACCEPTED JULY, 2022
+
+Fig. 6. The first 10 steps of the weighted sum of noise sequences (in green) and action sequences (in red) from different controllers right after entering Corner #2 (t = i = 0 at this instant). For clarity, only the steering angle commands are visualized. The results after applying the SGF filter are shown in blue. For SMPPI, the augmented action sequence is shown in purple. The actual steering commands applied to the vehicle for 25 steps (2.5 s) are shown on the right-hand side (in black).
+
+[7] J. Yin, Z. Zhang, E. Theodorou, and P. Tsiotras, “Trajectory Distribution Control for Model Predictive Path Integral Control using Covariance Steering,” in IEEE International Conference on Robotics and Automation (ICRA), 2022.
+[8] J. L. Va´zquez, M. Bru¨hlmeier, A. Liniger, A. Rupenyan, and J. Lygeros, “Optimization-based hierarchical motion planning for autonomous racing,” in IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS). IEEE, 2020, pp. 2397–2403.
+[9] E. Chisari, A. Liniger, A. Rupenyan, L. Van Gool, and J. Lygeros, “Learning from simulation, racing in reality,” in IEEE International Conference on Robotics and Automation (ICRA). IEEE, 2021, pp. 8046–8052.
+[10] M. Kobilarov, “Cross-entropy motion planning,” The International Journal of Robotics Research, vol. 31, no. 7, pp. 855–871, 2012.
+[11] E. A. Theodorou and E. Todorov, “Relative entropy and free energy dualities: Connections to path integral and kl control,” in IEEE Annual Conference on Decision and Control (CDC). IEEE, 2012, pp. 1466– 1473.
+[12] S. Sa¨rkka¨, “Unscented rauch–tung–striebel smoother,” IEEE Transactions on Automatic Control, vol. 53, no. 3, pp. 845–849, 2008.
+[13] H.-C. Ruiz and H. J. Kappen, “Particle smoothing for hidden diffusion processes: Adaptive path integral smoother,” IEEE Transactions on Signal Processing, vol. 65, no. 12, pp. 3191–3203, 2017.
+[14] A. Savitzky and M. J. Golay, “Smoothing and differentiation of data by simplified least squares procedures.” Analytical Chemistry, vol. 36, no. 8, pp. 1627–1639, 1964.
+[15] K. Adhikari, S. Tatinati, K. C. Veluvolu, and J. A. Chambers, “Physiological tremor filtering without phase distortion for robotic microsurgery,” IEEE Transactions on Automation Science and Engineering, 2020.
+
+[16] J. Wang, Y. Ye, X. Pan, X. Gao, and C. Zhuang, “Fractional zero-phase filtering based on the riemann–liouville integral,” Signal Processing, vol. 98, pp. 150–157, 2014.
+[17] S. Nakatani and H. Date, “Swing up control of inverted pendulum on a cart with collision by monte carlo model predictive control,” in Annual Conference of the Society of Instrument and Control Engineers of Japan (SICE). IEEE, 2019, pp. 1050–1055.
+[18] G. Williams, A. Aldrich, and E. A. Theodorou, “Model predictive path integral control: From theory to parallel computation,” Journal of Guidance, Control, and Dynamics, vol. 40, no. 2, pp. 344–357, 2017.
+[19] A. Nagabandi, G. Kahn, R. S. Fearing, and S. Levine, “Neural network dynamics for model-based deep reinforcement learning with modelfree fine-tuning,” in IEEE International Conference on Robotics and Automation (ICRA). IEEE, 2018, pp. 7559–7566.
+[20] R. Sekar, O. Rybkin, K. Daniilidis, P. Abbeel, D. Hafner, and D. Pathak, “Planning to explore via self-supervised world models,” in International Conference on Machine Learning (ICML). PMLR, 2020, pp. 8583– 8592.
+[21] N. A. Spielberg, M. Brown, N. R. Kapania, J. C. Kegelman, and J. C. Gerdes, “Neural network vehicle models for high-performance automated driving,” Science Robotics, vol. 4, no. 28, 2019.
+[22] A. Punjani and P. Abbeel, “Deep learning helicopter dynamics models,” in IEEE International Conference on Robotics and Automation (ICRA). IEEE, 2015, pp. 3223–3230.
+[23] J. Bae, T. Kim, W. Lee, and I. Shim, “Curriculum learning for vehicle lateral stability estimations,” IEEE Access, vol. 9, pp. 89 249–89 262, 2021.
+
+

@@ -1,0 +1,10 @@
+\section{Dynamic replanning and human-aware safety}\label{sec:safety}
+
+\subsection{Safety-aware objectives}
+ISO/TS 15066 speed-and-separation monitoring and power-and-force limiting reduce the robot speed near humans. Converting these limits into a time-dilation cost lets a planner minimise the \emph{expected execution time including safety slowdowns}; on a real collaborative cell this reduced the robot time by 19\%~\cite{faroni2022safetyaware}. The same principle with biomechanical limits is applied in graph search~\cite{laha2023sstar} and in convex, jerk-limited re-timing along a fixed path~\cite{palleschi2021fastsafe}. These per-configuration costs are non-smooth and naturally evaluated on MPPI rollouts.
+
+\subsection{Reactive, risk-aware and constraint-aware sampling}
+Recent MPPI variants enforce human separation by terminating violating rollouts at a constant 22\,ms per cycle on a torque-controlled arm~\cite{gursoy2026cosmik}, evaluate collision probabilities against non-Gaussian human predictions for crowds~\cite{trevisan2025drampi}, keep a contingency plan available at all times~\cite{jung2024contingency}, and satisfy kinematic constraints exactly by projection~\cite{lee2026prmppi}. Torque-level MPPI provides compliant behaviour for physical interaction~\cite{im2026torquemppi}.
+
+\subsection{Implications}
+Safety-aware costs are evaluated in the Open IPC (MPPI rollouts, planner edges) to \emph{anticipate} safety interventions, while the certified speed adaptation and safety rules remain in the Core IPC. Path switching and fallback strategies are provided by the multi-goal look-ahead and by the deterministic plan of each segment (Section~\ref{sec:selected}). Interfaces: human tracking from Activity~3, task alternatives and allocation from Activity~2.

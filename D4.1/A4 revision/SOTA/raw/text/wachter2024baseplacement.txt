@@ -1,0 +1,553 @@
+Available online at www.sciencedirect.com
+
+ScienceDirect
+
+IFAC PapersOnLine 58-19 (2024) 19–24
+
+Robot Base Placement Optimization for
+
+RRoobboott BBaassee PPllaacceemmeenntt OOppttiimmiizzaattiioonn ffoorr
+
+RPoibcko-tanBda-sPelaPcleacSeemqeunetncOeps tiinmIiznadtuiostnrifaolr
+
+RPPoiibcckko--taannBdda--sPPellaaPccleeacSSeeemqqeuuneetnnccOeepss tiiinnmIIiznnaddtuuiossttnrriifaaollr
+
+Pick-and-PlaEcnevSireoqnumenecnetss in Industrial
+
+Pick-and-PlaEEcnnevvSiirreooqnnummeneecnnettsss in Industrial
+
+Envir∗onments
+
+∗
+
+Alexander WEacnhvteirr∗o, CnhmrisetniatnsHartl-Nesic ∗,
+
+AAlleexxaannddeerr
+
+W WaaAcchhnttdeerre∗∗∗a,, sCCKhhrruiigsstti ii∗∗aa,,∗∗nn∗∗
+
+Hartl-Nesic ∗, Hartl-Nesic ∗∗,
+
+Alexander WaAchntderea, sCKhruigsti i∗a,∗n∗ Hartl-Nesic ,
+
+∗
+
+Alexander
+
+Andre∗as Kugi ∗∗,,∗∗∗∗ WaAchntderea, sCKhruigsti ian
+
+Hartl-Nesic ∗,
+
+∗ Automation & Control Institute, TU W∗i,∗e∗n, 1040 Vienna, Austria
+
+∗∗∗∗∗∗∗AAAIuuTttooAmmuaastttiirooinnan&&InCCsootnnittturrtooellAoIInnfnssTdttiierttceuuhattnees,,oKlTTogUUuygWWGi miieebnnH,, ,110014420010VVViieeinnennaan,,a,AAAuussuttsrrtiiraaia
+
+∗∗ AAIuTtoAmuasttiroinan&InCsotnitturtoel oInf sTtietcuhtne,olTogUy WGmiebnH, ,10142010VVieinenan,a,AAusutsrtiraia
+
+∗∗∗∗∗AIT Austrian Institute of Technology GmbH, 1210 Vienna, Austria
+
+AAIuTtoAmuasttiroinan&InCsotnitturtoel oInf sTtietcuhtne,olTogUy WGmiebnH, ,10142010VVieinenan,a,AAusutsrtiraia
+
+Abstract: T∗∗hAisITwoArkusptrrioapnosIensstaituhtiegholfyTpeachranloleloligzyedGamnbdHe, f1fi2c1ie0ntVoiepntnima,izAatuisotnriaprocedure for
+
+fAAinbbdssinttrrgaatcchtte:: gTTlohhbiissalwwlyoorrokkptppimrrooapploorssoeebssoaat bhhaiiggshhellpyylappcaaerrmaallelleenlltiizzieenddinaadnnuddsteerffiffaiiccliieeannssttemooppbttliiymmtiizzaaaskttiisoo.nnTpphrrisooccpeerddouucrreeeduffoorerr
+
+ffAiiunnlbddlysiinnterggmattcbhhteee:dggsTllaoohbbipsaaollwlliyynotroo-ktppottp-iipmmrooaaipnllotrrsooe(bbPsoo2attPbbh)aaitgssrheealjppyellcaaptccaoeerrmmayleelpennllttaizniiennndeiinnraddntuuodssettevrrfiiafaailclluiaeantssessteetmmohpbbetllipyymlattizaacaesskkmtissoe..nnTTtpshh,riissoccoppenrrdsoouiccdreeeeddruuifnorrgeer
+
+kffAiuuinnllbdlloyysidnteerygmmantcbbahtmeee:ddigsscTlaaohrboippsbaoolowliitynnottlro--ikmttpootip--itppmrsoo,aiipcnnloottrslole((ibPPssio22oatPPnbhs)),aittgsrrrheoaalbjjpyeeolccatpttcaoocerromayynleflppienglltaauiznnrienanndteeiinrroadnnttuoodcseehtevvrafiaafnaillcgluuieaaesntts,eesteattmonhhpdbeetliappymllcaatiyzaccaceesklmmtiiscoee.nnncTottpsshn,,rissocctcoorpaennrdissonuiictddre.eeedrrTuiifnnhorggeer
+
+ikkfniuiinvnnldleooyisddnteyygimgnnatbaahtmmeeeddiigsccolaoprrbootpbbaimoloolittyinztllao-iitmmtpiotoii-ittnpmsso,,gaioccnlaootrllosll(iibPssaiior2ootePnnbcss)y,,atcsrrrleooaebb-jpteoolicattmtcocceeroomoynnpeffpiintgglitamuunrrianaanltteiiiitnrooydnn,tuotccismehhtvraaeianna-leggluneeaessts,,resgeaaytmnnhoddbeplaapytilmccatyyacacceslkllmiiitsccye.,nccTaootshnn,idssscttaorrpaadnriiasonnipcttdet..eidrTTvuiinhhtrygee
+
+tiikfnnuoivvnlldeeoyyssdttneyiimaggnmaabattmeiecddaiscloolaypprottpcbiihmmooaitiinnzztlaag-ittminiioooig-tnnpsto,gghioocrnaaootllussl(giPsaahirr2opeePnuccs)tyy,.tccrTrlloaeehb--jetteoiictmmltaocteerotooyenpprfpittugliiammusenraasanlltaeiiittnroyyn,,toottpciimmtehivameean--lieeguznneaaeestt,rrieogganyytnh-oodbeppaapttsiilemmcadycaacemlllmiiittecyyet,,nhcaaotosnnd,ddscttoaaoraddnsiaascnippatdltt.eeiirTvvtiiinhhttyygee
+
+cttiknooyivncddeoleyysd-tnnytiaaginmmmaatemiiecc-doaaicpllolltyypriomtccbihhmaoaaltinnztlaggriatmiinnijoieggtncsttt,ghhoocrraooyluusligginsahhirolppeonuuwcstty,-..tcrTThloerhhb-oeetouitmllgaahctteottpoeenuprrftituugismussieetrassualataaiittnnoyion,oontppcismtthiitammeon-iiegrzzneeaadestt,ruiioogacnnyen--odbbepnaaatsseieermcddgyyacmmlliciteecoyttn,hhcsaoounddmdsttpooartadssiiaoccnpnaatllt..eeiTTvttihhtyee
+
+acctinoyypvccpdellreeyso--tnttaiagiicmmmahteeieic--sdooappulolttsypiiemmtdcihmaatalloinzttagorraatipnijjtoeeginmcctttghioozorreaoyylutsiihgnnaehrllpbeoouwwactsy--.ettcThhlperrhl-ooaetuucimlggeamhhtetppeoeuunprtttuissimsniiettasuutlwaaaittnoyiioo,ornntopissbmtiottmeoot-iiecrrzneeawddetrouuiogrccnykee-obceepennaltseeliesrrm,dggyysamhliccoteooywtnn,hissanouungdmmdatppoarttdesiiaoocdpnnault..ceitTTvtiiohhtnyee
+
+iaactnoyppcpptdlhrreyooe-ntaaaicccmmyhhceiiilc-sseoapuutllitssymieemddcehattoaloofntgoouraippnjttegiitmmcotthiio4zzr4eeoy%uttihhgneeahnlpbboduwaatssa-.eetThrpperhlldoaaeuucclcgeeatmmhtitpoeeenunnrttousiifsnnietesunttwwaaetrnooigooyrrnoopscbbtoiootmnottsiiiccruzeamwwdtooupiorrctnkkieo-bccneeenallosellfessr,,dguysspmhhcooteowwotnhii5snnou3ggdm%aatpoirrtneesiocddanauul.ccbettTetiisoohtnne-
+
+tiacnoyp-cptwlhreooe-rtasiccmtyhceilo-seomputpitsmieamdreiastoloofntour.apjteitmcotio4zr4ey%tihneanlbodwasa-ethrperldoauccgetmhipoenuntosifniteuntwaetroigoyrnoscbootnotsicruemwdouprctkieocneenloelfsr,guysphcotowoni5snu3gm%apirtneiodanu.cbtTeisohtnein the cycle time of up to 44 % and a reduction of energy consumption of up to 53 % in a best-
+
+tianop-ptwhroerascctyhcilosemutpismeadreistooofnou.ptitmo i4z4e %theanbdasae rpeldauccetmioenntoifnentwerogyrocboontsicumwoprtkiocnelolfs,usphotwo i5n3g%a irnedaucbteisotn-
+
+Cttinooo--ptwwhyoorerrigssctthytcc©looemm2tpp0im2aa4rreiiTssooohfnneu..Aputhoo4rs4. %Thaisnids aan roepdeuncatciocenssoafrteincleergunydceor nthsue mCCptBioYn-NoCf -uNpDtloic5en3s%e in a best-
+
+(Kthote-twypwso:or//srctdrsec:aotPmivrpeocacoremisssomnPo.lnasn.onrign/gli,ceDnisaegsn/boys-tnicc-anndd/4.O0/p)timization, Manufacturing Cells, Robot Base
+
+OKKeepyytwwimooirrzddasst::ioPPnrr,ooRcceeossbssoPPtsllaaMnnnnaiinniggp,,uDDlaiitaaoggrnnsoossttiicc aanndd OOppttiimmiizzaattiioonn,, MMaannuuffaaccttuurriinngg CCeellllss,, RRoobboott BBaassee
+
+KOepytwimoirzdast:ioPnr,oRceosbsoPtslaMnnainigp,uDlaitaogrnsostic and Optimization, Manufacturing Cells, Robot Base
+
+Optimization, Robots Manipulators
+
+OKepytwimoirzdast:ioPnr,oRceosbsoPtslaMnnainigp,uDlaitaogrnsostic and Optimization, Manufacturing Cells, Robot Base
+
+Optim1iz. aItNioTn,RROoDbUotCsTMIOanNipulators
+
+namically changing throughput (throughput-adaptive), i.e.,
+
+11.. IINNTTRROODDUUCCTTIIOONN
+
+nanaapmmlaiicccaaellmllyyeccnhhtaannwgghiiinncgghtthhdrreooliuuvggehhrsppuuatt ((stthhhorrrootuuggchhyppcuulett--aatiddmaappettiiivvnee))h,, iiig..eeh..-,,
+
+Robotic work cells1f.orINflTexRibOleDaUsCseTmIbOlyNare of tremendous antaharppmolluaaicccgaeehlmmlpyueecnnthttsainwwtughhaiiintccighhotnhddsreeaolliinuvvdgeehrrmsspuiaanti(mssthhhioozrrreottsugecchnyypeccurlleegt-yattiidcmmoanpeetsiuiivnnme)phh,tiiiggi.oehh.n--,
+
+RiRmoopbbooortttiiaccnwwcooerrfkkorcceetllhllsse1ff.coourrIrNrfflleTeenxxRtiibbOtllreeDenaaUdssCsseeTimmnIbbOalluyyNtaaorrmeeaootffiottnrree,mmineennwddhooicuuhss taitnnhharrpmloooluuaiwccgga-ehhtlmlpphyuureocntthutssagiinwtthuugphaaiuinttctiighoostnnihdsstrueaaolainnuvtddgieohrnmmspsuii.anntTii(mmsthhhiieozzrreeomtssugaeechnniynpeecurrlceggto-yyantidcctmrooainnpebtssuiuuivtnmmeio)pphn,ttisigii.ooeho.nn-f,
+
+iRpimmrooppbdooourrtttciaactnnwdccoeeivrffkeoorrrcsietttlhhylsee faccoduurvrrrrfaleenennxcttiebsttlrreeeunnapddsssteoiimnnbfaauluuylttlaoorimmnedaaottifviiooitdnnreu,,maiinnleiznwwadhhtoiioccuhhns ittiannhhripslloooluawwcgo--ehttrmphhkurreaoontruutseggiwthhauppshauuiftcottihollssnoiidswttuueaslaa:invttdiieoornnmsssi..anTTimshhieeozremmts aaecniiynnecrlccegooynnticttmrroiinebbsuuuittnmiioophnntissgiohoon-ff
+
+pi(pRmLrrooo¨apbddmoouurtmtcciacttlenwddcaoeiinvvrdfkeeorrGrcssiietuttlhyylsset,faaco2ddur0vvr1rfaal9ennen)xcc.tieeTbsstlrheeuuenappddsesttesooiimngnbffauuluoyllftllaosriimunnecddahotiifvvicoiiteddnrlleuu,smaaiinllneiizzvnwaaodhttloviioocuehnnss
+
+itnhirsloouwgo-htrphkuraotrusegithaupsauftotiollsnoiswtuasa:ntdionmsi.nTimhiezems aeninercgoynctroinbsuutmiopntsioonf this work are as follows:
+
+(p(iomLLpro¨a¨atpidmmomurmmatcatllleenpdcaaoeinnvsddfieotriGGrsoitnuuthyissnett,,gac22du00ovr11fra99entn))hc..teeTTstrhhreuoeenbpddoeesttsssoiinggannfanuuoodlfftl osswimuunoccdahhrtikviccpoieedinllellu,cssaieiinlsnnizvvwwaoohtllhvvioiceelhness tinhi•slowano-trhkarsaoyrunegchahpsruofotnlolsouiwtsu,sa:thiiognhsl.yTphaeramllaeilnizecdontorpibtiumtiozantsioonf
+
+(poionLpprco¨attoiidmmmrupmaacotlllreappdatooiinnvssdiiegttriiGsoovinnuetyriisnnsta,ggat2di0oolve1ffa9nrtt)ohhc.beeTsohrrtuooiecbbpdooeettnsssoidg-aanefnnufofddleflcswwtiunooocrdhrrsikkvcppfieodiileerluccsaeecilssnoizmvwwaoptlhhviloiieellnxees thi••s wapannororkcaaessadyyrunnercceahhsfrrooofronnrlooloouubwsso,,st: hhbiiaggshhellpyylappcaaemrraaellllneetlliiizzneeddassooeppmttbiimmlyiizztaaattsiikoosnn,
+
+(oinLpc¨atoimmrpmaollreapatoinnsdigtiGovnuerisnsta,gt2i0ole1f 9rt)oh.beTohrtoiecbdoetnssidg-anenfofdefcswtuoocrhrskcpfeoilerlcsecisnomvwoplhvlieelxes
+
+•• patphnrreoocciaeensddcyuuonrrcpeehoffrooroarrntrroioooubbnsoo,ottfhbbaiaagssPhee2lppyPllaatpccraeeammrjaeeelclnntettoliriizynnedaapsslassoeenpmmntebbimrllyycizottanaatssikkiodssn-,,
+
+ipnickor-apnodra-ptilnagcevoerpseartailteionrosbo(Pti´ecreezn-dG-oefsfeencdtoersetfoarl.c,o2m0p2l1e)x. iponpictkoimr-apanoldra-pptoilnasigcteiovnoeripnseagrtaiolteifonrtohsbeo(Prtoi´ecbreoeztn-sdG-aoenfsfdeencdwtoeorrsektpfoiaercl.ec,so2mw0p2hl1iel)xe.
+
+•• tpetahhrnrieeoncigiaennsdccyuoonrrlclppeihsoofriorrooaarnnttrsoiio,ooubnnksoi,oontffohbaadiagysPPhne22lapyPPmlattipccrraeaamlrjjiaeemelcclnttiettoolsirri,zyyneadappllsllaasroennopmnnbteeobimrrtlycciczootoannantssfikiioddgsn--,
+
+pAicksu-abn-odp-ptilmacael olapyeoruatioins a(Ph´eigrhez-t-Ghroosuegnhdpeuettroabl.o, t2ic02c1e)l.l piAnicksour-apbno-odrpa-ptilnmagcaelvoelarpsyeaortuailteioinrosbao(Pthi´eicgrheez-nt-dGh-roeofsufeegnchdtpoeruset tfrooarbl.co, ot2imc0p2cl1e)lx.l
+
+• etuephrrrriieoanntcgigienodccnuoosrll,llpeiiassofniioroodarnntrssaio,,obcnkkyoiionnctfloobiacddayysPtnnea2aaspPkmmlatciicccroeanmlljiisemmtecrntiiattoissrni,,yntaa,apllllslasrrenoomnbbeoobrttlycccotoonannsffkiidggs--,
+
+Acaussuebs-soipgtniimficaal nltayporuotduinctiaonhtigimh-ethlorsosuegsh, phuigthlriogbhotitnicg cthelel pAcaicukssu-eabsn-sodip-gptnilimaficcaeal noltapypeoruaotdiuoinctsiao(nPht´eigirmhez-et-Ghlorososuegnsh,dpheuigethtlrioagblh.o,titn2icg02ct1he)le.l
+
+•• ueauthrrrieaacnottgiiimnoocnnpossurl,,lptiaasonnitroiddaontnsaai,aocclnklyyyionccflloeiiaccdffyiPttcnaai2eassPnkkmttccicroohanneljiussemttrcrritiaastotiisrnni,cytta,,pflollarrnocnboeonrtscicdooennrsfiindgg-
+
+cimaupsoerstasingcneifoicfatnatkpinrgodeuvcetriyonpottimenetilaolssoepst,imhiigzhaltiigohntionpgptohreciAmaupssuoerbst-asoinpgctneiimfoicafaltnaltakypinorugotdeuvincetriyaonphotitgimehn-etihlaorlsosouepgsth,ipmhuiigtzhalrtioigobhnotitonicpgpctoherle-l
+
+•• autaeirrmiaccnootegimm-oecnnpposeuul,rlttigaasynittoii-doonnnpsa,aaticllkmllyyyincaloeelicdffffayiitnccnaiideeasnnkmttthcicrohhoneeluiuusmgtrrrhiiasstpttisunii,cctta,-ffalooldrrraopccbootoinnvtsseiicddoreeonrrbfiiinnogggt-
+
+itmunpiotyrta(Hncaemofettaakl.i,n1g9e8v5e)r.y potential optimization opporitcmuaunpsioteyrsta(sHingcanemifoicfeattnaatkl.pi,nr1go9de8uv5ce)tr.iyonpottimenetilaolssoepst,imhiigzhaltiigohntionpgptohre-
+
+• tabtuiiarmmacsoteeim--opeennnplaseeuc,rrteggamyynti--deoonnppatattsiicl.mmlyycaalellicffaaitnncaiddesnkttthhcrrohooneuuusggtrrhhiaspptiuunictt,--faaoddraappcottiinvvseeidrreoorbbinoogtt
+
+ttSimuutannptiiotteyyr-toa((fHH-ntchaaemme-oafeertttaaamkll..ie,,nt11gh99oe88dv55se))r..uyseppoteernfotriaml aonpcteiminidzaicteiosnlikoeppmoar-
+
+• tbaiamcsoem-penplaeucrtegamyti-eonnptatsil.mlyael ffaincidentthrhoeuugrhisptuict-faodrapcotinvseidreorbinogt base placements.
+
+SnStuttipaanuttiteelya--oob(ffiH--lttithhaymee--aa(errYtttoammslh.ee,ittk1hha9oow8dda5ss,).uu1ss9ee8pp5ee)rrffoorrmmaaannrcceeeaciinnhddaiibccieelssitylliikkeeinmmdeaax--
+
+btiamse-penlaecregmy-eonpttsi.mal and throughput-adaptive robot
+
+nSdntiipspatuutrelliaa-bobbufiit-lltiiotthyyne-a((MrYYtooamsskhhehiitkkahaalowwadaans,,du11sG99e88op55ine))rsf,oo2rrm01aaa8n)rrceeeaaanccindhhdaaidbbcoiiellsiittnyyloikteiinnfmuddleealyxx-
+
+base placeme2n.tsR. ELATED WORK 2. RELATED WORK
+
+dncdSoiitspsnattutsrreiliida-bbobeuufritt-ltiitoothhynnee-aa((MMrYstsoeaamsmkkhehhbitkaalhayllowaasdacnns,eddnu1asGG9er8iooop5iinne)(rssKf,,oa22rmm0011araa88nn))rcieeaaaenncitnddhadaliddb.c,ooiel2sit0nnyl0ooik9ttei;nffVmuudallealllyyx--
+
+2. RELATED WORK 2. RELATED WORK
+
+cdcnsaooispmnntussroiiliddasbbeeuerrittlittaothhyln.ee, aa(2MYss0ss2oeea2smmk)hhbbifkaollayylrwarssaoccn,beednno1aatG9rrb8iioooa5ins)((esKK,poaa2rlmma0c1arreaa8mnn)riieeaaneencttdh.aaTalldb..h,,oiel22ist00ney00oi99tni;;dnfVVuidcaaleelllyxs--
+
+The optimal arrangement of robots and assets within a The optimal arra2n.geRmEeLnAt ToEf DrobWotOsRaKnd assets within a
+
+cdsrseaaoisdmmntusrooicidssbeeueerttthitaaoehlln..eo,, pa(22Mts00is22mea22mki))zhbffaaooltylrriorarsnoocnbbedpnoorattGorbbioolaaienssm(eesK,’ppsa2llmaac0cco1reema8mmn)pieelanneenxttd..iatTTyld.hh,oaee2nss0need0oii9tsnn;eddfaVuiirccalceellhyss-
+
+Trohbeotoicptiwmoarlk acrerlalngisemcreunctiaolf froorboatcshiaenvdingassoepttsimwaitlhtinaska Trohbeotoicptiwmoarlk acrerlalngisemcreunctiaolf froorboatcshiaenvdingassoepttsimwaitlhtinaska
+
+crssreeapoddmnauucsoieccdseeeteorttthhtaoeehlb.eoo,tppaa2itts0niis2mme2amii)zzbcfaaoolttyrmiioorspnnocubepptnoarratootribbioollaneesmm(aeKll’’pyssalmacctcoorreammamcnpptieallneebxxtl.iieattTyylf.ho,aare2nnms0edd0ui9lssna;eedtaaViirrocaccenlhhs-.
+
+reoxbecoutitcionwoarnkd coeplel raistiocnruaclieaflficfoierncayc.hTiehveinmg oospt tpimroaml intaenskt reToxhbeecoutoitcpiotniwmoaarnlkdacorerplaelnrgaisetimocnreunactl ieaoflficfroioerbnocaytcs.hTiaenhvdeinmgasososeptttspimrwoamitlhintinaenskat
+
+srIsnepapdmaaouccroeecdseetterootthtaooelbb.oo,ttbpaa2tiit0nnai2min2aai)zaccfanootrmmoioprppnotuuibpmttoaartaottliiboollaannesymaaeollll’upyystlacttfcoorreaamrmccaptteaalrnebboxtbll.ieetoTytffhioocarrenmmwsedouuirllsnaakedttaciiroocecelnnlhs,..
+
+eaxpepcruotaicohn faonrdevoapleuraattiinognaalnedffoicpietinmcyiz.iTnghea mlaoysotuptriosmtoinuenset earoxpbepcorutoitacicohnwfoaornrkdevcoeapleluraaitstiinocgnruaaclnieadflfoicfpoietrinmcayicz.hiTnieghveianmglaoyosoptutptimriosamltointauensket
+
+IseIrnnepsdsaooeucrrnecddteieetarrotlhttaooesboopotbbepacttitnaatimsiinnaliizaakcanneotmooitohpppnettuiip(mmtfarraaotellibeoll-laanesyypmaooall’uucysttec)tffoorpamrrocaapitnalrretboo-xbbltieoooty-ttfpiioccaornmiwwndooutrrls(akkePtacci2roeePcllnllh),,.
+
+apperpfrooramchanfcoer ienvdailcueasti(nPgataenldanopdtiSmobizhin, g20a15la)y. oIunttihsetoeaurslye apexpeerpcfrouortamicohannfacoenrdienvodapilceuerasatti(inPognaataelnledfafnoicpdietiSnmocybiz.hiTn, gh20ea1m5la)oy.sotIunptrtiohsmetoienauernslyet
+
+eIresnopssssbaoeecornnetdttiietmaarolltoaaotssbioppotbneeacctsinatt, ssinaallliialkkcneeofemottahhppseetiubi((mtlffaerrateeliceeolo--anssnyppafoaalilguccyuteer))tfaorpptarioocoaiitnnarttsbo--blttoeooof--tfppiotcoohrmiiwennouttrrlo((akPPbtcoi22oetPPlnilc)),.
+
+pweorrfkoromf aYnocsehiinkdawicaes((1P98a5te)l, athned mSoabnhip, u2l0a1b5il)i.tyInintdhexeawralys pwapeorprfkrooraomcfhaYnfocoserhieinkvdaawilcuaeast(i(1nP9g8a5tae)nl,dathnopedtmiSmoabinzhipn, ug2l0a1b5lial)iy.toyIuntintidhsetxoeawuraslyes
+
+rearInoosrsmbboeoornsttd,tieammarnltoodaottsiioopobbnnesctsstat,,asicnaallllieallksneffieeotnaahpsstetiihbbi(mellfeerawelcceoloo-rasnnkypffsoaiipggucauutecrr)feaaopttrmiioooaiunnrstssot-btoobooffe-tpittccohhoiweennostrrirood(kPbbecroo2eettPdliilcc).,
+
+winotrkodoufceYdoashsiakamweaas(u1r9e8o5f),thteheromboatn’sipaublialibtiylityo minodveexinwaalsl wipneotrrfkoodromufcaeYndocasehsiiankdamwiceaeass(u(1rP9e8ao5tef)l,thatehnedrombSoatbn’hsip,au2bl0ial1ibt5iyl)i.tyoInmintodhveexeinawraallysl
+
+raeosrsmbeonst,tiamanlodatsiopobnescstt,ascallielksefietnahsteihb(elferweceoo-rsnkpfsaipgcauecr)eaptmiooiunstst-tobofe-ptcohoienstriod(Pbero2etPdic). arms, and obstacles in the workspace must be considered.
+
+iCnatrotedsuiacneddaesgraemeseoafsufreeodfotmhe(rDoboFot)’.sFaubriltihtyertoinmdiocvees iwnearlel iCwnoatrkotedsouifacneYdodasehsgirakeamewseaoafs(u1fr9e8eo5df)o,tmhteh(erDomboFoat)n’.sipFaublrialtibhtiyelrityoinmdiniocdveeesxiwnweaarlesl
+
+aTrorhmbiosst,wamonrodktioopbnrssot,apcaollselessfienastinhboelevweclooronkpfsitpgiaumcrieaztamitoiunossnt obpferotchcoendsuriodrberoeftodicr. CpraorpteosieadnbdyegMreaekshoafl farnededGomoin(sD(o2F0)1.8F),uwrthheerre iandriecaecshwabeirleCpinratorpoteodsuieacdnedbdyaesgMraeameksheoafslufarnedeodfGotmohien(rsDo(bo2Fo0t)1’.8sF)a,ubwrilthihteyerretoianmdrieocaveceshiwanbeairle-l
+
+ToTaprhhmtiiissms,wwiazooninrrdkkgotppbhrrseootapprcoolbsseeesosstinaabatnnhseoovvpweelloarcookeppsmttpiieammnciitezzaaimnttiiuooasnnt bappesrrsooceccomeenddbsuuliydrreetraeffsoodkrr. pitryopinodsedx bdyistMriabkuhtiaolnanisdcGomoipnust(e2d01a8n)d, wthheenrecaonrveearctheadbitlo-
+
+oTwopphhttiiiislmme wiiczzooiinnrkggsidttphherreeoinprrgoobbsteoohstteabbcaaonssmeeovpppellleaatccoeeepmmstcieemnnittazraiiinntoi.oaanTn haaprssressoeeecmmoedpbbutllyyirmettiaazfssoakkr- pCititthryyaeorpiitinnneoddsvieeadxxrnsebdddyiiressettgMarrriiceabbhekuuashttboiiaioofllnnitfaryniiessdemdccGaoopmmo,ippna(uusnDttd(eeo2ddFb0y)1aa.8nnNF)dd,guwurttthhyhheeeennrreeccitaoonnndarvvlie.ceeae(rrcs2tthee0wadd1be7ittr)looe-,
+
+wotwTipohhtniiillsmeegwiccozooainnrlskgssiiaddtprheererreoiinnpirnggovbsetteohhsstteeiagbccaaoontsmmeeodvppp:elllee(attacoee)epmsstmccieeminnnitaaizmrraiiintooizi..oainnTTghhaprrtsreehsoeeeecmooetdppbouttltyiirammeltiiaczzfsoyaakr-- pwtitthhryheeoipiciinnnhodvvseeudxrrtssieebldiyzirrseetMaarticcabhhhkueaahtbbiamiiollniiattanyyniisdpmmcuGaaolappmob,,ipniaalusinnttdd(ye2dbb0iyyn1ad8nNN)ed,xggwuuthfyyhoeeernnreoeecpttaotnaarivmlle..eaa((rc22tlhe00adt11ba77sit))lko-,,
+
+twctoiilpoohetnniiltmeiggmicoozeoaainll(ssgsciyaadtcrrheeelreei-niirtnngoivvmbeetoehsst-teoiiggbpcaaatottismmeeeddpap::llle)((at,aace))e(bmsmmc)eiinmnntaiiimmrniinioimzz.aiinniTnzggihnarttgsehhseeetmhottepbootltteyiaanmlletiarcczgsyyaky-- wpwtithlyhhaeiicicciennhhmdveuuexrnttsiitelldiiwzzirseeittarhtticbhhihnueeatbtimmhioleniaatwnnyiiisoppmrcuukaollsaapmpbb,apiiallcuiinetttdyyeodfbiiynnaaddnNseeudxxgrugthffyioocearrnl ooercppotobttnaiiovmml.te.aa(r2tllOe0dtt1aah7sste)kkor,
+
+ctcwiloloeehnnisltteuiigmmmcoeeoapnlt((ssiccoiyyadnccreellreeiin--nittngiihvmmeitgeehsh--teooi-gtppcahttotiirmmeodupaa:glle))h(t,,ape)((ubbstmc))esinmmncaeiiimnrnniaiiommzr.iioniiTzzsgiihnn(rtggtehiemetthhoeteep-oetteeniannmeleerirrcgzggyyayy-- pwvpthallhaaericcicaieenhtmmvioeuenrnntssitteloiwwzrfeiiettavhhtcahiihnnleaubttamhhitleeiiaotwwnynioopminrrukkadlssapippcb,eaaiaslccineetadyrooeffbitynaahdNsseeuuxg“rrumggfyiioiccenaarnillmoerrpuoot bbtmaiooml.tts..a(in2lOOg0ttu1ahh7lsaee)krr,
+
+ccotiolopoenntnisstmuuigmmmaoleapp)l,tt(siicoo(yacnncr)eleiipnn-irtniohhvmveiiggiesdhh-tioi--ngttpgahhttirrmeaooduua:rgglo)hh(b,appo)(uutbttm)bssimanccseeiimennnaaipmzrrliiaoonizcssgienm((tgtthiiemmetnhteete--oeefteonnanreelerrrdcgggyyy-- vpvwaalhalrruicicaaeehttm”iiooue(nnntAssitlsooiwazffdeieetavvht,aahinll1euu9taa8mhtt3eiiaoo),wnniotpiihnnrukeddlsaiipcc“beeaJisslcaiectaayorroeebfiittnaahhdnseeeux““crommgnfioiicdnnariiltmmoiropuuonbtmmiomntssu.aiinnmlOggbtuuahellsraaek”rr
+
+coolpentistmuimmalep),t(ico(ycnc)leipn-rtiohmvigiedh-io-ntpghtirmaouarglo)hb,po(utbt)bsmacseiennaipmrliaoizcsienm(gtiemtnhtee-efeonnreerrdggyy- vvp(Saalaallruucilaieestm””bioue((nnrAAsytssoawafnddietdaavh,,Cainl11ru99ata88ihtg33ei,o))1,,wn9otti8hhnr2keed)si,pc““aeaJJnscaadeccaoortoebbhfiietaah“nnsemu“ccraoomgnnniiicddpnaiiulttmliiraoouotnnbmoornntsvuu.ienmmOlgobbtucheelirratey””r
+
+optimal ), (c) providing a robot base placement foorr ddyy⋆ocopTntihsmuismaplrp)o,tjieo(ccnt)isipnfruonhvdigieddhi-nbtyghrthaoeurgFohFbpGout(tFbOsac9se9en9a8p9r6liao3cs9e9m().tiewmnwwte.-feffnge.ragt -
+
+vr((SSaataalruiilloaiiess”t”bbiouu((nDrrAsyyusoaabfnndeeddyav,CCaal1rrun9aaad8iitgg3i,,Lo)11,nu99hti88hn,22ed))1i,,9c“aa8eJnns8add)ca.orttebhhTieethah““neemmse“caaomnninniidppndiuuitmcllieaaousttnmoohrrnasvvuvieenmellgoobuaccelliisrattyyo”r
+
+⋆⋆opTtihmisaplr)o,je(cct)ispfruonvdieddinbyg thae rFoFbGot(FbOa9s9e98p96la3c9e9m). ewnwwt.fffogr.adty- vr(Sataluiloies””bu((DrAyusabndedya,Ca1rn9ad8ig3,L)1,u9ht8h,2e)1,9“a8Jn8ad)c.otbhTieha“nemsecaoninidpiutclieaostnohrnavuvemelobacelisrtyo” This project is funded by the FFG (FO999896399). www.ffg.at ratio” (Dubey and Luh, 1988). These indices have also
+
+⋆ This project is funded by the FFG (FO999896399). www.ffg.at r(Satailois”bu(Dryuabnedy Carnadig,L1u9h8,2)1,9a8n8d).thTeh“emseaninipduicleastohravveeloaclistyo
+
+⋆24T05h-i8s96p3roCjeocptyirsigfhutn©de2d02b4y Tthhee FAFuGtho(rFsO. T9h99is8i9s6a3n99o)p.ewnwawc.cfefsgs.aartticle unrdaetrioth”e C(DC uBbYe-yNCa-NndD lLicuenhs,e. 1988). These indices have also
+
+Peer review under responsibility of International Federation of Automatic Control.
+
+10.1016/j.ifacol.2024.09.080
+
+20
+
+Alexander Wachter et al. / IFAC PapersOnLine 58-19 (2024) 19–24
+
+been applied to optimize the complete robotic work cell layout (Bachmann et al., 2021) by minimizing the distance traveled between task sequences while maximizing the robot’s manipulability.
+Optimization procedures, in which the full robot motions are considered, are much more demanding since the robot trajectories must be updated for each base placement. For example, Weingartshofer et al. (2021) embed a full trajectory planner for a given set of complex continuous paths. Similarly, Kamrani et al. (2009) investigated the relationship between cycle time variations and base placement for given paths with the major limitation of not considering collisions.
+Free-space robot motions pose additional challenges to trajectory planning due to the much larger search space. The work of Baizid et al. (2015) solves the shortest distance traveled by the manipulator for a spot-welding application. Spensieri et al. (2016) utilized a reachability index map and evaluated the actual cycle time only for specific local minimums of the map. This two-stage optimization scheme only provides a list of base placement candidates instead of utilizing the cycle time within the optimization. In the work of Valsamos et al. (2022), joint velocities during task execution under a given end-effector velocity are minimized, considering only the shortest paths indicated by direct motions between two frames, not considering collisions.
+This work proposes a robot base placement optimization, considering the complete process scenario with free-space robot motions in an environment with obstacles. To this end, a P2P trajectory planner is embedded in a highly parallelized optimization. The optimization aims to minimize cycle time and can incorporate other heuristics for placement, like time-energy or throughput-adaptivity.
+3. PROBLEM DESCRIPTION
+This work aims to determine the optimal robot base placement b = {x, y, z, r} for a multi-P2P assembly task, with the robot position [x y z]T and the rotation r around the z-axis w.r.t. the world frame. The assembly task is specified by a sequence of N task-space poses X = {xi | i = 1, . . . , N }, which are traversed using consecutive free-space P2P movements. The N − 1 trajectories for the P2P movements between the sequence X are planned in the joint space, where q(t), q˙ (t), and q¨(t) are the position, velocity, and acceleration of the robot, respectively. For each pose xi, i = 1, . . . , N , a set of inverse kinematics (IK) solutions Qi = {qij | j = 1, . . . , Mi} is obtained, where Mi is the number of IK solutions for the pose xi.
+The robot movements are subject to constraints such as collisions with the environment, robot dynamic constraints, and the cyclic task constraint x1 = xN . The latter implies that the corresponding IK solutions q1 and qN must match to form a cyclic robot motion.
+The three distinct optimization goals (a) cycle-timeoptimal, (b) time-energy-optimal, and (c) throughputadaptive are investigated, which are further detailed in Sections 4.4–4.6.
+
+Fig. 1. Schematic drawing of the proposed black-box optimization scheme. A Bayesian optimizer asynchronously dispatches robot base placements to be investigated and evaluated by W workers in parallel.
+4. ROBOT BASE PLACEMENT OPTIMIZATION
+In this section, the proposed optimization procedure is described in detail. It consists of a Bayesian optimizer, which asynchronously orchestrates W workers running in parallel, see Fig. 1. Using an embedded cyclic P2P trajectory planner, each worker solves the assembly task for a given robot base placement and evaluates the cost. This way, the Bayesian optimizer evaluates the placements of interest and updates the underlying surrogate model of the cost function. The P2P trajectory planner is introduced in the following subsections, and subsequently, the optimization procedures for the three goals from Section 3 are explained.
+4.1 Point-to-Point Planner
+For practically time-optimal trajectory planning in clustered environments, the via-point stochastic optimization (VP-STO) planner is utilized (Jankowski et al., 2023). This task-agnostic planner utilizes a low-dimensional timecontinuous trajectory representation in the joint space based on via points, which by design adheres to the kinodynamic limits of the robot. Additionally, the planner optimizes the via points stochastically using an evolutionary strategy to minimize the movement duration and other task-related cost terms.
+The algorithm of the original work (Jankowski et al., 2023) was tailored to the application as the innermost planner of the robot base placement optimization. In order to reduce the likelihood of converging to local minima, the initial explorations are performed using a 100× larger population size, giving the algorithm a broad exploration and a higher chance to find the true optimum. After the first ten evolutionary steps, the population size is decreased to only proceed with the ten best participants. These modifications decrease the algorithm run time and improve the convergence speed. Lastly, a warm start is implemented using previous solutions for similar robot base placements. The collision check of the individual trajectories is performed with Mujoco Mjx, a multi-purpose physics engine (Todorov et al., 2012).
+Algorithm 1 describes the employment of VP-STO to plan a single P2P movement from the initial configuration q1 to the final configuration q2 for a given robot base
+
+Alexander Wachter et al. / IFAC PapersOnLine 58-19 (2024) 19–24
+
+21
+
+Algorithm 1 P2P planner: Given the robot base place-
+
+ment b, a database D of all previously evaluated trajecto-
+
+ries, compute the trajectory cost C for a trajectory from
+
+the start configuration q1 to the end configuration q2.
+
+1: procedure P2P-Planner(q1, q2, b, D)
+
+2: if isInvalid(q1, b) ∨ isInvalid(q2, b) then
+
+3:
+
+return inf
+
+4: end if
+
+5: if existsSimilar(q1, q2, b, D) then
+
+6:
+
+VP-STO.init← D(q1,D, q2,D, bD)
+
+7: end if
+
+8: C ← VP-STO(q1, q2, b) 9: return C
+
+▷ modified version
+
+10: end procedure
+
+Algorithm 2 Cyclic P2P planner: Given the assembly
+
+task X = {xi | i = 1, . . . , N } and a database D, the minimum total costs to traverse all poses in X , considering
+
+the cyclic constraint q1 = qN .
+
+1: procedure Cyclic-P2P-Planner(X , D)
+
+2: V ← {}
+
+▷ Initialize set of vertices
+
+3: E ← {}
+
+▷ Initialize set of edges
+
+4: for i = 1 to N do ▷ Compute all IK solutions
+
+5:
+
+Qi = {q1i , ..., qiMi } ← IK(xi)
+
+6: end for
+
+7: for i = 1 to N − 1 do
+
+▷ Compute all costs
+
+8:
+
+for q1 in Qi do
+
+9:
+
+V.append(q1)
+
+10:
+
+for q2 in Qi+1 do
+
+11:
+
+V.append(q2)
+
+12:
+
+Cq1,q2 ← P2P-Planner(q1, q2, b, D)
+
+13:
+
+E.add(q1, q2, Cq1,q2 )
+
+14:
+
+D.add(q1, q2, Cq1,q2 )
+
+15:
+
+end for
+
+16:
+
+end for
+
+17: end for
+
+18: G ← (V, E)
+
+▷ Construct the graph
+
+19: C ← Dijkstra(G) ▷ Considering cyclic constraint
+
+20: return C
+
+21: end procedure
+
+placement b. First, both configurations, q1 and q2, are ensured to be collision-free. Then, the trajectory database D containing all previously planned trajectories is queried for similar trajectories having d(q1, q1,D) + d(q2, q2,D) < ε with the Euclidean distance d(·, ·) and the threshold ε. If a similar trajectory is found, its via points are injected in the initial population of VP-STO, and reduced exploration parameters are used.
+
+4.2 Cyclic Point-to-Point Planner
+The cyclic P2P planner, see Algorithm 2, finds the optimal trajectory for a complete assembly task X , which minimizes the total cost C. The Mi IK solutions Qi for each of the N poses in X form a graph with i=1 N Mi vertices, as shown in Fig. 2. Thus, each node qij, i = 1, . . . , N , j = 1, . . . , Mi, represents a robot configuration to reach the pose xi in the task space. Each edge between two nodes corresponds to a single robot motion between two configurations, which the P2P planner computes in Algorithm 1. The edges are weighted by the resulting cost Cq1,q2 , indicating the transition costs between two configurations q1
+
+Fig. 2. Graph representation of the assembly task X = {xi | i = 1, . . . , N }. The vertices represent the IK solutions for the poses xi. The edges are weighted by the transition costs. The minimum-cost path is highlighted in red, respecting the cyclic constraint q1 = qN.
+and q2. Note that all edge costs can be computed independently and in parallel. The optimal trajectory for task X is the path through the graph with minimal total cost C using Dijkstra’s algorithm (Dijkstra, 1959). Additionally, the cyclic constraint q1 = qN is considered.
+
+4.3 Optimal Robot Base Placement
+The robot base placement optimization uses the blackbox optimization (BBO) routine of Li et al. (2021) to asynchronously select placements of interest and evaluate them in parallel using the workers, see Fig. 1. For each selected placement, a worker executes the cyclic P2P planner from the previous section to compute and evaluate the actual robot trajectories. The evaluated costs are used to update the surrogate model of the cost function for a specified number of iterations and find the global minimum cost.
+
+4.4 Cycle-Time-Optimal Robot Base Placement
+The cycle-time-optimal robot base placement aims to minimize the total cycle time of the assembly task X . To this end, only the trajectory duration T is chosen as cost C in Algorithms 1 and 2. The P2P planner outputs the minimal transition time between two robot configurations considering collisions and kinodynamic limits. Consequently, the optimization leads to a robot base placement where the actual trajectory duration is minimized instead of a performance metric, as in Makhal and Goins (2018) or Bachmann et al. (2021).
+
+4.5 Time-Energy-Optimal Robot Base Placement
+
+Cycle-time-optimal trajectories demand high energy consumption in general. However, a production line consists of many individual processes, whereas only a few processes determine the line’s cycle time. Consequently, many processes can be designed to reduce energy consumption significantly while accepting a slight increase in cycle time. This optimization goal is called time-energy-optimal robot base placement and is achieved by choosing the cost C in Algorithms 1 and 2 as
+
+C = T + wE ,
+
+(1)
+
+with
+
+T
+
+E = τ Tq˙ dt ,
+
+(2)
+
+0
+
+τ = M (q)q¨ + C(q, q˙ )q˙ + g(q) .
+
+(3)
+
+22
+
+Alexander Wachter et al. / IFAC PapersOnLine 58-19 (2024) 19–24
+
+The weight w in (1) allows to shift the balance between minimizing the cycle time or minimizing the energy consumption. The system dynamics are described by (3) with the mass matrix M (q), the Coriolis matrix C(q, q˙ ), and the vector of gravitational forces g(q).
+
+4.6 Throughput-Adaptive Robot Base Placement
+Flexible automation requires the robotic work cell to handle high-throughput scenarios with time-optimal robot motions and low-throughput situations with energy-saving trajectories. However, these two requirements contradict each other when optimizing the robot base placement. In the following, the optimization goal throughput-adaptive is introduced, which provides a robot base placement, considering these dynamic changes in the throughput.
+
+The expected maximum cycle time Tmax for low-throughput situations is specified beforehand for the optimization. The innermost P2P trajectory planner in Algorithm 1 uses the trajectory duration T as cost C, leading to a timeoptimal trajectory planning. In Algorithm 2, after line 17, an optimization-based scaling of the individual trajectories with the durations Ti is introduced. Using the optimization variable cT = [c1 c2 . . . cN−1], the trajectory parts are scaled to minimize the total energy consumption while respecting the maximum cycle time Tmax according to
+
+C = min
+c
+
+N −1 i=1
+
+ci Ti
+τ Tq˙ dt
+0
+
+(4a)
+
+N −1
+
+s.t.
+
+ciTi ≤ Tmax, 1 ≤ ci .
+
+(4b)
+
+i=1
+
+The cost C from (4a) is used in Algorithm 2. Consequently, the throughput-adaptive robot base placement optimizes for time-optimal trajectories, which scale in energy when a higher cycle time Tmax is allowed. This results in a placement where the robot motions are nearly time optimal in high-throughput situations but scale to low-throughput situations for a given cycle time Tmax to save energy. Note that the robot trajectories from Algorithm 1 using VP-STO are given as a superposition of basis functions, allowing a fast and computationally efficient time scaling. For a more detailed explanation, please refer to the original work of Jankowski et al. (2022).
+
+5. SIMULATION RESULTS
+
+This section investigates the robot base placement optimization for a robotic work cell with two distinct scenarios, see Fig. 3. The assembly task uses a Selective Compliance Assembly Robot Arm (SCARA). It consists of a sequence of N = 14 poses in the set X to pick and place objects between seven workstations. The scene is mostly free of obstacles in the sparse scenario (without the red fence in Fig. 3). In contrast, considering collisions is essential to successfully plan trajectories in the complex scenario (including the red fence).
+Given the joint limits of the robot, where the last joint spans the range of [−2π, 2π], up to M = Mi = 6 IK solutions exist for each pose in X , i = 1, . . . , N , yielding a graph with M × N nodes and M × M × (N − 1) trajectories. By exploiting rotational symmetries in the last axis, not all trajectories need to be computed, reducing
+
+(a)
+
+(b)
+
+Fig. 3. Visualization of the investigated robot work cell: In the sparse scenario, the red fence is removed, while the complex scenario includes it. (a) Top view, (b) isometric view.
+
+the computational effort. Furthermore, due to the robot’s design, a translation of the robot base along the z-axis does not influence the evaluated cost function. Therefore, it was considered fixed, which also eases the visualization of the cost function and the verification of the obtained global optima.
+Additionally, as the exact dynamic model of the SCARA was not available, the model (3) was approximated using τ ≈ M¯ q¨ with an average mass matrix M¯ . The Coriolis term was neglected, as it has a very minor impact on the system. The gravitational term also has a minor impact since all rotational axes of the SCARA are parallel to the gravity vector. Note that the evaluation of the full dynamic model according to (2) and (3) only slightly increases the computational effort since a batch implementation using Mujoco Mjx can be utilized (Todorov et al., 2012).
+In the following, the optimization procedure proposed in Section 4 is used for both scenarios to obtain robot base placements for the three optimization goals detailed in Sections 4.4–4.6. Additionally, these placements are compared to a manipulability-based placement (denoted by Manipulablity) (Moriguchi et al., 2022; Yoshikawa, 1985), a placement based on minimum manipulator travel time similar to the work of Baizid et al. (2015) (Joint-spacedistance), and a Cartesian-distance-based placement from the work of Bachmann et al. (2021) (Cartesian-distance). Furthermore, the placement chosen by a human expert (Human-expert, only available for the sparse scenario), and the worst possible placement (Worst, obtained by maximizing the cycle time) are evaluated.
+The main results are summarized in Section 5 and are discussed in the following subsections. For each method, the trajectories of the resulting base placement are evaluated using three different metrics. These are the total cycle time of the trajectories q(t) (denoted by T ), the time-energy cost (1) of the trajectories (T -E), and the pure energy cost (4a) after scaling the trajectories to a low-throughput situation with Tmax = 2.5 Tmin using the optimization (4) (E2.5×). The latter assesses how well a given base placement adapts to dynamic changes in the throughput. Each column is normalized to the minimum value. A red cross (×) in Section 5 indicates an invalid base placement where the assembly task cannot be completed.
+
+Alexander Wachter et al. / IFAC PapersOnLine 58-19 (2024) 19–24
+
+23
+
+Table 1. Robot base placements obtained using different optimization procedures and goals, evaluated in terms of cycle time (T ), time-energy cost (T -E), and energy consumption in low-throughput situations Tmax = 2.5 Tmin (E2.5×). A red cross (×) indicates an invalid base placement. Each column is normalized to the minimum value.
+
+Sparse scenario Complex scenario
+
+Robot base placement T T -E E2.5× T T -E E2.5×
+
+Cycle-time-optimal
+
+1 1.07 1.22 1 1.16 1.16
+
+Time-energy-optimal 1.13 1 1.01 1.08 1 1.09
+
+Throughput-adaptive 1.12 1
+
+1 1.04 1.02 1
+
+Manipulability
+
+1.17 1.20 1.36 × × ×
+
+Joint-space-distance 1.11 1.10 1.02 × × ×
+
+Cartesian-distance
+
+×× × ×× ×
+
+Human-expert
+
+1.21 1.18 1.46 n/a n/a n/a
+
+Worst
+
+1.78 2.11 2.36 1.21 1.30 1.19
+
+5.1 Sparse Scenario
+To give a qualitative overview of the 3-dimensional search space for the robot base placement in the sparse scenario (position x and y and rotation r), a full grid search is performed and visualized for the cycle time (Fig. 4a), and the time-energy cost (Fig. 4b). The color coding indicates the normalized value and infeasible points are omitted. The red and blue dots indicate the minimum cycle time and the time-energy cost, respectively.
+Next, the optimization procedure from Section 4 is applied to the sparse scenario. The black dots in Fig. 4a represent the evaluated points in the search space projected into the xy-plane. The initial random samples cover the search space, and the BBO quickly converges to regions close to the global optimum (red dot). Compared to the cycletime-optimal robot base placement, the worst feasible placement has a 1.78× higher cycle time. Conversely, this translates to a reduction of 44 %. The placement chosen by the human expert is 1.21× slower, see Section 5. In the sparse scenario, the time-energy-optimal as well as the throughput-adaptive robot base placements are very similar (blue dot in Fig. 4a). Additionally, these placements also coincide with a local minimum of the cycle time. The worst placement therefore has a 2.11× higher energy consumption, corresponding to a percentage gain from worst to best of 53 %.
+
+5.2 Complex Scenario
+The results for the complex scenario in Section 5 show that the cycle time can be reduced by 17 % (1.21×) and the time-energy cost by 23 % (1.30×) compared to the worst robot base placement. The difference between the worst and the best placement is less pronounced in this scenario than in the sparse scenario. This behavior originates from the robot’s occupied workspace due to the red fence, which significantly reduces the search space, see Fig. 3.
+The throughput-adaptive placement shows an overall good performance. It is close to time-optimal in the highthroughput situation (4 % higher compared to cycle-timeoptimal placement) and is most energy-saving in the lowthroughput situation (14 % lower compared to cycle-timeoptimal placement), which is achieved by applying the optimization-based trajectory scaling (4) for a given Tmax.
+
+r / rad
+
+-0.2 -0.1 0 0.1 y/m
+
+π
+π 2
+0 π −2 −π
+x/m
+(a) cycle time
+π
+
+> 1.25
+0.3 0.2 0.1 0 -0.1
+
+π 2
+
+r / rad
+
+0 π −2 −π
+x/m
+(b) time-energy
+
+0.3
+
+0.2
+
+1
+
+0.1
+
+0
+
+-0.1
+
+-0.2 -0.1 0 0.1 y/m
+
+Fig. 4. Cycle time T normalized to the time-optimal solution Tmin over the 3-dimensional search space (position x and y and rotation r). The red dot indicates the cycle-time-optimal robot base placement, and the blue dot shows the time-energy-optimal placement.
+In contrast, the time-energy-optimal placement does not scale well to low-throughput situations, requiring 9 % more energy than the throughput-adaptive placement.
+5.3 Comparison to the State of the Art
+This section compares the proposed optimization procedure to state-of-the-art schemes for robot base placement, specifically the Manipulability (Moriguchi et al., 2022; Yoshikawa, 1985), the Cartesian-distance (Bachmann et al., 2021), and the Joint-space-distance formulation of Baizid et al. (2015). The latter uses the cost
+Cq1,q2 = max |q1,j − q2,j | (5) j∈{1,...,m} q˙j,max
+to transition from a robot configuration q1 to q2 with m degrees of freedom at maximum joint velocity q˙j,max. This results in minimum-distance movements in the joint space without considering collisions.
+The results in Section 5 for the sparse scenario show that the placement using the manipulability performs 17 % worse than the cycle-time-optimal placement. Additionally, not considering collisions during placement optimization leads to an 11 % higher cycle time during operation.
+
+24
+
+Alexander Wachter et al. / IFAC PapersOnLine 58-19 (2024) 19–24
+
+The approach Cartesian-distance converges to an invalid placement for both scenarios. In the complex scenario, the state-of-the-art placement schemes do not provide valid solutions with which the assembly task is executable; see the red crosses in Section 5. This highlights the necessity of full trajectory planning within the optimization procedure for environments with significant obstacles.
+5.4 Algorithm Runtime
+The proposed method’s algorithm runtime for obtaining an optimal robot base placement in the considered scenes is approximately 80 min on a computer with 90 cores. Note that this runtime strongly depends on the underlying parameters of the P2P planner, the complexity of the environment, and the sequence length of the assembly task. In contrast, the runtime of placement methods based on performance indices is only in the order of a few minutes on the same hardware. However, the results in Section 5 show that these methods yield sub-optimal robot base placements in cycle time and energy, or they fail to provide valid placements in the presence of significant obstacles. The proposed method provides a global optimum and valid robot trajectories, which can be scaled easily to a given cycle time Tmax.
+6. CONCLUSIONS
+This work proposes a procedure to optimize the robot base placement of a robotic work cell for cycle-timeoptimality, time-energy-optimality, or adaptivity to dynamically changing throughput. A Bayesian optimizer is combined with a cyclic P2P trajectory planner to explore the search space rapidly in a highly parallelized manner. The P2P planner considers the complete scenario, including kinodynamic robot limits, collisions, and all robot configurations. Planning the actual trajectories yields significant performance improvements even in environments with many obstacles, where state-of-the-art methods fail to provide valid robot base placements. The throughput-adaptive placement performs close to cycletime-optimality in high-throughput situations and significantly reduces energy consumption in low-throughput situations. This adaptivity results from scaling the robot trajectory to a given cycle time. This work shows that significantly reduced cycle time and energy consumption can be achieved by carefully choosing the robot base placement within the work cell.
+Future work aims to expand the application of this method to optimize various other components of robotic cells. By incorporating additional optimization parameters, the end-of-arm tool, the kinematic structure of robotic manipulators, individual task positions or the full cell layout could be optimized.
+REFERENCES
+Asada, H. (1983). A geometrical representation of manipulator dynamics and its application to arm design. ASME. J. Dyn. Sys., Meas., Control., 105(3), 131–142.
+Bachmann, T., Nottensteiner, K., and Roa, M.A. (2021). Automated planning of workcell layouts considering task sequences. In Proc. ICRA, 12662–12668.
+Baizid, K., Yousnadj, A., Meddahi, A., Chellali, R., and Iqbal, J. (2015). Time scheduling and optimization of industrial robotized tasks based on genetic algorithms. Robot. Comput.-Integr. Manuf., 34, 140–150.
+
+Dijkstra, E.W. (1959). A note on two problems in connexion with graphs. J. Numer. Math., 1(1), 269–271.
+Dubey, R. and Luh, J.Y.S. (1988). Redundant robot control using task based performance measures. J. Robot. Syst., 5(5), 409–432.
+Ham, I., Hitomi, K., and Yoshida, T. (1985). Production Planning for Group Technology Applications, 29–42. Springer.
+Jankowski, J., Racca, M., and Calinon, S. (2022). From key positions to optimal basis functions for probabilistic adaptive control. IEEE Robot. Autom. Lett., 7(2), 3242– 3249.
+Jankowski, J., Brudermu¨ller, L., Hawes, N., and Calinon, S. (2023). VP-STO: Via-point-based stochastic trajectory optimization for reactive robot behavior. In Proc. ICRA, 10125–10131.
+Kamrani, B., Berbyuk, V., W¨appling, D., Stickelmann, U., and Feng, X. (2009). Optimal robot placement using response surface method. Int. J. Adv. Manuf. Technol., 44, 201–210.
+L¨ammle, A. and Gust, S. (2019). Automatic layout generation of robotic production cells in a 3D manufacturing simulation environment. Proc. CIRP, 84, 316–321.
+Li, Y., Shen, Y., Zhang, W., Chen, Y., Jiang, H., Liu, M., Jiang, J., Gao, J., Wu, W., Yang, Z., et al. (2021). Openbox: A generalized black-box optimization service. In Proc. ACM SIGKDD Int. Conf. Knowl. Discov. Data Min., 3209–3219.
+Makhal, A. and Goins, A.K. (2018). Reuleaux: Robot base placement by reachability analysis. In Proc. IRC, 137– 142.
+Moriguchi, K., Mizokami, T., and Morishige, K. (2022). Generation of a robot program and determination of an optimal workpiece placement considering the manipulability of industrial robots. Int. J. Autom. Technol., 16(6), 870–878.
+Nguyen, Q.C., Kim, Y., and Kwon, H.D. (2017). Optimization of layout and path planning of surgical robotic system. IJCAS, 15, 375–384.
+Patel, S. and Sobh, T. (2015). Manipulator performance measures-a comprehensive literature survey. J. Intell. Robot. Syst., 77, 547–570.
+P´erez-Gosende, P., Mula, J., and D´ıaz-Madron˜ero, M. (2021). Facility layout planning. An extended literature review. Int. J. Prod. Res., 59(12), 3777–3816.
+Salisbury, J.K. and Craig, J.J. (1982). Articulated hands: Force control and kinematic issues. IJRR, 1(1), 4–17.
+Spensieri, D., Carlson, J.S., Bohlin, R., Kressin, J., and Shi, J. (2016). Optimal robot placement for tasks execution. Procedia CIRP, 44, 395–400.
+Todorov, E., Erez, T., and Tassa, Y. (2012). Mujoco: A physics engine for model-based control. In Proc. IROS, 5026–5033.
+Valsamos, C., Miatliuk, K., Wolniakowski, A., Moulianitis, V., and Aspragathos, N. (2022). Optimal kinematic task position determination—application and experimental verification for the UR-5 manipulator. Appl. Sci., 12(18), 9352.
+Weingartshofer, T., Hartl-Nesic, C., and Kugi, A. (2021). Optimal TCP and robot base placement for a set of complex continuous paths. In Proc. ICRA, 9659–9665.
+Yoshikawa, T. (1985). Manipulability of robotic mechanisms. IJRR, 4(2), 3–9.
+
+

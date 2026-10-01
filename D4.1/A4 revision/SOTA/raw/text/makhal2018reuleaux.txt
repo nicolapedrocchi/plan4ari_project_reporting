@@ -1,0 +1,402 @@
+Reuleaux: Robot Base Placement by Reachability Analysis
+
+Abhijit Makhal* Department of Mechanical Engineering
+Idaho State University Pocatello, Idaho 83209 Email: http://makhabhi@isu.edu
+
+Alex K. Goins ROS-Industrial Email: alex.goins@swri.org
+
+arXiv:1710.01328v1 [cs.RO] 3 Oct 2017
+
+Abstract—Before beginning any robot task, users must position the robot’s base, a task that now depends entirely on user intuition. While slight perturbation is tolerable for robots with moveable bases, correcting the problem is imperative for ﬁxedbase robots if some essential task sections are out of reach. For mobile manipulation robots, it is necessary to decide on a speciﬁc base position before beginning manipulation tasks.
+This paper presents Reuleaux, an open source library for robot reachability analyses and base placement. It reduces the amount of extra repositioning and removes the manual work of identifying potential base locations. Based on the reachability map, base placement locations of a whole robot or only the arm can be efﬁciently determined. This can be applied to both statically mounted robots, where position of the robot and work piece ensure the maximum amount of work performed, and to mobile robots, where the maximum amount of workable area can be reached. Solutions are not limited only to vertically constrained placement, since complicated robotics tasks require the base to be placed at unique poses based on task demand.
+All Reuleaux library methods were tested on different robots of different speciﬁcations and evaluated for tasks in simulation and real world environment. Evaluation results indicate that Reuleaux had signiﬁcantly improved performance than prior existing methods in terms of time-efﬁciency and range of applicability.
+I. INTRODUCTION
+The robotic industry’s ongoing advancements depends upon state-of-the art equipments- with unique speciﬁcations and capabilities. As the hardware of the robotic systems are developed, so as the softwares are metamorphosed. From the perspective of an industry or household user, however, the main goal of deploying a robotic system remains the same: to successfully perform the desired task. Tasks can range from intense industrial work such as welding, packaging, and manipulation to relatively smaller scale of picking, placing or grasping. For users to accept and employ a robotic system, it must, (1) precisely execute the task, and (2) integrate well into the user’s workspace. For both features, the user and the robot should be aware of information about the robot’s reach and the workspace. Without these knowledge, deployment of the robot depends solely on user intuition. An incorrect intuition can lead to human casualty or catastrophic damage to the robotic system and workplace.
+The position of mobile robotic system with wheels or legs, can be changed, so the system is already facilitated with capabilities of moving itself. On the other hand, a system
+
+with a ﬁxed base or a system adamant to move, the task of shifting is completely relied on the user, which can be highly intimidating if the task cannot be performed from a speciﬁed location.
+Non-expert users who do not have an in-depth understanding of robot kinematics and the reachability challenges of robots, might hold misconceptions that the workspace of a robotic manipulator is sphere-shaped when the radius of the arm is fully extended and in this region the robot’s end-effector can move freely. On the contrary, the robotic arm’s workspace depends fully on the constraints posed on its arm joints. In the workspace, there are few positions where the arm can reach freely; in some sections of the workspace, the arm faces singularity. In this paper, the authors conferred few methods by which the robot’s workspace could be fully utilized and a suitable placement of the robot or manipulator base can be achieved.
+The paper makes the following three contributions to the ﬁeld of robotic workspace analysis and base placement, 1) A method to generate and analyze the precise reachability of any generic robotic arm in a time-efﬁcient manner, 2) A method to localize the feasible base positions of the whole robot or its manipulator for any given user task and 3) A comparison and evaluation of both methods on different robots with distinct characteristics.
+The rest of the paper is organized as follows: Section II presents relevant related work for robot workspace analysis and base placement. Section III explains the methodology incorporated in generating reachability map and Section IV discusses the procedure for constructing an inverse reachability map. The methods and procedures for ﬁnding the optimal base position are presented in Section V, while results of the reachability analysis and base placement methods as well as a comparison of results are documented in Section VI. We conclude with Section VII’s discussion of future work and work bottlenecks.
+II. RELATED WORK
+One of the challenges in developing a useful robotic system is designing a platform or workspace that lets the robot to effectively complete the desired task. Initial work on path planning and reachability was typically performed for simple
+
+Fig. 1. Reachability Map representation. From left to right a) LWR 7DOF arm with self-collision checking, b) 6DOF JACO arm without self-collision checking, c) right arm (7DOF) of PR2 mobile manipulator with self-collision checking. (Color representation with increasing reachability- Red, Yellow, Green, SkyBlue and Blue)
+
+grasp points on objects [1], which involves creating a map representing the areas of high dexterity for the manipulators. This work was then extended to the use of reachability maps to solve the inverse reachability task [2] and [3], where the optimal base placement was found in order to perform the desired grasp on an object. Work done by [4] examined ways to simplify the reachability map by generating a capability map, a simpliﬁed structure that permits faster and more efﬁcient searches of the map in order to solve the inverse reachability problem.
+Though these methods are limited. They solve only the general problem of whether or not an inverse kinematics solution was found. A given grasp location could mean that some or all of the solutions found could be non-optimal (near singularities or joint limits). The work of [5] presents the concept of manipulability ellipsoid measure, which can be derived from a Jacobian matrix of manipulators. The size of the ellipsoid and the principal axes represent the manipulation ability in a certain conﬁguration and are thus used to determine the effectiveness of a grasp at a given location. This work was extended in terms of grasping and manipulation in [6].
+To overcome the single grasp location issue, several papers extended the inverse reachability problem to solve for trajectories. Various methods have been used to search the reachability map in order to ﬁnd the location where the desired trajectory can be executed with the highest level of dexterity. [7] uses sampling of the trajectory to ﬁnd and overlay multiple base placements; [8] uses a pattern search to ﬁt the trajectory into the area representing the ﬁeld of high dexterity; and [9] uses a cross-correlation technique to ﬁt the desired trajectory to the model of the robot reachability map. Further improvements to the reachability map method were developed by [10] to include the ability to add a transform offset from the original end-effector location, which is useful if the robot is grasping a tool with a non-zero length.
+These methods allow planning for simple tasks, but they
+
+require a task to be completely speciﬁed prior to evaluation. [11] explores the case where a speciﬁc trajectory is not given; rather the task has been simpliﬁed into a generalized workspace environment where the robot must work. Here, competing constraints are given. However the operator still evaluates and conﬁrms the ﬁnal base placement of the robot on the mobile platform. For a simple operation with few operating points, this can be done manually, but for more complex parts and tasks such as welding pipes or assembling parts in constrained spaces, a manual approach for validation may not be feasible.
+III. REACHABILITY MAP
+A reachability map is a collection of all poses that the robot’s end effector can reach. To accommodate the inﬁnite number of reachable poses, similar poses are clustered into a sphere structure suitable for visualization and easy to access. The structure also captures the directional information of reachable poses, because several positions can be reached only from a certain direction. An individual sphere is represented as a multimap data structure, which holds information about the sphere’s position, all reachable poses belonging to the sphere, and the reachability measure of that sphere.
+To create a reachability map, a method similar to the work presented in [4] is incorporated where the robot’s workspace is discretized, sampled for reachable poses and information of reachable poses are stored in a structured manner. The reachability map structure of three different robots created with the Reuleaux library is shown in Fig.1
+A. Workspace Voxelization
+Input to the creation of a robot reachability map procedure is the Uniﬁed Robot Description format (URDF) model of the robot, from which a detailed robot description is obtained. The robot’s hypothesized workspace is ﬁrst voxelized to create a square structure around the robot. The voxelization process is performed by octree [12], a hierarchical data structure enabling
+
+Algorithm 1 Generate Reachability Map
+
+input (URDF of robot)
+
+1: procedure GenerateReachM ap
+
+2: create VoxelStructure V
+
+3: for each voxel vi in V do
+
+4:
+
+create sphere s
+
+5:
+
+checkforSelf Collision(s)
+
+6:
+
+Store sfiltered in S
+
+7: end for
+
+8: for each si in S do
+
+9:
+
+Sample surface and generate poses P
+
+10:
+
+for each j in P do
+
+11:
+
+ﬁndIKSolution (Pj)
+
+12:
+
+if solution then
+
+13:
+
+Store (si, Pj)
+
+14:
+
+end if
+
+15:
+
+di = F indReachabilityM easure(si)
+
+16:
+
+Store di with (si, Pj) in map
+
+17:
+
+end for
+
+18: end for
+
+19: end procedure
+
+spatial partitioning and searching between voxels. The root node of the octree is at the base of the manipulator, and every node is connected to its eight children. The tree is extended to the overestimation of the diameter of the robot arm in an extended state. The size of the voxels required are task dependent and thus user deﬁned. Tasks requiring a high degree of accuracy will need a smaller voxel size in order to provide more accurate results in the ﬁnal base placement location. The centers of voxels are determined, and a sphere with a radius of the voxel’s resolution is placed in every voxel.
+B. Self Collision Checking
+All the spheres collected by the voxelization procedure do not indicate reachable workspace to be considered. The workspace regions where the robot body is present should not be included in the workspace because end-effectors cannot reach those sections due to collisions. For ﬁltering out such sections, as a preprocessing step, the robot body is modelled as a collection of triangular meshes and checked for collisions with the voxelized sphere center. The sphere centers in collisions with robot body (excluding the arm considered for reachability analysis) are opted out of the workspace structure; they are not further discretized for reachability analysis.
+A collision checking library FCL [13] is used for fast collision checking. This method provides an advantage in terms of time efﬁciency since most other methods such as [4] and [3], check for collision only when obtaining solutions from poses. This step drastically reduces the number of spheres to be searched.
+In our method, self-collision is also included while checking for reachability of the poses. Certain poses may not be inside the robot body, but to reach the pose, some part of the robot may be in collision. Such poses can be considered unreachable.
+
+It is worth noticing in Fig.1 that reachability maps created without self-collision represent overall symmetric structures that consider higher reachability at the robot’s base, e.g. the reachability map of JACO arm (Fig.1b). Due to joint limits and self-collision, the area of the robot base should be less reachable, which can be seen in Fig.1a, the reachability map of the LWR arm. The reachability map of the PR2 robot in Fig.1c shows an inconsistent structure since the sphere centers within the robot’s body are ﬁltered out in this step.
+C. Workspace Sampling One of the most popular ways to determine robot’s possible
+reach position is by forward kinematics (FK), where the joints of the manipulator can be uniformly sampled and the conﬁguration of the tool center point (TCP) can be stored in an efﬁcient structure to represent the reachability workspace. The number of TCP positions in a voxel gathered from FK was considered to be a suitable representation of efﬁcient reachability in certain voxelized sections. In [4], it is proven invalid for most cases: If the positions in the voxel represents a singular conﬁguration, any large step in the conﬁguration space would cause small steps in the Cartesian space, leading to abundance of poses in a single region. Also, uniform sampling of the joint space does not guarantee uniform sampling in the Cartesian space.
+Fig. 2. Discretization of a single voxel in the workspace. The cube(yellow) is the voxel to be searched. A sphere (green) is ﬁtted inside the cube. The sphere is discretized with probable poses (red arrow)
+For uniformly sampling the task space, the spheres representing the voxels are sampled for uniform point distribution on the sphere by the method presented in [14]. From every point of the distribution, a direction is assumed towards the center of the sphere. As depicted in Fig.2, an individual voxel of the discretized workspace is ﬁtted with a sphere, and the sphere is sampled for points on its surface. From an individual point, a direction is considered towards the center of the sphere represented by a red arrow. Considering a frame, the direction towards the center of the sphere is the z-axis, while the x and y axes are tangential to the sphere surface.
+All the frames created in the previous step are collected and searched for inverse kinematics(IK) solutions. A closed-form analytical inverse kinematics solver IKFast[3] is employed to
+
+ﬁnd inverse kinematics solutions. For manipulators where analytical solutions are not available, a numerical solver KDL[15] is used which is less time-efﬁcient due of the nature of the solver. All reachable poses that return a valid joint solution are stored in a multimap datastructure with their corresponding sphere centers.
+
+D. Measure of Reachability
+The reachability map generation procedure is simpliﬁed in Algorithm 1. A reachability metric is been proposed for a given voxel based on the fraction of discrete poses in the sphere centered at that voxel that are reachable to the robot. In equation(1), the reachability measure is termed D, where the number of discretized frames of a sphere is represented by N and the number of reachable frames calculated is R.
+
+D = (R/N ) ∗ 100
+
+(1)
+
+Based on the calculated D, spheres are assigned to different colors ranging from red to blue, where blue represents higher reachability(i.e., the spheres with most reachable poses) and red represents lower reachability. In terms of decreasing reachability, the colors are in the sequence of blue, skyblue, green, yellow and red.
+
+IV. INVERSE REACHABILITY MAP(IRMS)
+Considering every pose in the reachability map to be a transformation matrix from the origin of the robot, inverse transformation on every pose are performed to create an inverse reachability map (IRM). The IRM is represented using the same data structure as the reachability map, consisting of poses and spheres. The 6D pose of the TCP is represented as:
+
+All the poses Bij are considered to be points and stored
+
+in an octree structure; they are processed through a nearest
+
+neighbour (NN) algorithm that clusters together all poses in
+
+the same voxel. This procedure is the inverse process of
+
+sphere discretization process. In the previous process, poses
+
+are obtained from spheres; here the spheres are acquired from
+
+transformed poses. The color of the voxels is determined by
+
+placebase index in eq(5).
+
+The colors are also arranged in the same sequence as
+
+in the reachability map. However, instead of representing
+
+reachability, here the different colors represent the probability
+
+of suitable base placements from where the task poses can be
+
+reached. The procedure for creating union map is explained
+
+in algorithm.2
+
+  n ∗ bmax
+
+∗ 100, if d ≥ 1
+
+d =  bmax − bmin 0,
+
+(5) otherwise
+
+where bmax is the maximum number of possible base poses in a sphere, bmin is minimum number of possible base poses in a sphere, and n is the number of base poses in the sphere. The size of the union map is the size of the inverse reachability map times the number of task poses.
+
+Tglobal T CP = x, y, z, ρ, φ, θ
+
+(2)
+
+T −1 = TT CP global (3)
+where {x, y, z} is the pose of the end effector and {ρ, φ, θ} is the orientation represented in Euler angles. In the IRM, T −1 is stored which will be later used in the base placement scenario where task poses are deﬁned by the user. To create a sphere structure a reachability measurement similar to the reachability map, we consider every transformed frame to be a position {x, y, z} in the environment.
+
+V. BASE PLACEMENT
+In this section, potential base poses for a given is be searched, where the task poses are completely dependent on the user. Task poses can be a discretized trajectory or can be an indication of certain regions the robot has to reach for pick and place task. The inverse reachability consisting of all the transformations is the main ingredient of the base placement process. Task poses taski are transformed using transformations Tj−1 of the inverse reachability map to create an union map of all the potential base poses Bij .
+
+Bij = taski ∗ Tj−1
+
+(4)
+
+Fig. 3. Task with real Fetch robot. From left to right, top to bottom. a)Real Fetch robot with 3 objects outside of reachable workspace, b)The visualization of the environment with arrows pointing to grasp poses, c) The inverse reachability map with robot models indicating solution feasibility for all task poses in rviz, d) The robot is reaching for one of the objects after base placement
+As explained in Algorithm 2, to search through all the spheres and poses for ﬁnding probable base locations for the speciﬁed task, multiple methods are incorporated. For every method, taski ∈ T ASK are task poses, bj ∈ B are base poses and sk ∈ S are spheres. n is the desired number of base locations. For ease of calculation, another parameter, m, is also deﬁned, which sets the number of spheres to be searched with the highest placebase index score; when task poses increase,
+
+Algorithm 2 Union Map Construction
+
+input (IRM , task poses taski)
+
+1: procedure createU nionM ap
+
+2: for each task pose taski do
+
+3:
+
+Transform IRM by taski and obtain bij
+
+4:
+
+Cluster poses bij by NN and assign to spheres
+
+5:
+
+Calculate PlaceBase index for every sphere Sk
+
+6:
+
+Update in Union map Sk, bij, d
+
+7: end for
+
+8: end procedure
+
+the number of spheres also increases. It is important to note that n should always be lower than m.
+
+the robot should reach all task poses. Instead of constructing new poses, all the poses in m spheres are searched for their reach towards all taski. The number of successful reaches is counted and stored. The n poses with the highest scores are considered to be ﬁnal base locations. Instead of counting the highest number of reaches, in IkSolutonScore method, the total number of IK solutions is considered as score, since the incorporated IK searching method provides maximum of 8 solutions. If there is such a task pose, which is almost nonreachable, the number of solutions decreases with unreachability. The n number of base poses with the highest scores are considered to be the ﬁnal base locations.
+
+Fig. 4. For a single task pose (magenta arrow), 3 ﬂoating base locations have been searched for the Kuka kr10 arm a) by PCA method b) GraspReachability method, c) IkSolution method, d) user intuition method screen by human input. The manipulator base poses are shown with axes. z axis is inside the robot model
+A. Placing Floating Base
+In the P rincipalComponentAnalysis(P CA) method, all m numbers of spheres with highest placebase index are searched for probable base locations. From m spheres, the orientations {ρm, φm, θm} of base locations are calculated using PCA method on each calculated spheres, s, while the positions {xm, ym, zm} are considered to be sphere centers. The dominant eigen vectors represent the axis of rotation by the which the base position is transformed from the origin. By normalizing the orientations, base locations from the PCA method are set as vertically parallel to the ground while ﬁxing the rotations in the x and y axis. The distances of the base locations varies from the xy plane(the ﬂoor) and the only rotation searched for is in the z axis. For every constructed probable base pose bm, all taski are searched for IK solutions, and the number of found solutions for each taski stored as a cumulative score. The n poses with the highest scores are considered to be probable base locations. The GraspReachabilityScore method is based on the simplistic assumption that from all calculated optimal base locations,
+
+Fig. 5. The husky robot with an UR5 arm. Two base locations are searched for 3 task poses(magenta arrow). The manipulator conﬁgurations from the the left robot model(green) are :a)Dark green, b)green c)white and from the right robot model(blue) are:1)Dark blue, 2)blue 3)pink
+B. Placing Base on the Ground
+Instead of ﬁnding a suitable place location for the robot in variable z locations, the verticalRobotM odel approach locates probable base locations for the robot on the ground. To solve for robot base location solutions, the transformation from arm base to robot base should be known.
+Bij = taski ∗ (Tglobal T CP )−1 ∗ (Trobotbase armbase )−1 (6)
+Instead of creating a union map with respect to manipulator’s base, the poses at the IRM are also transformed with another extra step by (T armbase robotbase)−1 to consider at the base location of the full robot shown in eq(6).The union map can then be constructed at the robot base location, and the placebase index is calculated for all s in S. As the base of most of the wheeled or legged robot models maintain a parallel stance with the ground, the union map can be transferred from movement in 6D Cartesian space SE(3) to 3DOF space SO(2),where the only movement allowed is the rotation about the z-axis and translation in x or y-axes. The union map is sliced through a horizontal axis w.r.t to ground. The 3D union map now can be considered as a 2D union map.
+
+Fig. 6. Base Placement task on 3 different robots. The task is represented by 3 poses in a table environment. The optimal base placement is shown on a) Kuka KR6, b)Universal UR5 and c)Motoman mh5
+
+Algorithm 3 Optimal Robot base by VerticalRobotModel
+
+method input (Union Map, task poses taski, desired number for base locations n, spheres to be searched m,robot model) output(n
+
+base locations)
+
+1: procedure f indbasebyV erticalRobotM odel
+
+2: if n > 0 and taski > 0 then
+
+3:
+
+ﬁnd T between arm base and robot base
+
+4:
+
+Transform IRM by T and taski
+
+5:
+
+Slice union map by 2D
+
+6:
+
+ﬁnd sm with Maximum PlaceBaseIndex
+
+7: end if
+
+8: for each k in Sm do
+
+9:
+
+Uniform sample rotations in z axis and obtain bj
+
+10:
+
+for each bj in k do
+
+11:
+
+Calculate score of reachability
+
+12:
+
+end for
+
+13: end for
+
+14: end procedure
+
+Despite the dimensionality reduction process, the 2D union map still contains the information of placebase index. The m highest placebase indexed spheres are considered to be the optimal base placement locations. As the orientation is constrained in only one direction, the orientation direction is sampled though an uniform interval to generate multiple base poses on a single sphere. From all calculated robot base positions, the reachability of the task poses are considered and the poses unable to reach all task poses are discarded. From the highest scored poses, n poses are selected as ﬁnal base pose.
+A typical condition is presented in Fig.5, where 2 base locations are searched with 3 task poses. Here, the robot has a Husky robot as a base, and a UR5 arm is the manipulator. To consider optimal base locations, there should be 6 manipulator states present for 3 task poses and 2 base locations . The robot solutions for the task poses are a) left: Dark green and pink, b) middle: Blue and white, c) right: Dark blue and green.
+
+VI. RESULTS
+The Reuleaux map generation library was applied on several robots with different speciﬁcations and sizes. Without the collision checking facility, the average reachability map generation time was around 156 sec. However, without self collision, the generated map was just a collection of reachable poses, which is disadvantageous. Since there are no standard metric to measure the efﬁciency of a reachability map, we can consider time efﬁciency and generalizability as the metrics. As the reachability map can be generated ofﬂine, its utility lies in using the map in other tasks.
+
+TABLE I REACHABILITY MAP GENERATION
+
+Method Reuleaux Diankov et.al[4] Zacharias et al[3]
+
+Robot
+PR2 LWR UR5 PR2 LWR UR5 PR2 LWR UR5
+
+(x100000) Poses
+processed 20.938 13.718 7.636 205.48 145.727 123.513 104.69 68.59 38.18
+
+(x1000) spheres created 2552 5127 5017
+2680 5213 4883
+
+Time(min)
+124.31 160.41 143.27 490.07 427.11 371.38 405.47 542.18 413.23
+
+In Table I we represent an analysis of Reuleaux’s reachability map generation compared to two methods presented in [3] and [4] on three different robots. PR2 right arm is a 7DOF manipulator, rigidly connected to the body. The LWR and UR5 are considered on the ground. While the DOF of LRW is 7, the UR5 has only 6ODF. In method [3], available as open-source library, reachability is not represented as sphere; instead it is represented as area. The opportunity to set the desired options for creating maps is only limited to saving joint solutions and setting a maximum radius. On the other hand, [4] represents reachability as a sphere and in extension with different shape representations. Because this method is most similar to our approach, we also represent their work as spheres.
+In Reuleux, the creation of a reachability map is based on the desired resolution of the voxels and maximum radius.
+
+Resolution is a very useful parameter as it determines the size of the voxel, which later creates the size of the spheres. For all our experiments, we set the resolution of voxels at 0.08m and maximum radius at 1m. For convenience, our implementation of [4] also uses the same resolution. For all the experments, the IKFast library was used to obtain ikfast solutions.
+In Table I, the signiﬁcant difference in the number of poses processed stems from fact that [3] obtained the poses by default parameters and in [4] all poses are rotated by 5 degrees in z-direction to obtain extra poses. Regarding the time difference, in our system we have ﬁltered out the spheres on the robot body in a preprocessing step.
+
+TABLE II MANIPULATOR BASE PLACEMENT PERFORMANCE
+
+Method PCA
+GraspReachability IKsolution
+
+Task Poses
+2 4 2 4 2 4
+
+Reachable Poses 10/10 20/20 9/10 17/20 10/10 19/20
+
+score
+97.28 93.45 89.7 85.1 96.52 96.27
+
+Time(sec)
+1.45 2.11 1.77 2.64 1.82 2.79
+
+Fig. 7. Base Placement in simulation. From left to right, top to bottom. a) The rviz view of the environment with arrows pointing to task poses, b) Simulated PR2 robot in a kitchen environment outside of reachable workspace, c) Visualization of the inverse reachability map with robot models indicating solution feasibility for all task poses, d) The robot is reaching for one of the task pose after base placement
+
+For all base placement experiments, task poses are decided based on reach tasks. In the simulation scenario, an individual task pose represents a region the robot must access. To represent a motion plan in terms of poses, the trajectory must be uniformly sampled, which is beyond the scope of this paper. For example, in the simulation scenario, shown in Fig.7, the tasks with magenta arrows represent different sections of the kitchen, such as the sink, oven and drawer. At the initial condition, the tasks were out of robot’s reachable workspace. The intent of the system is to ﬁnd the optimal base position from which all the task poses could be reached. To insert the task poses in the environment, we utilize the depth camera situated on the robot. If a depth camera is not present in the environment, an additional depth camera could be added to the simulation environment, and task poses could be inserted based on the point cloud view from the additional camera.
+In Table II, the base placement task on a table environment is performed by all three ﬂoating base placement methods. The result suggests that PCA method is best suited for placing only manipulators in different z locations. So, if user has the opportunity to change the manipulator base height w.r.t to the ground, the PCA method can ﬁnd the probable placement location for any given task. The solutions from the GraspReachabilityScore and IkSolutionScore methods can not be considered as optimal, as they are in turn inverse transformation of the task poses. So including redundancy of a manipulator, the solutions can be inﬁnite. Though from the solutions of this methods, all the task poses are still reachable.
+To evaluate the robot base placement method, we compared our results with methods presented in [7], with a table environment where the robot has to reach different section of the table. For consistency, all task poses are placed on the side of the table and every task pose was set to a different
+
+orientation. Fig.6 shows the task poses for this task on different robots. To prove effectiveness, we employed a new method userIntutition and provided a simple userinterface where the user can drag multiple robot models to set the optimal base placement for a task. We evaluated results from 3 different human users by userIntuition method and their average scores based on 5 tries are also presented in table IV. The reader is encouraged to evaluate the userIntutition method from the ofﬁcial repository for the base placement task. The interface for the userIntutition method has been shown in Fig.4d. The scores are calculated by IkSolutonScore methods.
+We also validated our base placement method: (1) in simulations on a PR2 robot in Franhofer IPA Kitchen environment and (2) using a real robot (the Fetch mobile manipulator) in a table environment. For 4 different iterations the robot is started from different initial locations and the task poses are kept different. For all iterations, task poses are kept outside the robot’s reach. As result, the robot had to move its base to an optimal base location from which all task poses could be reached. A simplistic base path planner is incorporated to move the robot base.
+In both simulation and real environments, the task poses were decided based on the point cloud from the robot’s depth camera (Refer to Fig.3b and Fig.7b for task poses.) The optimal base location and the reachability map, along with manipulator joint solutions for individual task poses, are shown in Fig.3c and Fig.7c. The ﬁnal condition, where the robot successfully reaches a task pose is shown in Fig.3d and Fig.7d. Table III represents the results from the real world and simulation experiments. In some cases, the robot could not reach the task pose due to failure in motion planning. Since we did not consider environmental obstacle when placing bases, in one scenerio, the robot failed to reach 2 of 3 task poses
+
+robot PR2 (sim)
+Fetch (real)
+
+TABLE III ROBOT BASE PLACEMENT PERFORMANCE
+
+reachable task poses
+4/6 6/6 6/6 5/6
+3/3 2/3 1/3 3/3
+
+base calculation 21.8s 18.2s 19.1s 18.6s
+9.23s 8.71s 8.23s 8.6s
+
+Time(sec) soln validation
+0.4s 0.7s 0.52s 0.7s
+
+Reach base 7.4s 5.2s 3.1s 6.5s
+
+0.1s 0.2s 0.11s 0.13s
+
+4.12 3.2s 7.23s 4.53s
+
+Reach task 7.1s 6.23s 2.1s 4.78s
+6.6s 7.87s 9.23s 7.21s
+
+TABLE IV ROBOT BASE PLACEMENT PERFORMANCE
+
+Method
+Reuleaux
+Vahrenkamp et al[7] User1
+User1
+User1
+
+Task Poses
+2 4 2 4 2 4 2 4 2 4
+
+Reachable Solutions
+10/10 20/20 9/10 17/20 10/10 19/20 9/10 19/20 10/10 18/20
+
+score
+97.28 93.45 89.7 81.17 96.52 95.36 92.8 94.22 97.4 79.23
+
+Time(sec)
+1.45 2.11 1.77 2.64 1.82 2.79 1.75 3.20 1.84 3.11
+
+due to collision. Also, since task poses are deﬁned by depth sensors, depth sensor errors had a substantial negative impact on base placement.
+VII. CONCLUSIONS
+In this paper, several methods were proposed to ﬁnd optimal manipulator base locations and robot base locations. The characteristics that distinguishes our process from other available base placement and reachability map creation tool is the timeefﬁciency, generalizability and user-friendliness. Further, the base solution is not limited to a single solution; the numbers of solutions depend on the tasks and user intent. From Table IV we can infer that the robot base placement solution presents signiﬁcantly improved results vis-a-vis human intuition and other methods. It is not possible for a human being to consider the most optimal base locations by intuition. The limitation of this approach is the input system of the task poses and its exclusion of collision when planning for base placement. The 3D depth cloud sensors are noisy and can provide with incorrect estimation of the environment. Collision in the base placement planning is vital, as the output base pose may be in collision with manipulated workpiece, worktable and other surroundings. Also base placement does not depend only on the reachability of the task poses, the power cost or minimum joint motions should also be considered. The work presented here is available as a self-contained C++ library at http://wiki.ros.org/reuleaux.
+
+ACKNOWLEDGMENTS
+The authors acknowledge the opportunity provided by ROSIndustrial and Google Summer of Code to accomplish the work presented in this paper. The authors are grateful of Dr.Alba Perez Gracia and Debashree Sheet Makhal for providing encouragement and support throughout the process. We are also thankful to Prof. Maya Cakmak for providing us with a fetch robot we could use for the experiments.
+REFERENCES
+[1] J. Mller, U. Frese, and T. Rfer, “Grab a mug - object detection and grasp motion planning with the nao robot,” in 2012 12th IEEERAS International Conference on Humanoid Robots (Humanoids 2012), pp. 349–356, Nov 2012.
+[2] F. Burget and M. Bennewitz, “Stance selection for humanoid grasping tasks by inverse reachability maps,” in 2015 IEEE International Conference on Robotics and Automation (ICRA), pp. 5669–5674, May 2015.
+[3] R. Diankov, Automated Construction of Robotic Manipulation Programs. PhD thesis, Carnegie Mellon University, Robotics Institute, August 2010.
+[4] F. Zacharias, C. Borst, and G. Hirzinger, “Capturing robot workspace structure: representing robot capabilities,” in 2007 IEEE/RSJ International Conference on Intelligent Robots and Systems, pp. 3229–3236, Oct 2007.
+[5] T. Yoshikawa, Foundations of Robotics: Analysis and Control. Cambridge, MA, USA: MIT Press, 1990.
+[6] N. Vahrenkamp and T. Asfour, “Representing the robot’s workspace through constrained manipulability analysis,” Auton. Robots, vol. 38, pp. 17–30, Jan. 2015.
+[7] N. Vahrenkamp, T. Asfour, and y. p. Ru¨diger Dillmann, journal=2013 IEEE International Conference on Robotics and Automation, “Robot placement based on reachability inversion,”
+[8] F. Zacharias, C. Borst, M. Beetz, and G. Hirzinger, “Positioning mobile manipulators to perform constrained linear trajectories,” in 2008 IEEE/RSJ International Conference on Intelligent Robots and Systems, pp. 2578–2584, Sept 2008.
+[9] F. Zacharias, W. Sepp, C. Borst, and G. Hirzinger, “Using a model of the reachable workspace to position mobile manipulators for 3d trajectories,” in 2009 9th IEEE-RAS International Conference on Humanoid Robots, pp. 55–61, Dec 2009.
+[10] J. Dong and J. C. Trinkle, “Orientation-based reachability map for robot base placement,” in 2015 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), pp. 1488–1493, Sept 2015.
+[11] O. Porges, R. Lampariello, J. Artigas, A. Wedler, C. Borst, and M. A. Roa, “Reachability and dexterity: Analysis and applications for space robotics,” 2015.
+[12] A. Hornung, K. M. Wurm, M. Bennewitz, C. Stachniss, and W. Burgard, “OctoMap: An efﬁcient probabilistic 3D mapping framework based on octrees,” Autonomous Robots, 2013. Software available at http://octomap.github.com.
+[13] “FCL ﬂexible collision library.” https://github.com/ ﬂexible-collision-library/fcl. Accessed: 2017-07-11.
+[14] J. Saff and A. Kuijlaars, “Distributing many points on the sphere,” in Mathematical Intelligencer, vol. 19, pp. 5–11, 1997.
+
+[15] “KDL kinematics and dynamics library (kdl).” http://wiki.ros.org/kdl. Accessed: 2017-07-11.
+
+

@@ -1,0 +1,1012 @@
+{
+ "kappen2005pathintegrals": {
+  "arxiv": "physics/0505066",
+  "title": "Path integrals and symmetry breaking for optimal control theory",
+  "authors": [
+   "H. J. Kappen"
+  ],
+  "published": "2005-05-09",
+  "journal_ref": "",
+  "doi": "10.1088/1742-5468/2005/11/P11011",
+  "abstract": "This paper considers linear-quadratic control of a non-linear dynamical system subject to arbitrary cost. I show that for this class of stochastic control problems the non-linear Hamilton-Jacobi-Bellman equation can be transformed into a linear equation. The transformation is similar to the transformation used to relate the classical Hamilton-Jacobi equation to the Schrödinger equation. As a result of the linearity, the usual backward computation can be replaced by a forward diffusion process, that can be computed by stochastic integration or by the evaluation of a path integral. It is shown, how in the deterministic limit the PMP formalism is recovered. The significance of the path integral approach is that it forms the basis for a number of efficient computational methods, such as MC sampling, the Laplace approximation and the variational approximation. We show the effectiveness of the first two methods in number of examples. Examples are given that show the qualitative difference between stochastic and deterministic control and the occurrence of symmetry breaking as a function of the noise."
+ },
+ "williams2015covariance": {
+  "arxiv": "1509.01149",
+  "title": "Model Predictive Path Integral Control using Covariance Variable Importance Sampling",
+  "authors": [
+   "Grady Williams",
+   "Andrew Aldrich",
+   "Evangelos Theodorou"
+  ],
+  "published": "2015-09-03",
+  "journal_ref": "",
+  "doi": "",
+  "abstract": "In this paper we develop a Model Predictive Path Integral (MPPI) control algorithm based on a generalized importance sampling scheme and perform parallel optimization via sampling using a Graphics Processing Unit (GPU). The proposed generalized importance sampling scheme allows for changes in the drift and diffusion terms of stochastic diffusion processes and plays a significant role in the performance of the model predictive control algorithm. We compare the proposed algorithm in simulation with a model predictive control version of differential dynamic programming."
+ },
+ "gandhi2021rmppi": {
+  "arxiv": "2102.09027",
+  "title": "Robust Model Predictive Path Integral Control: Analysis and Performance Guarantees",
+  "authors": [
+   "Manan Gandhi",
+   "Bogdan Vlahov",
+   "Jason Gibson",
+   "Grady Williams",
+   "Evangelos A. Theodorou"
+  ],
+  "published": "2021-02-17",
+  "journal_ref": "",
+  "doi": "10.1109/LRA.2021.3057563",
+  "abstract": "In this paper we propose a novel decision making architecture for Robust Model Predictive Path Integral control (RMPPI) and investigate its performance guarantees and applicability to off-road navigation. Key building blocks of the proposed architecture are an augmented state space representation of the system consisting of nominal and actual dynamics, a placeholder for different types of tracking controllers, a safety logic for nominal state propagation, and an importance sampling scheme that takes into account the capabilities of the underlying tracking control. Using these ingredients, we derive a bound on the free energy growth of the dynamical system which is a function of task constraint satisfaction level, the performance of the underlying tracking controller, and the sampling error of the stochastic optimization used within RMPPI. To validate the bound on free energy growth, we perform experiments in simulation using two types of tracking controllers, namely the iterative Linear Quadratic Gaussian and Contraction-Metric based control. We further demonstrate the applicability of RMPPI in real hardware using the GT AutoRally vehicle. Our experiments demonstrate that RMPPI outperforms MPPI and Tube-MPPI by alleviating issues of the aforementioned model predictive controllers related to either lack of robustness or excessive conservatism. RMPPI provides the best of the two worlds in terms of agility and robustness to disturbances."
+ },
+ "kim2022smppi": {
+  "arxiv": "2112.09988",
+  "title": "Smooth Model Predictive Path Integral Control without Smoothing",
+  "authors": [
+   "Taekyung Kim",
+   "Gyuhyun Park",
+   "Kiho Kwak",
+   "Jihwan Bae",
+   "Wonsuk Lee"
+  ],
+  "published": "2021-12-18",
+  "journal_ref": "",
+  "doi": "10.1109/LRA.2022.3192800",
+  "abstract": "We present a sampling-based control approach that can generate smooth actions for general nonlinear systems without external smoothing algorithms. Model Predictive Path Integral (MPPI) control has been utilized in numerous robotic applications due to its appealing characteristics to solve non-convex optimization problems. However, the stochastic nature of sampling-based methods can cause significant chattering in the resulting commands. Chattering becomes more prominent in cases where the environment changes rapidly, possibly even causing the MPPI to diverge. To address this issue, we propose a method that seamlessly combines MPPI with an input-lifting strategy. In addition, we introduce a new action cost to smooth control sequence during trajectory rollouts while preserving the information theoretic interpretation of MPPI, which was derived from non-affine dynamics. We validate our method in two nonlinear control tasks with neural network dynamics: a pendulum swing-up task and a challenging autonomous driving task. The experimental results demonstrate that our method outperforms the MPPI baselines with additionally applied smoothing algorithms."
+ },
+ "mohamed2022logmppi": {
+  "arxiv": "2203.16599",
+  "title": "Autonomous Navigation of AGVs in Unknown Cluttered Environments: log-MPPI Control Strategy",
+  "authors": [
+   "Ihab S. Mohamed",
+   "Kai Yin",
+   "Lantao Liu"
+  ],
+  "published": "2022-03-30",
+  "journal_ref": "",
+  "doi": "",
+  "abstract": "Sampling-based model predictive control (MPC) optimization methods, such as Model Predictive Path Integral (MPPI), have recently shown promising results in various robotic tasks. However, it might produce an infeasible trajectory when the distributions of all sampled trajectories are concentrated within high-cost even infeasible regions. In this study, we propose a new method called log-MPPI equipped with a more effective trajectory sampling distribution policy which significantly improves the trajectory feasibility in terms of satisfying system constraints. The key point is to draw the trajectory samples from the normal log-normal (NLN) mixture distribution, rather than from Gaussian distribution. Furthermore, this work presents a method for collision-free navigation in unknown cluttered environments by incorporating the 2D occupancy grid map into the optimization problem of the sampling-based MPC algorithm. We first validate the efficiency and robustness of our proposed control strategy through extensive simulations of 2D autonomous navigation in different types of cluttered environments as well as the cartpole swing-up task. We further demonstrate, through real-world experiments, the applicability of log-MPPI for performing a 2D grid-based collision-free navigation in an unknown cluttered environment, showing its superiority to be utilized with the local costmap without adding additional complexity to the optimization problem. A video demonstrating the real-world and simulation results is available at https://youtu.be/_uGWQEFJSN0."
+ },
+ "lambert2020svmpc": {
+  "arxiv": "2011.07641",
+  "title": "Stein Variational Model Predictive Control",
+  "authors": [
+   "Alexander Lambert",
+   "Adam Fishman",
+   "Dieter Fox",
+   "Byron Boots",
+   "Fabio Ramos"
+  ],
+  "published": "2020-11-15",
+  "journal_ref": "",
+  "doi": "",
+  "abstract": "Decision making under uncertainty is critical to real-world, autonomous systems. Model Predictive Control (MPC) methods have demonstrated favorable performance in practice, but remain limited when dealing with complex probability distributions. In this paper, we propose a generalization of MPC that represents a multitude of solutions as posterior distributions. By casting MPC as a Bayesian inference problem, we employ variational methods for posterior computation, naturally encoding the complexity and multi-modality of the decision making problem. We present a Stein variational gradient descent method to estimate the posterior directly over control parameters, given a cost function and observed state trajectories. We show that this framework leads to successful planning in challenging, non-convex optimal control problems."
+ },
+ "vlahov2024mppigeneric": {
+  "arxiv": "2409.07563",
+  "title": "MPPI-Generic: A CUDA Library for Stochastic Trajectory Optimization",
+  "authors": [
+   "Bogdan Vlahov",
+   "Jason Gibson",
+   "Manan Gandhi",
+   "Evangelos A. Theodorou"
+  ],
+  "published": "2024-09-11",
+  "journal_ref": "",
+  "doi": "",
+  "abstract": "This paper introduces a new C++/CUDA library for GPU-accelerated stochastic optimization called MPPI-Generic. It provides implementations of Model Predictive Path Integral control, Tube-Model Predictive Path Integral Control, and Robust Model Predictive Path Integral Control, and allows for these algorithms to be used across many pre-existing dynamics models and cost functions. Furthermore, researchers can create their own dynamics models or cost functions following our API definitions without needing to change the actual Model Predictive Path Integral Control code. Finally, we compare computational performance to other popular implementations of Model Predictive Path Integral Control over a variety of GPUs to show the real-time capabilities our library can allow for. Library code can be found at: https://acdslab.github.io/mppi-generic-website/ ."
+ },
+ "bhardwaj2021storm": {
+  "arxiv": "2104.13542",
+  "title": "STORM: An Integrated Framework for Fast Joint-Space Model-Predictive Control for Reactive Manipulation",
+  "authors": [
+   "Mohak Bhardwaj",
+   "Balakumar Sundaralingam",
+   "Arsalan Mousavian",
+   "Nathan Ratliff",
+   "Dieter Fox",
+   "Fabio Ramos",
+   "Byron Boots"
+  ],
+  "published": "2021-04-28",
+  "journal_ref": "5th Annual Conference on Robot Learning, 2021",
+  "doi": "",
+  "abstract": "Sampling-based model-predictive control (MPC) is a promising tool for feedback control of robots with complex, non-smooth dynamics, and cost functions. However, the computationally demanding nature of sampling-based MPC algorithms has been a key bottleneck in their application to high-dimensional robotic manipulation problems in the real world. Previous methods have addressed this issue by running MPC in the task space while relying on a low-level operational space controller for joint control. However, by not using the joint space of the robot in the MPC formulation, existing methods cannot directly account for non-task space related constraints such as avoiding joint limits, singular configurations, and link collisions. In this paper, we develop a system for fast, joint space sampling-based MPC for manipulators that is efficiently parallelized using GPUs. Our approach can handle task and joint space constraints while taking less than 8ms~(125Hz) to compute the next control command. Further, our method can tightly integrate perception into the control problem by utilizing learned cost functions from raw sensor data. We validate our approach by deploying it on a Franka Panda robot for a variety of dynamic manipulation tasks. We study the effect of different cost formulations and MPC parameters on the synthesized behavior and provide key insights that pave the way for the application of sampling-based MPC for manipulators in a principled manner. We also provide highly optimized, open-source code to be used by the wider robot learning and control community. Videos of experiments can be found at: https://sites.google.com/view/manipulation-mpc"
+ },
+ "pezzato2025isaacmppi": {
+  "arxiv": "2307.09105",
+  "title": "Sampling-based Model Predictive Control Leveraging Parallelizable Physics Simulations",
+  "authors": [
+   "Corrado Pezzato",
+   "Chadi Salmi",
+   "Elia Trevisan",
+   "Max Spahn",
+   "Javier Alonso-Mora",
+   "Carlos Hernández Corbato"
+  ],
+  "published": "2023-07-18",
+  "journal_ref": "",
+  "doi": "",
+  "abstract": "We present a method for sampling-based model predictive control that makes use of a generic physics simulator as the dynamical model. In particular, we propose a Model Predictive Path Integral controller (MPPI), that uses the GPU-parallelizable IsaacGym simulator to compute the forward dynamics of a problem. By doing so, we eliminate the need for explicit encoding of robot dynamics and contacts with objects for MPPI. Since no explicit dynamic modeling is required, our method is easily extendable to different objects and robots and allows one to solve complex navigation and contact-rich tasks. We demonstrate the effectiveness of this method in several simulated and real-world settings, among which mobile navigation with collision avoidance, non-prehensile manipulation, and whole-body control for high-dimensional configuration spaces. This method is a powerful and accessible open-source tool to solve a large variety of contact-rich motion planning tasks."
+ },
+ "zhang2024m3p2i_arxiv": {
+  "arxiv": "2312.02328",
+  "title": "Multi-Modal MPPI and Active Inference for Reactive Task and Motion Planning",
+  "authors": [
+   "Yuezhe Zhang",
+   "Corrado Pezzato",
+   "Elia Trevisan",
+   "Chadi Salmi",
+   "Carlos Hernández Corbato",
+   "Javier Alonso-Mora"
+  ],
+  "published": "2023-12-04",
+  "journal_ref": "",
+  "doi": "10.1109/LRA.2024.3426183",
+  "abstract": "Task and Motion Planning (TAMP) has made strides in complex manipulation tasks, yet the execution robustness of the planned solutions remains overlooked. In this work, we propose a method for reactive TAMP to cope with runtime uncertainties and disturbances. We combine an Active Inference planner (AIP) for adaptive high-level action selection and a novel Multi-Modal Model Predictive Path Integral controller (M3P2I) for low-level control. This results in a scheme that simultaneously adapts both high-level actions and low-level motions. The AIP generates alternative symbolic plans, each linked to a cost function for M3P2I. The latter employs a physics simulator for diverse trajectory rollouts, deriving optimal control by weighing the different samples according to their cost. This idea enables blending different robot skills for fluid and reactive plan execution, accommodating plan adjustments at both the high and low levels to cope, for instance, with dynamic obstacles or disturbances that invalidate the current plan. We have tested our approach in simulations and real-world scenarios."
+ },
+ "trevisan2024biasedmppi": {
+  "arxiv": "2401.09241",
+  "title": "Biased-MPPI: Informing Sampling-Based Model Predictive Control by Fusing Ancillary Controllers",
+  "authors": [
+   "Elia Trevisan",
+   "Javier Alonso-Mora"
+  ],
+  "published": "2024-01-17",
+  "journal_ref": "",
+  "doi": "10.1109/LRA.2024.3397083",
+  "abstract": "Motion planning for autonomous robots in dynamic environments poses numerous challenges due to uncertainties in the robot's dynamics and interaction with other agents. Sampling-based MPC approaches, such as Model Predictive Path Integral (MPPI) control, have shown promise in addressing these complex motion planning problems. However, the performance of MPPI relies heavily on the choice of sampling distribution. Existing literature often uses the previously computed input sequence as the mean of a Gaussian distribution for sampling, leading to potential failures and local minima. In this paper, we propose a novel derivation of MPPI that allows for arbitrary sampling distributions to enhance efficiency, robustness, and convergence while alleviating the problem of local minima. We present an efficient importance sampling scheme that combines classical and learning-based ancillary controllers simultaneously, resulting in more informative sampling and control fusion. Several simulated and real-world demonstrate the validity of our approach."
+ },
+ "yin2023shieldmppi": {
+  "arxiv": "2302.11719",
+  "title": "Shield Model Predictive Path Integral: A Computationally Efficient Robust MPC Approach Using Control Barrier Functions",
+  "authors": [
+   "Ji Yin",
+   "Charles Dawson",
+   "Chuchu Fan",
+   "Panagiotis Tsiotras"
+  ],
+  "published": "2023-02-23",
+  "journal_ref": "",
+  "doi": "",
+  "abstract": "Model Predictive Path Integral (MPPI) control is a type of sampling-based model predictive control that simulates thousands of trajectories and uses these trajectories to synthesize optimal controls on-the-fly. In practice, however, MPPI encounters problems limiting its application. For instance, it has been observed that MPPI tends to make poor decisions if unmodeled dynamics or environmental disturbances exist, preventing its use in safety-critical applications. Moreover, the multi-threaded simulations used by MPPI require significant onboard computational resources, making the algorithm inaccessible to robots without modern GPUs. To alleviate these issues, we propose a novel (Shield-MPPI) algorithm that provides robustness against unpredicted disturbances and achieves real-time planning using a much smaller number of parallel simulations on regular CPUs. The novel Shield-MPPI algorithm is tested on an aggressive autonomous racing platform both in simulation and using experiments. The results show that the proposed controller greatly reduces the number of constraint violations compared to state-of-the-art robust MPPI variants and stochastic MPC methods."
+ },
+ "yin2022covsteering": {
+  "arxiv": "2109.12147",
+  "title": "Trajectory Distribution Control for Model Predictive Path Integral Control using Covariance Steering",
+  "authors": [
+   "Ji Yin",
+   "Zhiyuan Zhang",
+   "Evangelos Theodorou",
+   "Panagiotis Tsiotras"
+  ],
+  "published": "2021-09-24",
+  "journal_ref": "2022 International Conference on Robotics and Automation (ICRA)",
+  "doi": "10.1109/ICRA46639.2022.9811615",
+  "abstract": "This paper presents a novel control approach for autonomous systems operating under uncertainty. We combine Model Predictive Path Integral (MPPI) control with Covariance Steering (CS) theory to obtain a robust controller for general nonlinear systems. The proposed Covariance-Controlled Model Predictive Path Integral (CC-MPPI) controller addresses the performance degradation observed in some MPPI implementations owing to unexpected disturbances and uncertainties. Namely, in cases where the environment changes too fast or the simulated dynamics during the MPPI rollouts do not capture the noise and uncertainty in the actual dynamics, the baseline MPPI implementation may lead to divergence. The proposed CC-MPPI controller avoids divergence by controlling the dispersion of the rollout trajectories at the end of the prediction horizon. Furthermore, the CC-MPPI has adjustable trajectory sampling distributions that can be changed according to the environment to achieve efficient sampling. Numerical examples using a ground vehicle navigating in challenging environments demonstrate the proposed approach."
+ },
+ "wang2021tsallis": {
+  "arxiv": "2104.00241",
+  "title": "Variational Inference MPC using Tsallis Divergence",
+  "authors": [
+   "Ziyi Wang",
+   "Oswin So",
+   "Jason Gibson",
+   "Bogdan Vlahov",
+   "Manan S. Gandhi",
+   "Guan-Horng Liu",
+   "Evangelos A. Theodorou"
+  ],
+  "published": "2021-04-01",
+  "journal_ref": "",
+  "doi": "",
+  "abstract": "In this paper, we provide a generalized framework for Variational Inference-Stochastic Optimal Control by using thenon-extensive Tsallis divergence. By incorporating the deformed exponential function into the optimality likelihood function, a novel Tsallis Variational Inference-Model Predictive Control algorithm is derived, which includes prior works such as Variational Inference-Model Predictive Control, Model Predictive PathIntegral Control, Cross Entropy Method, and Stein VariationalInference Model Predictive Control as special cases. The proposed algorithm allows for effective control of the cost/reward transform and is characterized by superior performance in terms of mean and variance reduction of the associated cost. The aforementioned features are supported by a theoretical and numerical analysis on the level of risk sensitivity of the proposed algorithm as well as simulation experiments on 5 different robotic systems with 3 different policy parameterizations."
+ },
+ "asmar2023mpopi": {
+  "arxiv": "2203.16633",
+  "title": "Model Predictive Optimized Path Integral Strategies",
+  "authors": [
+   "Dylan M. Asmar",
+   "Ransalu Senanayake",
+   "Shawn Manuel",
+   "Mykel J. Kochenderfer"
+  ],
+  "published": "2022-03-30",
+  "journal_ref": "",
+  "doi": "",
+  "abstract": "We generalize the derivation of model predictive path integral control (MPPI) to allow for a single joint distribution across controls in the control sequence. This reformation allows for the implementation of adaptive importance sampling (AIS) algorithms into the original importance sampling step while still maintaining the benefits of MPPI such as working with arbitrary system dynamics and cost functions. The benefit of optimizing the proposal distribution by integrating AIS at each control step is demonstrated in simulated environments including controlling multiple cars around a track. The new algorithm is more sample efficient than MPPI, achieving better performance with fewer samples. This performance disparity grows as the dimension of the action space increases. Results from simulations suggest the new algorithm can be used as an anytime algorithm, increasing the value of control at each iteration versus relying on a large set of samples."
+ },
+ "honda2024svgmppi": {
+  "arxiv": "2309.11040",
+  "title": "Stein Variational Guided Model Predictive Path Integral Control: Proposal and Experiments with Fast Maneuvering Vehicles",
+  "authors": [
+   "Kohei Honda",
+   "Naoki Akai",
+   "Kosuke Suzuki",
+   "Mizuho Aoki",
+   "Hirotaka Hosogaya",
+   "Hiroyuki Okuda",
+   "Tatsuya Suzuki"
+  ],
+  "published": "2023-09-20",
+  "journal_ref": "",
+  "doi": "",
+  "abstract": "This paper presents a novel Stochastic Optimal Control (SOC) method based on Model Predictive Path Integral control (MPPI), named Stein Variational Guided MPPI (SVG-MPPI), designed to handle rapidly shifting multimodal optimal action distributions. While MPPI can find a Gaussian-approximated optimal action distribution in closed form, i.e., without iterative solution updates, it struggles with the multimodality of the optimal distributions. This is due to the less representative nature of the Gaussian. To overcome this limitation, our method aims to identify a target mode of the optimal distribution and guide the solution to converge to fit it. In the proposed method, the target mode is roughly estimated using a modified Stein Variational Gradient Descent (SVGD) method and embedded into the MPPI algorithm to find a closed-form \"mode-seeking\" solution that covers only the target mode, thus preserving the fast convergence property of MPPI. Our simulation and real-world experimental results demonstrate that SVG-MPPI outperforms both the original MPPI and other state-of-the-art sampling-based SOC algorithms in terms of path-tracking and obstacle-avoidance capabilities. Source code: https://github.com/kohonda/proj-svg_mppi"
+ },
+ "mohamed2023gpmppi": {
+  "arxiv": "2307.04019",
+  "title": "GP-guided MPPI for Efficient Navigation in Complex Unknown Cluttered Environments",
+  "authors": [
+   "Ihab S. Mohamed",
+   "Mahmoud Ali",
+   "Lantao Liu"
+  ],
+  "published": "2023-07-08",
+  "journal_ref": "",
+  "doi": "",
+  "abstract": "Robotic navigation in unknown, cluttered environments with limited sensing capabilities poses significant challenges in robotics. Local trajectory optimization methods, such as Model Predictive Path Intergal (MPPI), are a promising solution to this challenge. However, global guidance is required to ensure effective navigation, especially when encountering challenging environmental conditions or navigating beyond the planning horizon. This study presents the GP-MPPI, an online learning-based control strategy that integrates MPPI with a local perception model based on Sparse Gaussian Process (SGP). The key idea is to leverage the learning capability of SGP to construct a variance (uncertainty) surface, which enables the robot to learn about the navigable space surrounding it, identify a set of suggested subgoals, and ultimately recommend the optimal subgoal that minimizes a predefined cost function to the local MPPI planner. Afterward, MPPI computes the optimal control sequence that satisfies the robot and collision avoidance constraints. Such an approach eliminates the necessity of a global map of the environment or an offline training process. We validate the efficiency and robustness of our proposed control strategy through both simulated and real-world experiments of 2D autonomous navigation tasks in complex unknown environments, demonstrating its superiority in guiding the robot safely towards its desired goal while avoiding obstacles and escaping entrapment in local minima. The GPU implementation of GP-MPPI, including the supplementary video, is available at https://github.com/IhabMohamed/GP-MPPI."
+ },
+ "mohamed2025umppi": {
+  "arxiv": "2306.12369",
+  "title": "Towards Efficient MPPI Trajectory Generation with Unscented Guidance: U-MPPI Control Strategy",
+  "authors": [
+   "Ihab S. Mohamed",
+   "Junhong Xu",
+   "Gaurav S Sukhatme",
+   "Lantao Liu"
+  ],
+  "published": "2023-06-21",
+  "journal_ref": "",
+  "doi": "",
+  "abstract": "The classical Model Predictive Path Integral (MPPI) control framework, while effective in many applications, lacks reliable safety features due to its reliance on a risk-neutral trajectory evaluation technique, which can present challenges for safety-critical applications such as autonomous driving. Furthermore, when the majority of MPPI sampled trajectories concentrate in high-cost regions, it may generate an infeasible control sequence. To address this challenge, we propose the U-MPPI control strategy, a novel methodology that can effectively manage system uncertainties while integrating a more efficient trajectory sampling strategy. The core concept is to leverage the Unscented Transform (UT) to propagate not only the mean but also the covariance of the system dynamics, going beyond the traditional MPPI method. As a result, it introduces a novel and more efficient trajectory sampling strategy, significantly enhancing state-space exploration and ultimately reducing the risk of being trapped in local minima. Furthermore, by leveraging the uncertainty information provided by UT, we incorporate a risk-sensitive cost function that explicitly accounts for risk or uncertainty throughout the trajectory evaluation process, resulting in a more resilient control system capable of handling uncertain conditions. By conducting extensive simulations of 2D aggressive autonomous navigation in both known and unknown cluttered environments, we verify the efficiency and robustness of our proposed U-MPPI control strategy compared to the baseline MPPI. We further validate the practicality of U-MPPI through real-world demonstrations in unknown cluttered environments, showcasing its superior ability to incorporate both the UT and local costmap into the optimization problem without introducing additional complexity."
+ },
+ "macenski2023nav2survey": {
+  "arxiv": "2307.15236",
+  "title": "From the Desks of ROS Maintainers: A Survey of Modern & Capable Mobile Robotics Algorithms in the Robot Operating System 2",
+  "authors": [
+   "Steve Macenski",
+   "Tom Moore",
+   "David Lu",
+   "Alexey Merzlyakov",
+   "Michael Ferguson"
+  ],
+  "published": "2023-07-28",
+  "journal_ref": "Robotics and Autonomous Systems, 2023",
+  "doi": "10.1016/j.robot.2023.104493",
+  "abstract": "The Robot Operating System 2 (ROS 2) is rapidly impacting the intelligent machines sector -- on space missions, large agriculture equipment, multi-robot fleets, and more. Its success derives from its focused design and improved capabilities targeting product-grade and modern robotic systems. Following ROS 2's example, the mobile robotics ecosystem has been fully redesigned based on the transformed needs of modern robots and is experiencing active development not seen since its inception. This paper comes from the desks of the key ROS Navigation maintainers to review and analyze the state of the art of robotics navigation in ROS 2. This includes new systems without parallel in ROS 1 or other similar mobile robotics frameworks. We discuss current research products and historically robust methods that provide differing behaviors and support for most every robot type. This survey consists of overviews, comparisons, and expert insights organized by the fundamental problems in the field. Some of these implementations have yet to be described in literature and many have not been benchmarked relative to others. We end by providing a glimpse into the future of the ROS 2 mobile robotics ecosystem."
+ },
+ "sundaralingam2023curobo": {
+  "arxiv": "2310.17274",
+  "title": "cuRobo: Parallelized Collision-Free Minimum-Jerk Robot Motion Generation",
+  "authors": [
+   "Balakumar Sundaralingam",
+   "Siva Kumar Sastry Hari",
+   "Adam Fishman",
+   "Caelan Garrett",
+   "Karl Van Wyk",
+   "Valts Blukis",
+   "Alexander Millane",
+   "Helen Oleynikova",
+   "Ankur Handa",
+   "Fabio Ramos",
+   "Nathan Ratliff",
+   "Dieter Fox"
+  ],
+  "published": "2023-10-26",
+  "journal_ref": "",
+  "doi": "",
+  "abstract": "This paper explores the problem of collision-free motion generation for manipulators by formulating it as a global motion optimization problem. We develop a parallel optimization technique to solve this problem and demonstrate its effectiveness on massively parallel GPUs. We show that combining simple optimization techniques with many parallel seeds leads to solving difficult motion generation problems within 50ms on average, 60x faster than state-of-the-art (SOTA) trajectory optimization methods. We achieve SOTA performance by combining L-BFGS step direction estimation with a novel parallel noisy line search scheme and a particle-based optimization solver. To further aid trajectory optimization, we develop a parallel geometric planner that plans within 20ms and also introduce a collision-free IK solver that can solve over 7000 queries/s. We package our contributions into a state of the art GPU accelerated motion generation library, cuRobo and release it to enrich the robotics community. Additional details are available at https://curobo.org"
+ },
+ "howell2022predictivesampling": {
+  "arxiv": "2212.00541",
+  "title": "Predictive Sampling: Real-time Behaviour Synthesis with MuJoCo",
+  "authors": [
+   "Taylor Howell",
+   "Nimrod Gileadi",
+   "Saran Tunyasuvunakool",
+   "Kevin Zakka",
+   "Tom Erez",
+   "Yuval Tassa"
+  ],
+  "published": "2022-12-01",
+  "journal_ref": "",
+  "doi": "",
+  "abstract": "We introduce MuJoCo MPC (MJPC), an open-source, interactive application and software framework for real-time predictive control, based on MuJoCo physics. MJPC allows the user to easily author and solve complex robotics tasks, and currently supports three shooting-based planners: derivative-based iLQG and Gradient Descent, and a simple derivative-free method we call Predictive Sampling. Predictive Sampling was designed as an elementary baseline, mostly for its pedagogical value, but turned out to be surprisingly competitive with the more established algorithms. This work does not present algorithmic advances, and instead, prioritises performant algorithms, simple code, and accessibility of model-based methods via intuitive and interactive software. MJPC is available at: github.com/deepmind/mujoco_mpc, a video summary can be viewed at: dpmd.ai/mjpc."
+ },
+ "xue2025dialmpc": {
+  "arxiv": "2409.15610",
+  "title": "Full-Order Sampling-Based MPC for Torque-Level Locomotion Control via Diffusion-Style Annealing",
+  "authors": [
+   "Haoru Xue",
+   "Chaoyi Pan",
+   "Zeji Yi",
+   "Guannan Qu",
+   "Guanya Shi"
+  ],
+  "published": "2024-09-23",
+  "journal_ref": "",
+  "doi": "",
+  "abstract": "Due to high dimensionality and non-convexity, real-time optimal control using full-order dynamics models for legged robots is challenging. Therefore, Nonlinear Model Predictive Control (NMPC) approaches are often limited to reduced-order models. Sampling-based MPC has shown potential in nonconvex even discontinuous problems, but often yields suboptimal solutions with high variance, which limits its applications in high-dimensional locomotion. This work introduces DIAL-MPC (Diffusion-Inspired Annealing for Legged MPC), a sampling-based MPC framework with a novel diffusion-style annealing process. Such an annealing process is supported by the theoretical landscape analysis of Model Predictive Path Integral Control (MPPI) and the connection between MPPI and single-step diffusion. Algorithmically, DIAL-MPC iteratively refines solutions online and achieves both global coverage and local convergence. In quadrupedal torque-level control tasks, DIAL-MPC reduces the tracking error of standard MPPI by $13.4$ times and outperforms reinforcement learning (RL) policies by $50\\%$ in challenging climbing tasks without any training. In particular, DIAL-MPC enables precise real-world quadrupedal jumping with payload. To the best of our knowledge, DIAL-MPC is the first training-free method that optimizes over full-order quadruped dynamics in real-time."
+ },
+ "pan2024mbd": {
+  "arxiv": "2407.01573",
+  "title": "Model-Based Diffusion for Trajectory Optimization",
+  "authors": [
+   "Chaoyi Pan",
+   "Zeji Yi",
+   "Guanya Shi",
+   "Guannan Qu"
+  ],
+  "published": "2024-05-28",
+  "journal_ref": "",
+  "doi": "",
+  "abstract": "Recent advances in diffusion models have demonstrated their strong capabilities in generating high-fidelity samples from complex distributions through an iterative refinement process. Despite the empirical success of diffusion models in motion planning and control, the model-free nature of these methods does not leverage readily available model information and limits their generalization to new scenarios beyond the training data (e.g., new robots with different dynamics). In this work, we introduce Model-Based Diffusion (MBD), an optimization approach using the diffusion process to solve trajectory optimization (TO) problems without data. The key idea is to explicitly compute the score function by leveraging the model information in TO problems, which is why we refer to our approach as model-based diffusion. Moreover, although MBD does not require external data, it can be naturally integrated with data of diverse qualities to steer the diffusion process. We also reveal that MBD has interesting connections to sampling-based optimization. Empirical evaluations show that MBD outperforms state-of-the-art reinforcement learning and sampling-based TO methods in challenging contact-rich tasks. Additionally, MBD's ability to integrate with data enhances its versatility and practical applicability, even with imperfect and infeasible data (e.g., partial-state demonstrations for high-dimensional humanoids), beyond the scope of standard diffusion models."
+ },
+ "pinneri2020icem": {
+  "arxiv": "2008.06389",
+  "title": "Sample-efficient Cross-Entropy Method for Real-time Planning",
+  "authors": [
+   "Cristina Pinneri",
+   "Shambhuraj Sawant",
+   "Sebastian Blaes",
+   "Jan Achterhold",
+   "Joerg Stueckler",
+   "Michal Rolinek",
+   "Georg Martius"
+  ],
+  "published": "2020-08-14",
+  "journal_ref": "",
+  "doi": "",
+  "abstract": "Trajectory optimizers for model-based reinforcement learning, such as the Cross-Entropy Method (CEM), can yield compelling results even in high-dimensional control tasks and sparse-reward environments. However, their sampling inefficiency prevents them from being used for real-time planning and control. We propose an improved version of the CEM algorithm for fast planning, with novel additions including temporally-correlated actions and memory, requiring 2.7-22x less samples and yielding a performance increase of 1.2-10x in high-dimensional control problems."
+ },
+ "kazim2024survey": {
+  "arxiv": "2309.12566",
+  "title": "Recent Advances in Path Integral Control for Trajectory Optimization: An Overview in Theoretical and Algorithmic Perspectives",
+  "authors": [
+   "Muhammad Kazim",
+   "JunGee Hong",
+   "Min-Gyeom Kim",
+   "Kwang-Ki K. Kim"
+  ],
+  "published": "2023-09-22",
+  "journal_ref": "",
+  "doi": "",
+  "abstract": "This paper presents a tutorial overview of path integral (PI) control approaches for stochastic optimal control and trajectory optimization. We concisely summarize the theoretical development of path integral control to compute a solution for stochastic optimal control and provide algorithmic descriptions of the cross-entropy (CE) method, an open-loop controller using the receding horizon scheme known as the model predictive path integral (MPPI), and a parameterized state feedback controller based on the path integral control theory. We discuss policy search methods based on path integral control, efficient and stable sampling strategies, extensions to multi-agent decision-making, and MPPI for the trajectory optimization on manifolds. For tutorial demonstrations, some PI-based controllers are implemented in Python, MATLAB and ROS2/Gazebo simulations for trajectory optimization. The simulation frameworks and source codes are publicly available at https://github.com/INHA-Autonomous-Systems-Laboratory-ASL/An-Overview-on-Recent-Advances-in-Path-Integral-Control."
+ },
+ "jankowski2023vpsto": {
+  "arxiv": "2210.04067",
+  "title": "VP-STO: Via-point-based Stochastic Trajectory Optimization for Reactive Robot Behavior",
+  "authors": [
+   "Julius Jankowski",
+   "Lara Brudermüller",
+   "Nick Hawes",
+   "Sylvain Calinon"
+  ],
+  "published": "2022-10-08",
+  "journal_ref": "",
+  "doi": "",
+  "abstract": "Achieving reactive robot behavior in complex dynamic environments is still challenging as it relies on being able to solve trajectory optimization problems quickly enough, such that we can replan the future motion at frequencies which are sufficiently high for the task at hand. We argue that current limitations in Model Predictive Control (MPC) for robot manipulators arise from inefficient, high-dimensional trajectory representations and the negligence of time-optimality in the trajectory optimization process. Therefore, we propose a motion optimization framework that optimizes jointly over space and time, generating smooth and timing-optimal robot trajectories in joint-space. While being task-agnostic, our formulation can incorporate additional task-specific requirements, such as collision avoidance, and yet maintain real-time control rates, demonstrated in simulation and real-world robot experiments on closed-loop manipulation. For additional material, please visit https://sites.google.com/oxfordrobotics.institute/vp-sto."
+ },
+ "sacks2023learningsampling": {
+  "arxiv": "2212.02587",
+  "title": "Learning Sampling Distributions for Model Predictive Control",
+  "authors": [
+   "Jacob Sacks",
+   "Byron Boots"
+  ],
+  "published": "2022-12-05",
+  "journal_ref": "",
+  "doi": "",
+  "abstract": "Sampling-based methods have become a cornerstone of contemporary approaches to Model Predictive Control (MPC), as they make no restrictions on the differentiability of the dynamics or cost function and are straightforward to parallelize. However, their efficacy is highly dependent on the quality of the sampling distribution itself, which is often assumed to be simple, like a Gaussian. This restriction can result in samples which are far from optimal, leading to poor performance. Recent work has explored improving the performance of MPC by sampling in a learned latent space of controls. However, these methods ultimately perform all MPC parameter updates and warm-starting between time steps in the control space. This requires us to rely on a number of heuristics for generating samples and updating the distribution and may lead to sub-optimal performance. Instead, we propose to carry out all operations in the latent space, allowing us to take full advantage of the learned distribution. Specifically, we frame the learning problem as bi-level optimization and show how to train the controller with backpropagation-through-time. By using a normalizing flow parameterization of the distribution, we can leverage its tractable density to avoid requiring differentiability of the dynamics and cost function. Finally, we evaluate the proposed approach on simulated robotics tasks and demonstrate its ability to surpass the performance of prior methods and scale better with a reduced number of samples."
+ },
+ "hansen2022tdmpc": {
+  "arxiv": "2203.04955",
+  "title": "Temporal Difference Learning for Model Predictive Control",
+  "authors": [
+   "Nicklas Hansen",
+   "Xiaolong Wang",
+   "Hao Su"
+  ],
+  "published": "2022-03-09",
+  "journal_ref": "",
+  "doi": "",
+  "abstract": "Data-driven model predictive control has two key advantages over model-free methods: a potential for improved sample efficiency through model learning, and better performance as computational budget for planning increases. However, it is both costly to plan over long horizons and challenging to obtain an accurate model of the environment. In this work, we combine the strengths of model-free and model-based methods. We use a learned task-oriented latent dynamics model for local trajectory optimization over a short horizon, and use a learned terminal value function to estimate long-term return, both of which are learned jointly by temporal difference learning. Our method, TD-MPC, achieves superior sample efficiency and asymptotic performance over prior work on both state and image-based continuous control tasks from DMControl and Meta-World. Code and video results are available at https://nicklashansen.github.io/td-mpc."
+ },
+ "lowrey2019polo": {
+  "arxiv": "1811.01848",
+  "title": "Plan Online, Learn Offline: Efficient Learning and Exploration via Model-Based Control",
+  "authors": [
+   "Kendall Lowrey",
+   "Aravind Rajeswaran",
+   "Sham Kakade",
+   "Emanuel Todorov",
+   "Igor Mordatch"
+  ],
+  "published": "2018-11-05",
+  "journal_ref": "",
+  "doi": "",
+  "abstract": "We propose a plan online and learn offline (POLO) framework for the setting where an agent, with an internal model, needs to continually act and learn in the world. Our work builds on the synergistic relationship between local model-based control, global value function learning, and exploration. We study how local trajectory optimization can cope with approximation errors in the value function, and can stabilize and accelerate value function learning. Conversely, we also study how approximate value functions can help reduce the planning horizon and allow for better policies beyond local solutions. Finally, we also demonstrate how trajectory optimization can be used to perform temporally coordinated exploration in conjunction with estimating uncertainty in value function approximation. This exploration is critical for fast and stable learning of the value function. Combining these components enable solutions to complex simulated control tasks, like humanoid locomotion and dexterous in-hand manipulation, in the equivalent of a few minutes of experience in the real world."
+ },
+ "okada2020vimpc": {
+  "arxiv": "1907.04202",
+  "title": "Variational Inference MPC for Bayesian Model-based Reinforcement Learning",
+  "authors": [
+   "Masashi Okada",
+   "Tadahiro Taniguchi"
+  ],
+  "published": "2019-07-08",
+  "journal_ref": "",
+  "doi": "",
+  "abstract": "In recent studies on model-based reinforcement learning (MBRL), incorporating uncertainty in forward dynamics is a state-of-the-art strategy to enhance learning performance, making MBRLs competitive to cutting-edge model free methods, especially in simulated robotics tasks. Probabilistic ensembles with trajectory sampling (PETS) is a leading type of MBRL, which employs Bayesian inference to dynamics modeling and model predictive control (MPC) with stochastic optimization via the cross entropy method (CEM). In this paper, we propose a novel extension to the uncertainty-aware MBRL. Our main contributions are twofold: Firstly, we introduce a variational inference MPC, which reformulates various stochastic methods, including CEM, in a Bayesian fashion. Secondly, we propose a novel instance of the framework, called probabilistic action ensembles with trajectory sampling (PaETS). As a result, our Bayesian MBRL can involve multimodal uncertainties both in dynamics and optimal trajectories. In comparison to PETS, our method consistently improves asymptotic performance on several challenging locomotion tasks."
+ },
+ "testouri2023mppiad": {
+  "arxiv": "2308.01654",
+  "title": "Towards a Safe Real-Time Motion Planning Framework for Autonomous Driving Systems: An MPPI Approach",
+  "authors": [
+   "Mehdi Testouri",
+   "Gamal Elghazaly",
+   "Raphael Frank"
+  ],
+  "published": "2023-08-03",
+  "journal_ref": "",
+  "doi": "10.1109/RAAI59955.2023.10601272",
+  "abstract": "Planning safe trajectories in Autonomous Driving Systems (ADS) is a complex problem to solve in real-time. The main challenge to solve this problem arises from the various conditions and constraints imposed by road geometry, semantics and traffic rules, as well as the presence of dynamic agents. Recently, Model Predictive Path Integral (MPPI) has shown to be an effective framework for optimal motion planning and control in robot navigation in unstructured and highly uncertain environments. In this paper, we formulate the motion planning problem in ADS as a nonlinear stochastic dynamic optimization problem that can be solved using an MPPI strategy. The main technical contribution of this work is a method to handle obstacles within the MPPI formulation safely. In this method, obstacles are approximated by circles that can be easily integrated into the MPPI cost formulation while considering safety margins. The proposed MPPI framework has been efficiently implemented in our autonomous vehicle and experimentally validated using three different primitive scenarios. Experimental results show that generated trajectories are safe, feasible and perfectly achieve the planning objective. The video results as well as the open-source implementation are available at: https://gitlab.uni.lu/360lab-public/mppi"
+ },
+ "abraham2020emppi": {
+  "arxiv": "2006.03106",
+  "title": "Model-Based Generalization Under Parameter Uncertainty Using Path Integral Control",
+  "authors": [
+   "Ian Abraham",
+   "Ankur Handa",
+   "Nathan Ratliff",
+   "Kendall Lowrey",
+   "Todd D. Murphey",
+   "Dieter Fox"
+  ],
+  "published": "2020-06-04",
+  "journal_ref": "IEEE Robotics and Automation Letters ( Volume: 5 , Issue: 2 , April 2020 )",
+  "doi": "10.1109/LRA.2020.2972836",
+  "abstract": "This work addresses the problem of robot interaction in complex environments where online control and adaptation is necessary. By expanding the sample space in the free energy formulation of path integral control, we derive a natural extension to the path integral control that embeds uncertainty into action and provides robustness for model-based robot planning. Our algorithm is applied to a diverse set of tasks using different robots and validate our results in simulation and real-world experiments. We further show that our method is capable of running in real-time without loss of performance. Videos of the experiments as well as additional implementation details can be found at https://sites.google.com/view/emppi."
+ },
+ "bhardwaj2020mpq": {
+  "arxiv": "2001.02153",
+  "title": "Information Theoretic Model Predictive Q-Learning",
+  "authors": [
+   "Mohak Bhardwaj",
+   "Ankur Handa",
+   "Dieter Fox",
+   "Byron Boots"
+  ],
+  "published": "2019-12-31",
+  "journal_ref": "",
+  "doi": "",
+  "abstract": "Model-free Reinforcement Learning (RL) works well when experience can be collected cheaply and model-based RL is effective when system dynamics can be modeled accurately. However, both assumptions can be violated in real world problems such as robotics, where querying the system can be expensive and real-world dynamics can be difficult to model. In contrast to RL, Model Predictive Control (MPC) algorithms use a simulator to optimize a simple policy class online, constructing a closed-loop controller that can effectively contend with real-world dynamics. MPC performance is usually limited by factors such as model bias and the limited horizon of optimization. In this work, we present a novel theoretical connection between information theoretic MPC and entropy regularized RL and develop a Q-learning algorithm that can leverage biased models. We validate the proposed algorithm on sim-to-sim control tasks to demonstrate the improvements over optimal control and reinforcement learning from scratch. Our approach paves the way for deploying reinforcement learning algorithms on real systems in a systematic manner."
+ },
+ "streichenberg2023mapi": {
+  "arxiv": "2302.06547",
+  "title": "Multi-Agent Path Integral Control for Interaction-Aware Motion Planning in Urban Canals",
+  "authors": [
+   "Lucas Streichenberg",
+   "Elia Trevisan",
+   "Jen Jen Chung",
+   "Roland Siegwart",
+   "Javier Alonso-Mora"
+  ],
+  "published": "2023-02-13",
+  "journal_ref": "2023 International Conference on Robotics and Automation (ICRA)",
+  "doi": "10.1109/ICRA48891.2023.10161511",
+  "abstract": "Autonomous vehicles that operate in urban environments shall comply with existing rules and reason about the interactions with other decision-making agents. In this paper, we introduce a decentralized and communication-free interaction-aware motion planner and apply it to Autonomous Surface Vessels (ASVs) in urban canals. We build upon a sampling-based method, namely Model Predictive Path Integral control (MPPI), and employ it to, in each time instance, compute both a collision-free trajectory for the vehicle and a prediction of other agents' trajectories, thus modeling interactions. To improve the method's efficiency in multi-agent scenarios, we introduce a two-stage sample evaluation strategy and define an appropriate cost function to achieve rule compliance. We evaluate this decentralized approach in simulations with multiple vessels in real scenarios extracted from Amsterdam's canals, showing superior performance than a state-of-the-art trajectory optimization framework and robustness when encountering different types of agents."
+ },
+ "gandhi2023safeis": {
+  "arxiv": "2303.03441",
+  "title": "Safe Importance Sampling in Model Predictive Path Integral Control",
+  "authors": [
+   "Manan Gandhi",
+   "Hassan Almubarak",
+   "Evangelos Theodorou"
+  ],
+  "published": "2023-03-06",
+  "journal_ref": "",
+  "doi": "",
+  "abstract": "We introduce the notion of importance sampling under embedded barrier state control, titled Safety Controlled Model Predictive Path Integral Control (SC-MPPI). For robotic systems operating in an environment with multiple constraints, hard constraints are often encoded utilizing penalty functions when performing optimization. Alternative schemes utilizing optimization-based techniques, such as Control Barrier Functions, can be used as a safety filter to ensure the system does not violate the given hard constraints. In contrast, this work leverages the principle of a safety filter but applies it during forward sampling for Model Predictive Path Integral Control. The resulting set of forward samples can remain safe within the domain of the safety controller, increasing sample efficiency and allowing for improved exploration of the state space. We derive this controller through information theoretic principles analogous to Information Theoretic MPPI. We empirically demonstrate both superior sample efficiency, exploration, and system performance of SC-MPPI when compared to Model-Predictive Path Integral Control (MPPI) and Differential Dynamic Programming (DDP) optimizing the barrier state."
+ },
+ "yin2024ccmppi": {
+  "arxiv": "2408.00494",
+  "title": "Chance-Constrained Information-Theoretic Stochastic Model Predictive Control with Safety Shielding",
+  "authors": [
+   "Ji Yin",
+   "Panagiotis Tsiotras",
+   "Karl Berntorp"
+  ],
+  "published": "2024-08-01",
+  "journal_ref": "",
+  "doi": "",
+  "abstract": "This paper introduces a novel nonlinear stochastic model predictive control path integral (MPPI) method, which considers chance constraints on system states. The proposed belief-space stochastic MPPI (BSS-MPPI) applies Monte-Carlo sampling to evaluate state distributions resulting from underlying systematic disturbances, and utilizes a Control Barrier Function (CBF) inspired heuristic in belief space to fulfill the specified chance constraints. Compared to several previous stochastic predictive control methods, our approach applies to general nonlinear dynamics without requiring the computationally expensive system linearization step. Moreover, the BSS-MPPI controller can solve optimization problems without limiting the form of the objective function and chance constraints. By multi-threading the sampling process using a GPU, we can achieve fast real-time planning for time- and safety-critical tasks such as autonomous racing. Our results on a realistic race-car simulation study show significant reductions in constraint violation compared to some of the prior MPPI approaches, while being comparable in computation times."
+ },
+ "rabiee2025gsmppi": {
+  "arxiv": "2410.02154",
+  "title": "Guaranteed-Safe MPPI Through Composite Control Barrier Functions for Efficient Sampling in Multi-Constrained Robotic Systems",
+  "authors": [
+   "Pedram Rabiee",
+   "Jesse B. Hoagg"
+  ],
+  "published": "2024-10-03",
+  "journal_ref": "",
+  "doi": "",
+  "abstract": "We present a new guaranteed-safe model predictive path integral (GS-MPPI) control algorithm that enhances sample efficiency in nonlinear systems with multiple safety constraints. The approach use a composite control barrier function (CBF) along with MPPI to ensure all sampled trajectories are provably safe. We first construct a single CBF constraint from multiple safety constraints with potentially differing relative degrees, using it to create a safe closed-form control law. This safe control is then integrated into the system dynamics, allowing MPPI to optimize over exclusively safe trajectories. The method not only improves computational efficiency but also addresses the myopic behavior often associated with CBFs by incorporating long-term performance considerations. We demonstrate the algorithm's effectiveness through simulations of a nonholonomic ground robot subject to position and speed constraints, showcasing safety and performance."
+ },
+ "parwana2025brmppi": {
+  "arxiv": "2506.07325",
+  "title": "BR-MPPI: Barrier-Rate Guided MPPI for Enforcing Multiple Inequality Constraints with Learned Signed Distance Fields",
+  "authors": [
+   "Hardik Parwana",
+   "Taekyung Kim",
+   "Kehan Long",
+   "Bardh Hoxha",
+   "Hideki Okamoto",
+   "Georgios Fainekos",
+   "Dimitra Panagou"
+  ],
+  "published": "2025-06-08",
+  "journal_ref": "",
+  "doi": "",
+  "abstract": "Model Predictive Path Integral (MPPI) control provides a sampling-based framework for optimal control, while Control Barrier Functions (CBFs) provide a principled means of enforcing safety constraints. We introduce BR-MPPI, which integrates CBF-like conditions into MPPI's control sampling procedure. CBFs impose inequality constraints that bound the rate of change of barrier functions using a class-K function of the barrier value. We instead impose the CBF condition as an equality constraint using a parametric linear class-K function and augment the system state with its parameter. The parameter's time derivative serves as an additional control input optimized by MPPI. We further design a cost function that promotes parameter values consistent with Nagumo's condition at the safe-set boundary, thereby encouraging safety. The resulting multiple state- and control-dependent equality constraints pose a challenge for random control sampling. We address this through state transformations and control projections inspired by manifold path planning that map sampled controls onto the constraint manifold. We also incorporate learned signed distance fields to represent robot geometry and reduce computation time. Simulations demonstrate improved sample efficiency over vanilla MPPI and higher navigation success rates across five robot models compared with safety-oriented MPPI variants. Hardware experiments on a quadrotor further demonstrate the method's ability to navigate constrained environments near safe-set boundaries."
+ },
+ "jung2024contingency": {
+  "arxiv": "2412.09777",
+  "title": "Contingency Constrained Planning with MPPI within MPPI",
+  "authors": [
+   "Leonard Jung",
+   "Alexander Estornell",
+   "Michael Everett"
+  ],
+  "published": "2024-12-13",
+  "journal_ref": "",
+  "doi": "",
+  "abstract": "For safety, autonomous systems must be able to consider sudden changes and enact contingency plans appropriately. State-of-the-art methods currently find trajectories that balance between nominal and contingency behavior, or plan for a singular contingency plan; however, this does not guarantee that the resulting plan is safe for all time. To address this research gap, this paper presents Contingency-MPPI, a data-driven optimization-based strategy that embeds contingency planning inside a nominal planner. By learning to approximate the optimal contingency-constrained control sequence with adaptive importance sampling, the proposed method's sampling efficiency is further improved with initializations from a lightweight path planner and trajectory optimizer. Finally, we present simulated and hardware experiments demonstrating our algorithm generating nominal and contingency plans in real time on a mobile robot."
+ },
+ "trevisan2025drampi": {
+  "arxiv": "2506.21205",
+  "title": "Dynamic Risk-Aware MPPI for Mobile Robots in Crowds via Efficient Monte Carlo Approximations",
+  "authors": [
+   "Elia Trevisan",
+   "Khaled A. Mustafa",
+   "Godert Notten",
+   "Xinwei Wang",
+   "Javier Alonso-Mora"
+  ],
+  "published": "2025-06-26",
+  "journal_ref": "",
+  "doi": "",
+  "abstract": "Deploying mobile robots safely among humans requires the motion planner to account for the uncertainty in the other agents' predicted trajectories. This remains challenging in traditional approaches, especially with arbitrarily shaped predictions and real-time constraints. To address these challenges, we propose a Dynamic Risk-Aware Model Predictive Path Integral control (DRA-MPPI), a motion planner that incorporates uncertain future motions modelled with potentially non-Gaussian stochastic predictions. By leveraging MPPI's gradient-free nature, we propose a method that efficiently approximates the joint Collision Probability (CP) among multiple dynamic obstacles for several hundred sampled trajectories in real-time via a Monte Carlo (MC) approach. This enables the rejection of samples exceeding a predefined CP threshold or the integration of CP as a weighted objective within the navigation cost function. Consequently, DRA-MPPI mitigates the freezing robot problem while enhancing safety. Real-world and simulated experiments with multiple dynamic obstacles demonstrate DRA-MPPI's superior performance compared to state-of-the-art approaches, including Scenario-based Model Predictive Control (S-MPC), Frenet planner, and vanilla MPPI."
+ },
+ "jansma2023interaction": {
+  "arxiv": "2309.14931",
+  "title": "Interaction-Aware Sampling-Based MPC with Learned Local Goal Predictions",
+  "authors": [
+   "Walter Jansma",
+   "Elia Trevisan",
+   "Álvaro Serra-Gómez",
+   "Javier Alonso-Mora"
+  ],
+  "published": "2023-09-26",
+  "journal_ref": "",
+  "doi": "",
+  "abstract": "Motion planning for autonomous robots in tight, interaction-rich, and mixed human-robot environments is challenging. State-of-the-art methods typically separate prediction and planning, predicting other agents' trajectories first and then planning the ego agent's motion in the remaining free space. However, agents' lack of awareness of their influence on others can lead to the freezing robot problem. We build upon Interaction-Aware Model Predictive Path Integral (IA-MPPI) control and combine it with learning-based trajectory predictions, thereby relaxing its reliance on communicated short-term goals for other agents. We apply this framework to Autonomous Surface Vessels (ASVs) navigating urban canals. By generating an artificial dataset in real sections of Amsterdam's canals, adapting and training a prediction model for our domain, and proposing heuristics to extract local goals, we enable effective cooperation in planning. Our approach improves autonomous robot navigation in complex, crowded environments, with potential implications for multi-agent systems and human-robot interaction."
+ },
+ "gursoy2026cosmik": {
+  "arxiv": "2604.10358",
+  "title": "COSMIK-MPPI: Scaling Constrained Model Predictive Control to Collision Avoidance in Close-Proximity Dynamic Human Environments",
+  "authors": [
+   "Ege Gursoy",
+   "Maxime Sabbah",
+   "Arthur Haffemayer",
+   "Joao Cavalcanti Santos",
+   "Pietro Noah Crestaz",
+   "Vladimir Petrik",
+   "Nicolas Mansard",
+   "Vincent Bonnet"
+  ],
+  "published": "2026-04-11",
+  "journal_ref": "",
+  "doi": "",
+  "abstract": "Ensuring safe physical interaction between torque-controlled manipulators and humans is essential for deploying robots in everyday environments. Model Predictive Control (MPC) has emerged as a suitable framework thanks to its capacity to handle hard constraints, provide strong guarantees and zero-shot adaptability through predictive reasoning. However, Gradient-Based MPC (GB-MPC) solvers have demonstrated limited performance for collision avoidance in complex environments. Sampling-based approaches such as Model Predictive Path Integral (MPPI) control offer an alternative via stochastic rollouts, but enforcing safety via additive penalties is inherently fragile, as it provides no formal constraint satisfaction guarantees. We propose a collision avoidance framework called COSMIK-MPPI combining MPPI with the toolbox for human motion estimation RT-COSMIK and the Constraints-as-Terminations transcription, which enforces safety by treating constraint violations as terminal events, without relying on large penalty terms or explicit human motion prediction. The proposed approach is evaluated against state-of-the-art GB-MPC and vanilla MPPI in simulation and on a real manipulator arm. Results show that COSMIK-MPPI achieves a 100% task success rate with a constant computation time (22 ms), largely outperforming GB-MPC. In simulated infeasible scenarios, COSMIK-MPPI consistently generates collision-free trajectories, contrary to vanilla MPPI. These properties enabled safe execution of complex real-world human-robot interaction tasks in shared workspaces using an affordable markerless human motion estimator, demonstrating a robust, compliant, and practical solution for predictive collision avoidance (cf. results showcased at https://exquisite-parfait-ffa925.netlify.app)"
+ },
+ "dierking2026parallelsbmpc": {
+  "arxiv": "2606.20712",
+  "title": "Real-World Deployment of Massively Parallel Sampling-Based MPC for Contact-Rich Manipulation",
+  "authors": [
+   "Magnus Dierking",
+   "Joao Carvalho",
+   "An Thai Le",
+   "Georgia Chalvatzaki",
+   "Jan Peters"
+  ],
+  "published": "2026-06-16",
+  "journal_ref": "",
+  "doi": "",
+  "abstract": "Sampling-based Model Predictive Control (SMPC) is a promising strategy for contact-rich robotic manipulation, combining gradient-free optimization with massively parallel GPU simulation. Yet, most prior work relies on simplified dynamics or remains confined to simulation. We present an MPC framework that leverages JAX for large-scale parallelization and efficient computation, coupled with the high-fidelity MuJoCo MJX simulator, and deploy it on a Franka Research 3 executing the Push-T manipulation task through a complete real-to-sim-to-real pipeline. The MTP variant with structured global sampling outperforms unimodal baselines such as CEM, MPPI, and PS across tasks that require mode switching, both in simulation and on hardware. Furthermore, we evaluate online domain randomization within the MPC sample budget, showing that contact-initiation parameters yield interpretable adaptation signals, whereas global physics parameters provide feedback that is too weak for reliable exploitation at typical replanning frequencies. These findings highlight key challenges for sampling-based MPC in contact-rich manipulation-contact sensitivity, tight compute budgets, and the difficulty of obtaining informative domain-randomization signals in real time."
+ },
+ "im2026torquemppi": {
+  "arxiv": "2609.02020",
+  "title": "Real-Time Dynamics-Based Torque-Sampling MPPI for Compliant and Force Aware Manipulation",
+  "authors": [
+   "Euncheol Im",
+   "Taehyun Kim",
+   "Yonghwan Oh",
+   "Myotaeg Lim",
+   "Yisoo Lee"
+  ],
+  "published": "2026-09-02",
+  "journal_ref": "",
+  "doi": "",
+  "abstract": "This study proposes a novel Model Predictive Path Integral (MPPI)-based task-space control framework. The proposed framework explicitly solves rigid-body dynamics within a real-time MPC formulation and enforces safety constraints, enabling accurate motion and force control that yields compliant behaviors for safe and effective physical interaction of robotic manipulators in unstructured environments. By leveraging MPPI, the proposed framework efficiently handles nonlinear dynamics that are difficult to solve with conventional MPC approaches in real-time. Furthermore, we develop a torque-sampling-based control architecture that enables efficient exploitation of GPU-based parallelization, resulting in effective compliant and force-aware behaviors. As a result, the proposed framework achieves a solver update rate of over 166 Hz with a 0.18 s prediction horizon, and its performance is validated through real-world experiments on a 7-DoF manipulator."
+ },
+ "lee2026prmppi": {
+  "arxiv": "2608.07573",
+  "title": "Projection-Retraction MPPI: Exact Constraint-Manifold Control for Manipulators",
+  "authors": [
+   "Seulchan Lee",
+   "Leesai Park",
+   "Minhyeong Kang",
+   "Sanghyun Kim"
+  ],
+  "published": "2026-08-04",
+  "journal_ref": "",
+  "doi": "",
+  "abstract": "Model Predictive Path Integral (MPPI) control is widely used in manipulation for its gradient-free, parallel handling of non-convex costs. Manipulation tasks, however, often impose constraints that hold throughout the motion: a closed kinematic chain that two grasping arms keep exactly, or joint limits and obstacle clearances that are never crossed. MPPI handles such constraints only through the cost, as soft penalties that hold approximately and fail under a strong task cost. To address this, we propose Projection-Retraction MPPI (PR-MPPI), which enforces the constraints inside the sampled dynamics. At every rollout step, the sampled velocity is projected to satisfy both constraint types: the equality restricts it to a subspace, and each inequality to a half-space within that subspace, so inequality handling never breaks the equality. This projection, however, satisfies the constraints only to first order, and a finite step leaves a small drift off the equality. Therefore, we retract the returned command back onto the constraint to numerical tolerance and independent of task weighting. We validate PR-MPPI on 14-DoF dual-arm systems. In simulation, the returned commands satisfy the closed-chain equality to numerical tolerance through a joint-limit stress test and randomized obstacle avoidance. On real hardware, the arms of a Unitree H1-2 humanoid reactively avoid a moving obstacle. Code and experiment videos are available at https://rcilab.github.io/prmppi."
+ },
+ "liu2026clusteringmppi": {
+  "arxiv": "2607.06499",
+  "title": "Clustering-Embedded Model Predictive Path Integral Control: Avoiding Averaging-Induced Failure and Enabling Efficient Cluster Selection for Dynamic Obstacles",
+  "authors": [
+   "Zidong Liu",
+   "Kaixin Chang",
+   "Xu Chen"
+  ],
+  "published": "2026-07-07",
+  "journal_ref": "IROS 2026",
+  "doi": "",
+  "abstract": "With the widespread availability of parallel computing hardware, sampling-based motion planning methods such as Model Predictive Path Integral (MPPI) control have become increasingly powerful for complex nonlinear systems in non-smooth task spaces. However, the sampling and forward-simulation pipeline in MPPI suffers from averaging-induced failure in cluttered environments, where the importance-weighted update averages incompatible rollouts and leads to hesitation or even collision when an obstacle lies directly ahead. This paper proposes Clustering-Embedded MPPI (CE-MPPI), a framework that architecturally resolves the averaging-induced failures inherent in standard MPPI within non-convex environments. Rather than simply mitigating interference, CE-MPPI redefines the control law by integrating a high-fidelity pruning and clustering stage. By leveraging density-based spatial clustering of applications with noise (DBSCAN) alongside a novel geometric direction feature that is extracted from collision-derived reference points, the system isolates feasible trajectory modes from the noise of infeasible rollouts. This is paired with an intelligent selection logic that optimizes for minimum cost in static scenes while actively steering opposite to obstacle flux in dynamic environments. Experiments in 2-D JAX-accelerated simulations show that CE-MPPI alleviates obstacle-front hesitation and avoids persistent coupling with moving obstacles in dynamic scenes. In particular, real-world tests on a 6-DoF UR5e manipulator with CUDA-parallel rollouts in Isaac Gym achieve a 48\\% reduction in time-to-goal and a 12\\% shorter end-effector path."
+ },
+ "desai2026fpgampi": {
+  "arxiv": "2601.17231",
+  "title": "Real-Time, Energy-Efficient, Sampling-Based Optimal Control via FPGA Acceleration",
+  "authors": [
+   "Tanmay Desai",
+   "Brian Plancher",
+   "R. Iris Bahar"
+  ],
+  "published": "2026-01-23",
+  "journal_ref": "",
+  "doi": "",
+  "abstract": "Autonomous mobile robots (AMRs), used for search-and-rescue and remote exploration, require fast and robust planning and control schemes. Sampling-based approaches for Model Predictive Control, especially approaches based on the Model Predictive Path Integral Control (MPPI) algorithm, have recently proven both to be highly effective for such applications and to map naturally to GPUs for hardware acceleration. However, both GPU and CPU implementations of such algorithms can struggle to meet tight energy and latency budgets on battery-constrained AMR platforms that leverage embedded compute. To address this issue, we present an FPGA-optimized MPPI design that exposes fine-grained parallelism and eliminates synchronization bottlenecks via deep pipelining and parallelism across algorithmic stages. This results in an average 3.1x to 7.5x speedup over optimized implementations on an embedded GPU and CPU, respectively, while simultaneously achieving a 2.5x to 5.4x reduction in energy usage. These results demonstrate that FPGA architectures are a promising direction for energy-efficient and high-performance edge robotics."
+ },
+ "aoyama2026hybrid": {
+  "arxiv": "2606.00737",
+  "title": "Beyond Pure Sampling: Hybrid Optimization Mechanisms for Non-Convex Model Predictive Control",
+  "authors": [
+   "Yuichiro Aoyama",
+   "Minchan Jung",
+   "Akash Ratheesh",
+   "Evangelos A. Theodorou"
+  ],
+  "published": "2026-05-30",
+  "journal_ref": "",
+  "doi": "",
+  "abstract": "This paper investigates the optimization mechanisms of non-convex Model Predictive Control (MPC) using the Maximum Entropy Differential Dynamic Programming (ME-DDP) framework. Navigating non-convex cost landscapes induced by nonlinear dynamics, multiple obstacles, etc. remains a fundamental challenge in robotics, where gradient-based methods frequently converge to suboptimal local minima. We demonstrate a dual-step optimization mechanism designed to overcome these traps. (1) an initial phase of using DDP to exploit the gradient of the cost landscape, followed by (2) disruption of the optimization via sampling from policies characterized by the inverse Hessian of the action-value function. We provide a rigorous analysis of this sampling mechanism of three ME-DDP variants: Unimodal Gaussian ME-DDP, Multimodal Gaussian ME-DDP, and Stein Variational DDP. Furthermore, with navigation tasks of four robotic systems under cluttered environments, we conduct extensive benchmarking of three variants of the ME-DDP, against deterministic DDP, and one of the most successful sampling-based schemes, Model Predictive Path Integral (MPPI) control with three policy parameterizations and update laws that correspond to those of ME-DDPs. The results show that in low-dimensional systems where the cost landscapes are relatively simple and local information is sufficiently representative, our framework consistently outperforms MPPIs. In high-dimensional systems, MPPI can occasionally discover aggressive maneuvers that enable it to steer the systems faster than DDP-based methods, whereas our method maintains a higher, more stable success rate. Finally, we validate the practical efficacy of the framework through hardware experiments with a quadrotor navigating a dense, non-convex obstacle field, confirming the robustness of the proposed framework for real-world deployment."
+ },
+ "makoviychuk2021isaacgym": {
+  "arxiv": "2108.10470",
+  "title": "Isaac Gym: High Performance GPU-Based Physics Simulation For Robot Learning",
+  "authors": [
+   "Viktor Makoviychuk",
+   "Lukasz Wawrzyniak",
+   "Yunrong Guo",
+   "Michelle Lu",
+   "Kier Storey",
+   "Miles Macklin",
+   "David Hoeller",
+   "Nikita Rudin",
+   "Arthur Allshire",
+   "Ankur Handa",
+   "Gavriel State"
+  ],
+  "published": "2021-08-24",
+  "journal_ref": "",
+  "doi": "",
+  "abstract": "Isaac Gym offers a high performance learning platform to train policies for wide variety of robotics tasks directly on GPU. Both physics simulation and the neural network policy training reside on GPU and communicate by directly passing data from physics buffers to PyTorch tensors without ever going through any CPU bottlenecks. This leads to blazing fast training times for complex robotics tasks on a single GPU with 2-3 orders of magnitude improvements compared to conventional RL training that uses a CPU based simulator and GPU for neural networks. We host the results and videos at \\url{https://sites.google.com/view/isaacgym-nvidia} and isaac gym can be downloaded at \\url{https://developer.nvidia.com/isaac-gym}."
+ },
+ "wagener2019dmd": {
+  "arxiv": "1902.08967",
+  "title": "An Online Learning Approach to Model Predictive Control",
+  "authors": [
+   "Nolan Wagener",
+   "Ching-An Cheng",
+   "Jacob Sacks",
+   "Byron Boots"
+  ],
+  "published": "2019-02-24",
+  "journal_ref": "",
+  "doi": "",
+  "abstract": "Model predictive control (MPC) is a powerful technique for solving dynamic control tasks. In this paper, we show that there exists a close connection between MPC and online learning, an abstract theoretical framework for analyzing online decision making in the optimization literature. This new perspective provides a foundation for leveraging powerful online learning algorithms to design MPC algorithms. Specifically, we propose a new algorithm based on dynamic mirror descent (DMD), an online learning algorithm that is designed for non-stationary setups. Our algorithm, Dynamic Mirror Descent Model Predictive Control (DMD-MPC), represents a general family of MPC algorithms that includes many existing techniques as special instances. DMD-MPC also provides a fresh perspective on previous heuristics used in MPC and suggests a principled way to design new MPC algorithms. In the experimental section of this paper, we demonstrate the flexibility of DMD-MPC, presenting a set of new MPC algorithms on a simple simulated cartpole and a simulated and real-world aggressive driving task. Videos of the real-world experiments can be found at https://youtu.be/vZST3v0_S9w and https://youtu.be/MhuqiHo2t98."
+ },
+ "williams2018tro_arxiv": {
+  "arxiv": "1707.02342",
+  "title": "Information Theoretic Model Predictive Control: Theory and Applications to Autonomous Driving",
+  "authors": [
+   "Grady Williams",
+   "Paul Drews",
+   "Brian Goldfain",
+   "James M. Rehg",
+   "Evangelos A. Theodorou"
+  ],
+  "published": "2017-07-07",
+  "journal_ref": "",
+  "doi": "",
+  "abstract": "We present an information theoretic approach to stochastic optimal control problems that can be used to derive general sampling based optimization schemes. This new mathematical method is used to develop a sampling based model predictive control algorithm. We apply this information theoretic model predictive control (IT-MPC) scheme to the task of aggressive autonomous driving around a dirt test track, and compare its performance to a model predictive control version of the cross-entropy method."
+ },
+ "faroni2022safetyaware": {
+  "arxiv": "2210.11655",
+  "title": "Safety-aware time-optimal motion planning with uncertain human state estimation",
+  "authors": [
+   "Marco Faroni",
+   "Manuel Beschi",
+   "Nicola Pedrocchi"
+  ],
+  "published": "2022-10-21",
+  "journal_ref": "",
+  "doi": "10.1109/LRA.2022.3211493",
+  "abstract": "Human awareness in robot motion planning is crucial for seamless interaction with humans. Many existing techniques slow down, stop, or change the robot's trajectory locally to avoid collisions with humans. Although using the information on the human's state in the path planning phase could reduce future interference with the human's movements and make safety stops less frequent, such an approach is less widespread. This paper proposes a novel approach to embedding a human model in the robot's path planner. The method explicitly addresses the problem of minimizing the path execution time, including slowdowns and stops owed to the proximity of humans. For this purpose, it converts safety speed limits into configuration-space cost functions that drive the path's optimization. The costmap can be updated based on the observed or predicted state of the human. The method can handle deterministic and probabilistic representations of the human state and is independent of the prediction algorithm. Numerical and experimental results on an industrial collaborative cell demonstrate that the proposed approach consistently reduces the robot's execution time and avoids unnecessary safety speed reductions."
+ },
+ "thomason2024vamp": {
+  "arxiv": "2309.14545",
+  "title": "Motions in Microseconds via Vectorized Sampling-Based Planning",
+  "authors": [
+   "Wil Thomason",
+   "Zachary Kingston",
+   "Lydia E. Kavraki"
+  ],
+  "published": "2023-09-25",
+  "journal_ref": "",
+  "doi": "",
+  "abstract": "Modern sampling-based motion planning algorithms typically take between hundreds of milliseconds to dozens of seconds to find collision-free motions for high degree-of-freedom problems. This paper presents performance improvements of more than 500x over the state-of-the-art, bringing planning times into the range of microseconds and solution rates into the range of kilohertz, without specialized hardware. Our key insight is how to exploit fine-grained parallelism within sampling-based planners, providing generality-preserving algorithmic improvements to any such planner and significantly accelerating critical subroutines, such as forward kinematics and collision checking. We demonstrate our approach over a diverse set of challenging, realistic problems for complex robots ranging from 7 to 14 degrees-of-freedom. Moreover, we show that our approach does not require high-power hardware by also evaluating on a low-power single-board computer. The planning speeds demonstrated are fast enough to reside in the range of control frequencies and open up new avenues of motion planning research."
+ },
+ "yin2024dpbreakpoints": {
+  "arxiv": "2411.17034",
+  "title": "Dynamic Programming-Based Redundancy Resolution for Path Planning of Redundant Manipulators Considering Breakpoints",
+  "authors": [
+   "Zhihang Yin",
+   "Fa Wu",
+   "Ruofan Bian",
+   "Ziqian Wang",
+   "Jianmin Yang",
+   "Jiyong Tan",
+   "Dexing Kong"
+  ],
+  "published": "2024-11-26",
+  "journal_ref": "",
+  "doi": "",
+  "abstract": "This paper proposes a redundancy resolution algorithm for a redundant manipulator based on dynamic programming. This algorithm can compute the desired joint angles at each point on a pre-planned discrete path in Cartesian space, while ensuring that the angles, velocities, and accelerations of each joint do not exceed the manipulator's constraints. We obtain the analytical solution to the inverse kinematics problem of the manipulator using a parameterization method, transforming the redundancy resolution problem into an optimization problem of determining the parameters at each path point. The constraints on joint velocity and acceleration serve as constraints for the optimization problem. Then all feasible inverse kinematic solutions for each pose under the joint angle constraints of the manipulator are obtained through parameterization methods, and the globally optimal solution to this problem is obtained through the dynamic programming algorithm. On the other hand, if a feasible joint-space path satisfying the constraints does not exist, the proposed algorithm can compute the minimum number of breakpoints required for the path and partition the path with as few breakpoints as possible to facilitate the manipulator's operation along the path. The algorithm can also determine the optimal selection of breakpoints to minimize the global cost function, rather than simply interrupting when the manipulator is unable to continue operating. The proposed algorithm is tested using a manipulator produced by a certain manufacturer, demonstrating the effectiveness of the algorithm."
+ },
+ "yin2024dprealtime": {
+  "arxiv": "2411.17052",
+  "title": "Dynamic Programming-Based Offline Redundancy Resolution of Redundant Manipulators Along Prescribed Paths with Real-Time Adjustment",
+  "authors": [
+   "Zhihang Yin",
+   "Fa Wu",
+   "Ziqian Wang",
+   "Jianmin Yang",
+   "Jiyong Tan",
+   "Dexing Kong"
+  ],
+  "published": "2024-11-26",
+  "journal_ref": "",
+  "doi": "",
+  "abstract": "Traditional offline redundancy resolution of trajectories for redundant manipulators involves computing inverse kinematic solutions for Cartesian space paths, constraining the manipulator to a fixed path without real-time adjustments. Online redundancy resolution can achieve real-time adjustment of paths, but it cannot consider subsequent path points, leading to the possibility of the manipulator being forced to stop mid-motion due to joint constraints. To address this, this paper introduces a dynamic programming-based offline redundancy resolution for redundant manipulators along prescribed paths with real-time adjustment. The proposed method allows the manipulator to move along a prescribed path while implementing real-time adjustment along the normal to the path. Using Dynamic Programming, the proposed approach computes a global maximum for the variation of adjustment coefficients. As long as the coefficient variation between adjacent sampling path points does not exceed this limit, the algorithm provides the next path point's joint angles based on the current joint angles, enabling the end-effector to achieve the adjusted Cartesian pose. The main innovation of this paper lies in augmenting traditional offline optimal planning with real-time adjustment capabilities, achieving a fusion of offline planning and online planning."
+ },
+ "razjigaev2025functional": {
+  "arxiv": "2512.10116",
+  "title": "Fast Functionally Redundant Inverse Kinematics for Robotic Toolpath Optimisation in Manufacturing Tasks",
+  "authors": [
+   "Andrew Razjigaev",
+   "Hans Lohr",
+   "Alejandro Vargas-Uscategui",
+   "Peter King",
+   "Tirthankar Bandyopadhyay"
+  ],
+  "published": "2025-12-10",
+  "journal_ref": "",
+  "doi": "",
+  "abstract": "Industrial automation with six-axis robotic arms is critical for many manufacturing tasks, including welding and additive manufacturing applications; however, many of these operations are functionally redundant due to the symmetrical tool axis, which effectively makes the operation a five-axis task. Exploiting this redundancy is crucial for achieving the desired workspace and dexterity required for the feasibility and optimisation of toolpath planning. Inverse kinematics algorithms can solve this in a fast, reactive framework, but these techniques are underutilised over the more computationally expensive offline planning methods. We propose a novel algorithm to solve functionally redundant inverse kinematics for robotic manipulation utilising a task space decomposition approach, the damped least-squares method and Halley's method to achieve fast and robust solutions with reduced joint motion. We evaluate our methodology in the case of toolpath optimisation in a cold spray coating application on a non-planar surface. The functionally redundant inverse kinematics algorithm can quickly solve motion plans that minimise joint motion, expanding the feasible operating space of the complex toolpath. We validate our approach on an industrial ABB manipulator and cold-spray gun executing the computed toolpath."
+ },
+ "zhong2024expansiongrr": {
+  "arxiv": "2405.13770",
+  "title": "Expansion-GRR: Efficient Generation of Smooth Global Redundancy Resolution Roadmaps",
+  "authors": [
+   "Zhuoyun Zhong",
+   "Zhi Li",
+   "Constantinos Chamzas"
+  ],
+  "published": "2024-05-22",
+  "journal_ref": "",
+  "doi": "",
+  "abstract": "Global redundancy resolution (GRR) roadmaps is a novel concept in robotics that facilitates the mapping from task space paths to configuration space paths in a legible, predictable, and repeatable way. Such roadmaps could find widespread utility in applications such as safe teleoperation, consistent path planning, and motion primitives generation. However, previous methods to compute GRR roadmaps often necessitate a lengthy computation time and produce non-smooth paths, limiting their practical efficacy. To address this challenge, we introduce a novel method Expansion-GRR that leverages efficient configuration space projections and enables rapid generation of smooth roadmaps that satisfy the task constraints. Additionally, we propose a simple multi-seed strategy that further enhances the final quality. We conducted experiments in simulation with a 5-link planar manipulator and a Kinova arm. We were able to generate the Expansion-GRR roadmaps up to 2 orders of magnitude faster while achieving higher smoothness. We also demonstrate the utility of the GRR roadmaps in teleoperation tasks where our method outperformed prior methods and reactive IK solvers in terms of success rate and solution quality."
+ },
+ "gautier2024weldingbase": {
+  "arxiv": "2407.05720",
+  "title": "Comparison of robot morphologies and base positioning for welding applications",
+  "authors": [
+   "Nicolas Gautier",
+   "Yves Guillermit",
+   "Yazid Sebsadji",
+   "Mathieu Porez",
+   "Damien Chablat"
+  ],
+  "published": "2024-07-08",
+  "journal_ref": "",
+  "doi": "",
+  "abstract": "This article undertakes a comprehensive examination of two distinct robot morphologies: the PUMA-type arm (Programmable Universal Machine for Assembly) and the UR-type robot (Universal Robots). The primary aim of this comparative analysis is to assess their respective performances within the specialized domain of welding, focusing on predefined industrial application scenarios. These scenarios encompass a range of geometrical components earmarked for welding, along with specified welding paths, spatial constraints, and welding methodologies reflective of real-world scenarios encountered by manual welders. The case studies presented in this research serve as illustrative examples of Weez-U Welding practices, providing insights into the practical implications of employing different robot morphologies. Moreover, this study distinguishes between various base positions for the robot, thereby aiding welders in selecting the optimal base placement aligned with their specific welding objectives. By offering such insights, this research facilitates the selection of the most suitable architecture for this particular range of trajectories, thus optimizing welding efficiency and effectiveness. A departure from conventional methodologies, this study goes beyond merely considering singularities and also delves into the analysis of collisions between the robot and its environment, contingent upon the robot's posture. This holistic approach offers a more nuanced understanding of the challenges and considerations inherent in deploying robotic welding systems, providing valuable insights for practitioners and researchers alike in the field of robotic welding technology."
+ },
+ "zhang2023basecoverage": {
+  "arxiv": "2304.08246",
+  "title": "Base Placement Optimization for Coverage Mobile Manipulation Tasks",
+  "authors": [
+   "Huiwen Zhang",
+   "Kai Mi",
+   "Zhijun Zhang"
+  ],
+  "published": "2023-04-17",
+  "journal_ref": "",
+  "doi": "",
+  "abstract": "Base placement optimization (BPO) is a fundamental capability for mobile manipulation and has been researched for decades. However, it is still very challenging for some reasons. First, compared with humans, current robots are extremely inflexible, and therefore have higher requirements on the accuracy of base placements (BPs). Second, the BP and task constraints are coupled with each other. The optimal BP depends on the task constraints, and in BP will affect task constraints in turn. More tricky is that some task constraints are flexible and non-deterministic. Third, except for fulfilling tasks, some other performance metrics such as optimal energy consumption and minimal execution time need to be considered, which makes the BPO problem even more complicated. In this paper, a Scale-like disc (SLD) representation of the workspace is used to decouple task constraints and BPs. To evaluate reachability and return optimal working pose over SLDs, a reachability map (RM) is constructed offline. In order to optimize the objectives of coverage, manipulability, and time cost simultaneously, this paper formulates the BPO as a multi-objective optimization problem (MOOP). Among them, the time optimal objective is modeled as a traveling salesman problem (TSP), which is more in line with the actual situation. The evolutionary method is used to solve the MOOP. Besides, to ensure the validity and optimality of the solution, collision detection is performed on the candidate BPs, and solutions from BPO are further fine-tuned according to the specific given task. Finally, the proposed method is used to solve a real-world toilet coverage cleaning task. Experiments show that the optimized BPs can significantly improve the coverage and efficiency of the task."
+ },
+ "nguyen2023taskclustering": {
+  "arxiv": "2305.17345",
+  "title": "Task-Space Clustering for Mobile Manipulator Task Sequencing",
+  "authors": [
+   "Quang-Nam Nguyen",
+   "Nicholas Adrian",
+   "Quang-Cuong Pham"
+  ],
+  "published": "2023-05-27",
+  "journal_ref": "",
+  "doi": "10.1109/ICRA48891.2023.10161293",
+  "abstract": "Mobile manipulators have gained attention for the potential in performing large-scale tasks which are beyond the reach of fixed-base manipulators. The Robotic Task Sequencing Problem for mobile manipulators often requires optimizing the motion sequence of the robot to visit multiple targets while reducing the number of base placements. A two-step approach to this problem is clustering the task-space into clusters of targets before sequencing the robot motion. In this paper, we propose a task-space clustering method which formulates the clustering step as a Set Cover Problem using bipartite graph and reachability analysis, then solves it to obtain the minimum number of target clusters with corresponding base placements. We demonstrated the practical usage of our method in a mobile drilling experiment containing hundreds of targets. Multiple simulations were conducted to benchmark the algorithm and also showed that our proposed method found, in practical time, better solutions than the existing state-of-the-art methods."
+ },
+ "makhal2018reuleaux": {
+  "arxiv": "1710.01328",
+  "title": "Reuleaux: Robot Base Placement by Reachability Analysis",
+  "authors": [
+   "Abhijit Makhal",
+   "Alex K. Goins"
+  ],
+  "published": "2017-10-03",
+  "journal_ref": "",
+  "doi": "",
+  "abstract": "Before beginning any robot task, users must position the robot's base, a task that now depends entirely on user intuition. While slight perturbation is tolerable for robots with moveable bases, correcting the problem is imperative for fixed-base robots if some essential task sections are out of reach. For mobile manipulation robots, it is necessary to decide on a specific base position before beginning manipulation tasks. This paper presents Reuleaux, an open source library for robot reachability analyses and base placement. It reduces the amount of extra repositioning and removes the manual work of identifying potential base locations. Based on the reachability map, base placement locations of a whole robot or only the arm can be efficiently determined. This can be applied to both statically mounted robots, where position of the robot and work piece ensure the maximum amount of work performed, and to mobile robots, where the maximum amount of workable area can be reached. Solutions are not limited only to vertically constrained placement, since complicated robotics tasks require the base to be placed at unique poses based on task demand. All Reuleaux library methods were tested on different robots of different specifications and evaluated for tasks in simulation and real world environment. Evaluation results indicate that Reuleaux had significantly improved performance than prior existing methods in terms of time-efficiency and range of applicability."
+ },
+ "elias2025cuspidal": {
+  "arxiv": "2501.18505",
+  "title": "Path Planning and Optimization for Cuspidal 6R Manipulators",
+  "authors": [
+   "Alexander J. Elias",
+   "John T. Wen"
+  ],
+  "published": "2025-01-30",
+  "journal_ref": "",
+  "doi": "",
+  "abstract": "A cuspidal robot can move from one inverse kinematics (IK) solution to another without crossing a singularity. Multiple industrial robots are cuspidal. They tend to have a beautiful mechanical design, but they pose path planning challenges. A task-space path may have a valid IK solution for each point along the path, but a continuous joint-space path may depend on the choice of the IK solution or even be infeasible. This paper presents new analysis, path planning, and optimization methods to enhance the utility of cuspidal robots. We first demonstrate an efficient method to identify cuspidal robots and show, for the first time, that the ABB GoFa and certain robots with three parallel joint axes are cuspidal. We then propose a new path planning method for cuspidal robots by finding all IK solutions for each point along a task-space path and constructing a graph to connect each vertex corresponding to an IK solution. Graph edges have a weight based on the optimization metric, such as minimizing joint velocity. The optimal feasible path is the shortest path in the graph. This method can find non-singular paths as well as smooth paths which pass through singularities. Finally, we incorporate this path planning method into a path optimization algorithm. Given a fixed workspace toolpath, we optimize the offset of the toolpath in the robot base frame while ensuring continuous joint motion. Code examples are available in a publicly accessible repository."
+ },
+ "wang2023rangedik": {
+  "arxiv": "2302.13935",
+  "title": "RangedIK: An Optimization-based Robot Motion Generation Method for Ranged-Goal Tasks",
+  "authors": [
+   "Yeping Wang",
+   "Pragathi Praveena",
+   "Daniel Rakita",
+   "Michael Gleicher"
+  ],
+  "published": "2023-02-27",
+  "journal_ref": "",
+  "doi": "",
+  "abstract": "Generating feasible robot motions in real-time requires achieving multiple tasks (i.e., kinematic requirements) simultaneously. These tasks can have a specific goal, a range of equally valid goals, or a range of acceptable goals with a preference toward a specific goal. To satisfy multiple and potentially competing tasks simultaneously, it is important to exploit the flexibility afforded by tasks with a range of goals. In this paper, we propose a real-time motion generation method that accommodates all three categories of tasks within a single, unified framework and leverages the flexibility of tasks with a range of goals to accommodate other tasks. Our method incorporates tasks in a weighted-sum multiple-objective optimization structure and uses barrier methods with novel loss functions to encode the valid range of a task. We demonstrate the effectiveness of our method through a simulation experiment that compares it to state-of-the-art alternative approaches, and by demonstrating it on a physical camera-in-hand robot that shows that our method enables the robot to achieve smooth and feasible camera motions."
+ },
+ "wang2025anytimetracking": {
+  "arxiv": "2502.03676",
+  "title": "Anytime Planning for End-Effector Trajectory Tracking",
+  "authors": [
+   "Yeping Wang",
+   "Michael Gleicher"
+  ],
+  "published": "2025-02-05",
+  "journal_ref": "",
+  "doi": "",
+  "abstract": "End-effector trajectory tracking algorithms find joint motions that drive robot manipulators to track reference trajectories. In practical scenarios, anytime algorithms are preferred for their ability to quickly generate initial motions and continuously refine them over time. In this paper, we present an algorithmic framework that adapts common graph-based trajectory tracking algorithms to be anytime and enhances their efficiency and effectiveness. Our key insight is to identify guide paths that approximately track the reference trajectory and strategically bias sampling toward the guide paths. We demonstrate the effectiveness of the proposed framework by restructuring two existing graph-based trajectory tracking algorithms and evaluating the updated algorithms in three experiments."
+ },
+ "tao2023rrtmppi": {
+  "arxiv": "2301.13143",
+  "title": "RRT Guided Model Predictive Path Integral Method",
+  "authors": [
+   "Chuyuan Tao",
+   "Hunmin Kim",
+   "Naira Hovakimyan"
+  ],
+  "published": "2023-01-30",
+  "journal_ref": "",
+  "doi": "",
+  "abstract": "This work presents an optimal sampling-based method to solve the real-time motion planning problem in static and dynamic environments, exploiting the Rapid-exploring Random Trees (RRT) algorithm and the Model Predictive Path Integral (MPPI) algorithm. The RRT algorithm provides a nominal mean value of the random control distribution in the MPPI algorithm, resulting in satisfactory control performance in static and dynamic environments without a need for fine parameter tuning. We also discuss the importance of choosing the right mean of the MPPI algorithm, which balances exploration and optimality gap, given a fixed sample size. In particular, a sufficiently large mean is required to explore the state space enough, and a sufficiently small mean is required to guarantee that the samples reconstruct the optimal controls. The proposed methodology automates the procedure of choosing the right mean by incorporating the RRT algorithm. The simulations demonstrate that the proposed algorithm can solve the motion planning problem in real-time for static or dynamic environments."
+ },
+ "belvedere2026feedbackmppi": {
+  "arxiv": "2506.14855",
+  "title": "Feedback-MPPI: Fast Sampling-Based MPC via Rollout Differentiation -- Adios low-level controllers",
+  "authors": [
+   "Tommaso Belvedere",
+   "Michael Ziegltrum",
+   "Giulio Turrisi",
+   "Valerio Modugno"
+  ],
+  "published": "2025-06-17",
+  "journal_ref": "IEEE Robotics and Automation Letters, 2026, 11 (1), pp.1 - 8",
+  "doi": "",
+  "abstract": "Model Predictive Path Integral control is a powerful sampling-based approach suitable for complex robotic tasks due to its flexibility in handling nonlinear dynamics and non-convex costs. However, its applicability in real-time, highfrequency robotic control scenarios is limited by computational demands. This paper introduces Feedback-MPPI (F-MPPI), a novel framework that augments standard MPPI by computing local linear feedback gains derived from sensitivity analysis inspired by Riccati-based feedback used in gradient-based MPC. These gains allow for rapid closed-loop corrections around the current state without requiring full re-optimization at each timestep. We demonstrate the effectiveness of F-MPPI through simulations and real-world experiments on two robotic platforms: a quadrupedal robot performing dynamic locomotion on uneven terrain and a quadrotor executing aggressive maneuvers with onboard computation. Results illustrate that incorporating local feedback significantly improves control performance and stability, enabling robust, high-frequency operation suitable for complex robotic systems."
+ },
+ "faulwasser2017pathfollowing": {
+  "arxiv": "1506.09084",
+  "title": "Implementation of Nonlinear Model Predictive Path-Following Control for an Industrial Robot",
+  "authors": [
+   "Timm Faulwasser",
+   "Tobias Weber",
+   "Juan Pablo Zometa",
+   "Rolf Findeisen"
+  ],
+  "published": "2015-06-30",
+  "journal_ref": "IEEE Transactions on Control System Technology, 2017 25(4), 1505-1511",
+  "doi": "10.1109/TCST.2016.2601624",
+  "abstract": "Many robotic applications, such as milling, gluing, or high precision measurements, require the exact following of a pre-defined geometric path. In this paper, we investigate the real-time feasible implementation of model predictive path-following control for an industrial robot. We consider constrained output path following with and without reference speed assignment. We present results from an implementation of the proposed model predictive path-following controller on a KUKA LWR IV robot."
+ },
+ "chen2025cooptimization": {
+  "arxiv": "2409.13448",
+  "title": "Co-Optimization of Tool Orientations, Kinematic Redundancy, and Waypoint Timing for Robot-Assisted Manufacturing",
+  "authors": [
+   "Yongxue Chen",
+   "Tianyu Zhang",
+   "Yuming Huang",
+   "Tao Liu",
+   "Charlie C. L. Wang"
+  ],
+  "published": "2024-09-20",
+  "journal_ref": "",
+  "doi": "",
+  "abstract": "In this paper, we present a concurrent and scalable trajectory optimization method to improve the quality of robot-assisted manufacturing. Our method simultaneously optimizes tool orientations, kinematic redundancy, and waypoint timing on input toolpaths with large numbers of waypoints to improve kinematic smoothness while incorporating manufacturing constraints. Differently, existing methods always determine them in a decoupled manner. To deal with the large number of waypoints on a toolpath, we propose a decomposition-based numerical scheme to optimize the trajectory in an out-of-core manner, which can also run in parallel to improve the efficiency. Simulations and physical experiments have been conducted to demonstrate the performance of our method in examples of robot-assisted additive manufacturing."
+ },
+ "zhao2025bstar": {
+  "arxiv": "2504.12719",
+  "title": "B*: Efficient and Optimal Base Placement for Fixed-Base Manipulators",
+  "authors": [
+   "Zihang Zhao",
+   "Leiyao Cui",
+   "Sirui Xie",
+   "Saiyao Zhang",
+   "Zhi Han",
+   "Lecheng Ruan",
+   "Yixin Zhu"
+  ],
+  "published": "2025-04-17",
+  "journal_ref": "",
+  "doi": "10.1109/LRA.2025.3604741",
+  "abstract": "B* is a novel optimization framework that addresses a critical challenge in fixed-base manipulator robotics: optimal base placement. Current methods rely on pre-computed kinematics databases generated through sampling to search for solutions. However, they face an inherent trade-off between solution optimality and computational efficiency when determining sampling resolution. To address these limitations, B* unifies multiple objectives without database dependence. The framework employs a two-layer hierarchical approach. The outer layer systematically manages terminal constraints through progressive tightening, particularly for base mobility, enabling feasible initialization and broad solution exploration. The inner layer addresses non-convexities in each outer-layer subproblem through sequential local linearization, converting the original problem into tractable sequential linear programming (SLP). Testing across multiple robot platforms demonstrates B*'s effectiveness. The framework achieves solution optimality five orders of magnitude better than sampling-based approaches while maintaining perfect success rates and reduced computational overhead. Operating directly in configuration space, B* enables simultaneous path planning with customizable optimization criteria. B* serves as a crucial initialization tool that bridges the gap between theoretical motion planning and practical deployment, where feasible trajectory existence is fundamental."
+ },
+ "wang2026mppiem": {
+  "arxiv": "2606.00317",
+  "title": "Generalized Model Predictive Path Integral Control as Expectation--Maximization",
+  "authors": [
+   "Jiarui Wang",
+   "Sina Sharifi",
+   "Mahyar Fazlyab"
+  ],
+  "published": "2026-05-29",
+  "journal_ref": "",
+  "doi": "",
+  "abstract": "Model Predictive Path Integral (MPPI) control is a powerful sampling-based method for solving stochastic optimal control problems and has enabled real-time control in complex robotic systems. Despite its empirical success, its theoretical understanding remains limited. In this work, we show that MPPI can be interpreted as a special case of the Expectation-Maximization (EM) algorithm applied to a probabilistic inference formulation of optimal control. This perspective leads to a generalized EM-MPPI framework that extends MPPI beyond the commonly used Gaussian parameterization. We analyze the convergence behavior of this algorithm and characterize the local convergence rate in terms of the covariance of the posterior trajectory distribution and the exploration distribution. For exponential-family distributions, we establish a sufficient increase property of the log-likelihood when the log-partition function is strongly convex. Specializing the analysis to Gaussian MPPI yields explicit global and local convergence characterizations. The code for the experiments will be available upon acceptance."
+ }
+}

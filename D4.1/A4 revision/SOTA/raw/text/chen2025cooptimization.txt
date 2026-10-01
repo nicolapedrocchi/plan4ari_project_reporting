@@ -1,0 +1,2654 @@
+AUTHORS’ VERSION UNDER REVIEW
+
+1
+
+Co-Optimization of Tool Orientations, Kinematic Redundancy, and Waypoint Timing for Robot-Assisted Manufacturing
+Yongxue Chen, Tianyu Zhang, Member, IEEE, Yuming Huang, Tao Liu, and Charlie C.L. Wang, Senior Member, IEEE
+
+arXiv:2409.13448v2 [cs.RO] 20 Dec 2024
+
+Abstract—In this paper, we present a concurrent and scalable trajectory optimization method to improve the quality of robotassisted manufacturing. Our method simultaneously optimizes tool orientations, kinematic redundancy, and waypoint timing on input toolpaths with large numbers of waypoints to improve kinematic smoothness while incorporating manufacturing constraints. Differently, existing methods always determine them in a decoupled manner. To deal with the large number of waypoints on a toolpath, we propose a decomposition-based numerical scheme to optimize the trajectory in an out-of-core manner, which can also run in parallel to improve the efficiency. Simulations and physical experiments have been conducted to demonstrate the performance of our method in examples of robot-assisted additive manufacturing.
+Note to Practitioners—In robot-assisted manufacturing, how to determine the motion commands according to a sequence of waypoints is a typical problem to be solved where the waypoints represent the positions of a tool-tip. Factors in three aspects need to be planned at each waypoint, including the tool orientation, the tool speed and the redundant degrees-of-freedom on the robotic system. In the trajectory planning step, the objective is always defined as improving the kinematic performance of joint motion in terms of velocity, acceleration, and jerk. Taking the strategy of existing methods that consider these aspects separately will generate less optimal results. This paper presents a new formulation that optimizes all these together while assigning certain manufacturing constraints. Considering that a toolpath can consist of a large number of waypoints in practice, how to improve planning efficiency with limited computer memory is an important issue to be solved. A decomposition based numerical scheme is developed to tackle this problem. The aforementioned issues can be effectively solved by the method proposed in this paper, the performance of which has been demonstrated on a dual robotic system with 6+2 DoFs. The proposed method is general and can also be applied to other types of systems with single or multiple robots as well as other manufacturing methods (e.g. milling).
+Index Terms—Motion planning, kinematics, tool orientation, redundancy optimization, robot-assisted manufacturing.
+I. INTRODUCTION
+U SING robots can provide a large workspace and high flexibility in manufacturing, which therefore facilitate the fabrication of product designs with larger dimensions and more complicated geometry. For example, robot-assisted additive manufacturing (AM) enables 3D printing of free-form curved layers, providing the benefits of support-structure free [1], reinforced mechanical strength [2], and improved surface quality [3]. These multiple benefits have recently been realized on the same models (refs. [4], [5]).
+
+Motion and trajectory planning is crucial in robot-assisted manufacturing, as it directly affects the quality of resultant workpieces. Several issues need to be addressed. First of all, most manufacturing tasks require only five degrees-offreedom (DoF), whereas robotic systems typically have higher DoFs, leading to kinematic redundancy. It means that, for any given task-satisfying constraints of the end-effector, a robotic system can have an infinite number of inverse kinematics (IK) solutions. Additionally, toolpaths provided for manufacturing tasks often only place strict requirements on the positions of the tooltip. That means both the tool orientations and the time-sequence can be adjusted while satisfying certain manufacturing constraints. Furthermore, in both AM and subtractive manufacturing (SM), the kinematic smoothness is to be optimized for ensuring the quality of material processing. When determining the joint trajectory of robots with kinematic redundancy, all these factors need to be considered simultaneously. On the other hand, for models with complicated geometry, the number of waypoints for a toolpath can go up to more than 8k, which is difficult to solve directly by existing methods (e.g., [6]–[8]). We address these challenges in this paper by proposing a new method that can simultaneously optimize tool orientations, kinematic redundancy of the robotic system, and waypoint timing for toolpaths with numerous waypoints.
+A. Related Work
+We review the relevant literature for tool orientations, kinematic redundancy and kinematic smoothness below.
+Tool orientations in multi-axis AM are often selected according to the surface normals of curved layers for achieving good material adhesion [2], [4], [5], [9]. For SM such as computer numerical control (CNC) milling, the methods to optimize tool orientations have been extensively studied [10]– [14]. A general purpose of these methods is to maximize the machining width while avoiding gouging and singularity.
+After determining the tool orientation, the 5-DoF toolpaths are obtained. In robot-assisted manufacturing, a most common situation is to execute the 5-DoF toolpath by a 6-DoF robot. In this case, the rotational angle of the end-effector around the tool axis is a redundant DoF and needs to be planned. Some researchers proposed to solve the redundancy at each waypoint one by one to improve the system’s local performance such as the robotic stiffness [15]–[17], contour error [18], and surface
+
+AUTHORS’ VERSION UNDER REVIEW
+
+2
+
+location error [19]. In order to improve global metrics of the manufacturing trajectory, such as smoothness and energy efficiency, some global optimization methods [7], [20] were presented to solve the redundant angles at all waypoints simultaneously.
+To enhance the kinematics of the trajectory, some methods proposed optimization criteria based on the joint velocity [21] and acceleration [6]. A local filtering method was proposed in [22] to minimize the jerk of a trajectory. This method is not limited to the 6-DoF robot and can also be applied to a dual-robot system in experiments. This method can only consider a small number of waypoints at each iteration, and its computational efficiency is very low when dealing with long toolpaths.
+Recently, methods have been proposed to optimize the tool orientation and the robot redundancy simultaneously (e.g., [8], [23]–[29]). Compared with the decoupled planning strategy, these methods can find more optimal solutions. Among these methods, the optimization algorithm based on sequential quadratic programming (SQP) [8] has shown its high efficiency and robustness in dealing with non-linear problems. It has been generalized and demonstrated to plan flank milling motions for a 6-DoF robot [30]. However, these methods cannot incorporate constraints related to waypoint timing, such as joint velocity, acceleration, and jerk, necessitating additional speed planning.
+The result of tool orientation and robot redundancy planning is a sequence of the robotic joint angles. With the determined joint angles, studies on speed planning have been conducted to improve the jerks of joint angles and the total manufacturing time (ref. [31], [32]). These methods can be classified into three categories, including the dynamic programming method [33], the numerical integration method [34], and the convex optimization methods [32], [35]–[41].
+The aforementioned methods are effective for trajectory planning in general, but they also have the following limitations.
+• Most of these methods only focus on one or two of the factors that have an influence on the quality of the resultant trajectory, which means that either the problems are solved in a manner of multiple stages or by simply fixing some of these variables. The generation of real optimal results is prevented.
+• For most of the above methods, when toolpaths consist of a large number of waypoints, the computational efficiency is low and the required computer memory is enormous.
+• Most methods for tool orientation and redundancy planning are designed for SM with a single 6-DoF robot, and they cannot be directly extended to cover the manufacturing systems with multiple robots.
+A concurrent and scalable trajectory optimization method for a dual-robot system with kinematic redundancy is needed.
+B. Our Method
+First of all, a kinematic model for dual robotic arms is formulated. We then introduce the kinematic smoothness metrics based on joint velocity, acceleration, and jerk. Constraints on
+
+{WCS} {WCS}
+
+Tool
+
+TooAl ni
+niA
+
+{TCS} {TCS}
+
+Robot B Robot 2
+
+Twb Twb
+
+Ttb Ttb
+{BCS}
+{BCS}
+(a)
+
+Robot A Robot 1
+
+Tool Tliw Tool
+Tliw
+{WCS} pi {WCS} Surface pi
+Surface g g
+
+niB niB
+{LCSi}
+{LCSi} Toolpath
+niA Toolpath niA
+
+(b)
+
+Fig. 1. The kinematic model of a robotic manufacturing system: (a) the dualrobots system with 6+2 DoFs, and (b) the schematic of the local coordinate systems around each waypoint pi.
+
+orientations and tool-tip motion are modeled according to the requirements for successful additive manufacturing. On this basis, an optimization method is developed to concurrently plan tool orientation, kinematic redundancy, and waypoint timing. The objective function of optimization is defined to enhance the kinematic smoothness of the resultant trajectory. To solve this problem for toolpaths with a large number of waypoints, an efficient computing scheme is proposed based on SQP and a developed decomposition strategy.
+The contributions of the paper are mainly in the following areas.
+• A new formulation with tool orientation, robot redundancy, and manufacturing time-sequence being optimized concurrently so that results with better performance can be achieved.
+• A decomposition-based numerical scheme to optimize the trajectory in an out-of-core manner which can also run in parallel to improve the efficiency.
+• A general formulation supporting both the single and the dual robots systems by incorporating the manufacturing constraints for AM applications.
+The rest of our paper is organized as follows. Section II presents the kinematic model of the robotic system and formulates the trajectory optimization problem in detail. The efficient method of numerical computation is presented in Sec. III. Section IV discusses details of the implementation and special cases. Simulations and experimental results are presented in Sec. V. Finally, we conclude the work in Sec. VI.
+II. PROBLEM STATEMENT
+A. Kinematic Model of the 6+2 DoFs Dual-Robot System
+Dual-robot systems have been increasingly used in different manufacturing scenarios [28], [42]–[44]. In particular, dualrobot systems allow the orientation change of both the workpiece and the printer head, which makes it easier to accumulate materials from more flexible directions in the model space enabling the fabrication of complex curved layers. This section presents the kinematic model of the 6+2 DoFs dual-robot system as shown in Fig. 1(a). Note that the modeling framework as well as the trajectory optimization method presented in this paper can be employed for a variety of single and dual-robot systems (i.e., not limited to this particular setup).
+The toolpath for manufacturing consists of a series of discrete waypoints denoted by {pi | i = 1, 2, · · · , n} with n
+
+AUTHORS’ VERSION UNDER REVIEW
+
+3
+
+being the number of waypoints, which is usually generated
+by a path planner and employed as the input of our trajectory
+optimizer. The toolpath must be accurately followed by the
+tooltip. The kinematic model presented here is for the case when the tooltip is located at pi, where the toolpath {pi} is represented in the workpiece coordinate system {WCS}.
+The robot holding the printer head is denoted as Robot A. The tool coordinate system {TCS} is established at the tooltip. Its z-axis is assigned along the tool axis being denoted as nAi . The kinematic model from the base coordinate system {BCS} to {TCS} is
+
+Tb A Rb t (qi ) = t (ωi) pbt,i , (1)
+
+0
+
+1
+
+where Ttb represents the forward kinematics (FK) of Robot A, and qAi ∈ R6 is the vector of its joint angles for reaching the waypoint pi. pbt,i ∈ R3 and Rtb ∈ SO(3) represent the
+
+tooltip position and tool orientation in {BCS} respectively.
+
+ωi = [ωi,1, ωi,2, ωi,3]T ∈ R3 is the exponential coordinate of
+
+Rtb (i.e., Rtb = exp([ωi])) with
+
+
+
+
+
+0 −ωi,3 ωi,2
+
+[ωi] =  ωi,3
+
+0 −ωi,1 .
+
+−ωi,2 ωi,1
+
+0
+
+In this paper, the operator [·] acting on a vector in R3 gives a skew-symmetric matrix belonging to the lie algebra so(3). For a given pbt,i, ωi can be considered as an independent variable in Eq.(1). In other words, for any ωi, as long as the
+homogeneous transformation matrix on the right-hand side of Eq.(1) is reachable, we can get qAi through the IK of the robot.
+As shown in Fig. 1(b), {LCSi} denotes a local coordinate
+system constructed at pi with its z-axis being assigned along the normal nBi of the current layer. For the robot holding the workpiece, denoted as Robot B, the transformation from
+{BCS} to {LCSi} can then be formulated as
+
+b Bw
+
+Rbi pbi
+
+Tw(qi )Tli =
+
+,
+
+(2)
+
+01
+
+where Twb is the FK of Robot B, representing the position and orientation of the workpiece coordinate system {WCS} with respect to (w.r.t.) {BCS}, and qBi ∈ R2 is the vector of joint angles for Robot B. Tli w represent the pose of {LCSi} w.r.t. {WCS}. Rib indicates the orientation of {LCSi} w.r.t. {BCS}, and pbi gives the representation of pi in {BCS}. Obviously, qBi is an independent variable in Eq.(2) since Tli w is constant.
+A successful manufacturing process requires the tooltip
+being located at the desired waypoints, which gives
+
+pt,i b = pib
+
+(3)
+
+for i = 1, 2, · · · , n. To ensure the quality of additive manufacturing, more constraints are also placed for tool orientations and other kinematic metrics with details given in Sec.II-D.
+Based on the above discussion, Eqs.(1)-(3) define the kinematic model of the dual-robot system for a waypoint pi on the toolpath. Although this model can be constructed without introducing {BCS}, it is included here for two main reasons: 1) to incorporate manufacturing constraints depending on the
+
+direction of gravity (see Sec. II-D for more details) that is
+
+defined in {BCS}, and 2) to provide a generalized method for
+
+constructing kinematic models, facilitating the replacement of
+
+any robot with ones in different configurations.
+
+There are five independent variables in this model, which
+
+are
+
+θi
+
+=
+
+[
+
+ωTi
+
+,
+
+(q
+
+B i
+
+)T
+
+]
+
+T
+
+∈
+
+R5.
+
+{θi | i
+
+=
+
+1, 2, · · ·
+
+, n}
+
+are
+
+used
+
+as the optimization variables together with the manufacturing
+
+time-sequence discussed below for the trajectory optimization
+
+problem. Details will presented in Sec. II-E.
+
+B. Manufacturing Time-Sequence as Variables
+
+The time spent by the tool moving along the toolpath is defined as a manufacturing time-sequence {ti | i = 2, · · · , n}, which can also be optimized to improve the quality and efficiency of manufacturing. Specifically, ti represents the time taken for the tool moving from pi−1 to pi. Therefore, the total manufacturing time for an input toolpath can be obtained by
+
+n
+
+Φtm = ti.
+
+(4)
+
+i=2
+
+When changing the time-sequence at all waypoints, the velocity of the tooltip is planned therefore also other kinematic metrics.
+
+C. Kinematic Metric
+
+The kinematic smoothness of a trajectory has been observed
+as an important way to improve the quality of robot-assisted
+manufacturing. It is mainly measured by the velocity, acceler-
+ation, and jerk of all the robot joints. Given the vector of joint angles of the dual-robot system as qi = [(qAi )T , (qBi )T ]T at the waypoint pi, the corresponding velocity, acceleration, and jerk vectors of joints are denoted by vi, ai, and ji.
+As the value of ti can change for different i, the unevenly spaced numerical differentiation is used to evaluate vi, ai, and ji (ref. [45]). We can have the velocity as
+
+t2i qi+1 + (t2i+1 − t2i )qi − t2i+1qi−1
+
+vi =
+
+.
+
+(5)
+
+(ti+1 + ti)titi+1
+
+The acceleration ai and the jerk ji can also derived by the method of [45] – see Appendix A for the formulas.
+We propose the following metric Φsmooth for evaluating the overall kinematic smoothness of a robotic system, which is defined as the integral of the norms of velocity, acceleration, and jerk along the toolpath.
+
+n
+
+Φsmooth = ϕi∆si
+
+(6)
+
+i=1
+
+ϕi = kvviT Wvi + kaaiT Wai + kj jiT Wji
+
+(7)
+
+where ∆si = (si + si+1)/2 with si = ∥pi − pi−1∥ being the distance between pi and pi−1, kv, ka and kj are three nonnegative coefficients, and W is a diagonal non-negative matrix used to control the importance of each joint. We choose the values of kv, ka and kj after normalization (see Sec. IV-B for details). W = I is also simply chosen for all examples tested in our work.
+
+AUTHORS’ VERSION UNDER REVIEW
+
+4
+
+Nozzle
+
+g, niA
+(a)
+
+niA g
+(d)
+
+Nozzle
+
+Nozzle
+
+Nozzle
+
+niB
+
+niB
+
+Printed part g
+
+niA
+
+(b)
+
+(c) Printed part
+
+Printed part
+
+Nozzle
+
+(e) Nozzle
+
+g, ni (f) B Printed part
+
+niB niA
+
+Fig. 2. The influence of orientations on additive manufacturing: the ideal conditions are given in (a)-(c) and the corresponding failure cases are shown in (d)-(f).
+
+D. Manufacturing Requirements
+The requirement of the relative orientation between the tool and the workpiece has been studied in [8], [10]–[13] for subtractive manufacturing such as milling. However, due to the working principle of material extrusion in additive manufacturing, constraints on the absolute orientation of both the printer head and the workpiece w.r.t. {BCS} need to be imposed in addition to the relative orientation.
+1) Requirements on Orientations: At each waypoint pi, the constraints on orientations are defined by the extrusion direction nAi , the normal nBi of curved layer, and the gravity direction g. The schematic of these three directions is shown in Fig. 1(b).
+Extruding materials out of the nozzle of a printer head needs the help of gravity. If the extrusion direction nAi deviates too much from the gravity g, the material flow will be nonuniform and not follow the direction of nAi . The quality of material deposition will be influenced as shown in Fig.2(d). The deviation is controlled by a constraint nAi · g ≥ cos α. As listed in Eq.(17), nAi is determined by ωi as it is the third column of Rtb in Eq.(1).
+To ensure a successful stacking of the material, the angle between the layer normal nBi and g should be constrained. If this is not controlled, an extreme case is as illustrated in Fig.2(e) where the extruded material will not be able to bond onto the already printed part – i.e., the material will fall away caused by gravity. The constraint is given in Eq.(18), where β is a threshold angle smaller than π/2 and nBi is determined by qBi as it is the third column of Rib in Eq.(2).
+At the same time, the angle between nBi and nAi also needs to be constrained. Since there is a certain distance between the tooltip and the printed layer in practice, a too-large deviation between these two directions will prevent the material from reaching the desired position as illustrated in Fig.2(f). This constraint is given in Eq.(19) with a threshold angle γ.
+2) Requirements on Tooltip Motion: The motion at the tooltip needs also to be controlled to ensure the quality of manufacturing. For example, if the tooltip goes through a sharp turn at a breakneck speed w.r.t. {WCS}, there is a high possibility that the extruded material will be carried away by the printer head and cannot be stably located in the desired position. To avoid this problem, the constraints of the tooltip velocity vit, the tangential acceleration ati, and the normal acceleration ani at the tooltip are imposed in {WCS} to ensure
+
+effective material adhesion at all waypoints. At a waypoint pi, the speed of motion vti is
+
+vit = si/ti.
+
+(8)
+
+With the detailed derivation given in Appendix B), the tangential acceleration ati and the normal acceleration ani can be computed by
+ait = 2(si+1ti − sitt+1) , (9) titi+1(ti + ti+1)
+
+n
+
+s2i t2i+1 + s2i+1t2i − 2sisi+1titi+1cos(σi)
+
+ai = κi
+
+22
+
+, (10)
+
+4ti ti+1
+
+where si = ∥pi − pi−1∥, κi is the approximated curvature of the toolpath at the pi, and σi is the angle between the two vectors pipi−1 and pipi+1.
+3) Requirement Caused by Extrusion Speed: Limited by
+the working principle of material deposition, the allowed extrusion speed has an upper bound vme ax. Therefore, the printer head cannot move too fast. Specifically, we need to
+have the following constraint
+
+ti ≥ Vi/vme axA¯i,
+
+(11)
+
+where Vi is the volume of material to be printed between pi−1 and pi, and A¯i is the average cross-sectional area of accumulated material.
+
+E. Optimization Problem
+The trajectory optimization problem by incorporating all the metrics and the constraints discussed above can be formulated as follows.
+
+min Φsmooth
+{θi },{ti }
+
+(12)
+
+subject to (i = 1, . . . , n)
+
+qiA = IKµ(ωi, pt,i b )
+
+(13)
+
+qmin ≤ qi ≤ qmax
+
+(14)
+
+|vi| ≤ vmax, |ai| ≤ amax, |ji| ≤ jmax (15)
+
+Γ(qi) < 0
+
+(16)
+
+nAi (ωi) · g ≥ cos(α)
+
+(17)
+
+nBi (qBi ) · g ≤ −cos(β)
+
+(18)
+
+nAi (ωi) · nBi (qBi ) ≤ −cos(γ)
+
+(19)
+
+vit ≤ vmax t , |ati| ≤ amax t , |ani | ≤ amax n (20)
+
+ti ≥ Vi/vme axA¯i
+
+(21)
+
+Φtm ≤ tu
+
+(22)
+
+where
+
+θi
+
+=
+
+[
+
+ω
+
+T i
+
+,
+
+(qBi
+
+)
+
+T
+
+]T
+
+.
+
+I K µ (·)
+
+represents
+
+the
+
+IK
+
+of
+
+Robot A according to the µ-th joint configuration, which is
+
+selected from the eight possible configurations as stated in
+
+Sec. III-A. pbt,i is determined by qBi according to Eqs.(2)
+
+and (3). Equations (14)-(15) represent the limits on joint
+
+angles, velocities, accelerations, and jerks. Equation (16) is
+
+the collision-free constraint, and Γ(·) is a proxy collision
+
+indication function trained by learning-based methods [22],
+
+[46]. Equations (17)-(21) represent the special constraints for
+
+additive manufacturing discussed in Sec. II-D, which needs
+
+AUTHORS’ VERSION UNDER REVIEW
+
+5
+
+to be replaced by other constraints when subtractive manufacturing such as milling is considered. Lastly, Eq.(22) gives a requirement on the maximally allowed manufacturing time.
+III. NUMERICAL COMPUTATION
+The formulation of trajectory planning proposed above is a large-scale, highly nonlinear, and nonconvex optimization problem. Solving it with off-the-shelf solvers is challenging and expensive in both the computing time and the memory consumption. In order to solve the problem effectively and efficiently, a new scheme of numerical computation is developed by exploiting the special structure of the problem and solving the problem in an out-of-core manner. There are four major steps of our method: initialization, decomposition, subproblem solving, and result correction.
+
+A. Initialization
+
+A good initialization is very important to the convergence
+
+speed of numerical computation. When handling the trajectory
+
+planning problem on a dual-robot system with 6+2 DoFs, the
+
+following steps are taken to determine the configuration index
+
+µ
+
+and
+
+the
+
+initial
+
+guess
+
+of
+
+{θi
+
+=
+
+[ωiT ,
+
+(q
+
+B i
+
+)T
+
+]
+
+T
+
+}.
+
+1) We first set nBi = −g for all i ∈ {1, · · · , n} and compute the vector of joint angles qBi by the IK of Robot B (i.e., Eq.(2)) using the analytical solution [47].
+2) We then assign nAi = g for all i ∈ {1, · · · , n}, which means assigning the third column of Rtb as g for Robot
+A employed in Eq.(1). 3) To determine Rtb and the joint angles {θi}, we need
+to know the rotation angle ηi of the tool around its axis (i.e., nAi ) and the configuration index µ. The graph-based optimization proposed in [6], [9], [22] is employed here
+
+to obtain these parameters.
+
+4) To make sure the initial solution is collision-free, colli-
+
+sion detection is conducted at every waypoint by using
+
+the the flexible collision library (FLC) proposed in [48].
+
+If a collision occurs at pi, ηi will be modified to ensure
+no collision while minimizing the change of ηi (ref. [9]). After that, ωi is determined by [ωi] = log(Rbt ).
+
+We denote the initial guess of {θi} as {θi0}, which represents the initial configuration of the robotic system.
+
+For the initial guess of time-sequence, a reasonable choice
+
+is based on the angular distance between discrete IK solutions
+
+as
+
+0
+
+t
+
+e ¯ qi,j − qi−1,j
+
+ti = max {si/vini, Vi/vmaxAi,
+
+},
+
+j=1,...,8
+
+vmax,j
+
+(23)
+
+where qi,j and vmax,j represent the jth element of qi and vmax. vtini should be chosen as a value less than vmt ax. According to Eqs.(8)-(10), the initial solution can satisfy the constraints defined in Eq.(20) as long as vtini is small enough. Starting from vtini = vmt ax, we progressively reduce the value of vtini until all the constraints in Eq.(20) are satisfied. The term (qi,j − qi−1,j)/vmax,j is added in Eq.(23) to indicate the
+demanded upper bound of joint velocity.
+
+(a11 , b11 )
+
+(a21 ,b21)
+
+1
+
+ζ ζ+5
+
+...
+
+...
+
+...
+
+......
+
+ζ /2+3
+
+3ζ/2+2
+
+(a12 ,b12 )
+
+Fig. 3. An illustration for two sets of toolpath-segments (upper and lower ones), where the toolpath-segments in the same set can be optimized simultaneously in parallel.
+
+B. Decomposition
+
+We propose a decomposition based numerical scheme to optimize the trajectory with a large number of waypoints in an out-of-core manner. The strategy is motivated by the block coordinate descent (BCD) method [49] and the Benders decomposition [50] but with certain modifications and analysis to fit our optimization framework. While only allowing the variables for a smaller range of waypoints as {θi | i = a, · · · , b} and {ti | i = a + 1, · · · , b} to change during the optimization with a, b ∈ {1, · · · , n} and a < b, the optimization problem becomes
+
+b+2
+
+min
+
+ϕi∆si
+
+{θi | i=a,··· ,b}
+
+{ti | i=a+1,··· ,b} i=a−2
+
+(24)
+
+subject to Eqs.(13)-(22) with i = a − 2, . . . , b + 2.,
+
+To facilitate the further introduction of this algorithm with different values of a and b, the decomposed sub-problem (i.e., Eq.(24)) is denoted as DS(a, b) in the rest of this paper.
+Analyzing the sub-problem defined in Eq.(24), it can be found that DS(a1, b1) and DS(a2, b2) are completely independent when a2 − b1 > 4. Therefore, they can be solved independently in parallel. Based on this, the decomposition strategy is proposed as follows.
+First, the following two sets of index-pairs are defined to represent two sets of toolpath-segments (see also Fig.3).
+
+{(a11, b11), (a12, b12), · · · , (am1 1 , bm1 1 )}
+
+(25)
+
+{(a21, b21), (a22, b22), · · · , (am2 2 , bm2 2 )}
+
+(26)
+
+where
+
+a1
+1
+
+=
+
+1,
+
+a2
+1
+
+=
+
+ζ /2
+
++
+
+3,
+
+max{
+
+b1
+m
+
+1
+
+,
+
+2
+bm2
+
+}
+
+=
+
+n,
+
+and
+
+m1
+
+and m2 give the sizes of the two sets. For j = 1, 2, we define
+
+aij − bij = ζ − 1, bij − ai−1 j = 5. (27)
+
+ζ ≥ 4 is an integer controlling the number of waypoints in each toolpath-segment. In our implementation and all tests, we set ζ = 100 to balance the effectiveness and efficiency.
+Two sets of sub-problems are then defined as
+
+S1 = {DS(a11, b11), DS(a12, b12), · · · , DS(a1m1 , bm1 1 )} (28) S2 = {DS(a21, b21), DS(a22, b22), · · · , DS(a2m2 , bm2 2 )} (29)
+
+Based on S1 and S2, the decomposed numerical scheme can be presented as Algorithm 1, where τ and kmax are two parameters to control the terminal condition of iterations. τ = 0.001 and kmax = 5 are chosen in our implementation by empirical tuning. Note that the choice of kmax is related to ζ — a smaller value of ζ tends to acquire a larger kmax.
+
+AUTHORS’ VERSION UNDER REVIEW
+
+6
+
+Algorithm 1: Decomposition-Based Optimization
+Input: Initial solution {θi0} and {t0i } Output: Optimized solution {θi∗} and {t∗i } 1 Ψold = ∞; 2 Assign Ψnew by the value of the objective function; 3 k = 0; 4 while (Ψold − Ψnew)/Ψold > τ and k < kmax do 5 k = k + 1; 6 Ψold = Φnew; 7 Solve problems in S1 in parallel; 8 Update solution {θi} and {ti}; 9 Solve problems in S2 in parallel; 10 Update solution {θi} and {ti}; 11 Assign Ψnew by the value of the objective
+function;
+12 {θi∗} = {θi} and {t∗i } = {ti}.
+
+C. Solving Sub-problem
+
+The next issue to be addressed is how to solve the decom-
+
+posed sub-problem Eq.(24). A novel SQP-based algorithm was
+
+proposed in [30] to solve the smooth trajectory optimization
+
+problem in robotic milling. The core of this algorithm is to
+
+solve quadratic programming (QP) sub-problems in an itera-
+
+tive way, and it is borrowed to solve the sub-problem in this
+
+work. The most critical aspect is how to locally approximate
+
+each DS(·) problem as a QP problem, considering the dual-
+
+robot system considered in this paper is more complicated
+
+than the 6-DoF single robot system in terms of kinematics.
+
+Specifically, we need to approximate the objective function
+
+as a quadratic function and approximate all the constraints
+
+as linear functions. The approximations are expected to have
+
+analytical forms for the efficiency of computation.
+
+For the sake of expression, we denote all the variables in a decomposed sub-problem as a vector x with xk being its value
+
+in the kth iteration. The approximation process is presented
+
+as follows.
+
+1) Increment Vector of Joint Angles: Our approximation is
+
+based on local linearization, which requires to compute the
+
+first-order differential increments of all parameters w.r.t. the
+
+variables to be optimized. Considering the variables {θi =
+
+[ω
+
+T i
+
+,
+
+(qBi
+
+)
+
+T
+
+]T
+
+}
+
+,
+
+the
+
+increment
+
+of
+
+qAi
+
+can
+
+be
+
+derived
+
+as
+
+A ∂qAi
+
+∂qAi B
+
+∆qi =
+
+∆ωi + B ∆qi .
+
+(30)
+
+∂ωi
+
+∂qi
+
+Suppose that ωi = [ωi,1, ωi,2, ωi,3]T , we can have the following equation for j ∈ {1, 2, 3} based on the differential kinematics [8], [30]:
+
+∂qAi
+
+−1
+
+= J Vωi,j ,
+
+∂ωi,j
+
+(31)
+
+where J is the Jacobian of Robot A defined at its tooltip. Vωi,j = [(Vω)T , (Vv)T ]T ∈ R6 can be considered as the spatial velocity of {TCS} w.r.t. to ωi,j, and its matrix form
+
+[Vω] Vv [Vωi,j ] =
+00
+
+can be obtained by
+
+b −1 ∂Rtb/∂ωi,j 0
+
+[Vωi,j ] = (Tt )
+
+,
+
+(32)
+
+0
+
+0
+
+where
+
+∂Rt b b ∂ωi
+
+= Rt A(ωi)
+
+,
+
+(33)
+
+∂ωi,j
+
+∂ωi,j
+
+A(ωi) = I − 2 1 − cos(∥ωi∥) [ωi] + 3 ∥ωi∥ − sin(∥ωi∥) [ωi]2.
+
+∥ωi∥
+
+∥ωi∥
+
+(34)
+
+Here I denotes an identity matrix.
+
+Similarly, for any element qiB,j, j ∈ {1, 2} in qBi , we have
+
+∂qAi
+
+−1
+
+= J VqB ,
+
+i,j
+
+∂ qiB,j
+
+(35)
+
+[V b −1 0 ∂pb qB ] = (T t /∂q t ) iB,j , (36)
+
+i,j
+
+0
+
+0
+
+where ∂pbt /∂qiB,j = ∂pbi /∂qiB,j has an analytical form according to Eq.(2).
+In summary, ∆qAi has an analytical form based on Eqs.(30), (31) and (35).
+2) Increments of Joint Velocity, Acceleration, and Jerk:
+Based on Eq.(5), the joint velocity is a function of joint angles
+and time-sequences. Therefore, its first-order increment is
+
+i+1 ∂vi
+
+i+1 ∂vi
+
+∆vi = ∂qj ∆qj + ∂tj ∆tj, (37)
+
+j=i−1
+
+j=i
+
+where ∆qj = [(∆qAj )T , (∆qBj )T ]T , ∆qAj has been given in Eq.(30). The increments of joint acceleration and jerk can be obtained in a similar way. All three increments have a concise form as
+
+∆vi = dvi ∆x, ∆ai = dai ∆x, ∆ji = dji ∆x, (38)
+
+dx
+
+dx
+
+dx
+
+with ∆x being the increment of the variable vector x.
+3) Local Approximation of the Objective Function: Substituting Eq.(38) into Eq.(7) yields the following local approximation of ϕi near any variable vector xk as
+
+ϕi(∆x) = kv(vi + dvi ∆x)T W(vi + dvi ∆x)
+
+dx
+
+dx
+
++ ka(ai + dai ∆x)T W(ai + dai ∆x) (39)
+
+dx
+
+dx
+
++ kj(ji + dji ∆x)T W(ji + dji ∆x)
+
+dx
+
+dx
+
+Thus, the objective function in Eq.(24) is approximated as
+
+b+2
+
+Φ=
+
+ϕi(∆x)∆si.
+
+(40)
+
+i=a−2
+
+Since Φ is a quadratic function of ∆x, it has the form
+
+Φ = ∆xT H∆x + 2fT ∆x + c
+
+(41)
+
+where H is a positive definition matrix, f is a vector, and c is a scalar.
+
+AUTHORS’ VERSION UNDER REVIEW
+
+7
+
+4) QP Construction: Based on the above discussion, the
+decomposed sub-problem can be analytically approximated near xk as the following QP-problem.
+
+min ∆xT H∆x + 2fT ∆x
+
+(42)
+
+∆x
+
+subject to (i = a, . . . , b; j = a − 2, . . . , b + 2)
+
+qmin ≤ qi(xk) + ∆qi ≤ qmax
+
+(43)
+
+− vmax ≤ vj (xk) + ∆vj ≤ vmax
+
+(44)
+
+− amax ≤ aj (xk) + ∆aj ≤ amax
+
+(45)
+
+− jmax ≤ jj (xk) + ∆jj ≤ jmax
+
+(46)
+
+Γ(xk) + (dΓ/dqi) ∆qi < 0
+
+(47)
+
+(dnAi /dωi)∆ωi · g ≥ cos(α) − nAi (xk) · g
+
+(48)
+
+(dnBi /dqBi )∆qBi · g ≤ −cos(β) − nBi (xk) · g (49)
+
+d(nAi · nBi )
+
+Ak Bk
+
+∆x ≤ −cos(γ) − ni (x ) · ni (x ) (50)
+
+dx
+
+vit(xk) + dvit/dx ∆x ≤ vmax t
+
+(51)
+
+|ati(xk) + dati/dx ∆x| ≤ amax t
+
+(52)
+
+|ani (xk) + (dani /dx) ∆x| ≤ amax n
+
+(53)
+
+ti(xk) + ∆ti ≥ Vi/vme axA¯i
+
+(54)
+
+b
+
+∆ti ≤ tu − Φtm(xk)
+
+(55)
+
+i=a+1
+
+where
+
+∆qi
+
+=
+
+[(∆q
+
+A i
+
+)
+
+T
+
+,
+
+(∆
+
+qBi
+
+)
+
+T
+
+]T
+
+.
+
+dΓ/dqi
+
+can
+
+be
+
+analytical
+
+as long as the collision indication function Γ is represented in
+
+an analytical form. Since nAi and nBi are the third columns of Rtb and Rib respectively, dnAi /dωi and dnBi /dqBi are obtained
+
+from Eq.(33) and the differentiation of Eq.(2), thereby allow-
+
+ing the calculation of d(nAi · nBi )/dx. The analytical form for dvit/dx, dati/dx, and dani /dx can be obtained by differentiating
+
+Eqs. (8)-(10).
+
+By the algorithm presented in [30], the solution can be
+
+obtained by iteratively solving a series of QP-problems. Note
+
+that since the QP-problem is sparse, it can be efficiently solved
+
+by using advanced libraries such as OSQP [51].
+
+D. Result Correction
+This step is conducted after determining the optimized {θi∗} and {t∗i }. As the collision indication function Γ(·) is obtained by the learning-based method that does not present the obstacles precisely, the resultant {θi∗} cannot completely assure a collision-free machining process. Therefore, we need to verify the result of optimization by using a geometry-based collision detection library. If a collision happens at pi, θi is modified by a bi-sectional search method to find a collisionfree solution between θ∗i and θi0.
+IV. IMPLEMENTATION DETAILS AND DISCUSSION
+In this section, we discuss the details of collision detection, normalization for different objectives, and the generalization of our approach.
+
+Training Data Sampling
+
+Proxy Model () Trajectory
+
+Update
+
+Optimization
+
+Trajectory Output
+
+Active Learning
+
+Layers Update
+
+Only for additive manufacturing
+
+Fig. 4. The training process of the proxy functions for collision detection.
+
+A. Collision Detection
+For the proxy detector of collision Γ(·), there are many learning-based methods to train it. For subtractive manufacturing, only the shape of the target workpiece needs to be considered in training. Differently, the shape of a workpiece changes from layer to layer while accumulating materials, and different proxy functions need to be trained for each layer.
+The coarse-to-fine sampling strategy proposed in [22] is adopted in our implementation to construct a dataset more adaptive to the shape of obstacles. Firstly, we obtain an approximately uniform sampling near obstacles in configuration space (C-space) by randomly sampling on the working layer surface and up-scaling in C-space. After that, the refinement step is conducted to increase the density of samples near the collision boundary in C-space.
+The learning-based algorithm, Fastron [46], is used to train the proxy function Γ(·). For the first printing layer, the proxy model is trained based on the samples obtained by the above method. At the same time, we get a set of supporting samples S1 for this proxy model. For the ith layer with i > 1, the Fastron Active Learning Algorithm proposed in [46] helps get a new set of samples Ai based on the supporting samples Si−1 of the last proxy model. Then the proxy model is updated based on samples Si−1 ∪ Ai and the current proxy model. In this way, we do not need to rebuild a new function for each layer but to update the existing one. The training flowchart for learning collision detection proxy functions is shown in Fig. 4.
+In special cases where the surface of a workpiece is relatively flat, the probability of a collision occurring is very low, especially when nAi and nBi are constrained. Therefore, the collision-free constraint in Eq.(16) can be removed from the optimization problem to accelerate the computation. This also avoids the steps of dataset generation and proxy model training and further reduces the computation time. It should be noted that the resultant trajectory is still ensured to be collision-free thanks to the result correction process presented in Sec. III-D.
+
+B. Normalization
+
+To facilitate the value setting of kv, ka, and kj in Eq.(7), it is better to normalize the corresponding terms in the
+kinematic metric. The normalization method proposed in [30] is conducted in all our tests. For example, if we denote vTi Wvi in Eq.(7) by ϕV ec i , the normalized result of ϕV ec i is
+
+˜V ec ϕV ec i − ϕV ec min
+
+ϕi = V ec
+
+V ec
+
+ϕmax − ϕmin
+
+(56)
+
+where
+
+ϕV ec
+max
+
+and
+
+ϕV ec min
+
+are
+
+the
+
+maximum
+
+and
+
+minimum
+
+values
+
+of ϕV ec i for i = 1, . . . , n based on the initial solution.
+
+AUTHORS’ VERSION UNDER REVIEW
+
+8
+
+Similarly,
+
+the
+
+terms
+
+of
+
+a
+
+T i
+
+Wa
+
+i
+
+and
+
+jiT Wji
+
+in
+
+Eq.(7)
+
+are
+
+normalized in the same way. After normalization, we choose
+
+the weight values as kv = 0.1, ka = 0.5, and kj = 1 by
+
+experiments and employ them in all examples tested in this
+
+paper.
+
+C. Generalization
+
+Our formulation is general which can handle the optimization of joint poses and the time-sequence in both a simultaneous and a decoupled manners. Specifically, we can fix the value of time-sequence {ti} so that the speed of tooltip’s motion can be controlled precisely. On the other aspect, when there are special requirements of joint poses on different waypoints, we can compute and determine the poses {θi} first and then only optimize the time-sequence {ti} by our optimization framework. Moreover, we can replace the timesequence by the sequence of arc-length parameters {si} for waypoints on the toolpath. As a result, the objective function becomes a metric evaluating the geometric smoothness of joint paths (ref. [7], [8]).
+As a general framework of trajectory optimization using kinematic redundancy, our method can also be applied to a single-robot system. For the system consisting of a 6-DoF robot and a fixed printer head shown in Fig. 25, {WCS} is located at the end of the robot. The kinematic model is
+
+Twb (qi)Tli wTtli = Ttb
+
+(57)
+
+with Rti 0
+Tlti = 0 1 (58)
+
+The exponential coordinate of Rti can be chosen as the independent variable since Tli w and Ttb are constant. Replacing {θi} in the optimization problem with this new independent variable yields the trajectory optimization model for the single robot system, and the method in Sec. III can be directly used to solve it. An example of such a single-robot system with kinematic redundancy is also given in the following section.
+
+V. SIMULATIONS AND EXPERIMENTS
+In this section, simulations and physical fabrication experiments of additive manufacturing are conducted to validate the effectiveness of our method. The robot system used consists of a robot with 6-DoF (ABB IRB-2600) and a position table with 2-DoF (ABB IRBP-A), as shown in Fig. 5. All programs are implemented by C++ and tested on a PC with an Intel Core i9 CPU at 3GHz and 32GB RAM.The method presented in this paper has been conducted to optimize trajectories for curved layers in AM as freeform surfaces, the results of which are discussed below and can also be found in the supplementary video: https://youtu.be/vILrYwFufUk. We have made our source code publicly accessible at the GitHub site: https://github.com/Yongxue-Chen/ConcurrentTrajOpt.
+
+A. Example I
+The first example is a curved layer with 7, 497 waypoints as shown in Fig. 6. The parameters for orientation constraints are set to α = 20◦, β = 8◦, γ = 12◦. The upper bound tu is set as the manufacturing time of the initial solution.
+
+Fig. 5. The dual-robot system used for AM experiments, where the printer head is mounted on the end-effector of the 6-DoF robot and the workpiece is mounted on the working plate of a position table with 2-DoF.
+
+0.4 0.3 0.2 0.1
+Fig.0 6.
+
+rad/s rad/s2 rad/s3
+
+ smooth
+
+vm
+0.6 0.4 0.2
+
+am
+8 6 4 2
+
+jm
+150 100 50
+
+The toolpath o0 f a curved layer f0or AM employed in0 Example I.
+
+ smooth
+0.4 0.3 0.2 0.1
+0
+
+rad/s rad/s2 rad/s3
+
+vm
+0.6 0.4 0.2
+
+am
+8 6 4 2
+
+jm
+150 100 50
+
+0
+R+O+T
+
+0
+
+R+O
+
+R+T
+
+0
+R
+
+Fig. 7. Ablation study by using Example I, where vm, am, and jm are the maximum values of joint velocity, acceleration, and jerk on the resultant trajectories. The dashed lines represent the maximally allowed joint velocity, acceleration, and jerk as constraints imposed in optimization.
+
+TABLE I OPTIMIZATION RESULTS OF EXAMPLE I: ABLATION STUDY.
+
+Φsmooth vm
+
+am
+
+jm
+
+Before Optimization
+
+4.48 1.22 27.06 812.24
+
+R+O+T R+O R+T R only
+
+0.28 0.55 0.40 0.57 0.39 0.57 0.42 0.57
+
+2.82 43.12 7.20 135.55 6.87 29.39 7.61 143.98
+
+Maximally Allowed
+
+0.60 5.00 50.00
+
+1) Importance of concurrent optimization: For trajectory optimization in robot-assisted AM, the most common framework is to just optimize the robot redundancy with predefined tool orientation and tooltip speed (e.g., [22]). We conduct an ablation study to demonstrate the importance of concurrent optimization as follows.
+Using ‘R’, ‘O’ and ‘T’ to denote the aspects of redundancy,
+
+AUTHORS’ VERSION UNDER REVIEW
+
+9
+
+Objective
+
+10 (0, 9.23) 8
+
+Without decompostion Using decomposition strategy
+
+6
+(111.95, 4.34)
+
+(1780.15, 4.65)
+
+0
+
+500
+
+1000
+
+1500
+
+2000
+
+Optimization time (s)
+
+Fig. 8. Effectiveness study of the decomposition scheme by Example I.
+
+TABLE II ACCELERATION MEASURED FOR EXAMPLE I.
+
+Before optimization After optimization
+
+Robot A Maximum Average
+
+0.1140 0.1040
+
+0.0066 0.0058
+
+Robot B Maximum Average
+
+0.1939 0.1869
+
+0.0441 0.0353
+
+†All values are given in terms of the gravitational acceleration g.
+
+8.43
+
+8.43 8.43 8.44
+
+8.43
+
+8.43
+
+8.43 8.43
+
+0.39
+
+0.51
+
+0.39
+
+0.78
+
+31.03
+
+32.33
+
+31.19
+
+37.65
+
+6.68
+
+6.73
+
+Fig. 9. Sensitivity study of initial solutions in Example I, where ‘GraphOpt’ represents the initial solution obtained from graph-based optimization. The others are derived by setting the redundant angle η to different fixed values.
+
+tool-orientation and time-sequence in optimization respectively, the result of concurrent optimization is represented as ‘R+O+T’ in the comparisons given in Fig. 7 and Table I. The result of only optimizing the kinematic redundancy is given as ‘R’. The effectiveness of different aspects is also shown by fixing the tool-orientaions (i.e., the ‘R+T’ result) or fixing the time-sequence (i.e., the ‘R+O’ result). Besides of the smoothness metric Φsmooth, we also check the maximal joint velocity (denoted by vm), the maximal joint acceleration (denoted by am), and the maximal joint jerk (denoted by jm) throughout the optimized trajectory among all components. They are compared with the maximally allowed values in Table I and Fig. 7 (visualized as dash lines).
+The comparison shows that concurrent optimization has the best performance. It reduces the objective function value by 93.75% with all constraints of maximal values satisfied. In contrast, the other three solutions do not meet the constraints on joint acceleration and/or jerk. This study proves the importance of our concurrent optimization framework.
+2) Effectiveness of decomposition scheme: The effectiveness of the decomposition scheme proposed in Sec. III-B is tested on this example. For this path containing 7, 497 waypoints, directly optimizing the entire path without the decomposition failed on our PC due to the out-of-memory reason. To compare the performance, tests are conducted by only using the first 1, 000 waypoints of the toolpath. The optimization process is as shown in Fig. 8. It can be found that the decomposition scheme can reduce the computing time by more than 93% without compromising the quality of optimization.
+3) Sensitivity study: Now we test the sensitivity of our optimization method when using different initial solutions for the first 500 waypoints of a toolpath (i.e., Example I). The results are presented in Fig. 9. The results indicate
+
+that when the initial solution lies within a certain range, both the optimization time and the final results are similar, demonstrating the robustness of our algorithm. However, due to the characteristics of numerical optimization methods, the algorithm does not converge to the optimal solution when the initial solution deviates significantly from the optimum – e.g., by setting the redundant angle η = 90◦ or η = 270◦. This test also validates the effectiveness of the initialization scheme as proposed in Sec. III-A – indicated as ‘GraphOpt’ in Fig. 9, which gives the best performance among other initial solutions.
+4) Results and physical verification: The results of optimization on all joint paths are shown in Fig. 10. It can be observed that the fluctuations in joint movements can be significantly reduced. This is mainly due to the improvement of kinematic smoothness. To further study the performance of our trajectory optimization approach, we analyze the histograms of two metrics ϕAcc i = aTi Wai and ϕJerk i = jiT Wji that give the kinematic smoothness at the i-th waypoint. The histograms before vs. after optimization are as shown in Fig.11, where the histograms after optimization are shifted substantially to the left, indicating that the smoothness at the vast majority of the waypoints has been improved.
+The performance of our trajectory optimization approach has been verified via physical fabrication conducted on a dualrobot system as shown in Fig. 5. Vibrations at the end-effectors of robots A and B are measured by accelerometers, and the results are illustrated in Table II and Fig. 12. After optimizing the trajectory, the average values of accelerations are reduced by 12.12% and 19.95% on robots A and B respectively. The periodogram power spectral density estimate of the measured data is shown in Fig. 12. The improvement in the vibration of Robot B is significant, as evidenced by a lower power spectral density.
+We also compared the quality of 3D printed curved layers by using both the trajectories before and after optimization – see the results shown in Fig. 13. When using the unoptimized trajectory, it is difficult to synchronize the speed of material extrusion with the nozzle movement due to the jerky motion of robotic joints. As a result, the extruded material is quite uneven in regions such as highlighted Areas ‘b’ and ‘c’. In Area ‘a’, the situation is even worse – i.e., the material breaks and piles up. All these problems can be clearly improved to achieve better surface quality by using the optimized trajectory.
+B. Example II
+The toolpath of Example II contains of 1, 987 waypoints as shown in Fig. 14. The comparison with the local filtering
+
+AUTHORS’ VERSION UNDER REVIEW
+
+10
+
+Angle
+
+0.05
+0
+-0.05
+-0.1 0
+0.74 0.72 0.7 0.68 0.66 0.64 0.62
+0
+
+Robot Joint 1 0.35
+
+0.3
+
+0.25
+
+0.2
+
+0.15
+
+0.1
+
+0.05
+
+2000 4000 6000 8000
+
+0
+
+Robot Joint 5 -0.35
+
+-0.4
+
+-0.45
+
+-0.5
+
+-0.55
+
+2000 4000 6000 8000 Waypoint index
+
+-0.6 0
+
+Before optimization
+
+After optimization
+
+Robot Joint 2
+
+Robot Joint 3 0.3
+
+0.76 0.25
+
+0.74 0.2
+0.72
+
+0.15 0.7
+
+0.1 0.68
+
+0.05 0.66
+
+2000 4000 6000 8000
+
+0
+
+0.64
+
+0
+
+2000 4000 6000 8000
+
+0
+
+Robot Joint 6
+
+Robot Joint 7 40
+
+0.5 30
+
+0
+
+20
+
+-0.5
+
+-1
+
+2000 4000 6000 8000
+
+0
+
+Waypoint index
+
+10
+
+0
+
+-10
+
+2000 4000 6000 8000
+
+0
+
+Waypoint index
+
+Robot Joint 4
+2000 4000 6000 8000 Robot Joint 8
+2000 4000 6000 8000 Waypoint index
+
+Angle
+
+Fig. 10. The robot joint path of Example I, where the joints 1-6 are from Robot A and the joints 7 & 8 belong to Robot B. The unit of joint angles is rad.
+
+Before optimization
+
+After optimization
+
+400
+
+Robot Joint 1400
+
+Robot Joint 2
+
+-0.02 0.24
+
+-0.025
+200
+-0.03
+
+200
+
+0.23
+
+0.22
+
+Number
+
+0 -0.035
+
+10-10 10-5 100
+
+105
+
+-0.04
+
+Acc
+
+-0.04i5
+
+0.21
+0 10-10 100.2-5 100 105 1010
+0.19 Jerk i
+
+Fig. 11.
+
+2150 2200 2250 2300 2350 2400Acc
+
+3J45e0rk3500 3550 3600
+
+Histograms of smoothness metrics ϕi and ϕi in Example I.
+
+Robot Joint 5
+
+Robot Joint 6
+
+0.65 -0.5
+
+Robot A
+
+0
+
+0.645
+
+Robot B
+-0.52
+0
+
+0.64
+-50
+0.635
+
+-0.54
+-50
+-0.56
+
+Power/frequency (dB/Hz)
+
+-100 0
+
+2320 2340 2360 2380-1204000 2420
+
+1200 1300 1400 1500
+
+1
+
+2
+
+3 W4 aypoin5t index 0
+
+1
+
+2
+
+W3 aypoin4t index 5
+
+Frequency (Hz)
+
+Frequency (Hz)
+
+Before optimization
+
+After optimization
+
+Fig. 12. The periodogram power spectral density estimate of the measured acceleration in Example I.
+
+Before optimization
+
+Robot Joint 3
+
+0.2
+
+b
+
+0.18
+
+0.16
+
+a
+
+0.14
+
+0.12
+
+c
+
+0.1
+
+3400 3450 3500 3550 3600 3650
+APftoesritioopnteirmJoizinatt1ion
+
+0.7
+
+b
+
+0.6
+
+0.5
+
+a
+
+0.4
+0.3 4100
+
+c
+4200 4300 4400 Waypoint index
+
+a
+0.76 0.75 0.74 0.73 0.72
+2100
+a
+1
+
+b
+Robot Joint 4
+c
+
+2150
+
+2200
+
+2250
+
+Positioner Joint 2 b
+
+0.5
+c
+0
+2350 2400 2450 2500 2550 Waypoint index
+
+Fig. 13. Results of physical fabrication for Example I, from which we can find significant improvement after optimization.
+
+method presented in [22] is conducted. The local filtering
+
+Robot Joint 1
+
+Robot Joint 2
+
+method n-0e.0e2 ds a prescribed time-0s.2e4quence, and the optim0i.2za-
+
+tion obj-e0.0c2t5 is to minimize the0.2j3oint jerk. The maxim0.1u8 m
+
+iteration -0t.i0m3 e of the local filterin0g.22 method is set to 120.0.1F6 or
+
+the purp-o0.0s3e5 of comparison, the ti0m.21 e-sequence in our me0t.1h4od
+
+is also fi-x0.0e4d during optimization0.(2i.e., the ‘R+O’ schem0.e12 is taken). I-0n.045both methods, the al0l.o19wable maximum veloc0.1ity, acceleration, an22d00 jer2k300 are240s0et to 03.4550ra35d00/s3,5508r36a00d/s2, an34d00 60rad/s3. The joiRnobtotpJoaintth5s obtained by [22R]obaotnJodinto6urs are given
+
+in Fig. 150.,65where less joint shaki-n0.g5 is observed in our res0.u6 lt.
+
+The co0.6m45parison of joint jerks has also been given in 0F.5ig.
+-0.52
+
+0.4
+
+0.64
+
+-0.54
+
+0.3
+
+0.635
+
+-0.56
+
+0.2
+
+Robot Joint 3
+
+Robot Joint 4
+
+z (mm)
+
+02.756 20
+
+01.755
+
+10
+
+0.74
+
+10
+
+0.73
+
+0
+
+-10
+
+y (mm)
+
+0.72
+
+20 10 0 -10 -20 x (mm)
+
+3500
+
+3600
+
+2100 2150 2200 2250
+
+Fig. 14. The toolpath of a curved layer for AM employed in Example II.
+
+Positioner Joint 1
+
+Positioner Joint 2
+
+1
+
+0.5
+
+0
+
+AUTHORS’ VERSION UNDER REVIEW
+
+11
+
+Angle
+
+0.06 0.05 0.04 0.03 0.02 0.01
+0 0
+
+Robot Joint 1 0.25
+
+0.2
+
+0.15
+
+0.1
+
+500 1000 1500 2000
+
+0
+
+Local filtering Robot Joint 2
+0.25
+
+0.2
+
+0.15
+
+0.1
+
+0.05
+
+500 1000 1500 2000
+
+0
+
+Our method
+Robot Joint 3 -0.83
+
+-0.84
+
+-0.85
+
+-0.86
+
+-0.87
+
+-0.88
+
+500 1000 1500 2000
+
+0
+
+Robot Joint 4 500 1000 1500 2000
+
+Angle
+
+0.94 0.93 0.92 0.91 0.9 0.89 0.88
+0
+
+Robot Joint 5 2
+
+1.98
+
+1.96
+
+1.94
+
+1.92
+
+500 1000 1500 2000
+
+0
+
+Waypoint index
+
+Robot Joint 6 1
+
+0.5
+
+0
+
+-0.5
+
+-1
+
+500 1000 1500 2000
+
+0
+
+Waypoint index
+
+Robot Joint 7 10
+
+5
+
+0
+
+-5
+
+500 1000 1500 2000
+
+0
+
+Waypoint index
+
+Robot Joint 7
+500 1000 1500 2000 Waypoint index
+
+Fig. 15. The robot joint path of Example II, where the joints 1-6 are from Robot A and the joints 7 & 8 belong to Robot B. The unit of joint angles is rad.
+
+0.02160
+0.025 5
+0.024 0.0230 0 0.022
+15
+
+Robot JoinLto1cal filtering Robot Joint 1
+
+Our methodRobot Joint 2 0.16 Robot Joint 2 10 0.15
+
+50.14
+
+500 1000 1500 2000 Robot Joint 3
+
+0.13 0 00.12 500
+
+1000 1500 2000
+
+40.11 Robot Joint 4
+
+10
+5
+0 0
+0.886
+0.8846
+4 0.882
+2 0.88
+0 0
+0.878
+60
+40
+
+920 940 960 980
+Robot Joint 5 500 1000 1500 2000
+Robot Joint 5
+
+500 1000 1500 2000
+
+Robot Joint 7
+
+1200
+
+1250
+
+1300
+
+Waypoint index
+
+2
+0 0 1.99
+10 1.98 5 1.97
+01.96 0
+60
+40
+
+20
+
+20
+
+1100 1200 1300 1400
+Robot Joint 6 500 1000 1500 2000
+Robot Joint 6
+
+500 1000 1500 2000
+
+Robot Joint 8
+
+1700
+
+1800
+
+1900
+
+Waypoint index
+
+0 0 500 1000 1500 2000
+Waypoint index
+
+0 0 500 1000 1500 2000
+Waypoint index
+
+Fig. 16. The comparison for the absolute values of jerks on different joints in Example II.
+
+16 and Table III. The trajectory obtained by our method has a lower average jerk in general, while those obtained by local
+
+TABLE III Rob 0.18 OotPJToiInMt I3ZATION RESULTS IN EXAMRPoLbEotIJIo. int 4
+
+-0.83
+
+0.16
+
+Before Opt.
+
+Computing Time (sec.)
+0.14
+Joint 1
+
+-0.835
+-00.4846
+
+0.12
+0.1 Average
+
+Joint 2 Joint 3 Joint 4
+
+0.67
+-0.845
+0.75 -00.1856
+
+0.08 Jerk
+
+Joint 5 Joint 6
+
+0.38
+-0.855
+0.41
+
+0.06
+
+Joint 7
+
+-50.2861
+
+1600 1650 1700Jo1in75t 08 1800
+
+9.47
+
+Joint 1
+
+8.72
+
+Joint 2 PositioneJroJionitnt31
+
+0.6 Maximal
+
+Joint 4
+
+9.09 12.25
+0.4
+3.06
+
+Jerk
+
+Joint 5
+
+6.52
+
+0.5
+
+Joint 6
+
+8.05.21
+
+0.4
+
+Joint 7
+
+67.99
+
+Joint 8
+
+182.803
+
+Our method 81.10
+
+Local filter 225.36
+
+0.36
+
+0.46
+
+0.37
+
+0.67
+
+0.42
+
+0.74
+
+0.10
+
+0.16
+
+0.27
+
+0.38
+
+0.17
+
+0.41
+
+0.60
+
+5.21
+
+1600 17010.501800 1900 7.99
+
+7.81
+
+8.72
+
+11.83
+
+9.09
+
+Po1si1ti.o5n8er Joint 2 12.21
+
+2.54
+
+3.63
+
+7.24
+
+6.52
+
+5.04
+
+8.02
+
+50.42
+
+68.00
+
+34.40
+
+55.11
+
+0.3 Average
+
+Robot A
+
+Velocity Robot B
+
+0.2 Maximal Robot A
+
+Velocity
+0.1
+
+Robot B
+
+Average Robot A A0ccelera5ti0on 10R0obot1B50
+MaximalWaypoRinotbiontdeAx
+
+Acceleration Robot B
+
+0.0094 0.21-07.21 0.0877 0.50-00.40
+0.0392 200 0.6802
+0.9700 8.7373
+
+0.0060 0.1514 0.0387 0.5000
+
+0.0094 0.2163 0.0876 0.5000
+
+0.0236
+
+0.0392
+
+500.1917 100 0.1658002
+
+W0.a5y7p4o3int index 0.9696
+
+3.8540
+
+5.0408
+
+†The joints 1-6 are from Robot A and the joints 7 & 8 belong to Robot B.
+
+filtering only perform better at some local maxima. The other observation to note is that the maximum jerk of Joint 7 (i.e., the first joint of Robot B) obtained by local filtering is still larger than the maximally allowed value 60 rad/s3 after 120 iterations. We can also find from Table III that both the average and the maximal values of joint velocity and acceleration have
+
+Angle
+
+Angle
+
+0 200 400 600 800 1000 1200 1400 1600 1800 AUTHORS’ VERSION UNDER REVIEW
+Optimization time (s)
+
+Objective Number
+
+150
+
+Before optimization
+
+Optimized with local filtering
+
+100
+10
+10 (0, 9.23) 85
+50
+
+Optimized with our method
+Without decompostion Using decomposition strategy
+
+60
+(111.95, 4.34)
+
+(1780.15, 4.65)
+
+Fig. 17.
+
+00
+
+5-1000
+
+-5 1000 0
+
+15005
+
+120000
+
+10
+
+10
+
+10
+
+10
+
+10
+
+OptimizatioJnerktime (s)
+
+i
+
+Histograms of smoothness metrics ϕJerk i for Example II.
+
+Objective
+
+30
+(0, 27.42)
+20
+
+Without decomposition Using decomposirion strategy
+
+10
+
+(32.84, 4.47)
+0
+
+0
+
+100
+
+(517.57, 4.72)
+200 300 400 500 600 Optimization time (s)
+
+Fig. 18. Effectiveness study of the decomposition scheme by Example II.
+
+12
+
+Robot A 150
+
+Robot B 60
+
+Probability density
+
+100
+
+40
+
+50
+
+20
+
+0 0
+
+0 0.01 0.02 0.03 0.04 0.05 0
+Acceleration (g)
+Local filtering
+
+0.02 0.04 0.06 Acceleration (g)
+Our method
+
+Fig. 19. The acceleration distribution of Robot A’s end-effector and Robot B’s end-plate during manufacturing in Example II with g representing the magnitude of the gravitational acceleration.
+
+Local filtering
+
+Our method
+
+been reduced by our method as they are incorporated in our formulation as smoothness metrics. Differently, they are nearly not changed by the local filtering method [22] as not included in the objective function of optimization.
+Fig. 17 illustrates that the histogram of the smoothness metrics ϕijerk obtained by both the local filtering method and our method. Our method can significantly shift the whole distribution to the left side while the improvement given by the local filtering method is mainly reflected at the right border of the distribution. This is because the local filtering method only conducts optimization for local parts with maximal jerk values.
+Compared with the local filtering method, the computational efficiency of our method has been improved tremendously – i.e., the computing time has been reduced by 64.01% from 225.36 sec. to 81.10 sec. The effectiveness of the decomposition scheme is also verified in this example. Again, we take the first 500 waypoints for testing because of the limit of computer memory. The result shown in Fig. 18 illustrates that the computing time is reduced by 93.65% with the help of the decomposition scheme.
+Similar to the earlier example, we also conducted physical fabrication to verify the effectiveness of our trajectory optimization method. Vibrations at the end-effectors of robots A and B are measured by accelerometers, and the results are
+
+TABLE IV ACCELERATION MEASURED IN EXAMPLE II.
+
+Local filtering Proposed method
+
+Robot A Maximum Average
+
+0.0661 0.0593
+
+0.0077 0.0067
+
+Robot B Maximum Average
+
+0.1493 0.0870
+
+0.0239 0.0165
+
+†All values are given in terms of the gravitational acceleration g.
+
+Fig. 20. The manufacturing results of Example II using trajectories optimized by different methods.
+illustrated in Table IV and Fig. 19. By using our method, the maximum and average acceleration of both Robot A end and Robot B end are decreased compared with the local filtering method. The improvement of the Robot B is relatively more pronounced, the average acceleration of which decreases by 30.96%. This is consistent with the smoothness performance of joint paths shown in Fig. 16. The 3D printed curve layers are as shown in Fig. 20. It can be found that our method can further enhance surface quality due to the improvement of joint jerks.
+C. Example III
+The third example is to use our method for optimizing the geometric smoothness of the trajectory1. As discussed in Sec. IV-C, this can be achieved by replacing {ti} in the optimization problem with a set of fixed {si} and excluding time information from the optimization process. The curved layer to fabricate is a saddle surface with a zig-zag toolpath containing 8, 832 waypoints as shown in Fig. 21. The optimization result is listed in Table V, showing that all three geometric smoothness metrics have been enhanced after optimization.
+One benefit of our method is that it can effectively avoid the drastic shaking of Joint 8 (i.e., the second joint of the position table as Robot B) caused by singularity. This has been demonstrated in Fig. 22, which shows the comparison of
+1Note that this only changes the joint path but not the 3D toolpath.
+
+AUTHORS’ VERSION UNDER REVIEW
+
+Objective function value
+
+10 TABLE V OPTIMIZATION RESULTS IN EXAMPLE III.
+
+(0, 9.23)
+9 Maximal
+
+Robot A
+
+Without decompostion
+BefUosriengOdpectmom. postAionftsetrraOtegpytimization
+
+18.90
+
+4.06
+
+dq
+
+value Robot B
+
+| ds | 8
+
+Average Robot A
+
+value Robot B
+
+1518.09 1.50 16.15
+
+145.54 1.00 13.55
+
+Maximal Robot A
+
+519.63
+
+6.44
+
+| ds2 d72q |
+
+value Average
+
+Robot B Robot A
+
+3652.33 0.17
+
+167.45 0.11
+
+value Robot B
+
+3.00
+
+1.73
+
+6
+
+Maximal Robot A
+
+66.23
+
+6.68
+
+| ds3 d3q |
+
+value Average
+
+Robot B Robot A
+
+759.07 0.12
+
+130.96 0.07
+
+5
+
+value Robot B
+
+2.32
+
+1.12
+
+∗Here |dq/ds|, |d2q/ds2| and |d3q/ds3| represent the first-, second-, and third-order derivatives of the joint angle w.r.t. the path arc-length parameter.
+0 200 400 600 800 1000 1200 1400 1600 1800 Optimization time (s)
+
+Before optimization
+
+13 After optimization
+
+Fig. 24. The manufacturing results of Example III using trajectories before vs. after optimization.
+
+Objective
+
+10 (0, 9.23) 8
+
+Without decompostion Using decomposition strategy
+
+6
+(111.95, 4.34)
+
+(1780.15, 4.65)
+
+0
+
+500
+
+1000
+
+1500
+
+2000
+
+Fig. 21. The toolpath of a curOvepdtimlaiyzeartiofonrtAimMe (esm) ployed in Example III.
+
+Printer Head Workpiece
+
+Joint 7 0.5
+
+Joint 8 2
+
+Angle (rad)
+Objective
+
+30
+0 (0, 27.42)
+20
+
+1.5
+W1ithout decomposition Using decomposirion strategy 0.5
+
+-0.5 10
+
+0
+
+(517.57, 4.72)
+
+4000 (32.84, 445.4070)
+
+5000
+
+0 Waypoint index
+
+0
+
+100 Befo2re00optimizati3on00
+
+4000
+
+4500
+
+Waypoint index
+
+4A0ft0er optimiz5at0io0n
+
+5000
+600
+
+Optimization time (s)
+
+Fig. 22. The joint paths of Robot B near the singularity in Example III.
+
+(0, 209.92) (26.95, 87.56)
+
+Without decomposition Using decomposirion strategy
+(423.97, 84.17)
+
+Fig. 23. Effectiveness study of the decomposition scheme by Example III.
+the joint paths of Robot B near its singular region (i.e., where the first joint angle of Robot B is near zero).
+The process optimization with and without the decomposition scheme has been tested on the first 500 waypoints with the comparison shown in Fig. 23. By using the decomposition scheme, the computational efficiency can be improved by 93.64% while obtaining the result with similar quality.
+The functionality of the improved smoothness on joint paths can be demonstrated by the quality of physical fabrication. Both unoptimized and optimized trajectories are fed into the
+
+6-DoF Robot
+Fig. 25. A single robot system with 6-DoF for AM as Example IV.
+controller of the robots, and the maximum allowable tooltip speed is set to 20mm/s. The real tooltip speed is planned by the robot controller automatically according to the kinematic and dynamic limits. The manufacturing time recorded shows that the printing time is reduced from 587 sec. to 534 sec. by optimization. The 3D printed parts are as shown in Fig. 24, where noticeable improvement of surface quality can be observed – especially when Robot B is near the singularity zone.
+D. Example IV In this example, we optimize the trajectory to realize the
+surface and toolpath of Example III on a single robot system with 6-DoF as shown in Fig. 25, where a fixed printer head is employed with the similar configuration as [1].
+The comparison of the joint paths using the first 1000 waypoints is shown in Fig. 26, indicating that optimization improves the trajectory smoothness. The performance improvement is also verified by the histograms of kinematic smoothness as given in Fig. 27. The effectiveness has also been demonstrated by the comparison shown in the supplementary video.
+
+AUTHORS’ VERSION UNDER REVIEW
+
+14
+
+Angle
+
+Angle
+
+0
+-0.1
+-0.2 0
+0.6 0.5 0.4
+0
+-0.5 -1
+-1.5 0
+
+Joint 1
+
+Joint 2 0
+
+Angle
+
+-0.2
+
+500 Joint 3
+
+1000
+
+0
+
+0
+
+500
+
+1000
+
+Joint 4
+
+Angle
+
+-1
+
+-2
+
+500 Joint 5
+
+1000
+
+0
+
+-1
+
+500
+
+1000
+
+Joint 6
+
+Angle
+
+-1.5
+
+-2
+
+500
+
+1000
+
+Waypoint index
+
+0
+
+500
+
+1000
+
+Waypoint index
+
+Before optimization
+
+After optimization
+
+Angle
+
+Fig. 26. The robot joint paths of Example IV.
+
+Number
+
+300
+
+400
+
+600
+
+400 200 200
+
+200
+
+100
+
+0
+
+0
+
+0
+
+10-10 10-5 100
+
+10-20 10-10 100
+
+10-20 10-10 100
+
+Vel
+
+Acc
+
+Jerk
+
+i
+
+i
+
+i
+
+Before optimization
+
+After optimization
+
+Fig. 27. Histograms of smoothness metrics for Example IV.
+
+VI. CONCLUSION AND DISCUSSION
+This paper presents a novel concurrent trajectory optimization framework for robot-assisted manufacturing. Based on the kinematic model of the dual robot system, trajectory optimization models are constructed considering the special requirements for the manufacturing process. Our computational framework can concurrently optimize the tool orientation, the kinematic redundancy, and the manufacturing time-sequence while minimizing the kinematic smoothness metrics. With the help of a newly proposed decomposition-based numerical scheme, the quality of trajectories with a large number of waypoints can be effectively improved with high efficiency.
+The performance of our framework has been demonstrated on different toolpaths to fabricate freeform surfaces. Both simulations and physical experiments are conducted for the verification. Compared with the unoptimized trajectories and the results of the local filtering method [22], our method can achieve much better kinematic smoothness, resulting in higher surface quality of physical fabrication. Meanwhile, the computing time spent on optimization can be reduced by more than 60% compared with the local filtering method and over 90% compared with the computation without applying the decomposition scheme.
+In our current implementation, the final collision correction step may affect the optimality of the results although it rarely occurs during our experimental tests. Moreover, it takes a relatively long time with up to 5 minutes to learn a highquality proxy function for collision detection, while for largescale paths with up to 8k waypoints, the optimization process itself takes less than 10 minutes. This is considered as a major
+
+limitation of our approach as the proxy function needs to be re-learned when the environment or the model changes. A more adaptive collision detection technique is needed for future research.
+
+ACKNOWLEDGMENTS
+The project is partially supported by the UK Engineering and Physical Sciences Research Council (EPSRC) Fellowship Grant (Ref.#: EP/X032213/1) and the chair professorship fund at the University of Manchester.
+
+APPENDIX A FORMULAS FOR JOINT ACCELERATION AND JERK
+
+The acceleration of joint obtained by the unevenly spaced numerical differentiation is
+ai = 2qi−1 − 2qi + 2qi+1 (59) ti(ti + ti+1) titi+1 ti+1(ti + ti+1)
+
+The joint jerk can be evaluated by
+
+ji = ρi1qi−2 + ρi2qi−1 + ρi3qi + ρi4qi+1 + ρi5qi+2 (60)
+
+with
+
+ρi1 =
+
+−12ti+1 − 6ti+2 + 6ti
+i+2
+
+, (61)
+
+ti−1(ti−1 + ti)(ti−1 + ti + ti+1)( j=i−1 tj )
+
+ρi2 = 12ti+1 + 6ti+2 − 6ti − 6ti−1 , (62) ti−1ti(ti + ti+1)(ti + ti+1 + ti+2)
+
+ρi3 = −12ti+1 − 6ti+2 + 12ti + 6ti−1 , (63) titi+1(ti+1 + ti+2)(ti−1 + ti)
+
+ρi4 = 6ti+1 + 6ti+2 − 12ti − 6ti−1 , (64) ti+1ti+2(ti + ti+1)(ti−1 + ti + ti+1)
+
+ρi5 =
+
+−6ti+1 + 12ti + 6ti−1
+
+ti+2(ti+1 + ti+2)(ti + ti+1 + ti+2)(
+
+j=i−1 i+2 tj ) . (65)
+
+The formulas are derived according to [45].
+
+APPENDIX B FORMULAS OF TOOLTIP ACCELERATION
+Denote the velocity of the tooltip as vT T P = vt, where t is the unit tangent of the toolpath. The acceleration at the tooltip can be computed by
+
+aT T P = dvT T P = dv t + v dt
+
+dt
+
+dt dt
+
+(66)
+
+= dv t + κv2n
+
+dt
+
+where κ and n represent the curvature and the unit normal of
+
+the toolpath. The acceleration consists of the tangential part
+
+and the normal part.
+
+For the toolpath in a discrete form, the tangential acceleration ati = dv/dt at the ith waypoint is
+
+ait = dv = vti+1 − vti dt (ti + ti+1)/2 (67)
+= 2(si+1ti − siti+1) titi+1(ti + ti+1)
+
+AUTHORS’ VERSION UNDER REVIEW
+
+15
+
+ti pi-1
+
+pi vit
+i ti+1
+pi+1
+
+Fig. 28. The local schematic of the toolpath in a discrete form.
+
+with vti = si/ti. As illustrated in Fig.28, let
+
+¯vit = (pi − pi−1)/ti + (pi+1 − pi)/ti+1 , (68) 2
+
+the discrete form of the normal acceleration ani = κv2 is obtained as
+
+ain = κi ¯vit 2
+
+s2i t2i+1 + s2i+1t2i − 2sisi+1titi+1cos(σi) (69)
+
+= κi
+
+22
+
+4ti ti+1
+
+where κi and σi are the path curvature and the angle at pi.
+
+REFERENCES
+[1] C. Dai, C. C. Wang, C. Wu, S. Lefebvre, G. Fang, and Y.-J. Liu, “Support-free volume printing by multi-axis motion,” ACM Trans. Graph., vol. 37, no. 4, 2018.
+[2] G. Fang, T. Zhang, S. Zhong, X. Chen, Z. Zhong, and C. C. L. Wang, “Reinforced FDM: Multi-axis filament alignment with controlled anisotropic strength,” ACM Trans. Graph., vol. 39, no. 6, 2020.
+[3] J. Etienne, N. Ray, D. Panozzo, S. Hornus, C. C. L. Wang, J. Mart´ınez, S. McMains, M. Alexa, B. Wyvill, and S. Lefebvre, “Curvislicer: slightly curved slicing for 3-axis printers,” ACM Trans. Graph., vol. 38, no. 4, 2019.
+[4] T. Zhang, G. Fang, Y. Huang, N. Dutta, S. Lefebvre, Z. M. Kilic, and C. C. L. Wang, “S3-slicer: A general slicing framework for multi-axis 3d printing,” ACM Trans. Graph., vol. 41, no. 6, 2022.
+[5] T. Liu, T. Zhang, Y. Chen, Y. Huang, and C. C. L. Wang, “Neural slicer for multi-axis 3d printing,” ACM Trans. Graph., vol. 43, no. 4, Jul. 2024.
+[6] J. Peng, Y. Ding, G. Zhang, and H. Ding, “Smoothness-oriented path optimization for robotic milling processes,” Sci. China-Technol. Sci., vol. 63, no. 9, p. 1751 – 1763, 2020.
+[7] Y.-A. Lu, K. Tang, and C.-Y. Wang, “Collision-free and smooth joint motion planning for six-axis industrial robots by redundancy optimization,” Rob. Comput. Integr. Manuf., vol. 68, p. 102091, 2021.
+[8] Y. Chen and Y. Ding, “Posture Optimization in Robotic Flat-End Milling Based on Sequential Quadratic Programming,” J. Manuf. Sci. Eng.Trans. ASME, vol. 145, no. 6, p. 061001, 2023.
+[9] T. Zhang, X. Chen, G. Fang, Y. Tian, and C. C. L. Wang, “Singularityaware motion planning for multi-axis additive manufacturing,” IEEE Robot. Autom. Lett., vol. 6, no. 4, pp. 6172–6179, 2021.
+[10] Y. Lu, Y. Ding, and L. Zhu, “Tool path generation via the multi-criteria optimisation for flat-end milling of sculptured surfaces,” Int. J. Prod. Res., vol. 55, no. 15, pp. 4261–4282, 2017.
+[11] J. C. J. Chiou and Y. S. Lee, “Optimal Tool Orientation for Five-Axis Tool-End Machining by Swept Envelope Approach,” J. Manuf. Sci. Eng.Trans. ASME, vol. 127, no. 4, pp. 810–818, 03 2005.
+[12] M. J. Barakchi Fard and H.-Y. Feng, “Effective Determination of Feed Direction and Tool Orientation in Five-Axis Flat-End Milling,” J. Manuf. Sci. Eng.-Trans. ASME, vol. 132, no. 6, p. 061011, 11 2010.
+[13] H. Gong, F. Fang, X. Hu, L.-X. Cao, and J. Liu, “Optimization of tool positions locally based on the bceltp for 5-axis machining of free-form surfaces,” Comput.-Aided Des., vol. 42, no. 6, pp. 558–570, 2010.
+[14] Y. Wang, J. Xu, and Y. Sun, “Tool orientation adjustment for improving the kinematics performance of 5-axis ball-end machining via cpm method.” Rob. Comput. Integr. Manuf., vol. 68, p. 102070, 2021.
+[15] G. Xiong, Y. Ding, and L. Zhu, “Stiffness-based pose optimization of an industrial robot for five-axis milling,” Rob. Comput. Integr. Manuf., vol. 55, pp. 19–28, 2019.
+[16] Z.-Y. Liao, Q.-H. Wang, H.-L. Xie, J.-R. Li, X.-F. Zhou, and T.-H. Pan, “Optimization of robot posture and workpiece setup in robotic milling with stiffness threshold,” IEEE/ASME Trans. Mechatron., vol. 27, no. 1, pp. 582–593, 2022.
+
+[17] Y. Guo, H. Dong, and Y. Ke, “Stiffness-oriented posture optimization in robotic machining applications,” Rob. Comput. Integr. Manuf., vol. 35, p. 69 – 76, 2015.
+[18] J. Lin, C. Ye, J. Yang, H. Zhao, H. Ding, and M. Luo, “Contour errorbased optimization of the end-effector pose of a 6 degree-of-freedom serial robot in milling operation,” Rob. Comput. Integr. Manuf., vol. 73, p. 102257, 2022.
+[19] T. Hou, Y. Lei, and Y. Ding, “Pose Optimization in Robotic Milling Based on Surface Location Error,” J. Manuf. Sci. Eng.-Trans. ASME, vol. 145, no. 8, p. 084501, 2023.
+[20] H. Lyu, X. Song, D. Dai, J. Li, and Z. Li, “Tool path interpolation and redundancy optimization of manipulator,” in 2017 13th IEEE Conference on Automation Science and Engineering (CASE), 2017, pp. 770–775.
+[21] T. Shibata, T. Abe, K. Tanie, and M. Nose, “Motion planning by genetic algorithm for a redundant manipulator using a model of criteria of skilled operators,” Inf. Sci., vol. 102, no. 1, pp. 171–186, 1997.
+[22] C. Dai, S. Lefebvre, K.-M. Yu, J. M. P. Geraedts, and C. C. L. Wang, “Planning jerk-optimized trajectory with discrete time constraints for redundant robots,” IEEE Trans. Autom. Sci. Eng., vol. 17, no. 4, p. 1711 – 1724, 2020.
+[23] L. Lu, J. Han, F. Dong, Z. Ding, C. Fan, S. Chen, H. Liu, and H. Wang, “Joint-smooth toolpath planning by optimized differential vector for robot surface machining considering the tool orientation constraints,” IEEE/ASME Trans. Mechatron., vol. 27, no. 4, pp. 2301–2311, 2022.
+[24] Z.-Y. Liao, J.-R. Li, H.-L. Xie, Q.-H. Wang, and X.-F. Zhou, “Regionbased toolpath generation for robotic milling of freeform surfaces with stiffness optimization,” Rob. Comput. Integr. Manuf., vol. 64, p. 101953, 2020.
+[25] Z. Li, F. Peng, R. Yan, X. Tang, S. Xin, and J. Wu, “A virtual repulsive potential field algorithm of posture trajectory planning for precision improvement in robotic multi-axis milling,” Rob. Comput. Integr. Manuf., vol. 74, p. 102288, 2022.
+[26] L. Xu, W. Mao, L. Zhu, J. Xu, and Y. Sun, “Tool orientation and redundancy integrated planning method constrained by stiffness for robotic machining of freeform surfaces,” Int. J. Adv. Manuf. Technol., vol. 121, no. 11-12, p. 8313 – 8327, 2022.
+[27] W. Ma, T. Hu, C. Zhang, and T. Zhang, “A robot motion position and posture control method for freeform surface laser treatment based on nurbs interpolation,” Rob. Comput. Integr. Manuf., vol. 83, p. 102547, 2023.
+[28] Z.-Y. Liao, Q.-H. Wang, Z.-H. Xu, H.-M. Wu, B. Li, and X.-F. Zhou, “Uncertainty-aware error modeling and hierarchical redundancy optimization for robotic surface machining,” Rob. Comput. Integr. Manuf., vol. 87, p. 102713, 2024.
+[29] R. K. Malhan, S. Thakar, A. M. Kabir, P. Rajendran, P. M. Bhatt, and S. K. Gupta, “Generation of configuration space trajectories over semi-constrained cartesian paths for robotic manipulators,” IEEE Trans. Autom. Sci. Eng., vol. 20, no. 1, pp. 193–205, 2023.
+[30] Y. Chen, Y. Lu, and Y. Ding, “Toolpath generation for robotic flank milling via smoothness and stiffness optimization,” Rob. Comput. Integr. Manuf., vol. 85, 2024.
+[31] Y. Wen and P. Pagilla, “Path-constrained and collision-free optimal trajectory planning for robot manipulators,” IEEE Trans. Autom. Sci. Eng., vol. 20, no. 2, p. 763 – 774, 2023.
+[32] Y. Chen, W. Dong, and Y. Ding, “An efficient method for collision-free and jerk-constrained trajectory generation with sparse desired way-points for a flying robot,” Sci. China-Technol. Sci., vol. 64, no. 8, p. 1719 – 1731, 2021.
+[33] M. Oberherber, H. Gattringer, and A. Mu¨ller, “Successive dynamic programming and subsequent spline optimization for smooth time optimal robot path tracking,” Mech. Sci., vol. 6, no. 2, p. 245 – 254, 2015.
+[34] E. Barnett and C. Gosselin, “A bisection algorithm for time-optimal trajectory planning along fully specified paths,” IEEE Trans. Rob., vol. 37, no. 1, p. 131 – 145, 2021.
+[35] W. Dong, Y. Ding, J. Huang, X. Zhu, and H. Ding, “An efficient approach of time-optimal trajectory generation for the fully autonomous navigation of the quadrotor,” J. Dyn. Syst. Meas. Control-Trans. ASME, vol. 139, no. 6, 2017.
+[36] K. Hauser, “Fast interpolation and time-optimization with contact,” Int. J. Robot. Res., vol. 33, no. 9, p. 1231 – 1250, 2014.
+[37] W. Fan, X.-S. Gao, C.-H. Lee, K. Zhang, and Q. Zhang, “Time-optimal interpolation for five-axis cnc machining along parametric tool path based on linear programming,” Int. J. Adv. Manuf. Tech., vol. 69, no. 5-8, p. 1373 – 1388, 2013.
+[38] L. Consolini, M. Locatelli, A. Minari, A. Nagy, and I. Vajk, “Optimal time-complexity speed planning for robot manipulators,” IEEE Trans. Rob., vol. 35, no. 3, p. 790 – 797, 2019.
+
+AUTHORS’ VERSION UNDER REVIEW
+
+16
+
+[39] X. Zhao, H. Zhao, J. Yang, and H. Ding, “An adaptive feedrate scheduling method with multi-constraints for five-axis machine tools,” in Intelligent Robotics and Applications, H. Liu, N. Kubota, X. Zhu, R. Dillmann, and D. Zhou, Eds. Cham: Springer International Publishing, 2015, pp. 553–564.
+[40] C. Ji, Z. Zhang, G. Cheng, M. Kong, and R. Li, “A convex optimization method to time-optimal trajectory planning with jerk constraint for industrial robotic manipulators,” IEEE Trans. Autom. Sci. Eng., vol. 21, no. 4, pp. 7629–7646, 2024.
+[41] S. Proia, G. Cavone, P. Scarabaggio, R. Carli, and M. Dotoli, “Safety compliant, ergonomic and time-optimal trajectory planning for collaborative robotics,” IEEE Trans. Autom. Sci. Eng., pp. 1–12, 2023.
+[42] S. Sui and Y. Ding, “Solving the axb=ycz problem for a dual-robot system with geometric calculus,” IEEE Trans. Autom. Sci. Eng., pp. 1– 19, 2023.
+[43] G. Fang, T. Zhang, Y. Huang, Z. Zhang, K. Masania, and C. C. Wang, “Exceptional mechanical performance by spatial printing with continuous fiber: Curved slicing, toolpath generation and physical verification,” Addit. Manuf., vol. 82, p. 104048, 2024.
+[44] L. Xu, D. Zhang, J. Xu, R. Wang, and Y. Sun, “A stiffness matchingbased deformation errors control strategy for dual-robot collaborative machining of thin-walled parts,” Rob. Comput. Integr. Manuf., vol. 88, p. 102726, 2024.
+[45] W. Gautschi, Numerical analysis. Springer Science & Business Media, 2011.
+[46] N. Das and M. Yip, “Learning-based proxy collision detection for robot motion planning applications,” IEEE Trans. Rob., vol. 36, no. 4, p. 1096 – 1114, 2020.
+[47] J. Yang and Y. Altintas, “Generalized kinematics of five-axis serial machines with non-singular tool path generation,” Int. J. Mach. Tools Manuf., vol. 75, p. 119 – 132, 2013.
+[48] J. Pan, S. Chitta, and D. Manocha, “Fcl: A general purpose library for collision and proximity queries,” in 2012 IEEE International Conference on Robotics and Automation, 2012, pp. 3859–3866.
+[49] P. Tseng, “Convergence of a block coordinate descent method for nondifferentiable minimization,” J. Optimiz. Theory App., vol. 109, no. 3, p. 475 – 494, 2001.
+[50] A. Geoffrion, “Generalized benders decomposition,” J. Optimiz. Theory App., vol. 10, no. 4, p. 237 – 260, 1972.
+[51] B. Stellato, G. Banjac, P. Goulart, A. Bemporad, and S. Boyd, “OSQP: an operator splitting solver for quadratic programs,” Math. Program. Comput., vol. 12, no. 4, pp. 637–672, 2020.
+
+Yuming Huang received the B.Eng. degree in process equipment and control engineering from the Taiyuan University of Technology, Taiyuan, China, in 2018 and the Msc degree in mechanical and automation engineering from the Chinese University of Hong Kong, Hong Kong, China, in 2019. From 2020 to 2021, he worked as a mechanical engineer at Changzhou Architectural Research Institute Group Co., Ltd., Changzhou, China. He is currently working toward the Ph.D. degree at the Digital Manufacturing Lab, The University of Manchester, Manchester, U.K. His research interest includes computation design for additive manufacturing, computation fabrication, and robot-assisted 3D printing.
+Tao Liu is a Ph.D. student at the University of Manchester in the School of Engineering. He received his master’s degree in the School of Mathematics and Statistics at Central South University, China, in 2020.
+His research interests include implicit surface modeling and robot assistant 3D printing.
+Charlie C.L. Wang (Senior Member, IEEE) received the B.Eng. degree in mechatronics engineering from the Huazhong University of Science and Technology, China, in 1998 and the Ph.D. degree in mechanical engineering from the Hong Kong University of Science and Technology, Hong Kong, in 2002. He is currently a Professor and Chair of Smart Manufacturing at the University of Manchester, United Kingdom. He was elected as a Fellow of the American Society of Mechanical Engineers in 2013. His research interests include digital manufacturing, computational design, soft robotics, mass personalization, and geometric computing.
+
+Yongxue Chen received the B.Eng. and M.Eng. degrees in mechanical engineering from Shanghai Jiao Tong University, Shanghai, China, in 2020 and 2023, respectively. He is currently working towards the Ph.D. degree in robot-assisted manufacturing with the Digital Manufacturing Lab, School of Engineering, The University of Manchester, Manchester, U.K.
+His current research interests include robotics and additive manufacturing.
+
+Tianyu Zhang (Student Member, IEEE) obtained his B.Eng. degree in mechanical engineering from the University of Electronic Science and Technology of China, China, in 2015, followed by a Master’s degree from Xi’an Jiaotong University, China, in 2018. He recently completed his Ph.D. in mechanical engineering at the University of Manchester, UK, in 2024 and is currently engaged in further research within the same group.
+His research focuses on robotic-assisted multiaxis additive manufacturing, geometry computing, and composite fabrication.
+
+

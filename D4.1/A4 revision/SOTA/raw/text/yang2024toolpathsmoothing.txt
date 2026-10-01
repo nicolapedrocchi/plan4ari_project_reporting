@@ -1,0 +1,1867 @@
+Robotics and Computer–Integrated Manufacturing 89 (2024) 102768 Contents lists available at ScienceDirect
+Robotics and Computer-Integrated Manufacturing
+journal homepage: www.elsevier.com/locate/rcim
+
+An analytical tool path smoothing algorithm for robotic machining with the consideration of redundant kinematics
+Jixiang Yang *, Qi Qi , Abulikemu Adili , Han Ding
+State Key Laboratory of Intelligent Manufacturing Equipment and Technology, School of Mechanical Science and Engineering, Huazhong University of Science and Technology, Wuhan 430074, China
+
+ARTICLE INFO
+Keywords: Robotic machining Tool path Kinematics Redundancy Spline
+
+ABSTRACT
+In the machining of complex parts with free-formed surfaces, robots are widely employed due to their advantages of a large operating space and high flexibility. The industrial robot with 6 degrees-of-freedom (DOF) has an extra redundant degree of freedom around the tool axis, which does not affect the tool pose related to the workpieces but influences the robot’s joint configuration. The motion performance and machining efficiency can be improved by optimizing the redundant angle. Based on this, an analytical path smoothing algorithm for 6-DOF robots with the consideration of redundant kinematics is proposed to improve the robot’s dynamic performance. The tool tip position and orientation are fit with the analytical 5th degree Pythagorean-Hodograph (PH) spline to satisfy C2 continuity, respectively. Therefore, the 5th degree polynomial spline with minimum acceleration is adopted to fit the redundant rotation angle and the tool tip position arc length. Then the tool path position spline, tool orientation spline, and redundant rotary angle spline are all synchronized to the tool position displacement, which makes it convenient to do interpolation along the tool path. The minimum time feed planning method considering the joint dynamic constraints is adopted to interpolate motion commands. Experimental results show that the motion efficiency of the robot in the same test path increases by 33.97 % compared with the regular spline without considering acceleration of the redundant angle spline. Meanwhile, the proposed tool path smoothing method effectively mitigates the joint vibration with a maximum reduction of 65.05 %, without sacrificing motion accuracy.
+
+1. Introduction
+Traditional industrial robots with six degrees of freedom (DOF) are commonly used to transport workpieces from one position to another. The trajectory plan for such carrying motions usually requires precise control over velocity and acceleration, while maintaining precise contour accuracy during the motion process is less important. However, as industrial robots have improved in terms of positioning accuracy and structural rigidity, they are increasingly utilized in manufacturing industries including milling [1–4], polishing [5–9], and deburring [10, 11], which fully show their larger workspace, lower cost, and higher flexibility [12,13]. When it comes to 5-axis machining tasks, addressing the dynamics and motion precision throughout the entire tool path profile becomes critical [14,15]. The generation and optimization of the contour motion path in robotic machining present a significantly higher degree of complexity compared with the "point-to-point" type motions. In recent years, many researchers have made significant progress in this
+
+field. Generally, commercial software typically generates robot motion
+commands that contain discrete positions and orientations. However, tangential discontinuity in these discrete linear tool paths can result in fluctuating velocity and acceleration. This leads to significant vibrations in the robot’s motion. Therefore, to ensure steady robotic machining motions, the tool path must be smoothed before being executed by the motor drives. Tool path smoothing methods can be categorized as either joint space methods or workpiece frame methods, depending on the operation space. In the joint space method, the robot motion commands of individual joints are smoothed directly [16–18]. This method allows for the direct execution of the smoothed tool path results by joint drives, eliminating the need for additional inverse kinematics computations. However, this method can make it challenging to restrain the deviation errors of the tool path profile when smoothing tool path commands of the joint due to the nonlinear kinematics. However, the workpiece frame method, involves direct smoothing of the tool path commands in the
+
+* Corresponding author. E-mail address: jixiangyang@hust.edu.cn (J. Yang).
+https://doi.org/10.1016/j.rcim.2024.102768 Received 27 December 2023; Received in revised form 21 March 2024; Accepted 25 March 2024 Available online 10 April 2024 0736-5845/© 2024 Elsevier Ltd. All rights reserved.
+
+J. Yang et al.
+
+Robotics and Computer-Integrated Manufacturing 89 (2024) 102768
+
+workpiece coordinate system (WCS) under the constraints of geometric deviation errors [19,20], and then the commands are transformed to joint displacements before being sent to joint drives [21–23]. This study focuses on the smoothing method of the 6-DOF robot in the WCS.
+Unlike 3-axis machining, where smoothing is required only for the tool position commands, 5-axis or 6-axis machining tasks necessitate the smoothing of the tool orientation direction as well [24–26]. Based on the synchronization method of the tool path position and orientation spline, smoothing methods can be classified into two categories: coupled methods and decoupled methods. In the coupled method, the fitting of tool path position and orientation splines is accomplished using the same parameter. For example, Langeron et al. [27] developed dual B-splines to represent the tool pose, one spline was used to fit the tool path position, while another one was used to fit points equidistant to the tip point along the orientation vector. Wan et al. [28] proposed a corner smoothing algorithm to smooth the tool tip position and tool orientation by constructing asymmetrical PH splines, which resulted in higher machining efficiency. To ensure that the two splines have equal distances after fitting, Huang et al. [29] proposed a novel curve “airthoid” to smooth the corners of the tool position in the WCS. Bi et al. [30] introduced a B-spline in the quaternion space rather than the Cartesian space. However, the orientation may exhibit large fluctuations at short linear segments for complex surface parts. The coupled method cannot accurately reflect the simultaneous variance tendency, subsequently affecting the dynamic performance of the orientation, which has been proven by the study of Yuen et al. [31]. To address this issue, algorithms were developed to smooth the position and orientation individually, fully reflecting the fluctuation of the tool path position and orientation. Then the position and orientation spline parameters were mapped to the tool tip displacement to synchronize them along the tool path [32,33]. Li et al. [34] proposed the use of triple NURBS curves to fit the position and axis of the tool.
+Unlike 5-axis machine tools, which are affected by only two rotary axes for tool-axis orientation, 6-DOF robots with their six rotary joints require more intricate processing. This is because the tool orientation may be affected by all six rotary joints, depending on the robot’s kinematics. Yang et al. [35] introduced an analytical continuous tool path corner smoothing algorithm specifically designed for 6R robot manipulators. This algorithm involves the construction of micro B-splines to represent the tool path position in the Cartesian system, while the tool orientation is represented by B-splines in the Euler angle frame. To ensure synchronization between the tool-axis direction and tool tip position, the remaining linear segments are replaced with specially constructed B-splines. Using this approach, the algorithm achieves smooth tool path corners by coordinating the tool tip displacement with the tool axis direction and position. However, there are two issues need to be further solved in the study of tool path smoothing for robotic machining. First, compared with 5-axis CNC machining, robot machining has one redundant rotary freedom. Although the redundant rotary freedom does not change the tool pose in the WCS, it affects the robot’s joint motions via inverse kinematics. Therefore, the smoothing of the redundant rotary angle directly affects the dynamic performance of the joint commands. While the discrete solution of the redundant rotary freedom has been studied [36,37], there are not tool path smoothing algorithms that consider the redundant rotation of 6R robot machining. Second, existing algorithms of 6R robot machining are mainly based on NURBS and B-splines, where iterative calculations are needed to estimate the tool length because the spline arc length lacks an explicit function with the spline parameter that restricts the calculation efficiency. Moreover, the estimation errors of tool lengths induce fluctuations of feed rate after tool path interpolation. Although some analytical tool path smoothing algorithms are reported to three-axis [38, 39] and five-axis machine tools [38] by constructing special splines that have analytical solutions of the arc-length, they cannot be directly adopted to 6-DOF robotic machining owing to the more complex and redundant kinematics of 6-DOF robot. Therefore, the development of
+
+analytical robot path smoothing algorithms for robotic 5-axis machining task is crucial, especially when considering the presence of the redundant DOF in robotic machining. These algorithms play a significant role in achieving precise and efficient motion planning, ensuring smooth tool path execution, and optimizing overall machining performance in complex 5-axis machining tasks.
+This paper proposes an analytical C2 continuous path smoothing algorithm for robotic machining with the consideration of redundant kinematics. This paper makes several significant contributions to the field, which includes the following:
+(1) The proposed algorithm considers the redundant kinematics of a 6-DOF robot in order to optimize tool path smoothing for robotic 5-axis machining task.
+(2) The algorithm analytically calculates the tool path position displacements and control points of all curves, making it suitable for high efficiency calculations during robot machining processes.
+(3) The algorithm employs a 5th-degree polynomial spline with minimum acceleration to fit the redundant orientation angle to the arc length, ensuring lower vibrations in robotic machining.
+(4) The C2 continuity of the tool path is achieved by optimizing the federate under the constraints of the joint velocity, acceleration and jerk, which results in acceleration continuity of the interpolated joint commands.
+The remaining sections of this paper are organized as follows: Section 2 provides the kinematics and redundancy analysis of robotic machining tasks. Section 3 compares the characteristics of robotic machining with traditional 5-axis CNC machining, and details how the tool path position, orientation and redundant rotary commands are all smoothed analytically by constructing corresponding splines. Section 4 presents experimental verifications. Section 5 provides the conclusions. 2. Kinematics and redundancy of robotic machining 2.1. Kinematics analysis of robotic machining
+As shown in Fig. 1, in the multi-axis machining tasks, cutting location commands (CL data) consist of discrete tool path positions P = [Px, Py, Pz]T and orientations O = [Ox, Oy, Oz]T in the WCS generated by the commercial computer-aided-manufacture (CAM) software.
+The transfer matrix of the cut location related to the workpiece frame
+Fig. 1. Tool pose representation of robotic milling.
+
+2
+
+J. Yang et al.
+
+is expressed as:
+
+[
+
+]
+
+twpT(θ) = R3×3 P 01×3 1 (1)
+
+⎡
+
+⎤
+
+R11 R12 R13
+
+where R3×3 = ⎣ R21 R22 R23 ⎦ is the rotary transfer matrix of the tool
+
+R31 R32 R33
+
+frame related to the workpiece frame, and P = [Px, Py, Pz]T is the trans­
+
+lation offset.
+
+As shown in Fig. 2, the homogeneous transfer matrix of the tool
+
+frame related to the workpiece frame is expressed as:
+
+[ ]− 1
+
+twpT(θ) = wp 0 T ⋅01T(θ1)⋅12T(θ2)⋅23T(θ3)⋅34T(θ4)⋅45T(θ5)⋅56T(θ6)⋅6t T
+
+(2)
+
+[
+
+]
+
+0
+
+0
+
+I3×3 wpP
+
+In Eq. (2), wpT =
+
+is the transfer matrix of the workpiece
+
+01×3 1 [ ]
+
+6
+
+6
+
+I1×3 t P
+
+related to the base frame. t T =
+
+is the transfer matrix of the
+
+01×3 1
+
+tool
+
+frame
+
+related
+
+to
+
+the
+
+frame
+
+of
+
+the
+
+6th
+
+axis.
+
+i− i
+
+1T(θi)(i
+
+=
+
+1,
+
+2,
+
+⋯6)
+
+is
+
+the
+
+transfer matrix of the i− th axis related to the (i − 1) − thaxis, and θi is
+
+the rotary displacement of the i−
+
+th
+
+axis.
+
+i− i
+
+1T(θi) can be determined from
+
+the Denavit-Hartenberg (DH) method.
+
+The robot task pose can be transferred to a vector (Px, Py, Pz, α, β, γ)
+
+with the Euler angle method, where (α, β, γ) are z-y-z Euler angles. The
+wp
+transfer matrix t T(θ) is as follows: twpT(θ) = Rot(z, α)Rot(y, β)Rot(z, γ)Trans( Px, Py, Pz) (3)
+
+⎡
+
+⎤
+
+⎡
+
+⎤
+
+Cα − Sα 0 0
+
+Cβ 0 Sβ 0
+
+where Rot(z, α) = ⎢⎢⎣ Sα Cα 0 0 ⎥⎥ ⎢ ⎦, Rot(y, β) = ⎢⎣ 0 1 0 0 ⎥⎥⎦
+
+0 0 10
+
+− Sβ 0 Cβ 0
+
+0 0 01
+
+0 001
+
+represent the rotation transformation and Trans(Px, Py, Pz) =
+
+⎡
+
+⎤
+
+1 0 0 Px
+
+⎢⎢⎣ 0 1 0 Py ⎥⎥⎦ represents the translation transformation, Cα, Sα, Cβ,
+
+0 0 1 Pz
+
+000 1
+
+Sβ, Cγ, Sγ are abbreviations of cosα, sinα, cosβ, sinβ, cosγ, sinγ in this
+
+paper, respectively.
+
+Robotics and Computer-Integrated Manufacturing 89 (2024) 102768
+
+The result of Eq. (3) is:
+
+⎡
+
+⎤
+
+CαCβCγ − SαSγ − CαCβSγ − SαCγ CαSβ Px
+
+wp ⎢ t T(θ) = ⎢ S ⎣ αCβCγ + CαSγ − SαCβSγ + CαCγ SαSβ Py ⎥⎥⎦ (4)
+
+− SβCγ
+
+Sβ Sγ
+
+Cβ Pz
+
+0
+
+0
+
+01
+
+Inverse kinematics model is needed to transfer the robot task pose to joint commands θ(t) = [θ1, θ2, θ3, θ4, θ5, θ6]T in the robotic joint space by combining Eqs. (2), (3) and (4). The robotic machining process, as illustrated in Fig. 2, involves two kinematics chains—the robot chain and the workpiece chain. These two chains constitute the entire kinematics system and are transformed into each other via kinematic equations.
+Combining Eq. (4), the tool orientation is calculated by using Euler angle as follows:
+[Ox, Oy, Oz, 0]T = twpT(θ)[rot, 0]T = [cosαsinβ, sinαsinβ, cosβ, 0]T (5)
+
+where rot = [0, 0, 1] is the tool orientation vector at the initial robot pose.
+
+For a given cutting location (CL) data [Px, Py, Pz, Ox, Oy, Oz]T generated
+
+by the CAM software, combining Eq. (5), the Euler angle α and β are
+
+calculated from elements of the vector:
+
+⎧
+
+(
+
+)
+
+⎨ α = atan2 Oy, Ox
+
+(√̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅ )
+
+(6)
+
+⎩ β = atan2 Ox2 + Oy2, Oz
+
+From Eq. (4), it can be seen that the robot joint displacements θ are affected by the rotary freedom α, β, and γ via robot inverse kinematics. However, from Eqs. (5) and (6), the tool orientation vector is not directly affected by the Euler angle γ, which means that the rotational angle around the z-axis vector does not change the orientation vector of the tool related to the WCS (see Fig. 3). Therefore, although the rotary freedom γ affects the robot joint configuration, it is redundant to the tool orientation adjustment in robotic machining. By using the redundant kinematics character of rotation freedom, many researchers studied the redundant angle optimization to improve the machining performance by fully utilizing the pose-dependent character of robotic machining, for example, enlarging the structure stiffness [2,40], enhancing the tool path smoothness of the robotic machining [37], and reducing the deformation error in robotic milling [3].
+In this paper, the initial redundant angles at discrete cutting locations are determined by using the tangential approximation method as
+
+Fig. 2. Kinematic model: (a) Local coordinate system set on the robot; (b) Kinematic chains of robotic machining system. 3
+
+J. Yang et al.
+
+Fig. 3. Redundant rotary angle and cutting location data of robotic milling.
+
+introduced in Ref. [37]. The specific procedures are as follows: as shown
+
+in Fig. 3, the tool tip position Pi is taken as the origin of the i th robot task
+
+pose; the tool orientation vector Oi is taken as the z-axis vector, i.e., zi = Oi; the cross product of the tool orientation vector and the vector PiPi+1
+
+is taken as the y-axis vector, i.e., yi = zi × (Pi+1 − Pi) / ‖ zi × (Pi+1 −
+
+Pi) ‖; and the x-axis vector is determined by the right hand rule xi = yi ×
+
+wp
+
+wp
+
+zi. Finally, the robot task pose t T(θ) is expressed as t T(θ) =
+
+[
+
+]
+
+xi yi zi Pi . Then, combining with Eq. (4), the initial Euler angle γ
+
+0 00 1
+
+corresponding to the cutting location [Pi, Oi] is calculated by γ =
+
+wp
+
+wp
+
+atan2(t T32, − t T31).
+
+Compared with the 5-axis task, the tool path of robotic machining
+
+with 6 DOF robot not only considers the position and orientation, the
+
+redundant rotary freedom γ (Fig. 3) also needs to be simultaneously
+
+considered to fully optimize the kinematic-dependent character of the
+
+robot machining system.
+
+Robotics and Computer-Integrated Manufacturing 89 (2024) 102768
+3. Tool path generation for 6-DOF robot machining
+3.1. Overall introduction of the tool path smoothing
+Due to the presence of the redundant rotary angle in the robotic machining tasks, this paper proposes a global analytical path smoothing method considering the redundant angle to fully harness the dynamic performance of the robot. The tool tip position is smoothed in Cartesian space by using a 5th degree Pythagorean-Hodograph (PH) spline P(u) that is capable of online high-speed analytical calculation. To construct the tool orientation spline, the discrete orientation vector O = [Ox, Oy, Oz]T is firstly transformed into the Euler angle space Θ = [α, β]T. Subsequently, the tool orientation is smoothed by creating a 5th degree plane PH spline Θ(ω) in the Euler angle space. The redundant rotation angles are smoothed by constructing a 5th degree polynomial spline γ(s) of the rotary angle γ related to the tool tip arc length s. Since both the position spline parameter u and redundant angle spline can establish analytical relationships with the tool tip arc length s, so only the tool orientation parameter ω is need to synchronize with s along the tool path. Therefore, the tool tip position, orientation and redundant rotation commands are smoothed and mapped to the tool tip displacements with functions P(u(s)), Θ(ω(s)) and γ(s) respectively. By doing feed rate plan along the tool tip displacements, the time-stamped arc-length s(t) is calculated. Finally, the time-stamped motion commands θ(t) of robot joints are obtained through robot kinematics based on the planed position commands P(u(s(t))), orientation commands Θ(ω(s(t))) and redundant angle commands γ(s(t)) are obtained. The flowchart of the proposed method is presented in Fig. 4.
+3.2. C2 continuous tool path position smoothing method
+Because of the advantage to analytically calculate the tool path arc length using spline parameter, PH-spline is used to smooth the tool tip position. This approach ensures both the efficiency and accuracy of tool path interpolation.
+
+Fig. 4. Flowchart of the proposed robotic path smoothing algorithm with the consideration of redundant rotary angle motion. 4
+
+J. Yang et al.
+
+A k-th degree PH-spline is defined as (for the i- th segment spline):
+
+∑k
+
+Pi(u) = Bi,jbkj (u)0 ≤ u ≤ 1
+
+(7)
+
+j=0
+
+where u is the spline parameter, {Bi,j} are the spline control points, and
+
+bkj (u) = k! uj(1 −
+j!(k− j)!
+
+u)k− j are the k-th degree PH-spline basis functions, in
+
+this paper k = 5. The schematic of the PH-spline is shown in Fig. 5.
+
+For more details about the PH-spline, the reader can refer to
+
+Ref. [41]. The 5th degree PH-spline curves are used to fit the tool tip position P = [Px, Py, Pz]. To construct the C2 continuous PH spline for N
+
+segment splines, the quadratic polynomial wi(u) and quaternion co­
+
+efficients q0, q1, ⋯, qN+1 are adopted to define the first derivative of
+
+Pi(u):
+
+P′i(u) = wi(u)iw∗i (u)
+
+(8)
+
+The quaternion polynomial is expressed as follows:
+
+wi(u) = wi,0(1 − u)2 + 2wi,1(1 − u)u + wi,2u2 ⎧
+
+⎪⎪⎪
+
+1
+
+⎪⎪⎪⎪⎨ wi,0 = 2 (qi− 1 + qi) (9)
+
+wi,1 = qi
+
+⎪⎪⎪⎪⎪ 1
+
+⎪⎪⎩ wi,2 = 2 (qi + qi+1)
+
+The PH-spline is constructed by using the above method which can satisfy the C2 continuity of the tool tip position. To calculate the
+quaternion coefficient qi, the i-th segment PH spline is calculated by integrating the Eq. (8):
+
+∫1 P′i(u)du = ΔPi
+
+0
+
+1 ∗ 1 ∗ ∗ ( ) = wi,0iwi,0 + wi,0iwi,1 + wi,1iwi,0 + ⋯
+
+5
+
+10
+
+1( ∗
+
+)
+
+∗
+
+∗
+
+wi,0iwi,2 + 4wi,1iwi,1 + wi,2iwi,0 + ⋯
+
+30
+
+1( ∗
+
+∗) 1 ∗
+
+wi,1iwi,2 + wi,2iwi,1 + wi,2iwi,2
+
+10
+
+5
+
+(10)
+
+Substituting Eq. (9) into Eq. (10): 6qi− 1iqi− 1 ∗ + 13( qi− 1iqi∗ + qiiqi− 1 ∗ ) + 54qiiqi∗ + qi− 1iqi+1 ∗ + qi+1iqi− 1 ∗ + 13( qiiqi+1 ∗ + qi+1iqi∗) + 6qi+1iqi+1 ∗ = 120ΔPi
+For i = 1, 2, ⋯, N
+
+(11)
+
+Assuming that the tangent vectors of the endpoints are t0 and tN, the expression for the initial and final boundary conditions are:
+
+Robotics and Computer-Integrated Manufacturing 89 (2024) 102768
+
+⎧ ⎪⎪⎨ P′1(0) = 1 (q0 + q1)i(q0 + q1)∗ = t0
+4
+
+⎪⎪⎩ ′
+
+1
+
+∗
+
+P N (1) = (qN + qN+1)i(qN + qN+1) = tN
+
+4
+
+(12)
+
+Through Eq. (11) and Eq. (12), N+2 quaternion equations about N+2
+
+unknown variables q are established. However, owing to the high order,
+
+these cannot directly be solved. Therefore, this paper adopts the
+
+Newton-like method in Ref [42] to solve q, the specific computation
+
+procedure is detailed in Appendix A. Substituting the q into Eq. (9), w is
+
+solved. The control points B are calculated by the following formulas:
+
+⎧
+
+⎪⎪ Bi,0 = Pi− 1
+
+⎪⎪
+
+⎪⎪⎪
+
+1
+
+⎪⎪⎪ Bi,1 = Bi,0 + wi,0iwi,0 ∗
+
+⎪⎪
+
+5
+
+⎪⎪⎪
+
+(
+
+)
+
+⎪⎪
+
+1
+
+⎪⎪⎪ Bi,2 = Bi,1 +
+
+wi,0iwi,1 ∗ + wi,1iwi,0 ∗
+
+⎨
+
+10
+
+⎪ 1 ∗ ∗ ∗ ( )
+
+⎪⎪ Bi,3 = Bi,2 + wi,0iwi,2 + 4wi,1iwi,1 + wi,2iwi,0
+
+⎪⎪
+
+30
+
+⎪⎪⎪
+
+(
+
+)
+
+⎪⎪
+
+1
+
+⎪⎪⎪ Bi,4 = Bi,3 +
+
+wi,2iwi,1 ∗ + wi,1iwi,2 ∗
+
+⎪⎪
+
+10
+
+⎪⎪
+
+⎪⎪⎪⎩ B 1 ∗ i,5 = Bi,4 + wi,2iwi,2
+
+5
+
+(13)
+
+Hence, a piecewise 5th degree PH spline curve that satisfies the C2
+
+continuity requirement is obtained. The points on the i-th PH spline are
+
+calculated as follows:
+
+⎡⎤ x(u) ∑k
+Pi(u) = ⎣ y(u) ⎦ = Bi,jbjk(u)
+
+(14)
+
+z(u)
+
+j=0
+
+Meanwhile, to synchronize between arc-lengths and spline parameters, it is essential to calculate the arc length of the tool path position spline. One notable advantage of the PH spline lies in its straightforward analytical arc-length calculation [43], as demonstrated by the following equations:
+
+⎧
+
+∑5
+
+⎪⎪⎪ si(u) = si,kkbkk5 (u)
+
+⎪⎨ kk=0
+
+⎪⎪⎪
+
+1 ∑ m− 1
+
+⎪⎩ si,0 = 0, si,m =
+
+σi,j, m = 1, ..., 5
+
+5 j=0
+
+(15)
+
+where σi = [σi,0, σi,1, σi,2, σi,3, σi,4] is the
+
+calculated by the following equations:
+
+⎧
+
+⎪⎪⎪⎪ σ ⎪ i,0 = |wi,0|2
+
+⎪⎪
+
+1(
+
+)
+
+⎪⎪⎪⎪⎪⎪ σi,1 = 2 wi,0iw∗i,1 + wi,1iw∗i,0
+
+⎪⎨
+
+(
+
+1
+
+∗
+
+)
+
+2
+
+∗
+
+⎪⎪ σi,2 = 6 wi,0iwi,2 + 4|wi,1| + wi,2iwi,0
+
+⎪⎪⎪
+
+(
+
+)
+
+⎪⎪⎪⎪ 1 ∗ ∗ ⎪ σi,3 = wi,1iwi,2 + wi,2iwi,1
+
+⎪⎪
+
+2
+
+⎪⎪⎩
+
+2
+
+σi,4 = |wi,2|
+
+parametric
+
+speed,
+
+which is (16)
+
+Fig. 5. Illustration of the PH-spline representation.
+
+3.3. Smoothing of the tool orientation
+The tool orientation Oi = [Oi,x, Oi,y, Oi,z](i = 0, 1, ..., N) is a unit vector, and if directly fitted using spline interpolation, it cannot maintain the constraint of unit length, which leads to the loss of orientation accuracy. Therefore, the tool orientation cannot be directly interpolated in the Cartesian space. Therefore, to overcome this limitation, the tool orientation vectors are converted to the Euler rotary angle space Θi = [αi, βi] by using Eq. (6).
+The C2 PH spline curves for the i th segment spline are constructed to
+5
+
+J. Yang et al.
+
+smooth the tool-axis orientation:
+
+[ α(ω) k ] ∑k Θi(ω) = β(ω) = Mi,jbj (ω)
+j=0
+
+(17)
+
+where ω is the spline parameter, {Mi,j} are the control points, and bkj (ω)
+
+= k! uj(1 −
+j!(k− j)!
+
+ω)k− j are basis functions of the PH spline. Fig. 6 provides
+
+an illustration of the tool orientation spline representation.
+
+To construct the PH spline, the quadratic polynomial vi(ω) is con­
+
+structed with N+2 unknown complex variables z0, z1, ⋯zN, zN+1 to
+
+represent the derivatives of the PH spline:
+
+Θ′i(ω) = v2i (ω)
+
+(18)
+
+where:
+
+vi(ω) = vi,0(1 − ω)2 + 2vi,1(1 − ⎧
+
+⎪⎪⎪
+
+1
+
+⎪⎪⎪⎪⎨ vi,0 = 2 (zi− 1 + zi)
+
+vi,1 = zi
+
+⎪⎪⎪⎪⎪ 1
+
+⎪⎪ vi,2 = (zi + zi+1)
+
+⎩
+
+2
+
+ω)ω + vi,2ω2
+
+(19)
+
+The PH-spline constructed using the above method can satisfy the C2
+
+continuity requirement of the i th tool-axis orientation segment spline.
+
+Thereafter, to calculate the coefficients z, integrate the Eq. (18):
+
+∫1
+′
+
+[ αi −
+
+Θi(ω)dω = ΔΘi =
+
+0
+
+βi −
+
+] ai− 1 βi− 1
+
+(20)
+
+= 1 zi− 1 2 + 9 zi2 + 1 zi+1 2 + 1 zi− 1zi+1 + 13zi− 1zi + 13zizi+1
+
+20
+
+20 20
+
+60
+
+60
+
+60
+
+where i = 1, ⋯, N.
+
+Assuming that the tangent vectors of the endpoints are tt0 and ttN, the
+
+expression for the initial and final boundary conditions are:
+
+⎧
+
+⎪⎪⎨
+
+Θ′1(0)
+
+=
+
+1 (z0
+
++
+
+z1 )2
+
+=
+
+tt0
+
+4
+
+⎪⎪⎩ ′
+
+1
+
+2
+
+Θ N (1) = (zN + zN+1) = ttN
+
+4
+
+(21)
+
+Combining Eqs. (20) and (21), N+2 quaternion equations about N+2 unknown variables z are established. Since the derivative of the Eqs. (20), (21) about z is directly obtained analytically, the solution of z = (z0, ⋯, zN+1) is calculated directly by using Newton-Raphson method in Ref. [44]. Substituting z into Eq. (19),vi(ω) is calculated, and the control points M are obtained by:
+
+Robotics and Computer-Integrated Manufacturing 89 (2024) 102768
+
+⎧
+
+⎪⎪⎪⎪ Mi,0 = Θi− 1 ⎪
+
+⎪⎪⎪
+
+12
+
+⎪⎪⎪⎪ Mi,1 = Mi,0 + v ⎪ 5 i,0
+
+⎪⎪
+
+⎪⎪
+
+1
+
+⎪⎪⎪⎨ Mi,2 = Mi,1 + 5vi,0vi,1
+
+⎪ 1 2 ( )
+
+⎪⎪ Mi,3 = Mi,2 + vi,0vi,2 + 2vi,1
+
+⎪⎪
+
+15
+
+⎪⎪
+
+⎪⎪⎪
+
+1
+
+⎪⎪⎪⎪ Mi,4 = Mi,3 + vi,2vi,1 ⎪ 5
+
+⎪⎪
+
+⎪⎪⎪⎩ M 1 i,5 = Mi,4 + v2i,2
+
+5
+
+(22)
+
+By substituting the control points M into Eq. (17), the PH spline Θi(ω) for the tool orientation in the Euler angle space is obtained.
+
+3.4. Smoothing of the redundant angle
+
+Due to the single-variable nature of the redundant angle γ, it is
+
+synchronized with the arc-length parameter s by employing a 5th degree
+
+piecewise polynomial fitting approach to satisfy γi(si) = γi(i = 1,2,...,N). By adjusting the coefficients of the polynomial, the C2 continuity and
+
+minimum acceleration is obtained, thereby ensuring high dynamics
+
+along the tool path. The schematic diagram is depicted in Fig. 7, where
+
+γi(s)
+
+=
+
+∑5
+
+5−
+
+j=0 ci,j s
+
+j is
+
+a
+
+5th
+
+degree
+
+polynomial
+
+in
+
+the
+
+i-th
+
+segment
+
+[0, si],
+
+(i = 1, 2, ..., N). To achieve the good dynamic performance of the redundant angle,
+the global index of the second order differential of the redundant angle related to the arclength Φ is minimized as follows:
+
+∑N ∫ Si d2γ 2 i=1 0 Φ = |ds2 | ds
+
+(23)
+
+The 1st and 2nd derivatives of the
+
+expressed as follows:
+
+{′
+
+[4 3 2
+
+]
+
+γ i(s) = 5s 4s 3s 2s 1 0 ⋅Ci
+
+γ i’′ (s) = 20s 12s 6s 2 0 0 [ 3 2 ]⋅Ci
+
+redundant
+
+angle
+
+spline are (24)
+
+where Ci = [ci,0, ci,1, ci,2, ci,3, ci,4, ci,5]T are the polynomial coefficients.
+
+By combining Eqs. (23) and (24) of the i th segment spline is
+
+expressed as follows:
+
+⎧
+
+⎫
+
+⎪⎪⎪ 400c2i,0s6 + 480ci,0ci,1s5 + 240ci,0ci,2s4 + ⋯ ⎪⎪⎪
+
+∫ Si ⎪⎨
+
+(
+
+)
+
+⎪⎬
+
+Φi =
+
+144ci,1 2 s4 + 80ci,0ci,3 + 144ci,1ci,2 s3 + ⋯ ds
+
+⎪⎪ (
+
+)
+
+⎪⎪
+
+0 ⎪⎪⎩ 48ci,1ci,3 + 36ci,2 2 s2 + 24ci,2ci,3s + 4ci,3 2 ⎪⎪⎭
+
+(25)
+
+Eq. (25) is transformed into the form of matrix multiplication:
+
+Fig. 6. Illustration of PH-spline representation for tool-axis orientation. 6
+
+Fig. 7. Fitting of redundant angle related to the arc length.
+
+J. Yang et al.
+
+⎡
+
+⎤
+
+⎢ 400si7 40si6 24si5 10si4 0 0 ⎥
+
+⎡
+
+⎤⎢ 7 T⎢
+
+⎥⎥⎡ ⎤
+
+ci,0 ⎢ 6 144 5
+
+4
+
+3
+
+⎥ ci,0
+
+⎢ ci,1 ⎥
+
+⎢ ⎢
+
+40si
+
+si 18si 8si 0 0 ⎥⎥⎢ ci,1 ⎥
+
+⎢ ⎥⎢
+
+5
+
+⎥⎢ ⎥
+
+⎢ ⎢
+
+ci,2
+
+⎥ ⎥
+
+⎢
+
+5
+
+4
+
+3
+
+2
+
+⎥⎢⎢
+
+ci,2
+
+⎥ ⎥
+
+Φi = ⎢ c ⎥ ⎢ 24si 18si 12si 6si 0 0 ⎥⎢ c ⎥
+
+⎢ i,3 ⎥ ⎢
+
+⎥⎢ i,3 ⎥
+
+⎣ ci,4 ⎦ ⎢⎢⎢ 10s4i 8s3i 6s2i 4si 0 0 ⎥⎥⎣ ⎥ ci,4 ⎦
+
+ci,5 ⎢
+
+⎥ ci,5
+
+⎢0
+
+0
+
+0 0 0 0⎥
+
+⎣
+
+⎦
+
+0
+
+0
+
+0 0 00
+
+⏟̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅⏞⏞̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅⏟
+
+Qi
+
+(26)
+
+Since this optimization function is a quadratic minimization (QP) program, in order to simplify the operation, Eq. (26) is written as:
+
+Φi = 1CiT QiCi 2
+
+(27)
+
+Therefore, the global optimization function is expressed as:
+
+minΦ = min 1CTQC (28) 2
+The spline of γ(s) should satisfy C2 continuity, therefore, the corresponding linear constraints need to be added. Firstly, position constraints are added to ensure that the spline passes through the discrete point (si, γi):
+
+γi(0) = γi− 1, γi(si) = γi For i = 1, 2⋯N − 1, N
+
+(29)
+
+The matrix form representation of Eq. (29) can be expressed as:
+
+[
+
+]
+
+[]
+
+s5 s4 s3 s2 0 0 0 0 0 0 s 0 = Ci = 0s For i = 1, 2⋯, N − 1, N i (30)
+
+⏟̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅⏞⏞̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅⏟
+
+⏟̅⏞⏞̅⏟
+
+L0i τ0i
+
+Therefore, the expressions of the global position constraints are as
+
+follows:
+
+⎡
+
+⎤ ⎡⎤
+
+⎢ L10
+
+⎢ L0
+
+⎢
+
+2
+
+⎢
+
+⎢
+
+⋱
+
+⎣
+
+0 ⎥ ⎢ τ01 ⎥ ⎥ ⎢ τ0 ⎥ ⎥ ⎢ 2⎥ ⎥C = ⎢ ⎥ ⎥ ⎢⋮⎥ ⎦ ⎣⎦
+
+0 LN0 τN0
+
+(31)
+
+⏟̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅⏞⏞̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅⏟ ⏟̅̅⏞⏞̅̅⏟
+
+L0
+
+τ0
+
+In order to satisfy the velocity and acceleration continuity con­
+
+straints of the adjacent polynomial splines, the following constraints
+
+should be satisfied:
+
+{ γ′i(0) = γ′i− 1(si− 1) For γi’′(0) = γ i− 1 ’′ (si− 1)
+
+i = 2, 3⋯N − 1
+
+(32)
+
+Similarly, the constraints in Eq. (32) are rewritten into the matrix
+
+form:
+
+[
+4
+
+3
+
+2
+
+][ ]
+
+5si− 1 4si− 1 3si− 1 2si− 1 1 0 ⋮ 0 0 0 0 − 1 0 Ci− 1
+
+20si− 1 3 12si− 1 2 6si− 1 2 0 0 ⋮ 0 0 0 − 2 0 0 ⋅ Ci
+
+⏟̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅⏞⏞̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅⏟
+
+L12i− 1
+[] =0
+0 ⏟̅⏞⏞̅⏟
+
+τ12i− 1
+
+(33)
+
+Therefore, based on Eq. (33), the global constraints of the velocity and acceleration continuity are written as:
+
+Robotics and Computer-Integrated Manufacturing 89 (2024) 102768
+
+⎡
+
+⎤
+
+⎢ L112
+
+0⎥
+
+⎡⎤ 0
+
+⎢ L12
+
+⎢
+
+2
+
+⎢
+
+⎥ ⎥
+
+⎢0⎥
+
+⎥⋅C
+
+=
+
+⎢ ⎣
+
+⎥ ⎦
+
+⎢
+
+⋱
+
+⎥
+
+⋮
+
+⎣ ⎦0
+
+0
+
+LN− 1 12
+
+⏟̅⏞⏞̅⏟
+
+⏟̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅⏞⏞̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅⏟
+
+τ12
+
+L12
+
+(34)
+
+The first and second derivatives at the initial and final endpoints are set to 0:
+
+⎡
+
+⎤
+
+⎢0 0 0 0 1 0 ⋮ 0 0 0 0 0 0⎥⎡ ⎤
+
+⎢
+
+⎥ C1
+
+⎢ 0 0 0 2 0 0 ⋮ 0 0 0 0 0 0 ⎥ ⎢ C1 ⎥
+
+⎢
+
+⎥⎢ ⎥
+
+⎢⎢ ⋯ ⋯ ⋯ ⋯ ⋯ ⋯ ⋮ ⋯
+
+⋯
+
+⋯
+
+⋯
+
+⋯
+
+⋯
+
+⎥⋅⎢ ⎥⎢
+
+⋯
+
+⎥ ⎥
+
+⎢ ⎢0
+
+0
+
+0
+
+0
+
+0
+
+0 ⋮ 5s4N
+
+4sN3 3sN2 2sN 1
+
+0
+
+⎥ ⎥
+
+⎣ CN
+
+⎦
+
+⎣
+
+3
+
+2
+
+⎦ CN
+
+0 0 0 0 0 0 ⋮ 20sN 12sN 6sN 2 0 0
+
+⏟̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅⏞⏞̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅⏟
+
+⎡ ⎤ Lend 0
+
+⎢0⎥
+
+⎢⎥
+
+=
+
+⎢ ⎢
+
+⋯
+
+⎥ ⎥
+
+⎣0⎦
+
+0 ⏟̅̅⏞⏞̅̅⏟
+τend
+
+(35)
+
+Combining with Eqs. (31), (34) and (35), the optimization problem is written as follows:
+
+minΦ = min 1CTQC 2
+⎡ L0 ⎤ ⎡ τ0 ⎤ s.t.⎢⎢⎣ L12 ⎥⎥ ⎢ ⎦C = ⎢⎣ τ12 ⎥⎥⎦
+Lend τend
+
+(36)
+
+The above quadratic minimization problem can be solved with the MATLAB Optimization Toolbox by using the fmincon function.
+The three types of splines established using the above method consist three different spline parameters, in order to facilitate the subsequent feed velocity planning, it is necessary to establish the three spline parameters (u, ω, γ) as functions of the arc length s. Since the redundant angle spline γ(s) is already a function of s, only u(s) and ω(s) need to be constructed. First, for u(s), because the constructed PH spline has solution of the arc length s related to the spline parameter u, (see Eq. (14)). The Newton-Raphson method is used to invert Eq. (15) to get u(s). The arc length range in segment i is defined as si, therefore, the solution of ut corresponding to st is converted to find the root of the equation ss(u) = 0:
+
+ss(u) = s(u) − st
+
+(37)
+
+where st is the given arc length that needs to calculate the corresponding spline parameter ut.
+The iterative equation is:
+
+ss(ukk− 1) ukk = ukk− 1 − ′
+ss (ukk− 1)
+
+(38)
+
+where kk is the iteration number, ss′(u) = s′(u), (see Eq. (15)). The tool-axis orientation does not directly have an analytical
+expression with the arc length, so the polynomial fitting method in [31] is used here just to establish the function ω(s):
+
+∑5 ωi(s) = di,js5− j
+j=0
+
+(39)
+
+where di = [di,0, di,1, ⋯, di,5] denotes the polynomial coefficients of the i
+
+7
+
+J. Yang et al.
+th segment. Therefore, the tool path position, orientation and redundant rotation
+angle commands are all smoothed and mapped to the tool tip displacements with functions P(u(s)), Θ(ω(s)) and γ(s) as shown in Fig. 8.
+
+3.5. Interpolation with drive constraints of industrial robot
+
+In the Sections 3.1~3.4, the tool position, orientation, and redundant
+
+angle splines are fitted to the arc-length s smoothly. The next step is to
+
+implement feed planning along the arc length s. In this study, a global
+
+feed planning algorithm is employed to realize feed planning which is
+
+achieved by the adoption of a minimum time feed optimization method
+
+considering joint dynamic constraints. This method aims to minimize
+
+the robot motion time along the trajectory while respecting the joint
+
+displacement, velocity, acceleration and jerk constraints imposed by the
+
+robotic joint movements, thereby achieving efficient and smooth motion
+
+commands:
+
+∫ S ds min ′
+0s ⎧ ⎪ θmin ≤ θ(s) ≤ θmax ⎪⎪⎪ ⎪⎨ |θ′(s)| ≤vmax s.t. ⎪⎪⎪ |θ″(s)| ≤amax ⎪⎪⎩
+’′
+|θ (s)| ≤jmax
+
+(40)
+
+where θmin, θmax, vmax, amax, jmax denote the joint displacement, velocity,
+
+acceleration and jerk constraints. θ′(s),θ″(s),θ″′(s) denote the joint
+
+displacement, velocity, acceleration and jerk related to the arc length s
+
+which are calculated by:
+
+⎧
+
+⎪⎪ ′
+
+dθ(s) ′
+
+⎪⎪ θ (s) = s
+
+⎪⎪⎪
+
+ds
+
+⎪⎨
+
+2
+
+’′
+
+d θ(s) ′ 2 dθ(s) ’′
+
+θ (s) = 2 (s ) + s
+
+(41)
+
+⎪⎪⎪
+
+ds
+
+ds
+
+⎪⎪⎪⎪⎪ ’′
+
+d3θ(s) ′ 3 d2θ(s) ′ ’′ dθ(s) ’′
+
+⎩ θ (s) = ds3 (s ) + 3 ds2 s s + ds s
+
+where
+
+s′
+
+=
+
+ds,
+dt
+
+s″
+
+=
+
+d2 s
+dt2 ,
+
+s″′
+
+=
+
+d3 s dt3
+
+denote
+
+the
+
+first,
+
+second
+
+and
+
+third
+
+differ­
+
+entials of the arc length s related to time t.
+
+The above optimization function in Eq. (40) is a nonlinear optimi­
+
+zation function which is solved using Sequential Quadratic Problem
+
+(SQP) in Ref. [45]. The output of velocity planning is the robot end pose
+
+[P(u(s(t))), Θ(ω(s(t))), γ(s(t))] with time stamp t, which is subsequently
+
+used to compute robot joint commands θ(t) through robot inverse
+
+Robotics and Computer-Integrated Manufacturing 89 (2024) 102768
+kinematics. The complete procedure of the proposed tool path generation and smoothing method is shown in Fig. 4.
+4. Experiments
+The proposed algorithm is implemented in MATLAB, version 2020, on a Windows 11 system. The experiment is conducted on a UR10 robot with a 3 kg load as shown in Fig. 9. The interpolation period in the feed planning is precisely set to be 0.008 s. The constraints of the robot position are set as vmax = 25mm/s, amax = 2000mm/s2, jmax = 10000mm/s3. The joint constraints are listed in Table 1.
+The test path is shown in Fig. 10, while Fig. 11 presents the global smoothed tool position spline, orientation spline, and redundant angle spline. To demonstrate the high efficiency calculation capability of the global PH spline, the total time required for the spline construction and the arc length calculation is compared with that of the B-spline method. It takes 74.8 ms for the proposed algorithm to finish the calculation, which is significantly faster than the B-spline method that requires 240.1 ms. The comparative results indicate that the proposed method can achieve highly accurate online calculations with improved efficiency.
+To demonstrate the benefits of the proposed redundant angle smoothing algorithm with the consideration of acceleration constraints, C2 continuous spline for (s, γ) without the consideration of the acceleration constraints of the redundant angle is compared here.
+The same feed planning method is applied to interpolate the joint motion commands of the robot while adhering to the corresponding constraints of tangential velocity, acceleration, and jerk. The result of the feed planning is presented in Fig. 12, which shows that the average velocity achieved by the proposed algorithm is 14.337 mm/s. This is faster than the regular spline method without the consideration of the acceleration constraints of the redundant angle that achieves an average velocity of 9.467 mm/s. As a consequence of this increase in velocity, the motion cycle of the proposed method is reduced by 33.97%, from 26.728 s to 17.648 s, when compared with the regular C2 continuous spline method. These results indicate that the proposed method effectively guarantees the motion dynamic constraints of the robot and enhances motion efficiency.
+Practical path experiments are conducted on the actual robot using the test path, as shown in Fig. 10. The real-time joint positions and velocities of the robot are collected using the Python function package “urrtde package”. The actual joint acceleration shown in Fig. 13 is calculated by differentiating the velocity of each joint. The maximum acceleration of each joint is drawn with a bar chart as shown in Fig. 14. It can be seen that the maximum acceleration of other joints decreased significantly except the joint 4 and joint 5 which is approximately at the
+
+Fig. 8. Parameter synchronization function of the tool tip position u(s), tool orientation ω(s) and redundant angle γ(s).
+8
+
+Fig. 9. Experimental platform used in the tests.
+
+J. Yang et al.
+
+Table 1 Joint kinematic constraints of the experimental UR 10 robot.
+
+Joint
+
+1
+
+2
+
+Position [◦] Velocity [◦/s] Acceleration[◦ /s2] Jerk [◦/s3]
+
+[− 360,360] 120 2000 10,000
+
+[− 360,360] 120 2000 10,000
+
+3
+[− 360,360] 120 2000 10,000
+
+Robotics and Computer-Integrated Manufacturing 89 (2024) 102768
+
+4
+[− 360,360] 180 2000 10,000
+
+5
+[− 360,360] 180 2000 10,000
+
+6
+[− 360,360] 180 2000 10,000
+
+Fig. 10. The test tool path.
+same level between regular spline and the proposed method. The results demonstrate that the method proposed in this study not only enhances the efficiency of robotic motion during tasks, but also effectively mitigates the joint acceleration with a maximum reduction of 65.05%, thereby reducing joint vibrations and enhancing the smoothness of joint movements.
+To further validate that the proposed method does not compromise the motion accuracy of the robot while enhancing its efficiency, the target joint values θtarget and actual joint values θactual are collected
+
+during the experiment by reading motor encoders during the movement with the "ur-rtde package" interface provided by the Universal Robots, and the joint tracking error eθ of the robot is calculated as the difference between the reference and actual joint positions along the test path by:
+
+eθ = θtarget − θactual
+
+(42)
+
+As shown in Fig. 15, Fig. 16, it is evident that the method proposed in this study outperforms the traditional spline in terms of joint tracking error peak values. This result demonstrates that by optimizing the acceleration of redundant angle splines, the proposed algorithm effectively enhances the robot’s motion efficiency and reduce the joint vibrations without sacrificing motion accuracy.
+Because the joint tracking error may not directly reflect the motion accuracy of the end effector, to further validate that the proposed method does not compromise the motion accuracy of the end effector while enhancing its efficiency, the tracking error of the end effector is calculated as the difference between the target position and the actual position of the end effector, while the contour error of the end effector is calculated as the closest distance between the target position and the actual position of the end effector with the algorithm in Ref. [46]. The target position and the actual position are calculated by using the target joint values θtarget and actual joint values θactual based on the forward
+
+Fig. 11. The smoothed tool path position, orientation and redundant angle.
+
+Fig. 12. Tangential velocities of the proposed method and the comparison method. 9
+
+J. Yang et al.
+
+Robotics and Computer-Integrated Manufacturing 89 (2024) 102768
+
+Fig. 13. Acceleration of each joint along the test path.
+
+Fig. 14. Maximum acceleration of each joint along the test path.
+
+kinematics transformation in Eq. (2). The tracking error and contour error of the end effector are as shown in Fig. 17. The results show that the contour error and tracking error of the end effector are at the same level between the proposed method and the comparison method, which proves that the proposed algorithm improves the efficiency without sacrificing the motion accuracy of the end effector.
+5. Conclusion
+This article presents an analytical C2 continuous tool path smoothing algorithm for robotic machining with the consideration of redundant kinematics. A 5th degree PH spline is used to smooth the tool path position and orientation that satisfies C2 continuity. To achieve smooth and continuous motion, the redundant rotation angles are smoothed using a 5th degree polynomial spline as a function of the tool position
+
+displacement. This polynomial spline is optimized to minimize global acceleration. Synchronizing the tool path position spline parameter, the tool orientation spline parameter, and the redundant angle spline parameter along the path are mapped to the tool tip position displacements. The global minimum time feed planning method considering the joint velocity, acceleration, and jerk constraints is adopted to interpolate motion commands. The algorithm effectively reduces abrupt motion changes and ensures a smoother movement of the robot. The proposed method shows a 33.97% higher motion efficiency compared to the regular PH spline method. Furthermore, experiments demonstrate that the proposed method effectively mitigates the joint vibration with a maximum reduction of 65.05%, without compromising motion accuracy.
+
+10
+
+J. Yang et al.
+
+Robotics and Computer-Integrated Manufacturing 89 (2024) 102768
+
+Fig. 15. Tracking error of each joint along the test path.
+Fig. 16. Maximum tracking error of each joint along the test path.
+Fig. 17. Error of the end effector: (a) Tracking error of the end effector; (b) Contour error of the end effector. 11
+
+J. Yang et al.
+CRediT authorship contribution statement
+Jixiang Yang: Project administration, Methodology, Conceptualization, Investigation, Resources, Supervision, Writing – review & editing. Qi Qi: Data curation, Methodology, Validation, Writing – original draft. Abulikemu Adili: Data curation, Methodology, Validation, Writing – original draft. Han Ding: Methodology, Project administration, Resources, Supervision, Writing – review & editing.
+Declaration of competing interest
+The authors declare that they have no conflicts of interest to this work.
+We declare that we do not have any commercial or associative
+
+Robotics and Computer-Integrated Manufacturing 89 (2024) 102768
+interest that represents a conflict of interest in connection with the work submitted.
+Data availability
+Data will be made available on request.
+Acknowledgement
+This research is supported by the National Natural Science Foundation of China under Grant Nos. 52188102, 52122512 and 52375496, and the Natural Science Foundation of Hubei Province, China, under Grant No. 2021CFA075.
+
+Appendix A. Newton-like method for calculating q
+
+Step 1: Selection of the initial solution
+
+Due to the similarity of the shape between a regular cubic B-spline curve and a 5th degree Pythagorean-Hodograph (PH) spline curve, the tool path
+
+position is often smoothed using a regular cubic B-spline curve as an initial solution to the PH-spline curve. Firstly, constructing the piecewise cubic B-
+
+spline ci(u), c′(u = 0, 0.5, 1) is calculated by using the geometric properties of the B-spline curve. Then the initial conditions according to Eq. (8) are
+
+given by the following equations:
+
+⎧
+
+⎪⎪ ′
+
+1
+
+∗′
+
+⎪⎪ P 1(0) = (q0 + q1)i(q0 + q1) = c1(0)
+
+⎪⎪⎪⎨ 4
+
+′
+
+1
+
+∗′
+
+P i(0.5) = (qi− 1 + 6qi + qi+1)i(qi− 1 + 6qi + qi+1) = c i(0.5)
+
+⎪⎪⎪
+
+64
+
+⎪⎪⎪
+
+1
+
+⎪⎩
+
+′
+PN
+
+(1)
+
+=
+
+∗′
+(qN + qN+1)i(qN + qN+1) = c N (1)
+
+4
+
+(A.1)
+
+where i = 1, 2, ⋯, N The solution of the quaternion equations in Eq (A.1) can be treated as the calculation task of AiA∗ = c. The solution is calculated as [47]:
+
+√̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅(
+
+)
+
+A = 1 (1 + λ)|c| − sinφ + cosφi − ucosφ + vsinφ j + vcosφ − usinφ k
+
+2
+
+1+λ
+
+1+λ
+
+(A.2)
+
+where (λ, u, v) = c/|c|, −
+
+π ≤ φ ≤ π. φ = −
+
+π 2
+
+is
+
+chosen
+
+here
+
+to
+
+obtain
+
+the
+
+initial
+
+solutionswhich
+
+are
+
+calculated
+
+as:
+
+√̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅ 1 ( v
+
+u)
+
+A = 2 (1 + λ)|c| 1 − 1 + λ j + 1 + λ k
+
+(A.3)
+
+Substituting Eq. (A.3) into Eq. (A.1), by solving the linear equations, the initial solution qkk=0 can be obtained, where kk is the iteration number.
+
+Step 2: Construction of the iteration equations and calculation
+
+After obtaining the initial solution q0 for iteration, the next step is to construct the iteration equations. The iteration equations are formed by
+
+combining Eqs. (11) and (12): ⎧
+
+⎪⎪ ′
+
+1
+
+∗
+
+⎪⎪ P 1(0) = (q0 + q1)i(q0 + q1) = t0
+
+⎪⎪
+
+4
+
+⎪⎪⎪⎨ 6q ∗ ( ∗ ∗ ) ∗ ( ∗ ∗ ) i− 1iqi− 1 + 13 qi− 1iqi + qiiqi− 1 + 54qiiqi + qi− 1iqi+1 + qi+1iqi− 1 + ⋯
+
+⎪( ∗
+
+∗) ∗
+
+⎪⎪ 13 qiiqi+1 + qi+1iqi + 6qi+1iqi+1 = 120ΔPi
+
+⎪⎪
+
+⎪⎪⎪⎪ ′
+
+1
+
+∗
+
+⎩ P N (1) = (qN + qN+1)i(qN + qN+1) = tN
+
+4
+
+(A.4)
+
+where i = 1, 2, ⋯, N
+
+Because the iterative equation in Eq. (A.4) contains the complex number i that cannot be
+
+adopted
+
+to
+
+realize
+
+the
+
+iterative
+
+calculation.
+
+Assuming
+
+that
+
+qkk
+i
+
+is
+
+the
+
+quaternion
+
+coefficient
+
+after
+
+following linearized approximation equation:
+
+qikkiqikk∗ = ( qikk − qikk− 1)iqikk− 1∗ + qikk− 1i( qikk − qikk− 1)∗ + qikk− 1iqikk− 1∗ + ( qikk − qikk− 1)i( qikk − qikk− 1)∗
+
+≈ ( qikk − qikk− 1)iqikk− 1∗ + qikk− 1i( qikk − qikk− 1)∗ + qikk− 1iqikk− 1∗
+
+kk kk∗
+
+kk kk∗
+
+(
+kk− 1 kk
+
+)∗
+kk− 1
+
+kk− 1 ( kk
+
+kk− 1)∗
+
+kk− 1 kk− 1∗
+
+kk− 1 kk− 1∗
+
+qi iqj + qj iqi ≈ 2qi i qj − qj
+
++ 2qj i qi − qi
+
++ qi iqj + qj iqi
+
+directly differentiated. The linearization the iteration calculation of the kk-th step,
+
+method is here is the
+(A.5)
+
+By substituting the above linearized equations into Eq. (A.4), N+2 linear equations are established. The iterative equations about
+
+qkk ,
+i− 1
+
+qkk ,
+i
+
+qkk (i
+i+1
+
+=
+
+1,
+
+2,
+
+⋯,
+
+N)
+
+can
+
+be
+
+obtained:
+
+12
+
+J. Yang et al.
+
+⎧ ⎪⎪ 1 ( kk kk) ( kk kk)∗ ′ ⎪⎪ q0 + q1 i q0 + q1 = c1(0) ⎪⎪ 4 ⎪⎪ ⎪⎪⎪⎪ qk0kiEai + qk1kiEbi + qk1kiEci = Q1 ⎪⎪⎪ ⎪⎪⎪⎨ ⋮
+
+⎪⎪ qki−k 1iEai + qki kiEbi + qki+k 1iEci = Qi
+
+⎪⎪
+
+⎪⎪
+
+⋮
+
+⎪⎪
+
+⎪⎪⎪⎪⎪⎪ qkNk− 1iEai + qkNkiEbi + qkNk+1iEci = QN
+
+⎪⎪⎪⎪ 1 ( kk kk ) ( kk kk )∗ ′ ⎩ q + q i q + q = c (1)
+
+N
+
+N+1
+
+N
+
+N+1
+
+N
+
+4
+
+where:
+
+⎧
+
+⎪⎪⎪ ( ⎪ kk− 1 kk− 1∗ kk− 1 kk− 1)∗ ⎪ Eai = 6qi− 1 + 6qi− 1 + 26qi + 2qi+1
+
+⎪⎪⎪⎪ ( ⎨ Ebi = 26qkk− 1 kk− 1 kk− 1∗ kk− 1)∗ i− 1 + 54qi + 54qi + 26qi+1
+
+( kk− 1
+
+kk− 1∗
+
+kk− 1
+
+kk− 1)∗
+
+⎪ Eci = 6qi− 1 + 6qi− 1 + 26qi + 2qi+1
+
+⎪⎪⎪⎪⎪ Qi = 120ΔPi + 6qkk− 1 kk− 1∗ k− 1 kk− 1∗ kk− 1 kk− 1∗ kk− 1 kk− 1∗ i− 1 iqi− 1 + 26qi− 1 iqi + 54qi iqi + 26qi iqi+1 + ⋯
+
+⎪⎪⎪⎩ 2qkk− 1 kk− 1∗ kk− 1 kk− 1∗ i− 1 iqi+1 + 6qi+1 iqi+1
+
+Robotics and Computer-Integrated Manufacturing 89 (2024) 102768
+(A.6) (A.7)
+
+The kk-th iteration accuracy is calculated as:
+
+√̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅
+
+∑N+1 kk
+
+kk− 1 2
+
+ζkk =
+
+i=1 ‖ qi − qi ‖
+
+(A.8)
+
+According to the preset iteration precision ξmin and the maximum number of iterations kkmax, the quaternion coefficients q are obtained through iterative calculations.
+
+References
+[1] C. Chen, F. Peng, R. Yan, Y. Li, D. Wei, Z. Fan, X. Tang, Z. Zhu, Stiffness performance index based posture and feed orientation optimization in robotic milling process, Robot. Comput. Integr. Manuf. 55 (2019) 29–40.
+[2] G. Xiong, Y. Ding, L. Zhu, Stiffness-based pose optimization of an industrial robot for five-axis milling, Robot. Comput. Integr. Manuf. 55 (2019) 19–28.
+[3] J. Lin, C. Ye, J. Yang, H. Zhao, H. Ding, M. Luo, Contour error-based optimization of the end-effector pose of a 6 degree-of-freedom serial robot in milling operation, Robot. Comput. Integr. Manuf. 73 (2022) 102257.
+[4] X. Qu, M. Wan, C. Shen, W. Zhang, Profile error-oriented optimization of the feed direction and posture of the end-effector in robotic free-form milling, Robot. Comput. Integr. Manuf. 83 (2023) 102580.
+[5] F. Tian, C. Lv, Z. Li, G. Liu, Modeling and control of robotic automatic polishing for curved surfaces, CIRP J. Manuf. Sci. Technol. 14 (2016) 55–64.
+[6] P. Xu, C. Cheung, B. Li, L.T. Ho, J. Zhang, Kinematics analysis of a hybrid manipulator for computer controlled ultra-precision freeform polishing, Robot. Comput. Integr. Manuf. 44 (2017) 44–56.
+[7] A.E.K. Mohammad, J. Hong, D. Wang, Design of a force-controlled end-effector with low-inertia effect for robotic polishing using macro-mini robot approach, Robot. Comput. Integr. Manuf. 49 (2018) 54–65.
+[8] F. Chen, H. Zhao, D. Li, L. Chen, C. Tan, H. Ding, Contact force control and vibration suppression in robotic polishing with a smart end effector, Robot. Comput. Integr. Manuf. 57 (2019) 391–403.
+[9] Y. Wang, J. Yang, D. Li, H. Ding, Tool path generation with global interference avoidance for the robotic polishing of blisks, Int. J. Adv. Manuf. Technol. 117 (2021) 1223–1232.
+[10] C. Kim, J.H. Chung, D. Hong, Coordination control of an active pneumatic deburring tool, Robot. Comput. Integr. Manuf. 24 (2008) 462–471.
+[11] A. Burghardt, D. Szybicki, K. Kurc, M. Muszyn˜ska, J. Mucha, Experimental study of inconel 718 surface treatment by edge robotic deburring with force control, Strength Mater. 49 (2017) 594–604.
+[12] A. Verl, A. Valente, S. Melkote, C. Brecher, E. Ozturk, L.T. Tunc, Robots in machining, CIRP Ann. 68 (2019) 799–822.
+[13] W. Ji, L. Wang, Industrial robotic machining: a review, Int. J. Adv. Manuf. Technol. 103 (2019) 1239–1255.
+[14] Z. Wang, Z. Chen, X. Zhang, Profile compensation for single-point diamond turning of microlens array, NanoManuf. Metrol. 5 (2022) 403–411.
+[15] Y. Wang, T. Zhou, J. Zhou, M. Li, Z. Liang, X. Wang, Precision milling of integrated turbine based on a non-contact on-machine measurement system, NanoManuf. Metrol. 5 (2022) 394–402.
+[16] A. Gasparetto, V. Zanotto, A technique for time-jerk optimal planning of robot trajectories, Robot. Comput. Integr. Manuf. 24 (2008) 415–426.
+[17] A. Gasparetto, A. Lanzutti, R. Vidoni, V. Zanotto, Experimental validation and comparative analysis of optimal time-jerk algorithms for trajectory planning, Robot. Comput. Integr. Manuf. 28 (2012) 164–181.
+
+[18] J. Huang, P. Hu, K. Wu, M. Zeng, Optimal time-jerk trajectory planning for industrial robots, Mech. Machine Theory 121 (2018) 530–544.
+[19] D. Song, J. Ma, Y. Zhong, J. Yao, Global smoothing of short line segment toolpaths by control-point-assigning-based geometric smoothing and FIR filtering-based motion smoothing, Mech. Syst. Signal. Process 160 (2021) 107908.
+[20] H. Sun, J. Yang, H. Ding, A novel tool path smoothing algorithm of 6R manipulator considering pose-dependent dynamics by designing asymmetrical FIR filters, Robot. Comput. Integr. Manuf. 86 (2024) 102681.
+[21] J. Huang, X. Du, L. Zhu, Real-time local smoothing for five-axis linear toolpath considering smoothing error constraints, Int. J. Mach. Tools Manuf. 124 (2018) 67–79.
+[22] Y. Sun, Y. Zhao, Y. Bao, D. Guo, A smooth curve evolution approach to the feedrate planning on five-axis toolpath with geometric and kinematic constraints, Int. J. Mach. Tools Manuf. 97 (2015) 86–97.
+[23] Z. Xie, F. Xie, X.J. Liu, J. Wang, Global G3 continuity toolpath smoothing for a 5DoF machining robot with parallel kinematics, Robot. Comput. Integr. Manuf. 67 (2021) 102018.
+[24] Q.B. Xiao, M. Wan, W.H. Zhang, Y. Yang, Tool orientation optimization for the fiveaxis CNC machining to constrain the contour errors without interference, J. Manuf. Process. 76 (2022) 46–56.
+[25] S. Dening, Z. Chao, M. Jianwei, L. Jinghua, Z. Yuguang, An adaptive singularity avoidance method for five-axis toolpath generation with invariant cutter-contact points and bounded tool orientation variation based on the reduction of Jacobian condition number, J. Manuf. Process. 101 (2023) 1521–1537.
+[26] H. Liu, G. Li, J. Xiao, A C3 continuous toolpath corner smoothing method for a hybrid machining robot, J. Manuf. Process. 75 (2022) 1072–1088.
+[27] J.M. Langeron, E. Duc, C. Lartigue, P. Bourdet, A new format for 5-axis tool path computation, using Bspline curves, Comput. Aided Des. 36 (2004) 1219–1229.
+[28] M. Wan, X.B. Qin, Q.B. Xiao, Y. Liu, W.H. Zhang, Asymmetrical pythagoreanhodograph (PH) spline-based C3 continuous corner smoothing algorithm for fiveaxis tool paths with short segments, J. Manuf. Process. 64 (2021) 1387–1411.
+[29] X. Huang, F. Zhao, T. Tao, X. Mei, A Novel Local Smoothing Method for Five-Axis Machining With Time-Synchronization Feedrate Scheduling, IEEE Access 8 (2020) 89185–89204.
+[30] Q. Bi, Y. Wang, L. Zhu, H. Ding, An algorithm to generate compact dual NURBS tool path with equal distance for 5-axis NC machining, in: H. Liu, H. Ding, Z. Xiong, X. Zhu (Eds.), Intelligent Robotics and Applications, Springer Berlin Heidelberg, Berlin, Heidelberg, 2010, pp. 553–564.
+[31] A. Yuen, K. Zhang, Y. Altintas, Smooth trajectory generation for five-axis machine tools, Int. J. Mach. Tools Manuf.. 71 (2013) 11–19.
+[32] R.V. Fleisig, A.D. Spence, A constant feed and reduced angular acceleration interpolation algorithm for multi-axis machining, Comput. Aided Des. 33 (2001) 1–15.
+[33] J. Yang, Y. Altintas, Generalized kinematics of five-axis serial machines with nonsingular tool path generation, Int. J. Mach. Tools Manuf.. 75 (2013) 119–132.
+[34] X. Li, H. Zhao, X. He, H. Ding, A novel cartesian trajectory planning method by using triple NURBS curves for industrial robots, Robot. Comput. Integr. Manuf. 83 (2023) 102576.
+
+13
+
+J. Yang et al.
+[35] J. Yang, D. Li, C. Ye, H. Ding, An analytical C3 continuous tool path corner smoothing algorithm for 6R robot manipulator, Robot. Comput. Integr. Manuf. 64 (2020) 101947.
+[36] G. Xiong, Y. Ding, L. Zhu, Stiffness-based pose optimization of an industrial robot for five-axis milling, Robot. Comput. Integr. Manuf. 55 (2019) 19–28.
+[37] J. Peng, Y. Ding, G. Zhang, H. Ding, Smoothness-oriented path optimization for robotic milling processes, Sci. China: Technol. Sci. 63 (2020) 1751–1763.
+[38] Q. Hu, Y. Chen, X. Jin, J. Yang, A real-time C3 continuous local corner smoothing and interpolation algorithm for CNC machine tools, J. Manuf. Sci. Eng. 141 (2019) 041004.
+[39] X. Huang, F. Zhao, T. Tao, X. Mei, A newly developed corner smoothing methodology based on clothoid splines for high speed machine tools, Robot. Comput. Integr. Manuf. 70 (2021) 102106.
+[40] Z. Liao, Q. Wang, H. Xie, J. Li, X. Zhou, P. Hua, Optimization of robot posture and workpiece setup in robotic milling with stiffness threshold, IEEE/ASME Trans. Mechatron. 27 (2022) 582–593.
+[41] F. Pelosi, M.L. Sampoli, R.T. Farouki, C. Manni, A control polygon scheme for design of planar PH quintic spline curves, Comput. Aided Geom. Des. 24 (2007) 28–52.
+
+Robotics and Computer-Integrated Manufacturing 89 (2024) 102768
+[42] R.T. Farouki, C. Manni, A. Sestini, Curve and surface design: saint Malo, in: T. Lyche, M.L. Mazure, L.L. Schumaker (Eds.), Spatial C2 PH Quintic Splines, Nashboro Press, 2002, pp. 147–156 (2003), n.d.
+[43] B. Dong, R.T. Farouki, Algorithm 952: pHquintic: a library of basic functions for the construction and analysis of planar quintic pythagorean-hodograph curves, ACM Transactions on Mathematical Software 41 (2015) 1–20.
+[44] R.T. Farouki, B.K. Kuspa, C. Manni, A. Sestini, Efficient solution of the complex quadratic tridiagonal system for C2 PH quintic splines, Numer. Algorithms 27 (2001) 35–60.
+[45] B. Sencer, Y. Altintas, E. Croft, Feed optimization for five-axis CNC machine tools with drive constraints, Int. J. Mach. Tools Manuf.. 48 (2008) 733–745.
+[46] F. Huo, A. Poo, Improving contouring accuracy by using generalized cross-coupled control, Int. J. Mach. Tools Manuf.. 63 (2012) 49–57.
+[47] R.T. Farouki, C. Giannelli, C. Manni, A. Sestini, Identification of spatial PH quintic Hermite interpolants with near-optimal shape measures, Comput. Aided Geom. Des. 25 (2008) 274–297.
+
+14
+
+

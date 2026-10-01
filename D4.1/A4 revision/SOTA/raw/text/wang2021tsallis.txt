@@ -1,0 +1,2420 @@
+Variational Inference MPC using Tsallis Divergence
+Ziyi Wang∗†, Oswin So∗, Jason Gibson, Bogdan Vlahov, Manan S. Gandhi Guan-Horng Liu and Evangelos A. Theodorou Autonomous Control and Decision Systems Lab Georgia Institute of Technology, Atlanta, Georgia ∗These authors contributed equally †Correspondence to: ZiyiWang@gatech.edu
+
+arXiv:2104.00241v1 [cs.LG] 1 Apr 2021
+
+Abstract—In this paper, we provide a generalized framework for Variational Inference-Stochastic Optimal Control by using the non-extensive Tsallis divergence. By incorporating the deformed exponential function into the optimality likelihood function, a novel Tsallis Variational Inference-Model Predictive Control algorithm is derived, which includes prior works such as Variational Inference-Model Predictive Control, Model Predictive Path Integral Control, Cross Entropy Method, and Stein Variational Inference Model Predictive Control as special cases. The proposed algorithm allows for effective control of the cost/reward transform and is characterized by superior performance in terms of mean and variance reduction of the associated cost. The aforementioned features are supported by a theoretical and numerical analysis on the level of risk sensitivity of the proposed algorithm as well as simulation experiments on 5 different robotic systems with 3 different policy parameterizations.
+I. INTRODUCTION
+Variational Inference (VI) is a powerful tool for approximating the posterior distribution of the unobserved random variables [1]. VI recasts the approximation problem as an optimization problem. Instead of directly approximating the target distribution p(z|x) of the latent variable z, VI minimizes the Kullback-Leibler (KL) divergence between a tractable variational distribution q(z) and the target distribution. Due to its faster convergence and comparable performance to Markov Chain Monte Carlo sampling methods, VI has received increasing attention in machine learning and robotics [2, 3, 4].
+VI has been applied to Stochastic Optimal Control (SOC) problems recently. In Okada and Taniguchi [5], the authors formulated the SOC problem as a VI problem by setting the desired policy distribution as the target distribution. The VI-SOC framework works directly in the space of policy distributions instead of speciﬁc policy parameterizations in most SOC and Reinforcement Learning (RL) frameworks. This gives rise to a uniﬁed derivation for a variety of parametric policy distributions, such as unimodal Gaussian and Gaussian mixture in Okada and Taniguchi [5]. Lambert et al. [6] derived the VI-SOC algorithm for non-parametric policy distribution using Stein variational gradient descent. Apart from the policy distribution, the VI-SOC framework is characterized by two components, the optimality likelihood function and distributional distance metric. The optimality likelihood function measures the likelihood of trajectory samples to be optimal and deﬁnes the cost/reward transform to allow for different algorithmic developments. The distributional distance metric is the measure of distance between
+
+the variational distribution and target distribution. In existing VI-SOC works, the KL divergence is used as
+the distributional distance metric due to its simplicity. On the other hand, recent advances in VI research involve extending the framework to other statistical divergences, such as the α-divergence [7] and χ-divergence [8]. In Wang et al. [9], Regli and Silva [10], the authors proposed variants of the α-divergence to improve the performance and robustness of the inference algorithm. Wan et al. [11] further extended the VI framework to f -divergence, which is a broad statistical divergence family that recovers the KL, α and χ-divergence as special cases.
+Tsallis divergence is another generalized divergence rooted in non-extensive statistical mechanics [12]. Tsallis divergence and Tsallis entropy are generalizations of the KL divergence and Shannon entropy respectively. The Tsallis entropy is nonadditive (hence non-extensive) in the sense that for a system composed of (probabilistically) independent subsystems, the total entropy differs from the sum of the entropies of the subsystems [13]. Over the last two decades, an increasing number of complex natural, artiﬁcial and social systems have veriﬁed the predictions and consequences derived from the Tsallis entropy and divergence [14, 15, 16, 17]. Lee et al. [17] demonstrated that Tsallis entropy regularization leads to improved performance and faster convergence in RL applications.
+In this paper, we provide a generalized formulation of the VI-SOC framework using the Tsallis divergence and introduce a novel Model Predictive Control (MPC) algorithm. The main contribution of our work is threefold:
+• We propose the Tsallis VI-MPC algorithm, which allows for additional control of the shape of the cost transform compared to previous VI-MPC algorithms using KL divergence.
+• We provide a holistic view of connections between Tsallis VI-SOC and the state-of-the-art Model Predictive Path Integral (MPPI) control, Cross Entropy Method (CEM) and Stochastic Search (SS) methods.
+• We show, both analytically and numerically, that the proposed Tsallis VI-SOC framework achieves lower cost variance than MPPI and CEM. We further demonstrate the superior performance of Tsallis VI-SOC in mean cost and variance minimization on simulated systems from control theory and robotics for 3 different choices of
+
+policy distributions.
+The rest of this paper is organized as follows: in Section II, we review KL VI-SOC and derive the Tsallis VI-SOC framework. In Section III, we discuss the connections between Tsallis VI-SOC and related works. A reparameterization and analysis of the framework is included in Section IV, and we propose the novel Tsallis VI-MPC algorithm in Section V. We showcase the performance of the proposed algorithm against related works in Section VI and conclude the paper in Section VII.
+
+II. TSALLIS VARIATIONAL INFERENCE-STOCHASTIC OPTIMAL CONTROL
+In this section, we review the VI-SOC formulation using KL divergence [5] and derive the novel Tsallis divergence VI-SOC framework.
+
+A. SOC Problem Formulation
+In discrete time SOC, we work with trajectories τ := {X, U } of state, X := {x0, x1, . . . , xT } ∈ Rnx×T +1, and control, U := {u0, u1, . . . , uT −1} ∈ Rnu×T over a ﬁnite time horizon T > 0. The goal in SOC problems is to minimize the
+expected cost deﬁned by an arbitrary cost function J : Rnx×T × Rnu×T −1 → R+ with initial state distribution p(x0) and state transition probability p(xt+1|xt, ut) corresponding to stochastic dynamics xt+1 = F (xt, ut, t) where t ∈ Rn is the system stochasticity.
+
+B. KL VI-SOC
+We can formulate the SOC problem as an inference problem and apply methods from VI. To apply VI to SOC, we introduce a dummy optimality variable o ∈ {0, 1} with o = 1 indicating that the trajectory τ = {X, U } is optimal. Table I compares the differences in notation between conventional VI methods and SOC formulated as a VI problem.
+The objective of VI-SOC is to sample from the posterior distribution
+p(o = 1|τ )p(τ ) p(τ |o) =
+p(o) p(o = 1|τ ) T −1 (1) = p(o = 1) p(x0) p(xt+1|xt, ut)p(ut).
+t=0
+Here p(xt+1|xt, ut) is the state transition probability, p(x0) is the initial state distribution and p(ut) is some prior control distribution (e.g. zero mean Gaussian or uniform distribution). For simplicity, we use o to indicate o = 1 and o for o = 0 from here on. We can now formulate the VI-SOC objective as minimizing the distance between a controlled distribution q(τ ) and the target distribution p(τ |o)
+q∗(τ ) = arg min DKL (q(τ ) p(τ |o))
+q(τ )
+
+= arg min Eq(τ)
+q(τ )
+= arg min Eq(τ)
+q(τ )
+
+p(X|U )q(U ) log p(o|τ )
+p(o) p(X|U )p(U ) T −1 q(ut)
+− log p(o|τ ) + log t=0 p(ut)
+
+(2) ,
+
+TABLE I: Notation comparison between Variational Inference and Variational Inference-Stochastic Optimal Control.
+
+Notation
+x z p(z) q(z) p(x|z) p(z|x)
+
+VI
+Meaning
+data latent variable prior distribution variational distribution generative model posterior distribution
+
+Notation
+o τ p(τ ) q(τ ) p(o|τ ) p(τ |o)
+
+VI-SOC
+Meaning
+optimality trajectory prior distribution controlled distribution optimality likelihood optimal distribution
+
+where the constant p(o) is dropped. The ﬁrst term in the objective measures the likelihood of a trajectory being optimal while the second term serves as regularization. Splitting the expectation in the ﬁrst term, we get
+
+q∗(U ) = arg min − Eq(U)[Ep(X|U)[log p(o|τ )]] q(U) (3) + DKL (q(U ) p(U )) ,
+
+where p(U ) and q(U ) represent t=0 T −1 p(ut) and t=0 T −1 q(ut) respectively due to independence and
+p(X|U ) = p(x0) t=0 T −1 p(xt+1|xt, ut). Optimality Likelihood: The optimality likelihood in Eq. (3)
+can be parameterized by a non-increasing function of the trajectory cost J(X, U ) as p(o|τ ) := f (J(X, U )). The monotonicity requirement ensures that trajectories incurring higher costs are always less likely to be optimal. Common choices of f include f (x) = exp(−x) and f (x) = 1{x≤γ}. In this paper, we choose f (x) = exp(−x) such that log p(o|τ ) = −J(X, U ). To avoid excessive notation, we abuse the notation to deﬁne J (U ) := Ep(X|U)[J (X, U )] and the N -sample empirical approximation of the expectation J = Nn=1[J (n)]. Hence, Eq. (3) takes the form
+q∗(U ) = arg min Eq(U)[J (X, U )] + DKL (q(U ) p(U )) ,
+q(U )
+(4) which can be interpreted as an application of the famous maximum entropy principle.
+
+C. Tsallis VI-SOC
+
+In this subsection, we use the Tsallis divergence as the regularization function and derive the Tsallis-VI-SOC algorithm. First, we deﬁne the deformed logarithm and exponential as
+
+xr−1 − 1 logr(x) = r − 1 , (5)
+
+1
+
+expr(x) = (1 + (r − 1)x)+r−1 ,
+
+(6)
+
+where (·)+ := max(0, ·) and r > 0. Using logr and expr we can deﬁne the Tsallis entropy and the corresponding Tsallis
+divergence [12] as
+
+Sr(q(z)) := − Eq[logr q(z)] = − 1 q(z)rdz − 1 , (7) r−1
+
+and Dr (q(z)
+
+q(z) p(z)) :=Eq logr
+p(z)
+
+1
+
+=
+
+q(z)
+
+r−1
+
+q(z) r−1 dz − 1 .
+p(z) (8)
+
+Note that as r → 1, logr → log, expr → exp, Dr → DKL and Sr → S, where S is the Shannon entropy, recovering the KL VI-SOC framework.
+Versions of Tsallis Statistics: In our deﬁnition of the deformed logarithm and exponential in Eqs. (5) and (6), we use the variable r instead of the q used in most literature to avoid assigning multiple meanings to q. Also, our deﬁnition of logr and expr differ from its original deﬁnitions [18], but the original can be recovered with r = 2 − r, where r corresponding to the value used in [18]. Additionally, there are multiple formulations of the Tsallis entropy differing in their deﬁnitions of the internal energy and how expectations are taken [12, 19, 20]. We have chosen to use the formulation from [12] due to its simplicity in computing the expectation. However, as shown in [21], they are equivalent and can be recovered from each other via a change of variables.
+We can now deﬁne a new objective by replacing the KL divergence regularizer in Eq. (4) with the Tsallis divergence and introducing a parameter λ that multiplies the optimality likelihood to make the regularization strength tunable:
+
+q∗(U ) = arg min λ−1Eq(U)[J ] + Dr (q(U ) p(U )) . (9)
+q(U )
+
+The controlled distribution has to satisfy the additional constraint of q(U ) dU = 1. The optimal policy distribution q∗
+can be explicitly solved for with the form
+
+expr −λ˜−1J p(U )
+
+q∗(U ) =
+
+,
+
+(10)
+
+expr −λ˜−1J p(U ) dU
+
+where λ˜ = α(r − 1)λ with α being the Lagrange multiplier for the constraint that q∗ integrates to 1. A detailed derivation can be found in Section SM-1 of the supplementary materials. We can now use Eq. (10) to obtain the optimal control distribution by transforming the prior distribution.
+
+D. Update Laws
+
+In general, it is computationally inefﬁcient to sample from q∗(U ) via Eq. (10) directly. Instead, we can approximate q∗(U )
+by some policy π(U ) lying in a class Π of tractable distributions
+and solve for an iterative update law by minimizing the KL divergence between π(U ) and q∗(U ):
+
+πk+1(U ) = arg min DKL (q∗(U ) π(U )) . (11)
+π(U )∈Π
+
+However, because one can only evaluate q∗(U ) at a ﬁnite
+
+number
+
+of
+
+points
+
+{U (n)}N ,
+n=1
+
+we
+
+instead
+
+approximate
+
+q∗(U )
+
+by the empirical distribution q˜∗(U ) with weights w(n):
+
+N
+
+q˜∗(U ) = w(n)1{U=U(n)},
+
+n=1
+
+w(n) =
+
+q∗(U (n)) n =1 N q∗(U (n )) .
+
+(12) (13)
+
+We now solve Eq. (11) for 3 different policy classes: unimodal Gaussian, Gaussian mixture and a nonparametric policy corresponding to Stein Variational Gradient Descent (SVGD) [6, 22]. The full derivations for each can be found in the supplementary material in Section SM-2.
+Unimodal Gaussian: For a unimodal Gaussian policy distribution with parameters Θ := {(µt, Σt)}t=0 T −1, the update laws for the k + 1th iteration take the form of
+
+N
+µtk+1 = w(n)ut(n),
+n=1
+N
+Σtk+1 = w(n)(ut(n) − µtk+1)(ut(n) − µtk+1)T.
+n=1
+
+(14) (15)
+
+Gaussian Mixture: Alternatively, the policy distribution can
+be an L-mode mixture of Gaussian distribution with parameters Θ := {θl}Ll=1 for θl := (φl, {µl,t, Σl,t}t=0 T −1), where φl is the mixture weight for the lth component. Although it is not
+possible to directly solve Eq. (11) in this case, we draw from
+Expectation Maximization (EM) to derive an iterative update
+scheme for the k + 1th iteration with the form
+
+φlk+1 = LNl , (16) l =1 Nl
+
+1N
+
+n (n) n
+
+µl,t k+1 = Nl ηl(ut )w ut ,
+
+n=1
+
+(17)
+
+1N
+
+n (n) n
+
+k+1 n
+
+k+1 T
+
+Σl,t k+1 = Nl ηl(ut )w (ut − µl,t )(ut − µl,t ) ,
+
+n=1
+
+(18)
+
+where
+
+ηl(ut(n)) =
+
+φlkN (ut(n)|µl,t k , Σl,t k )
+
+L
+
+k
+
+(n) k
+
+,
+k
+
+l =1 φl N (ut |µl ,t, Σl ,t)
+
+N T −1
+
+Nl =
+
+ηl(ut(n))w(n).
+
+n=1 t=0
+
+(19) (20)
+
+Stein Variational Policy: The policy can also be a non-
+parametric distribution approximated by a set of particles Θ := {θl}Ll=1 for some parametrized policy πˆ(U ; θ). In [6], πˆ is taken to be a unimodal Gaussian with ﬁxed variance, where θ ∈ Rnx×(T −1) corresponds to the mean. The update law of
+
+each Stein particle for the k + 1th iteration has the form
+
+θlk+1 = θlk + φˆ∗(θlk),
+
+(21)
+
+L
+φˆ∗(θ) = kˆ(θl, θ)G(θm) + ∇θl kˆ(θl, θ), (22)
+
+l=1
+
+S G(θl) = s=1 w(l,s)∇θ log πˆ(U (n), θl) , (23) Ss=1 w(l,s)
+
+where the N is chosen such that N = LS, kˆ is a kernel function, and w(l,s) = w(m+L(l−1)), where S denotes the number of rollouts for each of the L particle. As noted in [23], SVGD
+becomes less effective as the dimensionality of the particles
+increases due to the inverse relationship between the repulsion
+force in the update law and the dimensionality. Hence, we
+follow [6] in choosing a sum of local kernel functions as our choice of kˆ.
+
+Fig. 1: Reparameterized expr (Eq. (28)). Left: r is varied with ﬁxed γ = 1. It is clear that expr → CEM as r → ∞. Right: γ is adjusted accordingly such that expr → MPPI as r → 1.
+
+III. CONNECTIONS TO RELATED WORKS
+In this section, we compare VI-SOC with three samplingbased methods from optimization, thermodynamics, and information theory that have been applied to stochastic control problems. A comparison of problem formulations and update laws for different approaches with a unimodal Gaussian policy is in Table II.
+
+A. Stochastic Search
+SS [24] is a stochastic optimization scheme and has also been applied to the SOC setting [25, 26]. SS-SOC parameterizes the control policy with a distribution from the exponential family during problem formulation and optimizes with respect to policy parameters whereas VI-SOC performs optimization at the distribution level. The SS-SOC framework formulates the problem as
+θ∗ = arg max Eπ(U;θ) S(Ep(X|U)[J (X, U )]) , (24)
+θ
+where S(·) is a monotonically decreasing shape function. Note that in Eq. (24), the expectation taken with respect to p(X|U ) is inside the shape function S as opposed to outside as in Eq. (3). For convex shape/optimality likelihood functions, the objective in VI-SOC corresponds to an upper bound of that in SS-SOC, i.e.,
+
+S(Ep(X|U)[J (X, U )]) ≤ Ep(X|U)[S(J (X, U ))]. (25)
+
+A detailed comparison of the two formulations can be found in [5].
+The parameter update of SS-SOC has the form
+
+k+1
+
+k
+
+N S(J (n))(T (ut(n)) − N1
+
+θt = θt + β
+
+N
+
+n˜=1 N T (ut(n˜))) ,
+
+n=1 n =1 S(J (n ))
+
+(26)
+
+where T (·) denotes the sufﬁcient statistic for the corresponding
+
+parameter and β is the step size. In the case of a unimodal
+
+Gaussian policy, the update in Eq. (26) is equivalent to Eqs. (14) and (15) with S(J) = expr(−λ˜−1J).
+
+B. Cross Entropy Method
+CEM [27] is a widely used algorithm in reinforcement learning and optimal control problems [28, 29]. The objective function of CEM minimizes the expected cost E[J]. The policy update law for CEM corresponds to that of SS-SOC in Eq. (26) with shape function S(J) = 1{J≤γ} where γ is the elite threshold. As will be shown in Section IV-A, CEM is also a special case of the reparameterized Tsallis VI-SOC with r → ∞.
+
+C. Model Predictive Path Integral Control
+
+MPPI is another approach closely related to VI-SOC and SS-SOC [30, 31]. The framework solves for the controls by minimizing the KL divergence between a controlled distribution and the optimal control distribution
+
+∗
+
+exp −λ−1J p(U )
+
+q (U ) =
+
+−1
+
+.
+
+(27)
+
+exp (−λ J) p(U ) dU
+
+The optimal distribution achieves the free energy lower bound,
+
+F
+
+=
+
+−
+
+λ
+
+log
+
+Ep
+
+(U
+
+)
+
+[exp(−
+
+1 λ
+
+J
+
+)],
+
+which
+
+has
+
+been
+
+shown
+
+to
+
+be
+
+the solution of the Hamilton-Jacobi-Bellman equation [32].
+
+The optimal distribution here is equivalent to Eq. (10) when
+
+r → 1. The corresponding update law can also be obtained
+
+from the SS-SOC framework with S(J) = exp(−λ−1J).
+
+IV. ANALYSIS
+
+A. Effect of expr To facilitate the analysis, we focus on the expr term in
+Eq. (10). Reparametrizing λ˜ = (r − 1)γ, we get
+
+1
+expr(−λ˜−1J ) = 1 − J r−1 γ+
+
+= exp r−1 1 log 1 − Jγ 0,
+
+, J <γ ,
+J ≥γ
+(28)
+
+where γ is now the threshold beyond which the optimality weight is set to 0. The reparameterization adjusts the original
+
+TABLE II: Comparison of the objective and the update law for a unimodal Gaussian policy with ﬁxed variance between different SOC approaches.
+
+Formulation Tsallis VI-SOC KL VI-SOC SS-SOC MPPI CEM
+
+Objective (Minimize) −λE[log p(o|τ )] + Dr (q p) −λE[log p(o|τ )] + DKL (q p) E[S (J )] E[J] + DKL (q p) E[J ]
+
+Update Law for Unimodal Gaussian
+
+θtk+1 =
+
+N n=1
+
+expr (−λ˜−1Jn)s(unt )unt
+N n =1 expr −λ˜−1J n s(unt )
+
+θtk+1 =
+
+N n=1
+
+exp(−λ−1Jn)s(unt )unt
+
+N exp −λ−1J n s(un )
+
+n =1
+
+t
+
+θk+1 = θk + β
+
+t
+
+t
+
+N S(J n)(unt − 1 N N n˜=1 un˜t )
+
+n=1
+
+N S(J n )un
+
+n =1
+
+t
+
+θk+1 = θk +
+
+t
+
+t
+
+N n=1
+
+exp(−λ−1J n)s(unt )unt N n =1 exp(−λ−1J n )s(unt )
+
+θtk+1 = αθtk + (1 − α)
+
+N n=1
+
+1{J n ≤γ } unt n =1 {J N 1 n ≤γ}
+
+parameter λ˜ at every iteration to maintain the same threshold
+
+γ, which is a more intuitive parameter. In addition, we have
+
+observed that the reparameterized framework is easier to tune
+
+and achieves better performance than the original formulation.
+
+Therefore, we focus our analysis and simulations on only the
+
+reparameterized version hereon after. Note that in practice, it
+
+is easier to deﬁne an elite fraction, which adjusts γ based on
+
+the scale of the costs, instead of using γ for easier tuning.
+
+Figure 1 illustrates the shapes of the function corresponding
+
+to different r and γ values. For J < γ, as r → ∞,
+
+expr(−λ˜−1J) → 1. Hence, expr(−λ˜−1J) converges point-
+
+wise to the step function 1{J≤γ} with r → ∞. On the other
+
+hand,
+
+for
+
+any
+
+0
+
+<
+
+J γ
+
+<
+
+1,
+
+we
+
+have
+
+that
+
+expr(−λ˜−10) = exp − 1 log 1 − J , (29)
+
+expr(−λ˜−1J )
+
+r−1
+
+γ
+
+which tends to 0 as r → 1. Hence, exp 1 r−1 log 1 − Jγ converges to 1{J=0} as r → 1.
+
+B. Variance Reduction
+With the connection to SS, the effect of Tsallis divergence can be analyzed through the equivalent problem formulation in optimization. In Section III-A, it is shown that Tsallis VI-SOC corresponds to an upper bound of SS-SOC with objective
+
+θ∗ = arg max Eπ(U;θ) expr(−λ˜−1J ) .
+
+(30)
+
+θ
+
+The variance reduction effect can be analyzed through the coefﬁcient of Absolute Risk Aversion (ARA) [33]
+
+S (J)
+
+A(J) = −
+
+,
+
+(31)
+
+S (J)
+
+for the optimization problem
+
+min Ep(X|U),π(U;θ)[S(J (X, U ))],
+
+(32)
+
+θ
+
+where Tsallis VI-SOC corresponds to S(J) = expr(−λ˜−1J)). The ARA coefﬁcient measures a scaled ratio of terms corresponding to the mean and variance terms in the Taylor series expansion of the objective. Negative value of the coefﬁcient corresponds to a risk-averse objective, and positive value of
+
+the coefﬁcient corresponds to risk-seeking behavior.1The ARA coefﬁcient of Tsallis VI-SOC is
+r−2 ATsallis(J ) = − (r − 1)(γ − J ) . (33)
+
+The ARA coefﬁcients for MPPI and CEM are
+
+1 AMPPI(J ) = λ , (34)
+
+1
+
+ACEM(J) = lim −k tanh k(γ − J) . (35)
+
+k→∞
+
+2
+
+Since AMPPI is a positive constant, it corresponds to a riskseeking algorithm. For a cost below the elite threshold, J < γ, ACEM = −∞ and ATsallis ≶ 0 for r ≶ 2. This leads to the Tsallis VI-SOC framework achieving lower variance than MPPI. For the same elite threshold γ and a properly selected r, we hypothesize that Tsallis VI-SOC results in lower mean cost than CEM since CEM penalizes variance inﬁnitely harder than the mean and assigns equal weights to all elite samples. A more detailed analysis and the derivation of ARA coefﬁcient are included in Section SM-3 of the supplementary material.
+
+V. MODEL PREDICTIVE CONTROL ALGORITHM
+With the update laws in Section II-D and a choice of the optimality likelihood function f , we propose the novel Tsallis VI-MPC algorithm, summarized in Algorithm 1.
+Given the initial state distribution p(x0) and a prior policy distribution, N × M initial states are sampled. Given the initial states, N control trajectories are sampled from the policy distribution. For each control trajectory sample, M state trajectories are propagated for a total of N × M rollouts. The state transitions at each timestep are sampled from the stochastic dynamics F (x, u, ) where corresponds to system stochasticity (zero mean Gaussian ∼ N (0, σ2I) used in this paper). The cost of each trajectory is normalized to [0, 1] for numerical stability and easier tuning. Depending on the choice of policy distribution class, the policy parameters are updated based on the update laws in Section II-D.
+
+1ARA is originally used for utility maximization, where a larger ARA corresponds to greater risk aversion. This is the opposite in our case when we are performing cost minimization.
+
+Cost (Mean)
+
+Cost (Mean)
+
+MPPI 10 1
+
+CEM
+Optimal Hyperparam
+
+Optimal Hyperparam
+
+(Mean)
+
+(Std Dev) 4.0
+
+10 1
+
+3.5
+
+Tsallis 4e­03 2e­03
+
+Cost (Mean)
+
+10 2
+
+10 2
+
+q
+
+3.0
+
+1e­03
+
+2.5
+
+5e­04
+
+10 3
+
+10 3
+
+0.2
+
+0.4
+
+0.6
+
+0.8
+
+Lambda
+
+0.0 0.2 0.4 0.6 0.8 1.0 2.00.40 0.45 0.50 0.55 0.60 3e­04
+
+Elite Fraction
+
+Elite Fraction
+
+4.0
+
+2e­03
+
+7e­03 10 2
+
+3.5
+
+1e­03
+
+5e­03
+
+q
+
+3.0
+
+9e­04
+
+Cost (Std Dev)
+
+3e­03 10 3
+
+2.5
+
+7e­04
+
+0.2
+
+0.4
+
+0.6
+
+0.8
+
+0.0 0.2 0.4 0.6 0.8 1.0 2.00.40 0.45 0.50 0.55 0.60 5e­04
+
+Lambda
+
+Elite Fraction
+
+Elite Fraction
+
+Cost (Std Dev)
+
+Cost (Std Dev)
+
+Fig. 2: Comparison of mean cost and cost variance for the numerical analysis system Eq. (36). The cost achieved using the updated u from a single update step, averaged over 4096 different seeds, is shown over the entire range of the hyperparameter set for CEM, MPPI and Tsallis VI-SOC. The hyperparameters which minimize the mean and standard deviation of the cost are shown as a cyan and orange star respectively.
+
+Algorithm 1 Tsallis Variational Inference MPC
+
+1: Given: p(x0): initial state distribution; N : number of
+
+policy samples; M : number of state samples; T : MPC
+
+horizon; T : number of MPC steps; K: optimization
+
+iterations per MPC step
+
+2:
+
+Initialize
+
+Θ0
+0
+
+3: {x0n,m}n,m=1 N,M ∼ p(x0)
+
+4: for t = 0 to T − 1 do
+
+5: for k = 0 to K do
+
+6:
+
+for n = 1 to N in parallel do
+
+7:
+
+for m = 1 to M in parallel do
+
+8: Xn,m, U n = frollout(x0n,m, Θtk )
+
+9:
+
+J n,m = fcost(Xn,m, U n)
+
+10:
+
+end for
+
+11: J n = M m=1 1 M f ( max Jn,m−min Jn,m Jn,m−min Jn,m )
+
+12:
+
+end for
+
+13:
+
+Θtk+1 = fupdate({J n, U n}Nn=1)
+
+14: end for
+
+15: Execute qK (ut ,0)
+
+16: Θ0t +1 = frecede(ΘKt )
+
+17: end for
+
+TABLE III: Comparison on a simple single stage stochastic optimization problem Eq. (36). The best values are boldfaced.
+
+Algorithm
+Tsallis CEM MPPI
+
+Cost (Mean)
+2.65 × 10−4 5.36 × 10−4 7.95 × 10−4
+
+Cost (Std Dev)
+4.80 × 10−4 9.26 × 10−4 1.16 × 10−3
+
+Mean Control Error
+2.20 × 10−2 5.04 × 10−2 4.33 × 10−2
+
+For the ﬁrst iteration, we perform additional warm-up iterations by running the optimization loop (line 5 to 14) for a larger Kwarmup iterations before executing the ﬁrst control
+
+Cost
+
+Cost Function Evaluated Points
+1.00
+0.75
+0.50
+0.25
+0.00 5.0 2.5
+
+MPPI CEM
+0.0 2.5 Control
+
+Tsallis Global Minima
+5.0
+
+Fig. 3: A comparison of the updated means for CEM, MPPI and Tsallis VI-SOC using the best set of hyperparameters on a single realization of 64 noisy samples of u (green) for the numerical analysis system. Each sample is a noisy realization.
+
+and performing K optimization iterations in the ensuing MPC steps.
+Control Selection: With the optimized policy distribution from the VI-SOC framework, the control to be executed on the real system is selected differently based on the choice of policy class. For the unimodal Gaussian policy, the mean of the distribution is used. For the Gaussian mixture policy, the mean of the model with the highest mixture weight is executed. In terms of the Stein policy, the Stein particle with the highest weight is used.
+Receding Horizon: After the control execution, the policy distribution is shifted to warm start the optimization at the next MPC timestep. Let θ be the next iteration’s starting sequence and θ be the current iteration’s sequence and set θt = θt+1 for
+
+t = 0, ..., T −2. Finally, set the last item in the new sequence as
+θT −1 = θT −1. This is known as the receding horizon technique in MPC. Note that in Algorithm 1, Θ = {θ0, · · · , θT −1}.
+
+VI. SIMULATIONS
+In this section, we compare the proposed Tsallis VI-MPC algorithm against MPPI and CEM, which represent state-ofthe-art sampling-based SOC algorithms. Since in practice, the shape functions used in SS-SOC corresponds to the ones which result in MPPI and CEM, we have chosen to only compare to MPPI and CEM. We ﬁrst validate our analysis on a simple numerical experiment. We then showcase the scalability and performance of the Tsallis VI-MPC algorithm on 2D point mass, quadcopter, ant, manipulator and humanoid systems in simulation under the 3 aforementioned policy distributions.
+
+A. Numerical Analysis
+
+We verify the analysis in Section IV-B that Tsallis VI-SOC
+
+results in greater variance reduction by comparing the expr
+
+cost transform with the CEM and MPPI cost transforms on the
+
+following simple single-stage stochastic optimization problem:
+
+−  λ e 2λ (λσ2−2u) erf λ√σ2−u − c 
+
+2
+
+2σ
+
+min Eξ 
+
++ 0.1ξ , (36)
+
+u
+
+d
+
+where ξ ∼ N (0, 1), erf is the corresponding error function, the constants λ and σ are chosen to be λ = 0.2, σ = 2.5, and c and d are chosen such that the noiseless objective function is normalized between 0 and 1 for u ∈ [−5, 5]. Figure 3 plots the objective function near its minimum and the noisy objective values.
+To ensure that only the weight computation of the three methods is tested, we sample 64 instances of u uniformly from [−5, 5] and use the same set of samples for all three methods. We use the update law corresponding to the unimodal Gaussian with ﬁxed variance for each algorithm and compare the resulting mean and standard deviation of the cost obtained from each method after a single optimization iteration. A grid search is performed over 4096 different hyperparameters, and the optimization metric is computed as the cost averaged over 4096 random seeds. The results for the best performing hyperparameters are shown in Table III and agree with our intuition that the objective function of Tsallis VI-SOC should result in a lower variance compared to MPPI and a lower mean compared to CEM. In addition, in Fig. 2, we observe that mean cost increases slower as the elite fraction decreases from the optimal value than when increases, while the opposite is true for cost standard deviation.
+B. Controls and Robotics Systems
+The dynamics for the planar navigation and quadcopter tasks are solved via an Euler discretization. Details of the dynamics can be found in Section SM-4. For the manipulator, ant, and humanoid tasks, we use the GPU-accelerated Isaac-Gym [34] to sample trajectory rollouts in parallel. Additional system
+
+stochasticity is injected to each system through the controls channel such that F (xt, ut, t) = F (xt, ut + t).
+The hyperparameters and system conﬁgurations for all simulations are included in Section SM-4. To ensure fair comparisons, all hyperparameters for each method are tuned using a combination of the TPE algorithm [35] from the Neural Network Intelligence (NNI) AutoML framework and hand tuning.
+1) Planar Navigation: We ﬁrst test the different algorithms on a point-mass planar navigation problem. The task is for the point-mass with double-integrator stochastic dynamics to navigate through an obstacle ﬁeld to reach the target location. The dynamics and obstacle ﬁeld are set up the same way as [6]. If a crash occurs, a crash cost is incurred and no further movement is allowed.
+2) Quadcopter: We also set up a quadcopter 3-D navigation task. The task is for the quadcopter to reach a target location while avoiding obstacles. The quadcopter dynamics are taken from [36]. The quadcopter task is similiar to the planar navigation task, where the system is expected to ﬂy through a randomly generated forest to reach the target location. If a crash occurs, a crash cost is incurred and no further movement is allowed.
+3) Franka Manipulator: We next test on the Franka manipulator modiﬁed to have 7-DOF by removing the last joint and ﬁxing the ﬁngers. The objective of this task is to move the end effector around the obstacles to the goal. An illustration of the task is in Fig. 4. It is worth noting that no crash cost is in place for the Franka manipulator. Instead, contact is included as a part of the simulation dynamics.
+Fig. 4: Task setup for Franka manipulator. The goal is to reach the red block while avoiding the pink and green obstacles.
+4) Ant: We also consider the task of locomotion. We test on the ant system, which has 29 state dimensions, 8 control dimensions, and is a widely used testbed for RL algorithms.
+5) Humanoid: Finally, we test our approach on the complex humanoid locomotion task. The humanoid system has 56 state dimensions, 21 control dimensions, and has very unstable dynamics. C. Discussion
+In Table IV, we can see the results of each experiment summarized between each robotic system, policy parameterization,
+
+TABLE IV: Comparisons of mean and standard deviation of cost against MPPI and CEM on different systems and policy classes. The policy classes are deﬁned as Unimodal Gaussian (UG), Gaussian Mixture (GM), and Stein (S). Note that the negative of the reward is used for the locomotion tasks (ant and humanoid). The best mean cost and cost variance for each system-policy distribution pair is boldfaced. The mean and standard deviation reduction percentages are included to the right where positive values correspond to a reduction.
+
+System Planar
+Navigation Quadcopter
+Franka
+Ant
+Humanoid
+
+Policy UG GM S UG GM S UG GM S UG GM S UG GM S
+
+MPPI
+
+Mean
+
+Std
+
+30 023.7
+
+3644.1
+
+39 313.8
+
+8924.8
+
+38 225.0
+
+5169.9
+
+15 266.2
+
+1374.0
+
+22 145.5
+
+4007.3
+
+29 238.3
+
+5084.3
+
+64.2
+
+8.4
+
+67.2
+
+8.3
+
+72.4
+
+4.2
+
+−528.7
+
+54.1
+
+−621.0
+
+55.5
+
+−673.7
+
+36.1
+
+−423.8
+
+233.8
+
+−592.9
+
+170.2
+
+−794.7
+
+174.0
+
+CEM
+
+Mean
+
+Std
+
+34 617.5
+
+2523.3
+
+53 385.3
+
+5494.0
+
+38 847.6
+
+6641.8
+
+15 756.8
+
+2707.1
+
+17 654.1
+
+1593.9
+
+21 064.7
+
+2218.0
+
+66.4
+
+18.4
+
+68.7
+
+13.0
+
+80.4
+
+14.0
+
+−652.6
+
+26.7
+
+−659.1
+
+53.6
+
+−670.0
+
+32.2
+
+−660.8
+
+208.5
+
+−725.9
+
+164.9
+
+−840.8
+
+168.1
+
+Tsallis
+
+Mean
+
+Std
+
+28 714.7
+
+570.2
+
+31 369.2
+
+5683.2
+
+33 324.5
+
+4006.4
+
+14 673.4
+
+1458.4
+
+16 430.6
+
+1498.2
+
+15 976.0
+
+1218.3
+
+57.4
+
+5.5
+
+59.2
+
+5.4
+
+71.8
+
+3.3
+
+−692.9
+
+37.2
+
+−663.8
+
+36.3
+
+−677.4
+
+13.4
+
+−899.3
+
+80.1
+
+−738.1
+
+103.8
+
+−919.7
+
+105.9
+
+Tsallis vs MPPI
+
+∆Mean% ∆Std%
+
+4.4
+
+84.4
+
+20.2
+
+36.3
+
+12.8
+
+22.5
+
+3.9
+
+−6.1
+
+25.8
+
+62.6
+
+45.4
+
+76.0
+
+10.6
+
+34.5
+
+12.0
+
+34.9
+
+0.8
+
+21.4
+
+31.1
+
+31.3
+
+6.9
+
+34.7
+
+0.6
+
+62.8
+
+112.2
+
+65.7
+
+24.5
+
+39.0
+
+15.7
+
+39.2
+
+Tsallis vs CEM
+
+∆Mean% ∆Std%
+
+17.1
+
+77.4
+
+41.2
+
+−3.4
+
+14.2
+
+39.7
+
+6.9
+
+46.1
+
+6.9
+
+6.0
+
+24.2
+
+45.1
+
+13.6
+
+70.1
+
+13.9
+
+58.5
+
+10.7
+
+76.4
+
+6.2
+
+−39.0
+
+0.7
+
+32.4
+
+1.1
+
+58.3
+
+36.1
+
+61.6
+
+1.7
+
+37.1
+
+9.4
+
+37.0
+
+and choice of SOC framework. Across all systems we can see Tsallis VI-MPC results in lower means and variances in most policy parameterizations. The trend continues even as the complexity of the dynamics increases showing that the ﬂexibility provided by the VI-MPC framework is useful even in high dimensional systems.
+First in the planar navigation case, we see that Tsallis VIMPC outperforms the other algorithms in almost all policy parameterizations. During testing, there was high variability in the trajectories computed by each algorithm. The best performing algorithms would have a large increase in velocity towards the goal state, and would have enough variation in sampled trajectories to ”see“ obstacles via large costs in order to avoid them. When comparing the trajectories computed through the GM policy parameterization we tend to see a reduced ability to stabilize at the goal resulting in larger costs overall when compared to other parameterizations. For these systems, the Stein policy results in longer trajectories to the goal. Next in the Quadcopter experiments, we observe that the Tsallis VI-MPC outperforms both MPPI and CEM in mean cost for the unimodal Gaussian and Stein policies. When looking at the high dimensional simulation environments, we see the same trend of Tsallis VI-MPC reducing the mean and variance in comparison to CEM and MPPI holds even for complex systems with contact dynamics.
+The performance of the Tsallis VI-MPC can be attributed to the ability of the algorithm to sample policies that are low cost (via the elite fraction), but then improve beyond the CEM
+
+by performing the cost weighted averaging similar to MPPI. These characteristics of Tsallis VI-MPC are additionally heavily related to the choice of hyperparameters. From hand tuning, we observe that reducing the elite fraction generally results in lower mean cost but higher standard deviation and vice versa. As the cost transform approaches that of CEM or MPPI, the mean and standard deviation approaches their corresponding value. This veriﬁes that the Tsallis VI-SOC framework can be thought of as an interpolation between CEM and MPPI to a certain degree. The best performing conﬁguration is usually somewhere in between these two extremes.
+Finally note that even though the Tsallis VI-SOC framework is typically used over multiple iterations in optimization schemes where the parameters can evolve as the optimization progresses, we have shown the beneﬁts even in MPC mode, where a single iteration of optimization is performed, reiterating the empirical result that a single step has higher reduction in mean cost and variance compared to traditional MPC methods.
+VII. CONCLUSION
+We present a generalized Variational Inference-Stochastic Optimal Control framework using Tsallis divergence, which allows for additional control of the cost/reward transform and results in lower cost/reward variance. We provide a unifying study of the connections between Tsallis VI-SOC, MPPI, CEM, and SS methods. The performance and variance reduction beneﬁts of the proposed Tsallis VI-SOC framework is veriﬁed analytically and numerically. We further showcase advantages
+
+of the Tsallis VI-MPC algorithm against MPPI and CEM on 5 different systems with 3 different policy distributions. We leave 2 extensions of this work as future research directions: 1. Implementation of the proposed algorithm on real systems; 2. Comparison against VI-MPC algorithms using other generalized divergences.
+ACKNOWLEDGMENTS
+This work is supported by NASA Langley and the NSFCPS award #1932288. This work is supported by Sandia National Laboratories, a multimission laboratory managed and operated by National Technology and Engineering Solutions of Sandia, LLC., a wholly owned subsidiary of Honeywell International, Inc., for the U.S. Department of Energy’s National Nuclear Security Administration under contract DENA-0003525. Additionally, this work is supported by NASA LaRC.
+REFERENCES
+[1] David M Blei, Alp Kucukelbir, and Jon D McAuliffe. Variational inference: A review for statisticians. Journal of the American statistical Association, 112(518):859–877, 2017.
+[2] Cheng Zhang, Judith Bütepage, Hedvig Kjellström, and Stephan Mandt. Advances in variational inference. IEEE transactions on pattern analysis and machine intelligence, 41(8):2008–2026, 2018.
+[3] Tanmay Shankar and Abhinav Gupta. Learning robot skills with temporal variational inference. In International Conference on Machine Learning, pages 8624–8633. PMLR, 2020.
+[4] Emmanuel Pignat, Teguh Lembono, and Sylvain Calinon. Variational Inference with Mixture Model Approximation for Applications in Robotics. In 2020 IEEE International Conference on Robotics and Automation (ICRA), pages 3395–3401. IEEE, 2020.
+[5] Masashi Okada and Tadahiro Taniguchi. Variational inference mpc for bayesian model-based reinforcement learning. In Conference on Robot Learning, pages 258– 272. PMLR, 2020.
+[6] Alexander Lambert, Adam Fishman, Dieter Fox, Byron Boots, and Fabio Ramos. Stein Variational Model Predictive Control. arXiv preprint arXiv:2011.07641, 2020.
+[7] Yingzhen Li and Richard E Turner. Rényi Divergence Variational Inference. arXiv preprint arXiv:1602.02311, 2016.
+[8] Adji B Dieng, Dustin Tran, Rajesh Ranganath, John Paisley, and David M Blei. Variational Inference via χ Upper Bound Minimization. arXiv preprint arXiv:1611.00328, 2016.
+[9] Dilin Wang, Hao Liu, and Qiang Liu. Variational inference with tail-adaptive f-divergence. arXiv preprint arXiv:1810.11943, 2018.
+
+[10] Jean-Baptiste Regli and Ricardo Silva. Alpha-beta divergence for variational inference. arXiv preprint arXiv:1805.01045, 2018.
+[11] Neng Wan, Dapeng Li, and Naira Hovakimyan. f Divergence Variational Inference. arXiv preprint arXiv:2009.13093, 2020.
+[12] Constantino Tsallis. Possible generalization of BoltzmannGibbs statistics. Journal of statistical physics, 52(1):479– 487, 1988.
+[13] Constantino Tsallis, Murray Gell-Mann, and Yuzuru Sato. Asymptotically scale-invariant occupancy of phase space makes the entropy Sq extensive. Proceedings of the National Academy of Sciences, 102(43):15377–15382, 2005.
+[14] Eric Lutz. Anomalous diffusion and Tsallis statistics in an optical lattice. Physical Review A, 67(5):051402, 2003.
+[15] Bin Liu and J Goree. Superdiffusion and non-Gaussian statistics in a driven-dissipative 2D dusty plasma. Physical review letters, 100(5):055003, 2008.
+[16] Ralph G DeVoe. Power-law distributions for a trapped ion interacting with a classical buffer gas. Physical review letters, 102(6):063001, 2009.
+[17] Kyungjae Lee, Sungyub Kim, Sungbin Lim, Sungjoon Choi, and Songhwai Oh. Tsallis reinforcement learning: A uniﬁed framework for maximum entropy reinforcement learning. arXiv preprint arXiv:1902.00137, 2019.
+[18] Constantino Tsallis. What are the numbers that experiments provide. Quimica Nova, 17(6):468–471, 1994.
+[19] Evaldo MF Curado and Constantino Tsallis. Generalized statistical mechanics: connection with thermodynamics. Journal of Physics a: mathematical and general, 24(2): L69, 1991.
+[20] Constantino Tsallis, RenioS Mendes, and Anel R Plastino. The role of constraints within generalized nonextensive statistics. Physica A: Statistical Mechanics and its Applications, 261(3-4):534–554, 1998.
+[21] GL Ferri, S Martinez, and A Plastino. Equivalence of the four versions of tsallis’s statistics. Journal of Statistical Mechanics: Theory and Experiment, 2005(04):P04009, 2005.
+[22] Qiang Liu and Dilin Wang. Stein variational gradient descent: A general purpose bayesian inference algorithm. arXiv preprint arXiv:1608.04471, 2016.
+[23] Jingwei Zhuo, Chang Liu, Jiaxin Shi, Jun Zhu, Ning Chen, and Bo Zhang. Message passing stein variational gradient descent. In International Conference on Machine Learning, pages 6018–6027. PMLR, 2018.
+[24] Enlu Zhou and Jiaqiao Hu. Gradient-based adaptive stochastic search for non-differentiable optimization. IEEE Transactions on Automatic Control, 59(7):1818– 1832, 2014.
+[25] George I Boutselis, Ziyi Wang, and Evangelos A Theodorou. Constrained sampling-based trajectory optimization using stochastic approximation. In 2020 IEEE International Conference on Robotics and Automation (ICRA), pages 2522–2528. IEEE, 2020.
+
+[26] Ziyi Wang, Oswin So, Keuntaek Lee, Camilo A Duarte, and Evangelos A Theodorou. Adaptive CVaR Optimization for Dynamical Systems with Path Space Stochastic Search. arXiv preprint arXiv:2009.01090, 2020.
+[27] Pieter-Tjerk De Boer, Dirk P Kroese, Shie Mannor, and Reuven Y Rubinstein. A tutorial on the cross-entropy method. Annals of operations research, 134(1):19–67, 2005.
+[28] Shie Mannor, Reuven Y Rubinstein, and Yohai Gat. The cross entropy method for fast policy search. In Proceedings of the 20th International Conference on Machine Learning (ICML-03), pages 512–519, 2003.
+[29] Marin Kobilarov. Cross-entropy randomized motion planning. In Robotics: Science and Systems, volume 7, pages 153–160, 2012.
+[30] Grady Williams, Paul Drews, Brian Goldfain, James M Rehg, and Evangelos A Theodorou. Information-theoretic model predictive control: Theory and applications to autonomous driving. IEEE Transactions on Robotics, 34 (6):1603–1622, 2018.
+[31] Ziyi Wang, Grady Williams, and Evangelos A Theodorou. Information theoretic model predictive control on jump diffusion processes. In 2019 American Control Conference (ACC), pages 1663–1670. IEEE, 2019.
+[32] Evangelos A Theodorou and Emanuel Todorov. Relative entropy and free energy dualities: Connections to path integral and kl control. In 2012 ieee 51st ieee conference on decision and control (cdc), pages 1466–1473. IEEE, 2012.
+[33] John W Pratt. Risk aversion in the small and in the large. In Uncertainty in economics, pages 59–79. Elsevier, 1978.
+[34] Miles Macklin, Kenny Erleben, Matthias Müller, Nuttapong Chentanez, Stefan Jeschke, and Viktor Makoviychuk. Non-smooth newton methods for deformable multibody dynamics. ACM Transactions on Graphics (TOG), 38(5):1–20, 2019.
+[35] James Bergstra, Rémi Bardenet, Yoshua Bengio, and Balázs Kégl. Algorithms for hyper-parameter optimization. In 25th annual conference on neural information processing systems (NIPS 2011), volume 24. Neural Information Processing Systems Foundation, 2011.
+[36] Winter Guerra, Ezra Tal, Varun Murali, Gilhyun Ryou, and Sertac Karaman. FlightGoggles: Photorealistic sensor simulation for perception-driven robotics using photogrammetry and virtual reality. In 2019 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS). IEEE, November 2019. doi: 10.1109/iros40897.2019. 8968116. URL https://doi.org/10.1109/iros40897.2019. 8968116.
+
+SM-1. DERIVATION OF OPTIMAL DISTRIBUTION
+
+To solve for the optimal distribution, we ﬁrst formulate the Lagrangian as
+
+L(U, λ, α) = λ−1Eq(U)[J ] + Dr (q(U ) p(U ))
+
+(37)
+
++ α 1 − q(U )dU ,
+
+(38)
+
+which
+
+can
+
+be
+
+solved
+
+by
+
+setting
+
+∂L ∂q
+
+=
+
+0
+
+as
+
+∂L = λ−1J + r q(U ) r−1 − α = 0 (39)
+
+∂q
+
+r − 1 p(U )
+
+1
+⇒ q∗(U ) = r − 1 r−1 α − λ−1J r−1 1 p(U ). (40) r
+
+Setting λ−1 = α(r − 1)λ˜−1, we get
+
+q∗(U ) = α(r − 1) r−1 1 1 − (r − 1)λ˜−1J r−1 1 p(U ) (41) r
+
+1
+
+α(r − 1) r−1 ˜−1
+
+=
+
+expr −λ J p(U ).
+
+(42)
+
+r
+
+We now use the constraint that q(U ) dU = 1 by integrating both sides to get
+
+1
+
+α(r − 1) r−1 ˜−1
+
+1=
+
+expr −λ J p(U ) dU
+
+(43)
+
+r
+
+1
+
+α(r − 1) r−1
+
+1
+
+⇒
+
+=
+
+.
+
+(44)
+
+r
+
+expr −λ˜−1J p(U ) dU
+
+Plugging the normalizing constants back in we can get the optimal policy q∗ to be
+
+expr −λ˜−1J p(U )
+
+q∗(U ) =
+
+.
+
+(45)
+
+expr −λ˜−1J p(U ) dU
+
+SM-2. DERIVATION OF UPDATE LAWS
+
+For each of the following update laws, we make use of the following equality:
+
+πk+1(U ) = arg min DKL (q˜∗(U ) π(U ))
+
+(46)
+
+π(U )∈Π
+
+= arg min q˜∗(U ) log q˜∗(U )dU − q˜∗(U ) log π(U )dU.
+
+(47)
+
+π(U )∈Π
+
+We can drop the ﬁrst term as it doesn’t relate to the arg minπ(U)∈Π:
+
+= arg min − q˜∗(U ) log π(U )dU
+
+(48)
+
+π(U )∈Π
+
+= arg max q˜∗(U ) log π(U )dU
+
+(49)
+
+π(U )∈Π
+
+N
+
+= arg max w(n) log π(U (n)).
+
+(50)
+
+π(U )∈Π n=1
+
+A. Unimodal Gaussian
+For the case of a policy class of unimodal Gaussian distributions where the controls ut ∈ Rnu of each timestep are independent, the p.d.f. for each timestep’s control has the form
+
+N (ut; µt, Σt) = 1 exp − 1 (ut − µt)TΣt−1(ut − µt) . (51)
+
+(2π)nu |Σt|
+
+2
+
+where we have that
+
+∇µt log N (ut; µt, Σt) = (ut − µt)TΣt−1
+
+(52)
+
+∇Σ−1 log N (ut; µt, Σt) = 1 Σt − 1 (ut − µt)(ut − µt)T. (53)
+
+t
+
+2
+
+2
+
+Minimizing the KL divergence between π(U ) and q˜∗(U ) and using Eq. (46), we have
+
+πk+1(U ) = arg min DKL (q˜∗(U ) π(U ))
+
+(54)
+
+π(U )∈Π
+
+N T −1
+
+= arg max
+
+w(n) log N (U (n); µt, Σt).
+
+(55)
+
+µ,Σ n=1 t=0
+
+Hence, we have that
+
+N
+
+0 = w(n)∇µt log N (U (n); µt, Σt)
+
+(56)
+
+n=1
+
+N
+0 = w(n)∇Σt log N (ut(n); µt, Σt). (57)
+
+n=1
+
+Using Eqs. (52) and (53) then results in the update laws
+
+N
+µt = w(n)ut(n) (58)
+n=1
+N
+Σt = w(n)(ut(n) − µt)(ut(n) − µt)T. (59)
+n=1
+
+B. Mixture of Gaussian
+For a Gaussian mixture model π(U ; θ) with L components with parameters θ := {θl}Ll=1 and θl := {(φl, {µl,t, Σl,t}t=0 T −1) such that
+
+T −1
+
+π(U ; θ) = πt(ut; θ)
+
+(60)
+
+t=0
+
+L
+
+πt(ut; θ) := πmN (ut; µl, Σl).
+
+(61)
+
+l=1
+
+Directly trying to minimize the KL divergence between π(U ; θ) and q˜∗(U ) and using Eq. (46) gives us
+
+N T −1
+
+L
+
+θ∗ = arg max w(n) log φlN (ut(n); µl,t, Σl,t) . (62)
+
+θ n=1 t=0
+
+l=1
+
+However, it is not straightforward to solve Eq. (62) directly. Instead, we can use the expectation maximization algorithm and introduce the latent variables {Zn}Nn=1, Zn ∈ [L] which
+form a categorical distribution q(Z) over each of the L mixtures and denotes which mixture each sample U (n) was sampled
+
+from. Then, we can write log π(U ; θ) as
+
+log π(U ; θ) = q(z) log π(U ; θ)dz
+
+(63)
+
+π(U ; θ)p(z|U ; θ)
+
+= q(z) log
+
+dz
+
+(64)
+
+p(z|U ; θ)
+
+p(U, z; θ)
+
+= q(z) log
+
+dz
+
+(65)
+
+p(z|U ; θ)
+
+p(U, z; θ)
+
+p(z|U ; θ)
+
+= q(z) log
+
+dz − q(z) log
+
+dz
+
+(66)
+
+q(z)
+
+q(z)
+
+= F (q, θ) + DKL (q p) .
+
+(67)
+
+where F (q, θ) is the ELBO, and provides a lower bound for the log likelihood log p(U ; θ). Now, to optimize F (q, θ), we estimate q(z) via p(z|U ; θk), where θk is the previous iteration’s parameters. Then, the ELBO becomes
+
+p(U, z; θ)
+
+F (q, θ) = q(z) log
+
+dz
+
+(68)
+
+q(z)
+
+= q(z) log p(U, z; θ)dz − q(z) log q(z)dz
+
+(69)
+
+= p(z|U ; θk) log p(U, z; θ)dz − p(z|U ; θk) log p(z|U ; θk)dz
+
+(70)
+
+= Q(θ, θk) + H(z|U ).
+
+(71)
+
+Since the second term is a function of θk and thus is not dependent on θ, it sufﬁces to optimize Q(θ, θk). To do so, the EM algorithm separates this into two steps:
+1) E-step: Compute p(z|U ; θk). 2) M-step: Compute arg maxθ Q(θ, θk).
+In our case, we have that
+
+Q(θ, θk) = p(z|U ; θk) log p(U, z; θ)dz
+
+(72)
+
+N L T −1
+= Ez∼p(z|U;θk) 1{Zn = l}w(n) log φl + log N (ut(n)|µl,t, Σl,t) (73)
+n=1 l=1 t=0
+N L T −1
+= p(Zn = l|ut(n); θk)w(n) log φl + log N (ut(n)|µl,t, Σl,t) (74)
+n=1 l=1 t=0
+N L T −1
+= ηl(ut(n))w(n) log φl + log N (ut(n)|µl,t, Σl,t) . (75)
+n=1 l=1 t=0
+
+where we have deﬁned ηl(ut(n)) := p(Zn = l|ut(n); θk) for simplicity. To compute this, note that
+
+(n) k
+
+p(u|Zn = l; θk)p(Zn = l; θk)
+
+p(Zk = l|ut ; θ ) = L
+
+(76)
+
+l =1 p(u|Zn = l ; θk)p(Zn = l ; θk)
+
+φlN (ut(n); µlk, Σlk)
+
+=L
+
+.
+
+(77)
+
+l =1 φlN (u(n); µkl , Σkl )
+
+To solve for the optimal θ∗ in the M-step, we apply the ﬁrst order conditions to µl,t and Σl,t to obtain
+
+=⇒
+
+N
+0 = ηl(ut(n))w(n)(ut(n) − µl,t k+1)Σl,t −1
+
+n=1
+
+1N
+
+(n) (n) (n)
+
+µl,t k+1 =
+
+ηl(ut )w ut .
+
+Nl,t n=1
+
+(78) (79)
+
+and
+
+N
+0 = ηl(ut(n))w(n)
+n=1
+
+1 Σl,t k+1 − 1 (ul,t − µl,t k+1)(ul,t − µl,t k+1)T
+
+2
+
+2
+
+1N
+
+(n) (n) (n)
+
+k+1 (n)
+
+k+1 T
+
+=⇒ Σl,t k+1 =
+
+ηl(ut )w (ut − µl,t )(ut − µl,t ) .
+
+Nl,t n=1
+
+(80) (81)
+
+where we have deﬁned Nl,t :=
+
+N n=0
+
+ηl(ut(n))w(n)
+
+for
+
+convenience.
+
+Since
+
+φ∗l
+
+has
+
+the
+
+constraint
+
+by applying the Lagrangian multiplier λ, yielding the following Lagrangian:
+
+L l=1
+
+φ∗l
+
+=
+
+1,
+
+we
+
+solve
+
+for
+
+φ∗l
+
+N L T −1
+
+L
+
+Lt = ηl(ut(n))w(n) log φl + log N (ut(n)|µl,t, Σl,t + λ 1 − φl . (82)
+
+n=1 l=1 t=0
+
+l=1
+
+Applying ﬁrst order conditions for φl gives
+
+=⇒
+
+N T −1 1
+
+0 = ηl(ut(n))w k+1 (n) − λ
+
+n=1 t=0
+
+φl
+
+1 N T −1
+
+(n) (n)
+
+φlk+1 = λ
+
+ηl(ut )w
+
+n=1 t=0
+
+1 T −1
+
+= λ
+
+Nl,t.
+
+t=0
+
+(83) (84) (85)
+
+To solve for the Lagrange multiplier λ, we plug in the constraint to get
+
+L
+λ=
+
+N T −1
+
+L T −1
+
+ηl(ut(n))w(n) =
+
+Nl,t.
+
+l=1 n=1 t=0
+
+l=1 t=1
+
+(86)
+
+Hence, we ﬁnally get that
+
+Nl
+
+φl = L
+
+.
+
+(87)
+
+l =1 Nl
+
+where we have deﬁned Nl := t=0 T −1 Nl,t.
+
+C. Non-parametric Policy via SVGD
+
+We now derive the update law for the choice of a fully non-parametric policy via SVGD. SVGD solves the variational
+
+inference problem
+
+π∗ = arg min{DKL (π(U ) q∗(U ))}.
+
+(88)
+
+π∈Π
+
+over the set Π := {z|z = T (x)} consisting of all distributions obtained by smooth transforms T of random variables x, where
+x is drawn from some tractable reference distribution. One can show that the direction of steepest descent φ∗ which maximizes the negative gradient −∇ DKL q[T ] p | =0 in
+zero-centered balls in the RKHS Hd has the form
+
+φ∗(·) = EU∼π [k(U, ·)∇U log q∗(U ) + ∇U k(U, ·)] .
+
+(89)
+
+Hence, one can then compute the optimal distribution π∗ by iteratively applying φ∗ to some initial distribution p0. However, given that we only have an empirical approximation q˜∗ of the optimal distribution q∗, the gradient of log q∗ cannot be easily
+computed. To solve this, following [6], instead of optimizing directly over the distribution of controls U , one can instead
+optimize over some distribution g of parameters θ of a parametrized policy πˆ(U ; θ), such that
+
+π(U ) = Eθ∼g [πˆθ(U )] and q∗(θ) = EU∼πˆ(·;θ) [q∗(U )] .
+
+(90)
+
+By doing so, we obtain the following new VI problem and steepest descent direction respectively:
+
+g∗ = arg min{DKL (g(θ) q∗(θ))}
+
+(91)
+
+θ∈Θ
+
+φˆ∗(·) = Eθ∼g kˆ(θ, ·)∇θ log EU∼πˆ(·;θ)[q∗(U )] + ∇θkˆ(θ, ·) ,
+
+(92)
+
+As a result, we can now take the gradient of log EU∼πˆ(·;θ)[q∗(U )] as
+
+∗
+
+∇θEU∼πˆ(·;θ)[q∗(U )]
+
+∇θ log EU∼πˆ(·;θ)[q (U )] =
+
+∗
+
+(93)
+
+EU∼πˆ(·;θ)[q (U )]
+
+q∗(U )∇θπˆ(U ; θ) dU = EU∼πˆ(·;θ)[q∗(U )] (94)
+
+EU∼πˆ(·;θ)[q∗(U )∇θ log πˆ(U ; θ)]
+
+=
+
+∗
+
+.
+
+(95)
+
+EU∼πˆ(·;θ)[q (U )]
+
+Discretizing the above since we only have a discrete approximation q˜∗ of q∗, we get that
+
+∗
+
+N n=1
+
+q˜∗(U
+
+(n))∇θ
+
+log
+
+πˆ(U
+
+(n);
+
+θ)
+
+∇θ log EU∼πˆ(·;θ)[q (U )] =
+
+N
+
+.
+
+(96)
+
+n=1 q˜∗(U (n))
+
+Hence, by letting g be an empirical distribution g(θ) = l=1 L 1{θl}, we obtain the following update rule for the particles
+
+{θl}Ll=1:
+
+θk+1 l = θlk + φˆ∗(θlk).
+
+(97)
+
+SM-3. VARIANCE REDUCTION ANALYSIS
+The variance reduction analysis is conducted through the connection between Tsallis VI-SOC, MPPI, CEM, and SS-SOC. With the appropriate selection of the shape function, the update laws of Tsallis VI-SOC, MPPI and CEM can be derived from SS-SOC. Associated with the SS-SOC update laws are their corresponding problem formulation in stochastic optimization. For the reparameterized Tsallis VI-SOC framework, its associated problem formulation in optimization is
+
+θ∗ = arg max Ep(u;θ) exp 1 log 1 − J . (98)
+
+θ
+
+r−1
+
+γ
+
+Note that the scenario where J ≥ γ is ignored since the Taylor series expansion and analysis will be around 0 < J < γ. Similarly, the optimization problem formulation corresponding to MPPI is
+
+θ∗ = arg max Ep(u;θ) exp(−λ−1J ) .
+
+(99)
+
+θ
+
+For CEM, the corresponding problem formulation is
+
+θ∗ = arg max Ep(u;θ) [1J≤γ ] .
+θ
+
+(100)
+
+To analyze degree of risk aversion of each problem formulation, we can look at its Taylor series expansion. For a cost likelihood function c(Jθ) where Jθ is a stochastic cost term parametrized by the parameter θ, the Taylor series expansion around E[Jθ] := J˜θ has the form:
+
+c(Jθ) = c(J˜θ) + c (J˜θ) Jθ − J˜θ
+
+1˜
+
+˜2 3
+
++ c (Jθ) Jθ − Jθ + O(Jθ ).
+
+2
+
+(101)
+
+Taking the expectation:
+
+E[c(Jθ)] ≈ c(J˜θ) +
+
+1 c
+
+(J˜θ )Var(Jθ ).
+
+2
+
+(102)
+
+On the other hand, if we deﬁne the certainty equivalent cost JθCE such that c(JθCE) = E[c(Jθ)], we have that
+
+f (JθCE) = c(J˜θ) + c (J˜θ) JθCE − J˜θ
+
++
+
+O(Jθ
+
+2 C
+
+E
+
+).
+
+(103)
+
+Hence,
+
+c (J˜θ) JθCE − J˜θ
+
+≈
+
+1 c
+
+(J˜θ )Var(Jθ ).
+
+2
+
+(104)
+
+Deﬁning πA := J˜θ − JθCE as the Absolute Risk Premium (which is a negative quantity for cost minimization as opposed to a positive quantity for utility/reward maximization), we now have that
+
+−1 c (J˜θ) πA ≈ 2 c (J˜θ) Var(Jθ)
+= 1 A(J˜θ)Var(Jθ), 2
+
+(105) (106)
+
+where A(·) is the ARA coefﬁcient, deﬁned by
+
+c (J)
+
+A(J) = −
+
+.
+
+c (J)
+
+(107)
+
+The absolute risk premium measures the difference between the mean cost and average cost scaled by the cost transform as a function of the cost function variance. Therefore, the ARA coefﬁcient indicates the degree of risk aversion with respect to the cost function variance.
+The ARA coefﬁcients for Tsallis VI-SOC and MPPI can be easily computed from equation 107 as
+
+r−2 ATsallis(J ) = − (r − 1)(γ − J )
+
+(108)
+
+1 AMPPI(J ) = λ .
+
+(109)
+
+Since CEM’s problem formulation includes the non-differentiable indicator function, we cannot directly apply the same analysis.
+
+However, by taking the indicator function as the limit of the sigmoid function σ
+
+1{J≤γ} = lim σ(−k(J − γ)),
+k→∞
+we can state the CEM problem formulation as
+
+(110)
+
+θ∗ = arg max Ep(u;θ) lim σ(−k(J − γ)) .
+
+θ
+
+k→∞
+
+With this, the ARA coefﬁcient can be computed as
+
+1
+
+ACEM(J) = lim −k tanh k(γ − J) .
+
+k→∞
+
+2
+
+SM-4. SIMULATION DETAILS
+
+A table of the system parameters is shown in Table V.
+
+A. Planar Navigation
+
+(111) (112)
+
+10.0 7.5 5.0 2.5 0.0 2.5 5.0 7.5 10.0
+10.0 7.5 5.0 2.5 0.0 2.5 5.0 7.5 10.0
+Fig. 5: Setup for the Planar Navigation task. The goal is for the robot (orange dot) to reach the goal location (red cross) while avoiding the obstacles (blue squares) in the middle. A crash cost of 10000 is incurred for crashing into the obstacles.
+
+We consider the task of navigating a 2D double integrator through an obstacle ﬁeld (see Fig. 5). The state consists of (xt, x˙ t),
+
+while the control is ut = x¨t, where xt, x˙ t, x¨t ∈ R2 represent the position, velocity and acceleration of the system. For the initial
+
+T
+
+T
+
+T
+
+T
+
+position x0 := ( −9 −9 , 0 0 ) and goal position xgoal := ( 9 9 , 0 0 ), we deﬁned the quadratic cost function:
+
+T −1
+J (X, U ) = 10000ccrash + (xT − xgoal)TQf (xT − xgoal) + (xt − xgoal)TQt(xt − xgoal) + uTt Rut,
+t=0
+where ccrash is the indicator variable for crashing into an obstacle, and
+
+(113)
+
+Qt := diag( 0.5 0.5 0.2 QT := diag( 0.25 0.25 1
+R := diag( 0.01 0.01 ).
+
+0.2 ) 1)
+
+(114) (115) (116)
+
+B. Quadrotor
+
+The quadrotor task includes navigating a 3D obstacle course with 35 randomly placed obstacles while trying to reach a target location and hover. The control of the quadrotor is done through angular rates and a thrust command, we assume a low level tracking controller that is common for ﬂight systems. The state of the quadrotor x is composed of the 3 coordinates x, y, z angular position represented in quaternions and linear and angular velocities for a total of 13 states. The location of target is represented in cartersian coordinates by xtarget and is located at (25,25,5). The initial location x0 of the quadrotor is at (0,0,5). For this task, we use the following quadratic cost function:
+
+T −1
+J (X, U ) = 40 xtarget − x + 10 x˙ + 2 ω + 1e7ccrash,
+t=0
+
+(117)
+
+where x is the cartesian coordinates of the quadrotor, x˙ is the linear velocity, ω is the angular rates, and ccrash is the indicator function that is 1 if the following conditions are met, and 0 otherwise
+1) If the vehicle gets within 0.75 of an obstacle. 2) If the vehicle goes above 10 meters or below 0 meters in the z axis.
+
+C. Franka
+
+The Franka manipulator is modiﬁed to have 7-DOF by removing the last joint and ﬁxing the ﬁngers in place. For state x := (e, e˙) and control u := q˙, where e, e˙ ∈ R3 are the position and velocity of the end-effector, and q˙ ∈ R7 are the joint velocities, the objective is to reach the goal position xgoal with obstacles between the starting position of the end effector and
+the goal. For this task, we use the following quadratic cost function:
+
+T −1
+J (X, U ) = 5 et − xgoal
+t=0
+
++ 0.1 e˙t .
+
+(118)
+
+D. Ant
+
+For the Ant, we take inspiration from the cost function for the HalfCheetah from [5] and modify the cost function to reward
+
+forward velocity. For the instantaneous x velocity vt, torso height ht and angle to the vertical axis α, the cost function J is
+
+deﬁned as
+T −1
+
+J (X, U ) = −vt1{ht≤0.7}1{|α|≥0.5} + 0.005 ut 2.
+
+(119)
+
+t=0
+
+E. Humanoid
+
+Similar to the Ant, we modify the cost function to reward forward velocity only if the height of the agent’s root is not too
+
+close or far from the ground and the humanoid is oriented upwards. For the instantaneous x velocity vt, torso height ht and
+
+angle to the vertical axis α,
+T −1
+
+J (X, U ) = −vt1{0.85≤ht≤1.4}1{|α|≥0.5} + 0.005 ut 2.
+
+(120)
+
+t=0
+
+System
+Planar Navigation Quadcopter Franka Ant Humanoid
+
+TABLE V: System parameters
+
+Episode Length
+300 400 80 128 128
+
+Trials
+100 100
+8 8 8
+
+State Space (xt ∈)
+R4 R13 R14 R29 R55
+
+Control Space (ut ∈)
+R2 R4 R7 R8 R21
+
+Timestep
+(∆t)
+0.01 0.015 0.005 0.05 0.033
+
+System Noise
+(σ)
+1.0 6.67 0.5 0.005 0.05
+
+SM-5. ADDITIONAL RESULTS
+In this section we include the results of different framework’s sensitivity with respect to its hyperparpameters on the planar navigation example with ﬁxed variance unimodal Gaussian policy in Table X. We also include the cumulative cost comparison plots of the simulator systems. All plots in this section show error bars of ±1 standard deviation of the cost.
+
+Cumulative Cost (Smaller is better)
+
+80 60 40 20 00
+
+Manipulator
+
+MPPI
+
+CEM
+
+Tsallis
+
+20
+
+40
+
+60
+
+80
+
+Timestep
+
+Fig. 6: Unimodal Gaussian on Manipulator
+
+Cumulative Cost (Smaller is better)
+
+MPPI GMM
+80
+
+Manipulator
+CEM GMM
+
+60
+
+40
+
+20
+
+00
+
+20
+
+40
+
+60
+
+Timestep
+
+Fig. 7: Gaussian Mixture on Manipulator
+
+Tsallis GMM
+80
+
+TABLE VI: Optimization Hyperparameters Per Dynamics
+
+System
+Planar Navigation Quadcopter Franka Ant Humanoid
+
+Warmup Iterations
+8 64 32 32 32
+
+Iterations per Timestep
+1 1 2 4 4
+
+Number of Samples
+256 1024 256 256 1024
+
+MPC Horizon T
+96 150 20 20 20
+
+TABLE VII: Hyperparameters for Unimodal Gaussian
+
+System Planar Navigation Quadcopter Franka Ant Humanoid
+
+Optimizer
+MPPI CEM Tsallis
+MPPI CEM Tsallis
+MPPI CEM Tsallis
+MPPI CEM Tsallis
+MPPI CEM Tsallis
+
+Control Std Dev (σ)
+18.000 7.780 18.667
+0.934 1.056 1.450
+0.720 0.629 0.790
+0.130 0.500 0.536
+0.587 0.378 0.540
+
+λ−1 0.015 3.970 54.794 54.000 19.559
+
+Elite Fraction
+0.098 0.070
+0.015 0.140
+0.038 0.167
+0.050 0.044
+0.019 0.018
+
+r 1.796 6.276 1.989 5.179 5.933
+
+TABLE VIII: Hyperparameters for Gaussian Mixture Model
+
+System Planar Navigation Quadcopter Franka Ant Humanoid
+
+Optimizer
+MPPI CEM Tsallis
+MPPI CEM Tsallis
+MPPI CEM Tsallis
+MPPI CEM Tsallis
+MPPI CEM Tsallis
+
+Number of Mixtures L
+4 4 4
+4 4 4
+4 4 4
+4 4 4
+4 4 4
+
+λ−1 3.051 0.650 37.031 16.943 65.221
+
+Elite Fraction
+0.770 0.036
+0.015 0.010
+0.027 0.450
+0.050 0.024
+0.013 0.037
+
+r 33.294
+1.040 1.150 5.000 6.281
+
+TABLE IX: Hyperparameters for Stein Policy
+
+System Planar Navigation Quadcopter Franka Ant Humanoid
+
+Optimizer
+MPPI CEM Tsallis
+MPPI CEM Tsallis
+MPPI CEM Tsallis
+MPPI CEM Tsallis
+MPPI CEM Tsallis
+
+Number of Particles N
+8 8 8
+8 8 8
+8 8 8
+8 8 8
+16 16 16
+
+Kernel Bandwidth Multiplier
+1.030 0.462 9.444
+2.869 12.902
+2.320
+2.569 11.188
+7.100
+6.683 7.100 7.100
+9.157 14.816
+6.000
+
+λ−1 71.200
+3.829 50.160
+8.160 63.527
+
+Elite Fraction
+0.023 0.382
+0.071 0.047
+0.229 0.370
+0.150 0.400
+0.021 0.100
+
+r 3.420 2.077 2.000 2.500 3.000
+
+TABLE X: Sensitivity Results for hyperparameters on planar navigation example with ﬁxed variance unimodal Gaussian policy. Tsallis mean variation results are bolded. Note that Tsallis hyperparameters demonstrate lower cost sensitivity when perturbed from their baseline values.
+
+MPPI λ
+
+Mean
+
+Std
+
++10%
+
+30 294.44
+
+Baseline
+
+30 023.73
+
+-10%
+
+30 143.85
+
+Mean Variation (%)
+
+0.65
+
+3499.19 3644.07 4273.51
+6.65
+
+CEM γ
+
+Mean
+
+Std
+
+35 557.07 34 617.47 34 427.06
+1.08
+
+1753.46 2523.34 2654.51 −12.66
+
+Mean
+28 806.34 28 714.70 28 571.64
+−0.09
+
+Tsallis
+
+γ
+
+r
+
+Std
+
+Mean
+
+Std
+
+531.61 570.20 591.37 −1.53
+
+28 873.70 28 714.70 28 535.40
+−0.04
+
+572.90 570.20 657.00
+7.85
+
+MPPI Stein
+
+Manipulator
+CEM Stein
+
+Tsallis Stein
+
+Cumulative Cost (Smaller is better)
+
+80 60 40 20 0 0 20 40 60 80
+Timestep
+Fig. 8: Nonparametric Stein Policy on Manipulator
+
+Cumulative Cost (Smaller is better)
+
+0 200 400 600
+0
+
+Ant
+
+MPPI
+
+CEM
+
+Tsallis
+
+20 40 60 80 Timestep
+Fig. 9: Unimodal Gaussian on Ant
+
+100 120
+
+Cumulative Cost (Smaller is better)
+
+MPPI GMM
+0
+
+Ant
+CEM GMM
+
+Tsallis GMM
+
+200
+
+400
+
+600
+
+0 25 50 75 100 125 Timestep
+Fig. 10: Gaussian Mixture on Ant
+
+Cumulative Cost (Smaller is better)
+
+0 200 400 600
+0
+
+Ant
+
+Stein
+
+CEM Stein
+
+Tsallis Stein
+
+20 40 60 80 100 120 Timestep
+Fig. 11: Nonparametric Stein Policy on Ant
+
+Cumulative Cost (Smaller is better)
+
+0 250 500 750 1000 0
+
+Humanoid
+
+MPPI
+
+CEM
+
+Tsallis
+
+20 40 60 80 100 120 Timestep
+Fig. 12: Unimodal Gaussian on Humanoid
+
+Cumulative Cost (Smaller is better)
+
+Humanoid
+
+MPPI GMM
+0
+
+CEM GMM
+
+Tsallis GMM
+
+200
+
+400
+
+600
+
+800
+
+0 25 50 75 100 125 Timestep
+
+Fig. 13: Gaussian Mixture on Humanoid
+
+Cumulative Cost (Smaller is better)
+
+0 250 500 750 1000
+
+Humanoid
+
+MPPI Stein
+
+CEM Stein
+
+0 25 50 75 100 Timestep
+Fig. 14: Nonparametric Stein Policy on Humanoid
+
+Tsallis Stein
+125
+
+

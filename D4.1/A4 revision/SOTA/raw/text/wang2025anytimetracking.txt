@@ -1,0 +1,700 @@
+1
+– Preprint – Anytime Planning for End-Effector Trajectory Tracking
+Yeping Wang and Michael Gleicher
+
+arXiv:2502.03676v1 [cs.RO] 5 Feb 2025
+
+Abstract—End-effector trajectory tracking algorithms find joint motions that drive robot manipulators to track reference trajectories. In practical scenarios, anytime algorithms are preferred for their ability to quickly generate initial motions and continuously refine them over time. In this paper, we present an algorithmic framework that adapts common graph-based trajectory tracking algorithms to be anytime and enhances their efficiency and effectiveness. Our key insight is to identify guide paths that approximately track the reference trajectory and strategically bias sampling toward the guide paths. We demonstrate the effectiveness of the proposed framework by restructuring two existing graph-based trajectory tracking algorithms and evaluating the updated algorithms in three experiments.
+Index Terms—Constrained Motion Planning, Motion and Path Planning
+I. INTRODUCTION
+M ANY applications require a robot manipulator to accurately and smoothly move its end-effector along a specific trajectory. These applications involve welding, sanding, polishing, painting, and additive manufacturing. For redundant manipulators or applications with tolerances, there exist infinitely many possible motions to track a reference end-effector trajectory. Thus, planning algorithms seek to find optimal motions among these possibilities based on criteria such as minimal joint movement [1], minimal end-effector error [1], [2], minimal maximum joint velocity [3], or minimal number of reconfigurations, i.e., instances where the robot pauses task execution and restarts from another joint configuration [4], [5].
+To track an end-effector trajectory based on some optimality criteria, common graph-based approaches [1], [3], [4], [6], [7] first sample inverse kinematics (IK) solutions for each waypoint on the reference trajectory. These IK solutions serve as vertices to construct a layered graph, where each layer corresponds to a waypoint. Edges are added to link IK solutions in adjacent layers, and these edges’ weights are defined according to the optimality criteria. Finally, a graph search method is utilized to find the optimal motion. The success of this approach relies heavily on the density of the sampling to sufficiently discretize the solution space. Existing graphbased trajectory tracking approaches often rely on uniformly dense IK sampling, which leads to long delays in finding initial solutions. In practical scenarios with limited computational resources, anytime algorithms are preferred because they can generate feasible solutions quickly and progressively refine them over time. This flexibility allows anytime algorithms to
+This work was supported in part by National Science Foundation under Award 2007436 and in part by the Los Alamos National Laboratory and the Department of Energy.
+Both authors are with the Department of Computer Sciences, University of Wisconsin-Madison, Madison, WI 53706, USA [yeping|gleicher]@cs.wisc.edu
+
+be stopped at any time, enabling trade-offs between solution quality and computation time.
+In this work, we present an anytime algorithmic framework that enhances existing approaches to efficiently and effectively generate robot motions to track reference end-effector trajectories. Our framework enhances existing methods by incorporating a heuristic to prioritize samples that are likely to lead to good solutions. Our key insight is to identify guide paths that approximately track the reference trajectory and strategically bias sampling toward the guide paths, which progressively densifies the graph. This approach enables frequent identification of effective solutions within a significantly reduced timeframe. Over time, the graph converges towards the dense graph used in conventional algorithms. We show that, in the worst case, our anytime framework converges to the conventional framework, although in practice its ability to sample strategically usually leads to better results in less time. The algorithmic framework is independent of specific IK sampling algorithms, optimality criteria, or graph searching algorithms. We provide an open-source implementation of our framework 1.
+The central contribution of this work is a guided anytime algorithmic framework (Sections III-D and IV). To explain our approach, we first describe the conventional sequential framework and a naïve anytime framework as baselines (Sections III-B and III-C). We evaluated our framework through three experiments (§V). First, we applied it to two end-effector trajectory tracking algorithms, Stampede [1] and IKLink [4], originally based on the conventional framework. Our results show that our framework accelerates both algorithms, generating solutions with less computation time than the conventional and naïve frameworks, while matching or exceeding their solution quality. Additionally, we applied it to semiconstrained trajectory tracking, which expands the solution space by allowing tolerances and requiring more IK samplings. Unlike baseline frameworks, which are inefficient due to naïve sampling, our framework enhances IKLink’s efficiency and effectiveness for this task.
+II. RELATED WORK
+A. End-Effector Trajectory Tracking
+The end-effector trajectory tracking problem, also known as path-wise inverse kinematics [1], task-space non-revisiting tracking [5], or task-constrained motion planning [8], involves various approaches based on input type. Specifically, trajectory tracking methods [1], [2], [4], [5], [6] take a timestamped trajectory as input, whereas path tracking methods [3], [7] track a sequence of coordinates without timing.
+1Open-sourced code https://github.com/uwgraphics/IKLink/tree/anytime
+
+2
+
+End-effector trajectory tracking methods can be broadly categorized into two groups: trajectory optimization and graphbased approaches. Trajectory optimization directly optimizes a joint-space trajectory while satisfying constraints. For example, Holladay et al. [9] utilize TrajOpt [10], a trajectory optimization method, to minimize the Fréchet distances between current solutions and a given reference trajectory. Instead of Fréchet distances, Torm [11] minimizes the summed Euclidean distance between corresponding waypoints on the current and reference trajectories. These optimization methods require an initial trajectory as a starting point, are sensitive to this initial trajectory [12], and are prone to be stuck in local minima [9]. Meanwhile, graph-based approaches [1], [3], [4], [6], [7] construct a hierarchical graph where vertices represent inverse kinematics (IK) solutions. A path within the graph defines a robot motion by sequentially connecting the IK solutions. We will review these approaches in §III-B as part of the discussion on the conventional algorithmic framework. Below, we discuss IK sampling strategies in graph-based approaches.
+B. IK Sampling in Graph-based Trajectory Tracking
+In graph-based end-effector trajectory tracking, the majority of the computation time is consumed by sampling inverse kinematics (IK) solutions and establishing connections between them [13]. Some prior work [1], [4], [6], [7] exhaustively samples IK solutions before searching for a path, resulting in long computation time before obtaining initial solutions. [2], [13]. Meanwhile, other approaches use incremental sampling to accelerate the procedure. For example, CppFlow [3] leverages a generative IK solver, IKFlow [14], which rapidly produces a diverse set of IK solutions by learning the distribution of uniformly sampled IK solutions. If the graph search algorithm fails to find a viable motion, the algorithm incrementally samples additional IK solutions to density the graph. In contrast to uniform sampling, Malhan et al. [13] use continuity in Cartesian space as a heuristic for IK selection during incremental graph construction. However, the heuristic is applicable solely to non-redundant robotic arms. Holladay et al. [2] presents strategies to balance uniform sampling with targeted sampling around certain areas. However, their approach is designed specifically to minimize the Fréchet distance in Cartesian space, and it remains unclear how to adapt their strategies to address objectives such as minimizing joint movements. Our method, like Holladay et al. [2], balances uniform and targeted sampling, but differs by sampling around a guide path that roughly tracks the reference trajectory.
+C. Semi-Constrained End-Effector Trajectory Tracking
+In certain trajectory tracking scenarios, precise end-effector movements in all six degrees of freedom are not necessary, i.e., allowing for certain tolerances in Cartesian space. For instance, in a drawing task, the robot may be permitted to tilt or rotate the pen as long as the pen tip position remains precise and the motion remains collision-free. This problem is called semi-constrained end-effector trajectory tracking. Due to tolerances, the solution space expands, requiring more IK solutions to cover the solution space. Graph-based approaches with uniform sampling, e.g., Descartes [6], have a significant
+
+increase in computational load when using redundant robots or having tolerances on multiple degrees of freedom [15]. Therefore, developing a more efficient algorithm is essential for semi-constrained end-effector tracking. In this work, we present a guided anytime algorithmic framework to accelerate graph-based trajectory tracking approaches. We show how this framework can efficiently and effectively compute motions to track semi-constrained end-effector trajectory in §V.
+III. TECHNICAL OVERVIEW In this section, we first formalize our problem statement and describe the conventional algorithmic framework. We then describe a naïve anytime framework and why it is ineffective. Finally, we give an overview of our guided anytime framework and its advantages over previous approaches.
+A. Problem Statement
+Consider a k degree of freedom robot manipulator whose joint configuration and end-effector pose are denoted by q∈Rk and p∈SE(3), respectively. End-effector trajectory tracking refers to the problem of computing a joint space trajectory ξ:[0, Tχ]→Rk that drives the robot’s end-effector along a desired trajectory χ:[0, Tχ]→SE(3), where Tχ represents the total time duration of the end-effector trajectory. In practice, the target end-effector trajectory χ is often represented in a discrete form {(t1, p1), ..., (tn, pn)}, where pi is the endeffector pose at timestamp ti. We assume that the waypoints are sufficiently dense to accurately approximate χ.
+In general, there are some requirements for joint space continuity, e.g., in a short time interval τ >0, all joint movements are within their velocity limits, vmin≤[ξ(t+τ )j −ξ(t)j]/τ ≤vmax, ∀j∈{1, ..., k}, ∀t∈[0, Tχ−τ ]. However, in scenarios where the input trajectory is complex and can not be tracked as a single, continuous path, exceptions to this requirement may be permissible if the task allows for interruptions. In such instances, joint discontinuities may be introduced deliberately. Each joint discontinuity requires the robot to perform an arm reconfiguration, in which the robot pauses the task execution, relocates itself in the joint space, and resumes task execution from another configuration.
+This work focuses on the cases where the robot manipulator has some redundancy; it is either a redundant arm (k > 6) or a non-redundant arm performing semi-constrained trajectory tracking, where certain tolerances are permitted on the endeffector poses. Due to the redundancy, the trajectory can be tracked by infinitely many possible motions, requiring optimization criteria to select the best solution.
+Graph-based trajectory tracking algorithms maintain a layered graph G=(V, E), where each layer corresponds to a waypoint on the reference trajectory. V and E denote vertices and edges in the graph, respectively. The notation V [x] denotes all vertices in the layer corresponding to the x-th waypoint. V [x][y] represents the y-th IK solution that aligns the endeffector with the x-th waypoint. |V [x]| denotes the total number of vertices in V [x].
+B. Baseline 1: Conventional Algorithmic Framework
+Many existing graph-based trajectory tracking algorithms use a sequential framework. As shown in Figure 1-A, these
+
+WANG et al.: ANYTIME PLANNING FOR END-EFFECTOR TRAJECTORY TRACKING
+
+3
+
+Conventional Framework (Baseline 1, §III.B)
+
+Naïve Anytime Framework (Baseline 2, §III.C)
+
+Sample all IK solutions Construct a layered graph
+Search for a solution
+
+Sample some IK solutions
+Add edges to the layered graph
+Search for a solution
+
+Guided Anytime Framework (Ours, §III.D)
+Sample sparse IK solutions
+Add sparse edges to the layered graph
+Search for a guide path Sample additional IK solutions (with a bias towards the guide path)
+Add dense edges to the layered graph
+Search for a solution
+
+Fig. 1. Three algorithmic frameworks described and evaluated in this paper
+approaches sample inverse kinematics (IK) solutions for each waypoint on the end-effector trajectory, use these IK solutions as graph vertices, and search for a solution in the graph.
+1) IK Sampling: The two primary goals of IK sampling are to find IK solutions that are diverse enough to cover the entire solution space and dense enough to construct a smooth motion. In order to generate diverse IK solutions, one common approach is to randomly sample starting configurations in a robot’s joint space and find IK solutions that are closest to the starting configurations using an optimization-based IK solver, such as Trac-IK [16] or RelaxedIK [17], or an iterative IK solver, such as Orocos KDL or the damped least squares IK algorithm [18]. Another approach [3] uses a learned generative IK solver, IKFlow [14], which learns the distribution of uniformly sampled IK solutions and efficiently generates a diverse set of IK solutions.
+To ensure sufficient density of IK solutions, many previous approaches specify a fixed number of IK solutions for each waypoint, represented by m. For example, Stampede [1] sets m=250, IKLink [4] sets m=300, and CppFlow [3] sets m=175. We note that these numbers are used for a 7-DoF robotic arm to track a fully constrained end-effector trajectory. For scenarios involving a more redundant robot (DoF>7) or a semi-constrained trajectory, more IK solutions may be necessary. This is because the solution space is larger and requires more IK solutions to densely cover the entire space.
+2) Graph Construction: The sampled IK solutions are used as vertices to construct a layered graph where each layer corresponds to a waypoint on the end-effector trajectory. Edges connect vertices in consecutive layers if the robot can move between the two IK solutions within the time budget specified by the reference trajectory. Edge weights are defined based on various problem formulations such as total joint movement [1] or maximum joint movement [3].
+3) Graph Search: Once the graph is constructed, any paths within the graph represent possible robot motions by connecting the IK solutions. The shortest path from the first layer to the last layer corresponds to a high-quality motion that tracks the trajectory. Different methods are utilized to search for the shortest path. For example, Descartes [6] uses Dijkstra’s algorithm, Niyaz et al. [7] uses lifelong planning A∗, Stampede [1] uses value iteration, and IKLink [4] uses a dynamic programming method with two objectives.
+Analysis: Although multiple IK solutions are sampled for a waypoint, ultimately, only one IK solution is selected to
+
+construct the robot motion. Hence, we seek ways to improve the sampling process, i.e., biasing sampling towards areas with a high probability of being selected. Additionally, the number of IK solutions decides the number of edges in the graph; a small set of IK solutions can reduce the time for connectivity checking and graph search.
+C. Baseline 2: Naïve Anytime Algorithmic Framework
+The aforementioned conventional framework does not provide a solution until completion. In contrast, an anytime algorithm provides an initial solution and then iteratively refines it, enabling the process to be stopped at any time and allowing for tradeoffs between solution quality and computation time. As shown in Figure 1-B, a naïve anytime framework uses the same random sampling process to initially sample a smaller set of IK solutions, from which a layered graph is constructed. A graph search is then conducted to identify an initial solution. The solution is iteratively refined by sampling additional IK solutions, expanding the graph, and performing further graph searches to find new solutions. The solutions are always at least as good as, if not better than, the previous ones because the graph incorporates all vertices and edges from its previous version. The algorithm continues until it reaches a predefined threshold, such as running time or the number of iterations.
+Analysis: The naïve anytime framework has the advantage of generating an initial solution quickly and refining it over time. However, it requires some heuristic to find an effective initial solution. In our implementation, we use an optimizationbased IK solver to find IK solutions that are close to those of the previous waypoints, which helps ensure smooth motion. This heuristic is similar to GreedyIK in Wang et al. [4]. Despite this, the naïve framework often converges slowly, because the samples are added in a random order. This effect is demonstrated in the experiments in §V. Meanwhile, our proposed algorithmic framework uses heuristics to bias sampling such that initial solutions are likely to be effective, and the additional sampling focuses on adding samples likely to improve the solution.
+D. Overview of Guided Anytime Algorithmic Framework
+Similar to the aforementioned approaches, the proposed framework maintains a layered graph, in which a layer corresponds to a waypoint on the reference trajectory and a vertex represents an IK solution. The key idea of our method is to bias sampling toward guide paths. A guide path is a sequence of vertices that approximately tracks the reference trajectory. It typically includes sparse edges that connect vertices that are a few layers apart. Upon refinement, guide paths are likely to be good solutions. A solution is a path through the graph with a vertex at every time step, thus accurately tracking the trajectory. During refinement, sparse edges within guide paths are potentially replaced by dense edges which connect vertices with adjacent timestamps, thereby gradually converting guide paths to solutions.
+As shown in Figure 2, our algorithm starts by constructing a graph in which IK solutions are sampled for certain waypoints and connected using sparse edges. An initial guide path is identified by searching over these sparse edges. The guide
+
+4 Sparse Vertex Sampling
+
+Sparse Edge Addition & Guide Path Search
+
+ⷁ
+
+ⷂ
+
+Additional Vertex Sampling
+
+Dense Edge Addition & Solution Search
+
+ⷃ
+
+ⷄ
+
+1st Iteration 2nd Iteration
+
+ⷅ
+
+ⷆ
+
+⷇
+
+Cartesian Waypoint
+
+IK Solution
+
+or
+
+Sparse Edge
+
+or
+
+Dense Edge
+
+or
+
+Guide Path or Solution
+
+More Iterations
+Fig. 2. An illustration of the guided anytime algorithmic framework. In the 1st iteration, A a limited set of IK solutions are sampled for specific waypoints. B The IK solutions construct a graph with sparse edges (dashed lines) and a guide path (red) is identified by searching in the graph. C Additional IK solutions are sampled with a bias toward the guide path. D Dense edges (solid lines) are added to connect vertices in adjacent layers and an initial solution (red) is identified by searching through the dense edges. In the 2nd iteration, E additional sparse edges are added to connect the newly added vertices, and a
+new guide path (red) is found by searching through both sparse and dense edges. F More vertices are sampled, biasing toward the new guide path. G After
+additional dense edges are added, a new solution (red) is identified in the new graph. In subsequent iterations, the algorithm continues to densify the graph
+and refine the solutions.
+
+path is refined by adding vertices near it and connecting them with dense edges. An initial solution is found by searching over the dense edges. The process is repeated by identifying new guide paths, performing further sampling around them, and finding new solutions.
+Stages: Our framework contains six stages, briefly described here. The details of the stages are outlined in §IV.
+1) Sparse Vertex Sampling: In contrast to the conventional framework which samples IK solutions for every waypoint, this stage samples a limited number of IK solutions for a subset of waypoints spaced apart. We sample at every s waypoint, where the sparse step size s is a hyperparameter.
+2) Sparse Edge Addition: This stage adds sparse edges to the graph, connecting vertices that are s layers apart. While sparse edges still correspond to feasible motion segments, they typically do not accurately track the reference trajectory because intermediate waypoints are omitted.
+3) Guide Path Search: This stage identifies a guide path by finding the shortest path from the first to the last layer, using both dense and sparse edges. Guide paths correspond to motions that approximately track the reference end-effector trajectory. The heuristic assumes that high-quality solutions are likely to be found near guide paths.
+4) Additional Vertex Sampling: This stage adds vertices to the graph through a combination of random sampling and targeted sampling around a guide path. The underlying assumption is that IK solutions near the guide path are more likely to yield high-quality solutions. In addition, we also randomly sample an equivalent number of IK solutions. This helps avoid local minima where guide paths are misleading and ensures that the algorithm converges to the same worstcase expected performance as the conventional approach.
+5) Dense Edge Addition: This stage adds dense edges to the graph to connect vertices in adjacent layers. In addition,
+
+certain sparse edges are superseded by the dense edges. 6) Solution Search: This stage identifies a solution by
+finding the shortest path from the first to the last layer using only dense edges. The solution, containing only dense edges, precisely tracks the reference trajectory.
+Incremental Improvement: As shown in Algorithm 1, after generating a solution, the algorithm repeats the process, which involves identifying a new guide path, sampling additional vertices with a bias toward this new guide path, adding dense edges to connect the new vertices, and finding a new solution in the new graph. Because each new graph contains vertices and dense edges from its predecessor, each new solution is at least as good as, if not better than, the solution before, thus ensuring incremental improvement. The algorithm terminates upon reaching a predefined threshold, such as maximum running time or sampling capacity.
+Analysis: The proposed framework involves random sampling IK solutions, which mimics the process of the baseline approaches. Therefore, given sufficient time, our method will generate the same (probabilistic) sample set as the baseline approaches. With finite time and sampling budget, even the baseline approaches cannot provide guarantees of optimality, although Holladay [2] has proven that a similar algorithm converges towards optimality as the sampling density grows. Most prior works [1], [4], [3] empirically show the effectiveness of their algorithms. Similarly, we empirically demonstrate that our sampling strategy often more quickly finds solutions with better or equal quality in §V.
+IV. TECHNICAL DETAILS In §III-D, we gave an overview of our anytime algorithmic framework; this section details its stages. 1) Sparse Vertex Sampling: This stage involves sampling m0 IK solutions for every s waypoint, starting from index
+
+WANG et al.: ANYTIME PLANNING FOR END-EFFECTOR TRAJECTORY TRACKING
+
+5
+
+Algorithm 1: Guided Algorithmic Framework
+
+input : an end-effector trajectory χ={(t1, p1), ..., (tn, pn)}
+
+output : a joint space trajectory p, which is refined over iteration
+
+hparam: initial number of IK solutions for each waypoint m0,
+
+sparse step size s, max number of iterations imax
+
+1 V ← SparseSample(χ, s, m0)
+
+▷ Sparse vertex sampling
+
+2 E ← ∅, i ← 0
+
+3 while i < imax do
+
+4 i←i+1
+
+5 E ← AddSparseEdges(V, E, χ)
+
+▷ Sparse edge addition
+
+6 G ← (V, E)
+
+7 ξ′ ← SearchHybrid (G) 8 V ← AdditionalSample(V, χ, ξ′)
+
+▷ Guide path search ▷ Sample more vertices
+
+9 E ← AddDenseEdges(V, E, χ)
+
+▷ Dense edge addition
+
+10 G ← (V, E)
+
+11 ξ ← SearchDense (G)
+
+▷ Solution search
+
+SparseSampling(χ, s, m0) randomly samples m0 IK solutions for every s waypoints along the reference trajectory χ. Specific sampling methods are discussed in §III-B1. SearchHybrid(G) finds the shortest path from the first layer to the last layer in G, using both dense and sparse edges. Specific search methods are discussed in §III-B3. SearchDense(G) finds the shortest path from the first layer to the last layer in G, using only dense edges.
+
+Algorithm 2: AddSparseEdges
+
+input : vertices V , edges E
+
+an end-effector trajectory χ={(t1, p1), ..., (tn, pn)}
+
+output : updated edges E
+
+hparam : sparse step size s, scaling factor η
+
+1 for x = s+1 to n do
+
+2 for y1 = 1 to |V [x−s]| do
+
+3
+
+for y2 = 1 to |V [x]| do
+
+4
+
+if Linkable(V [x−s][y1], V [x][y2], tx−tx−s) and
+
+Cost(V [x−s][y1], V [x][y2])∗η <
+
+CostDense(V [x−s][y1], V [x][y2]) then
+
+5
+
+e ← (V [x−s][y1], V [x][y2])
+
+6
+
+e.weight = Cost(V [x−s][y1], V [x][y2])
+
+7
+
+e.is_sparse = True
+
+8
+
+E ← E ∪ {e}
+
+Linkable(V1, V2, ∆t) returns true if the robot can move between the two given joint configurations within the time duration, without exceeding joint velocity limits. Cost(V1, V2) returns the cost to move directly between the two joint configurations. As discussed in §III-B2, the cost depends on problem formulation. CostDense(V1, V2) returns the lowest cost that moves between the two joint configurations using dense edges. The lowest cost can be computed using graph search methods. If the two joint configurations are not connected by dense edges, return infinity.
+
+1 and including index n. A total of ⌈n/s + 1⌉ × m0 IK solutions are sampled, where n is the number of waypoints on the reference trajectory and ⌈·⌉ is a ceiling function that rounds a real number up to the nearest integer. The specific sampling methods described in §III-B1 can be used to sample IK solutions. This stage generates the initial set of vertices in the graph, which are used to find an initial guide path.
+2) Sparse Edge Addition: This stage adds sparse edges to the graph. Algorithm 2 outlines the AddSparseEdges function. In order to add a sparse edge between vertices that are s layers away, the Linkable function checks if the robot can move between the configurations within the time budget. In our implementation, Linkable assumes linear movements in joint space and checks if a linear movement is within the robot’s joint velocity limit. In addition, the algorithm checks whether the two vertices are already connected by dense edges. If a path composed of dense edges connects the two vertices and its cost is similar to the cost of the sparse edge, it suggests that the area has already been sufficiently sampled, eliminating
+
+the need for a sparse edge. 3) Guide Path Search: A guide path is identified by finding
+the lowest cost path from the first to the last layer of the graph, using both dense and sparse edges. Specific graph search algorithms discussed in §III-B3 can be used to find the path with the lowest cost.
+4) Additional Vertex Sampling: This stage takes a guide path as input and biases sampling toward it. As shown in Algorithm 3, this stage first samples around every sparse edge within the guide path, then randomly samples an equivalent amount of IK solutions. Sampling around the sparse edges allows them to be replaced by dense edges.
+In order to sample around a sparse edge, we linearly interpolate joint configurations on the sparse edge (LinInterp), apply some random disturbance (AddRandDelta), and use it as starting configurations of an IK solver. The IK solver finds IK solutions near the starting configuration. We use RelaxedIK [17] in our implementation, but any other IK solvers mentioned in §III-B1 are also compatible.
+In order to randomly sample IK solutions across the entire trajectory, we first randomly select waypoints using Softmax, which assigns higher selection probabilities to waypoints with fewer randomly sampled IK solutions.
+px= nexp(−|Vr[x]|) (1) i=0 exp(−|Vr[i]|)
+where x is the waypoint index, and |Vr[x]| is the number of existing randomly sampled IK solutions for waypoint x. After selecting a waypoint, we generate a random IK solution by initiating an IK solver’s starting configuration at a random location (RandConfig) in the robot’s joint space.
+5) Dense Edge Addition: This stage adds dense edges to the graph, which connect vertices in adjacent layers. As detailed in Algorithm 4, the procedure involves iterating over all pairs of vertices located on adjacent layers. The algorithm uses the Linkable function to check the feasibility of each pair. After adding dense edges, the algorithm identifies and removes the sparse edges that have been superseded by dense edges. Specifically, if there exists a path composed of dense edges that connects the two endpoint vertices of a sparse edge, and the path’s cost is similar to the sparse edge’s cost, maintaining the sparse edge becomes unnecessary. Our approach shares a similar idea with lazy planning [19], [20], which delays the evaluation of edges until they are necessary for the solution. In our approach, sparse edges serve as estimators and a more accurate cost is computed when replacing sparse edges with dense edges.
+6) Solution Search: This stage identifies a solution by finding the lowest cost path from the first to the last layer, using only dense edges. Specific graph search approaches described in §III-B3 can be used to find the shortest path. The identified solution corresponds to a motion that accurately tracks every waypoint on the reference trajectory.
+V. EXPERIMENTS In this section, we compare our proposed algorithm framework with the two baseline approaches described in §III: the conventional sequential framework and the naïve anytime framework. We conducted three independent experiments in
+
+6
+
+Algorithm 3: AdditionalSample
+
+input : vertices V , a guide path ξ′,
+
+an end-effector trajectory χ={(t1, p1), ..., (tn, pn)}
+
+output : updated vertices V
+
+hparam : number of new IK solutions per waypoint md
+
+perturbation bound δ
+
+▷ Sample around the guide path
+
+1 foreach edge in ξ′ do
+
+2 if edge.is_sparse then
+
+3
+
+for x= e.start_idx to e.end_idx do
+
+4
+
+r = (x−e.start_idx)/(e.end_idx−e.start_idx)
+
+5
+
+q = LinInterp(e.start_vertex, e.end_vertex, r)
+
+6
+
+for i = 1 to md do
+
+7
+
+q = AddRandDelta(q, δ)
+
+8
+
+v = IK(px, q)
+
+9
+
+V = V ∪ {v}
+
+▷ Randomly Sample
+
+10 Pr = CompProb(V )
+
+11 for i = 1 to |V | do
+
+12 x ← SampleIndex(p)
+
+13 v = IK(px, RandConfig())
+
+14 V = V ∪ {v}
+
+15 Pr = CompProb(V )
+
+LinInterp(V1, V2, r) returns a joint configuration along the straight line between V1 and V2 based on a specified ratio r. AddRandDelta(q, δ) adds random disturbance rand(−δ, δ) to each joint
+value qj , ∀j ∈ {1, ..., k}, and clips q to the valid joint range. IK(p, qs) returns an IK solution that moves the end-effector to p. The IK solution is regularized to be near the starting configuration qs. CompProb(V ) returns the probability of selecting a waypoint using Eq. 1.
+
+Algorithm 4: AddDenseEdges
+
+input : vertics V , edges E,
+
+an end-effector trajectory χ={(t1, p1), ..., (tn, pn)}
+
+output : updated Edges E
+
+hparam : scaling factor η
+
+1 for x = 2 to n do
+
+2 for y2 = 1 to |V [x]| do
+
+▷ Add dense edges
+
+3
+
+for y1 = 1 to |V [x−1]| do
+
+4
+
+e ← {(V [x−1][y1], V [x][y2])}
+
+5
+
+if Linkable(V [x−1][y1], V [x][y2], tx−tx−1) then
+
+6
+
+e.weight = Cost(V [x−1][y1], V [x][y2])
+
+7
+
+e.is_sparse = False
+
+8
+
+E ← E ∪ {e}
+
+▷ Remove sparse edges
+
+9
+
+if x > s then
+
+10
+
+for y1 = 1 to |V [x−s]| do
+
+11
+
+e ← {(V [x−s][y1], V [x][y2])}
+
+12
+
+if e ∈ E and Cost(V [x−s][y1], V [x][y2])∗η <
+
+CostDense(V [x−s][y1], V [x][y2]) then
+
+13
+
+E ← E\{e}
+
+simulation, each involves two testbeds. The first testbed tracks 10 randomly generated trajectories, comparing our framework with various parameter settings (step size s=3, 5, or 10) against the baselines. The second testbed tracks a trajectory 10 times and we report the average, best, and worst motions generated by each method to provide a comprehensive overview of the performance variations.
+Our implementation is based on the open source IKLink library in Rust. We note that the Rust implementation performs faster than the implementation evaluated in the original paper [4]. Our framework used md=5, δ=0.2, η=1.1 (across all experiments), m0=50 (Experiments A&B) and m0=500 (Experiment C). All evaluations were performed on a laptop with an Intel i7-11800H 2.30 GHz CPU and 16 GB of RAM.
+
+A. Experiment A - Tracking with Minimal Joint Movements
+We apply our framework to the Stampede algorithm [1] to find robot motions that track end-effector trajectories with minimal joint movements. As proposed in the original paper, Stampede used the conventional sequential framework. Stampede samples IK solutions by initiating an optimizationbased IK solver, RelaxedIK [17], with starting configurations sampled from a uniform distribution. Additionally, it uses value iteration for graph search. Since our objective is to minimize joint movements, we define the edge weights within the graph as the Euclidean distances in joint space between two joint configurations.
+This experiment uses a 7-degrees-of-freedom KUKA LBR iiwa robot. The first testbed tracks 10 random cumulative cubic Bézier curves [22] for smooth position and orientation changes. These trajectories have an average length of 1.26 m, an average angular displacement of 5.13 rad, and an average of 379.4 waypoints. The second testbed replicates a writing task from prior work [3], [11], where the robot traces a “hello” trajectory. The trajectory is rescaled to fit iiwa’s workspace.
+As shown in the left column of Figure 3, while all three approaches generated motions with similar joint movements, our framework achieved initial solutions 2× faster. The results show that our heuristic is effective for simple trajectories and enables fast identification of effective motions.
+B. Experiment B - Tracking with Minimal Reconfigurations
+We apply our framework to the IKLink algorithm [4] which utilizes the conventional sequential framework to track the end-effector trajectory of any complexity. If a reference trajectory is too complex to be tracked as a single, continuous path, IKLink generates motions with minimal reconfigurations. In addition, IKLink has a secondary objective of minimizing joint movements. Similar to Stampede, IKLink uses RelaxedIK [17] to uniformly sample IK solutions. It also leverages RelaxedIK’s velocity regularization to find IK solutions close to those in the previous layer, thereby generating smooth motions. Moreover, similar IK solutions are merged using a clustering method. IKLink finds motions using dynamic programming, which incorporates both the number of reconfigurations and joint movements as objectives.
+This experiment uses a 7-DoF Franka Panda robot. The first testbed tracks random trajectories that consist of two consecutive cubic cumulative Bézier curves [22]. The trajectories average 2.26 m in length, 12.07 rad in angular displacement, and 677.6 waypoints. The second testbed involves a 3D scanning task, in which a robot accurately moves a sensor along a predefined trajectory, ensuring the sensor consistently points at the object.
+As shown in Figure 3, our framework was more efficient and converged to motions with fewer or equal configurations, compared to both the conventional framework (baseline 1) and the naïve anytime framework (baseline 2).
+C. Experiment C - Tracking Trajectories with Tolerances
+In this experiment, we show how our framework extends IKLink’s capability [4] to track semi-constrained endeffector trajectories. IKLink was originally designed for fullyconstrained trajectory tracking, which requires all 6 DoF of
+
+WANG et al.: ANYTIME PLANNING FOR END-EFFECTOR TRAJECTORY TRACKING
+
+7
+
+Joint Movement (rad) (averaged over 10 random trajectories)
+
+Experiment A: Minimal Joint Movements
+Testbed 1: Random Trajectory Tracking 8 Baseline 1
+
+6
+Baseline 2
+4
+Ours
+
+2
+3.29s 1.50s
+
+20.51s
+
+0
+
+0
+
+10
+
+20
+
+30
+
+Time (s) Testbed 2: Writing
+
+Baseline 2
+
+Baseline 1
+
+14
+
+Ours
+
+12
+
+10
+
+8
+
+6
+
+4 5.71s
+
+2 2.10s
+
+0
+
+0
+
+10
+
+34.84s
+
+20
+
+30
+
+40
+
+Time (s)
+
+Baseline 1: conventional framework + Stampede (Exp A) or IKLink (Exp B & C) Ours (s=5): our framework + Stampede (Exp A) or IKLink (Exp B & C)
+
+Num of Recon g (averaged over 10 repetitions)
+
+Num of Recon g (averaged over 10 random trajectories)
+
+Experiment B: Minimal Recon gurations Testbed 1: Random Trajectory Tracking
+
+2.5
+
+2.0
+
+Baseline 1
+
+1.5
+
+1.0
+
+0.5
+
+0 0 20 40 60 80 Time (s)
+Testbed 2: 3D Scanning
+2
+
+Baseline 2 Ours
+100 120
+
+Baseline 2
+Baseline 1
+1 Ours
+
+0 0 20 40 60 80 100 Time (s)
+Baseline 2: naïve framework + Stampede (Exp A) or IKLink (Exp B & C) Ours (s=3): our framework + Stampede (Exp A) or IKLink (Exp B & C)
+
+Num of Recon g (averaged over 10 repetitions)
+
+Num of Recon g (averaged over 10 random trajectories)
+
+Experiment C: Trajectory with Tolerances Testbed 1: Random Trajectory Tracking
+
+1.0
+
+Baseline 1
+
+0.8 Baseline 2
+
+0.6 0.4 Ours
+
+0.2
+
+0 0 20 40
+Testbed 2: Sanding 9
+
+60 80 100 120 140 Time (s)
+
+6
+
+3 Baseline 2
+Baseline 1
+Ours
+
+0
+
+0
+
+20 40
+
+60 80 100
+
+Time (s)
+
+Region between max and min values Ours (s=10): our framework + Stampede (Exp A) or IKLink (Exp B & C)
+
+Joint Movement (rad) (averaged over 10 repetitions)
+
+Fig. 3. Results of our three experiments, each on two testbeds. For random trajectory tracking (top row), the results are averaged over 10 randomly generated
+trajectories. For specific tasks (bottom row), the results are averaged over 10 repetitions of the same trajectory, with colored regions indicating the range
+between the maximum and minimum values within these repetitions. In the line charts, the initial point of a line encodes the average computation time to get initial solutions. Left column: our framework enabled Stampede to find initial effective solutions faster than the baselines. Middle column: IKLink with our framework converged faster than with the naïve framework. Right column: for trajectories with tolerances, our framework enabled IKLink to find motion with fewer reconfigurations than the baseline frameworks. The robot visualizations were generated using Motion Comparator [21]3.
+
+TABLE I EXPERIMENT RESULTS
+
+Method
+Baseline 1 Baseline 2 Ours (s=5) Ours (s=3) Ours (s=10)
+
+Exp A
+
+Testbed 1
+Time† JM‡ 20.5 7.14 7.1 7.14 1.8 6.97 2.5 6.99 3.5 7.01
+
+Testbed 2
+
+Time† JM‡
+
+34.8 13.92
+
+34.4 13.92 8.1 13.85
+
+/
+
+/
+
+/
+
+/
+
+Exp B
+
+Testbed 1
+
+Time† # RC‡
+
+58.2
+
+1.8
+
+58.9
+
+1.8
+
+13.6
+
+1.3
+
+20.6
+
+1.5
+
+22.2
+
+1.6
+
+Testbed 2
+
+Time† # RC‡
+
+66.7
+
+1.0
+
+31.2
+
+1.0
+
+4.4
+
+1.0
+
+/
+
+/
+
+/
+
+/
+
+Exp C
+
+Testbed 1
+
+Time† # RC‡‡
+
+38.3
+
+0.9
+
+41.9
+
+0.9
+
+20.9
+
+0.4
+
+28.7
+
+0.6
+
+14.6
+
+0.7
+
+Testbed 2
+
+Time† # RC‡
+
+41.6
+
+2.6
+
+74.1
+
+2.9
+
+24.6
+
+0.8
+
+/
+
+/
+
+/
+
+/
+
+†: Average computation time to achieve the same performance of Baseline 1 (the conventional framework) ‡: Average performance achieved within Baseline 1’s computation time (JM=Joint Movement, # RC=Number of Reconfigurations)
+
+the end-effector to be accurate. This requirement becomes overly restrictive in applications such as welding, where the torch may rotate around its principal axis. In contrast, semi-constrained trajectory tracking allows the end-effector to move within certain tolerances. Semi-constrained tracking poses a greater challenge to graph-based approaches because the solution space is larger and requires more samplings to sufficiently cover the solution space. We demonstrate that the IKLink using the conventional framework struggles to quickly find plausible motions, and the proposed anytime framework enables IKLinks to efficiently and effectively track trajectory with tolerances. We use RangedIK [23] as the IK solver, which is an extension of RelaxedIK that generates IK solutions that move the end-effector within specified tolerances.
+The first testbed randomly generates 10 welding trajectories for a Franka Panda robot. Each trajectory is composed of four cumulative cubic Bézier curves [22]. The trajectories average 1.29 m in length, 22.70 rad in angular displacement, and 646.8 waypoints. Compared to the random trajectories in Experiments A and B, these trajectories involve more rotational movements. In the welding task, the tolerance is along the torch’s principal axis, i.e., the robot is allowed to freely rotate its end-effector along the principal axis (z-axis). As shown in Figure 3, the principal axis is angled 45 degrees
+
+from the robot’s last axis. The robot must coordinate the movement of all its joints to exploit the tolerance, in contrast to just rotating the last joint when the principal axis aligns with the last axis. In the second testbed, a 7-degrees-of-freedom Rethink Robotics Sawyer robot performs a sanding task by tracking a spiral trajectory. The robot can freely rotate the sanding tool around its principal axis, which is oriented 90 degrees from the robot’s last axis.
+As shown in Figure 3, our framework enabled IKLink to quickly find motions with fewer reconfigurations than the baseline frameworks, while IKLink with both the conventional and naïve anytime frameworks struggled to find optimal solutions for trajectories with tolerances.
+Summary: Across all experiments, our anytime framework requires less computation time to achieve motions of the same quality and reaches equal or better motion quality within the same time frame compared to both the conventional and naïve anytime frameworks. Figure 3 shows that our framework consistently outperforms the baselines (our lines are consistently below or overlapping with the baselines), while Table I presents the corresponding quantitative results.
+Experiments A and B show that our framework accelerates the performance of both Stampede and IKLink, enabling
+3Visualization tool: https://github.com/uwgraphics/MotionComparator
+
+8
+
+them to find motions of higher or equal quality in less time, in comparison to both the conventional and naïve anytime frameworks. Experiment C shows that our framework extends IKLink’s ability to efficiently generate motions for tracking semi-constrained trajectories.
+Our results also show the effects of the hyperparameter step size s, which defines the length of sparse edges. A smaller s increases the number of IK samples in Stage 1, sparse vertex sampling, thereby raising computation time for obtaining initial solutions. Meanwhile, a larger s reduces the accuracy of guide paths as cost estimators, leading to slower algorithm convergence. In our experiments, we observe a sweetspot at s=5.
+VI. DISCUSSION This section summarizes the limitations, implications, and conclusions of our work. Limitations: Our work has several limitations that suggest future research directions. First, our algorithm lacks a qualitybased stopping threshold; users can specify the maximum number of iterations, running time, or sampling budget, but the algorithm does not automatically stop upon convergence. Future work should explore the effects of adaptive stopping thresholds such as when the guide path no longer updates with iterations. Second, our method uses a heuristic to bias sampling in graph-based approaches. While we provide empirical evidence to demonstrate its ability to efficiently produce highquality solutions, we cannot guarantee consistent performance across all scenarios. In certain scenarios, the heuristic may be misleading, causing the method to be slower than the naive anytime framework. Future work may provide a more rigorous understanding of the heuristic’s effectiveness. Third, while we expect that our framework generalizes across many graph-based tracking algorithms, we have only demonstrated it on two. Finally, the present work does not consider dynamic constraints, focusing solely on the velocity constraints of robot joints. Future work should consider incorporating acceleration constraints and the inertia of the robot to improve the quality of generated motions. Implications: The guided anytime framework presented in this work enables graph-based approaches to efficiently and effectively find motions that accurately move a manipulator’s end-effector along reference trajectories. It quickly generates initial solutions and continues to refine them as needed. We have demonstrated that it accelerates and improves solutions over prior methods and enables solving problems that a prior method cannot. The proposed framework is particularly beneficial for scenarios where end-effector trajectories are complex or have specific tolerances. Conclusion: This paper presented an anytime framework that enables graph-based trajectory tracking algorithms to efficiently and effectively find robot motions. Our framework generates trajectories of equal or better quality in less time than previous approaches.
+REFERENCES
+[1] D. Rakita, B. Mutlu, and M. Gleicher, “Stampede: A discreteoptimization method for solving pathwise-inverse kinematics,” in IEEE Int. Conf. on Robotics and Automation. IEEE, 2019, pp. 3507–3513.
+
+[2] R. Holladay, O. Salzman, and S. Srinivasa, “Minimizing task-space frechet error via efficient incremental graph search,” IEEE Robotics and Automation Letters, vol. 4, no. 2, pp. 1999–2006, 2019.
+[3] J. Morgan, D. Millard, and G. S. Sukhatme, “Cppflow: Generative inverse kinematics for efficient and robust cartesian path planning,” in Int. Conf. on Robotics and Automation. IEEE, 2024, pp. 12 279–12 785.
+[4] Y. Wang, C. Sifferman, and M. Gleicher, “Iklink: End-effector trajectory tracking with minimal reconfigurations,” in IEEE Int. Conf. on Robotics and Automation (ICRA). IEEE, 2024, pp. 12 165–12 171.
+[5] T. Yang, J. V. Miro, Y. Wang, and R. Xiong, “Optimal task-space tracking with minimum manipulator reconfiguration,” IEEE Robotics and Automation Letters, vol. 7, no. 2, pp. 5079–5086, 2022.
+[6] ROS-I. (2015) Descartes—a ros-industrial project for performing pathplanning on under-defined cartesian trajectories. [Online]. Available: http://wiki.ros.org/descartes
+[7] S. Niyaz, A. Kuntz, O. Salzman, R. Alterovitz, and S. Srinivasa, “Following surgical trajectories with concentric tube robots via nearestneighbor graphs,” in Proceedings of the 2018 International Symposium on Experimental Robotics. Springer, 2020, pp. 3–13.
+[8] M. Cefalo, G. Oriolo, and M. Vendittelli, “Task-constrained motion planning with moving obstacles,” in 2013 IEEE/RSJ Int. Conf. on Intelligent Robots and Systems. IEEE, 2013, pp. 5758–5763.
+[9] R. M. Holladay and S. S. Srinivasa, “Distance metrics and algorithms for task space path optimization,” in IEEE/RSJ Int. Conf. on Intelligent Robots and Systems (IROS). IEEE, 2016, pp. 5533–5540.
+[10] J. Schulman, Y. Duan, J. Ho, A. Lee, I. Awwal, H. Bradlow, J. Pan, S. Patil, K. Goldberg, and P. Abbeel, “Motion planning with sequential convex optimization and convex collision checking,” The International Journal of Robotics Research, vol. 33, no. 9, pp. 1251–1270, 2014.
+[11] M. Kang, H. Shin, D. Kim, and S.-E. Yoon, “Torm: Fast and accurate trajectory optimization of redundant manipulator given an end-effector path,” in 2020 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS). IEEE, 2020, pp. 9417–9424.
+[12] M. Yoon, M. Kang, D. Park, and S.-E. Yoon, “Learning-based initialization of trajectory optimization for path-following problems of redundant manipulators,” in IEEE Int. Conf. on Robotics and Automation (ICRA). IEEE, 2023, pp. 9686–9692.
+[13] R. K. Malhan, S. Thakar, A. M. Kabir, P. Rajendran, P. M. Bhatt, and S. K. Gupta, “Generation of configuration space trajectories over semi-constrained cartesian paths for robotic manipulators,” IEEE Trans. Automation Sci. and Eng., vol. 20, no. 1, pp. 193–205, 2022.
+[14] B. Ames, J. Morgan, and G. Konidaris, “Ikflow: Generating diverse inverse kinematics solutions,” IEEE Robotics and Automation Letters, vol. 7, no. 3, pp. 7177–7184, 2022.
+[15] J. De Maeyer, B. Moyaers, and E. Demeester, “Cartesian path planning for arc welding robots: Evaluation of the descartes algorithm,” in 2017 22nd IEEE International conference on emerging technologies and factory automation (ETFA). IEEE, 2017, pp. 1–8.
+[16] P. Beeson and B. Ames, “Trac-ik: An open-source library for improved solving of generic inverse kinematics,” in 2015 International Conf. on Humanoid Robots (Humanoids). IEEE, 2015, pp. 928–935.
+[17] D. Rakita, B. Mutlu, and M. Gleicher, “Relaxedik: Real-time synthesis of accurate and feasible robot arm motion.” in Robotics: Science and Systems, vol. 14. Pittsburgh, PA, 2018, pp. 26–30.
+[18] C. W. Wampler, “Manipulator inverse kinematic solutions based on vector formulations and damped least-squares methods,” IEEE Trans. on Systems, Man, and Cybernetics, vol. 16, no. 1, pp. 93–101, 1986.
+[19] R. Bohlin and L. E. Kavraki, “Path planning using lazy prm,” in ICRA. Millennium conference. IEEE Int. Conf. on Robotics and Automation. Symposia proceedings, vol. 1. IEEE, 2000, pp. 521–528.
+[20] N. Haghtalab, S. Mackenzie, A. Procaccia, O. Salzman, and S. Srinivasa, “The provable virtue of laziness in motion planning,” in Int. Conf. on Automated Planning and Scheduling, vol. 28, 2018, pp. 106–113.
+[21] Y. Wang, A. Peseckis, Z. Jiang, and M. Gleicher, “Motion comparator: Visual comparison of robot motions,” IEEE Robotics and Automation Letters, vol. 9, no. 9, pp. 7699–7706, 2024.
+[22] M.-J. Kim, M.-S. Kim, and S. Y. Shin, “A general construction scheme for unit quaternion curves with simple high order derivatives,” in 22nd Annual Conf. on Computer Graphics and Interactive Technologies, 1995, pp. 369–376.
+[23] Y. Wang, P. Praveena, D. Rakita, and M. Gleicher, “Rangedik: An optimization-based robot motion generation method for ranged-goal tasks,” in IEEE Int. Conf. on Robotics and Automation (ICRA). IEEE, 2023, pp. 8090–8096.
+
+

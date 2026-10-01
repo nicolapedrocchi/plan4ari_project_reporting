@@ -1,0 +1,657 @@
+IEEE CONTROL SYSTEMS LETTERS, VOL. 10, 2026
+
+2089
+
+Model Predictive Path Integral Control as Preconditioned Gradient Descent
+Mahyar Fazlyab , Member, IEEE, Sina Shariﬁ , and Jiarui Wang
+
+Abstract— Model Predictive Path Integral (MPPI) control is a widely used sampling-based method for trajectory optimization, yet its convergence properties remain only partially understood. This letter provides a direct convergence analysis using variational optimization. By lifting constrained trajectory optimization to a Kullback-Leibler (KL) regularized problem over decision distributions, we derive a reduced free-energy objective deﬁned over a parametric sampling family. For general parametric families, we derive gradient and Hessian representations of this reduced objective and analyze preconditioned gradient descent on the sampling-distribution parameters. In the ﬁxed-covariance Gaussian case, the classical MPPI update is recovered exactly as a unit-step preconditioned gradient update. We prove descent and stationarity guarantees for the exact expectation-based iteration when the Hessian of the reduced objective is bounded in the metric induced by the preconditioner. For the Gaussian family, we further show that the preconditioned Hessian is governed by the covariance of the Gibbs-tilted distribution relative to the covariance of the sampling distribution, yielding a covariance-dependent sufﬁcient condition for the descent of exact unit-step MPPI. Numerical experiments illustrate the theory and the effect of key hyperparameters.
+Index Terms— Optimal control, optimization algorithms, predictive control for nonlinear systems.
+I. INTRODUCTION
+M ODEL Predictive Path Integral (MPPI) control, e.g., [14], [16], is a widely used sampling-based method for
+trajectory optimization in nonlinear and nonconvex settings,
+owing to its simplicity, parallelizability, and ability to handle nondiﬀerentiable dynamics and costs. In its standard form,
+MPPI updates the sampling distribution by drawing perturbed
+control sequences, reweighting them according to their trajec-
+tory costs, and shifting the nominal control toward a weighted
+average of the sampled rollouts. Despite its empirical success
+in robotics and real-time control, this update is typically
+introduced through stochastic optimal control or control-
+as-inference arguments, which do not directly expose its
+underlying optimization structure. As a result, basic questions
+Received 17 March 2026; revised 22 May 2026; accepted 11 June 2026. Date of publication 1 July 2026; date of current version 31 July 2026. This work was supported in part by the National Science Foundation under Grant 2515978 and in part by the Internal Funds from Johns Hopkins University. Recommended by Senior Editor R. Vazquez. (Corresponding author: Mahyar Fazlyab.)
+The authors are with the Department of Electrical and Computer Engineering, Johns Hopkins University, Baltimore, MD 21218 USA (e-mail: mahyarfazlyab@jhu.edu; sshari12@jhu.edu; jwang486@ jhu.edu).
+Digital Object Identiﬁer 10.1109/LCSYS.2026.3708745
+
+such as how MPPI relates to gradient-based methods, when its update is guaranteed to decrease a well-deﬁned objective, and how its hyperparameters inﬂuence stability and convergence remain only partially understood [4]. These gaps motivate the need for a direct optimization-theoretic interpretation of MPPI.
+A.. Contributions
+This letter provides a variational, optimization-theoretic derivation of MPPI, with the goal of establishing convergence guarantees beyond special cases [18]. Starting from constrained trajectory optimization, we lift the problem to a KL-regularized distributional formulation and eliminate the auxiliary decision distribution to obtain a reduced negative logpartition, or free-energy objective over a tractable sampling family. We then analyze the convergence of preconditioned gradient descent on the free energy objective. Our framework enables three concrete consequences. First, it yields descent and stationarity guarantees, including an O(1/K) ergodic stationarity rate, for the exact preconditioned-gradient iteration when the Hessian of the reduced objective is bounded in the metric induced by the preconditioner. Second, in the ﬁxed-covariance Gaussian family, it recovers classical MPPI exactly as a unit-step preconditioned gradient update and shows that the preconditioned Hessian of the reduced objective is governed by the covariance of the Gibbs-tilted distribution relative to the sampling covariance. This leads to an explicit covariance-dependent suﬃcient condition for descent of exact unit-step MPPI. Third, it provides a principled basis for selecting the algorithm hyperparameters, including step size, multiple inner updates, and stopping criteria based on stationarity. To the best of our knowledge, our framework provides the ﬁrst theoretical convergence analysis of MPPI and related sampling algorithms for general nonlinear systems and cost functions, with bounded feasible sets being the only requirement. Numerical experiments support the theory and illustrate the eﬀect of key hyperparameters on performance.
+B.. Related Work
+1) Probabilistic Inference Perspective: Inference-based formulations recast control as posterior inference over action sequences conditioned on an optimality variable, leading to updates closely related to MPPI [4]. This viewpoint has been developed extensively in reinforcement learning and control [6]. In particular, [10] introduced a variational inference MPC framework that recovers several sampling-based optimization
+
+2475-1456 © 2026 IEEE. All rights reserved, including rights for text and data mining, and training of artiﬁcial intelligence and similar technologies. Personal use is permitted, but republication/redistribution requires IEEE permission. See https://www.ieee.org/publications/rights/index.html for more information.
+Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:22:23 UTC from IEEE Xplore. Restrictions apply.
+
+2090
+
+IEEE CONTROL SYSTEMS LETTERS, VOL. 10, 2026
+
+methods, including MPPI [15], CEM [1], and CMA-ES [2] as special cases. Our contribution is complementary: rather than deriving MPPI through inference, we show that it can be obtained directly as a preconditioned gradient step on a KL-regularized free-energy objective.
+2) Diffusion Perspective: Another line of work connects MPPI to model-based diﬀusion [5], [11], [17]. In [17], building on the score estimation result from [11] that Mscore-estimation result from [11], it is shown on a Gaussian-smoothed Gibbs distribution. Although this interpretation explains the mechanism of MPPI, it still does not directly reveal its convergence properties.
+3) Optimization Perspective: MPPI has also been studied through optimization-based perspectives, particularly distributional mirror descent (MD) and its accelerated variants [7], [9], [13]. In particular, [9] hypothesized a O(1/k) convergence guarantee. Wagener et al. [13] considered utility-transformed trajectory objectives and showed that MD on the exponentialutility yields classical MPPI under a ﬁxed-covariance Gaussian family with unit step size. In contrast, in our framework, the free-energy objective arises naturally from the KL-regularized variational formulation of the original constrained trajectory optimization problem. More importantly, none of the aforementioned approaches provide convergence guarantees.
+4) Theoretical Analysis of MPPI: Motivated by the empirical success of MPPI, several recent works have begun to study its theoretical properties. In particular, CoVO-MPC [18] analyzes the convergence behavior of MPPI using contraction theory, proving at least linear convergence for (time-varying) LQR. However, the same contraction result cannot be extended to general nonlinear settings. Separately, [3] studies the optimality and suboptimality of MPPI in stochastic and deterministic settings, with an emphasis on deterministic MPPI and its approximation error. Our analysis is complementary to these works: we analyze the convergence for general nonlinear systems and cost, with bounded feasible set being the main requirement.
+
+C.. Notation
+
+For a symmetric matrix A, A 0 and A 0 denote positive
+
+semideﬁniteness and positive deﬁniteness. The identity matrix
+
+is I, and λmin(A), λmax(A) denote the extreme eigenvalues of
+
+A. We use · for both the Euclidean and spectral norms. For
+
+P
+
+0, let
+
+x
+
+2 P
+
+=
+
+x
+
+Px.
+
+For
+
+a
+
+density
+
+π,
+
+Eπ[·],
+
+Covπ(·),
+
+and
+
+supp(π) denote expectation, covariance, and support. We write
+
+π(u) = N (u; µ, Σ) for a Gaussian density and KL(ρ π) for the
+
+Kullback–Leibler divergence. The notation ρ π means that ρ
+
+is absolutely continuous with respect to π. For a diﬀerentiable
+
+function F, ∇F and ∇2F denote its gradient and Hessian. For
+
+a set C, 1C denotes its indicator function.
+
+II. VARIATIONAL FORMULATION A.. Trajectory Optimization as Constrained Minimization
+We consider ﬁnite-horizon trajectory optimization over an open-loop control sequence u := (u0, u1, . . ., uT−1) ∈ RdT applied to a dynamical system
+xt+1 = F(xt, ut),
+
+possibly nonlinear and nonsmooth, from a given initial condition x0. Let f0(u) denote the trajectory objective (e.g., cumulative stage costs and a terminal cost), and C ⊂ RdT denote the set of feasible control sequences, encoding constraints such as obstacle avoidance, state bounds, or input limits. Throughout, we assume that C is nonempty and compact and that f0 is continuous. The resulting trajectory optimization problem is
+
+min f0(u).
+
+(1)
+
+u∈C
+
+B.. KL-Regularized Distributional Formulation
+Following the framework of variational optimization, e.g., [12], we ﬁrst lift the pointwise trajectory optimization problem (1) to an optimization problem over probability distributions on the open-loop control sequence u:
+min Eρ[ f0(u)] s.t. supp(ρ) ⊆ C
+ρ
+Here, ρ denotes a decision distribution over u. This unregularized lifted problem is equivalent to the original pointwise problem and collapses to a Dirac measure at a minimizer of f0 over C. To obtain a nondegenerate distributional formulation, we introduce a base, or sampling, distribution π over the same control-sequence space and regularize ρ relative to π using the KL divergence. We require ρ π; otherwise, KL(ρ π) = +∞. For a regularization parameter τ > 0, consider
+min Eρ[ f0(u)] + τ KL(ρ π) s.t. supp(ρ) ⊆ C. (2)
+ρ
+The support constraint enforces the hard feasibility of the decision distribution. Problem (2) trades oﬀ low expected trajectory cost under ρ with proximity to the sampling distribution π. As τ → 0, the regularization vanishes and optimal solutions concentrate on the optimal set U = arg minu∈C f0(u).
+
+C.. Optimizing the Base Distribution
+
+For any ﬁxed base distribution π, (2) provides an upper
+
+bound on the optimal value of the original constrained prob-
+
+lem: Á
+
+min Eρ[ f0(u)] + τKL(ρ π) ≥ min Eρ[ f0(u)] = min f0(u),
+
+ρ
+
+ρ
+
+u∈C
+
+where both minimizations are taken over distributions ρ supported on C, and the equality follows by choosing ρ as a Dirac
+measure at any minimizer of f0 over C. Note that the upper bound is a function of π. Therefore, we can optimize over π to
+seek the tightest such upper bound. However, if we optimize over π without restriction, the pair (ρ, π) may collapse (e.g., π = ρ), undermining stability and exploration. We therefore restrict π to a tractable family Π (e.g., Gaussians with bounded
+covariance), and consider
+
+min min Eρ[ f0(u)] + τ KL(ρ π) s.t. supp(ρ) ⊆ C. (3)
+π∈Π ρ
+For a ﬁxed π ∈ Π, the minimizer over ρ in (3) is given by the truncated Gibbs tilt
+ρπ (u) = T (π)(u) := π(u) exp − f0(u)/τ 1C(u) , (4) Z(π)
+
+Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:22:23 UTC from IEEE Xplore. Restrictions apply.
+
+FAZLYAB et al.: MODEL PREDICTIVE PATH INTEGRAL CONTROL AS PRECONDITIONED GRADIENT DESCENT
+
+2091
+
+where Z(π) is the normalizing constant Z
+
+Z(π) := π(v) exp − f0(v)/τ dv.
+
+(5)
+
+C
+
+See the full derivation in the longer version. Since π is
+positive on C, we have Z(π) > 0. Thus, ρπ is obtained by reweighting the base distribution π according to trajectory cost
+
+and feasibility: lower-cost feasible control sequences receive
+
+larger probability mass, whereas infeasible sequences receive
+
+zero mass. Substituting (4) into the inner objective yields
+
+Eρπ [ f0(u)] + τ KL(ρπ π) Ä
+= Eρπ [ f0(u)] + τ Eρπ − f0(u) τ − log Z(π)
+
+= −τ log Z(π).
+
+(6)
+
+Therefore, the joint optimization problem (3) reduces to the
+
+optimization problem over the negative log-partition or free-
+
+energy objective,
+
+min −τ log Z(π).
+
+(7)
+
+π∈Π
+
+This objective is precisely the π-dependent upper bound obtained after eliminating the auxiliary distribution ρ.
+
+III. OPTIMIZATION OVER A PARAMETRIC SAMPLING FAMILY
+In this section, we specialize the reduced problem (7) to a parametric family of sampling distributions Π := {πθ : θ ∈ Θ}, where Θ ⊆ Rp is the parameter space. For each θ ∈ Θ, the corresponding optimal decision distribution is
+
+ρθ(u) := T (πθ)(u).
+
+(8)
+
+Accordingly, the reduced problem becomes
+
+Z f0(u)
+
+min F(θ) := −τ log Z(θ) = −τ log πθ(u)e− τ du. (9)
+
+θ∈Θ
+
+C
+
+We make the following assumption, under which the reduced
+objective F becomes twice diﬀerentiable. Assumption 1: The family {πθ}θ∈Θ is strictly positive on C,
+twice continuously diﬀerentiable in θ, and such that diﬀerentiation under the integral sign is valid for Z(θ) up to second
+order.
+
+A.. Preconditioned Gradient Descent
+In contrast to the original constrained trajectory optimization problem, the reduced problem (9) is diﬀerentiable in the distribution parameters and is therefore amenable to gradientbased optimization. The following result provides expressions for the gradient and Hessian of F(θ) that will be useful for algorithm design and convergence analysis.
+Lemma 1 (Gradient and Hessian Representations): Under Assumption 1,
+
+∇F(θ) = −τEρθ ∇θ log πθ(u)
+
+(10)
+
+= −τ Eπθ w(u)∇θ log πθ(u) , (11) Eπθ [w(u)]
+
+where
+
+w(u) := exp − f0(u)/τ 1C(u).
+
+(12)
+
+In addition,
+
+Á
+
+∇2F(θ) = −τ
+
+Eρθ
+
+2
+∇θ
+
+log
+
+πθ
+
+(u)
+
++ Covρθ
+
+∇θ log πθ(u)
+
+. (13)
+
+Proof: See the proof in the longer version. The gradient representations in Lemma 1 naturally motivate a preconditioned gradient method for minimizing the reduced objective F(θ). Given a symmetric positive deﬁnite preconditioner P 0 and a step size η > 0, the exact preconditioned gradient descent is
+
+θk+1 = θk − ηP∇F(θk)
+
+= θk + ητP Eρθk ∇θ log πθk (u) .
+
+(14)
+
+In practice, the expectation with respect to ρθk is generally intractable. Using (11), we can sample from πθk instead. Speciﬁcally, we draw samples u( j) ∼ πθk , j = 1, . . ., N, and
+deﬁne the self-normalized importance weights
+
+w(u( j))
+
+w¯ j := PN
+
+j = 1, · · · , N.
+
+(15)
+
+r=1 w(u(r))
+
+This yields the self-normalized Monte Carlo estimator of (14),
+
+XN
+
+θk+1 = θk + ητP w¯ j ∇θ log πθk (u( j)).
+
+(16)
+
+j=1
+
+This update has the standard structure of a weighted sample average used in policy search and sampling-based control methods, and recovers MPPI as a special case under a suitable Gaussian parameterization.
+
+B.. Convergence Analysis
+
+We now analyze the exact preconditioned gradient iteration (14) with a constant step size η > 0, and derive conditions under which it yields descent and convergence of the reduced objective. Since the iteration is preconditioned by P, the relevant notion of smoothness is naturally expressed in the metric induced by P.
+Assumption 2: For the chosen positive deﬁnite matrix P 0, there exists a constant LP > 0 such that
+
+sup P1/2∇2F(θ)P1/2 ≤ LP.
+θ∈Θ
+
+The following lemma is an immediate consequence of Assumption 2.
+Lemma 2: Under Assumption 2, for all θ, θ + ∆θ ∈ Θ,
+
+F(θ + ∆θ) ≤ F(θ) + ∇F(θ) ∆θ + LP ∆θ P−1∆θ. (17) 2
+Proof: See the proof in the longer version. Theorem 1: Suppose Assumption 2 holds, and let {θk} be generated by (14) with a constant step size η > 0. If
+
+0 < η < 2 , (18) LP
+
+then the following hold:
+
+1) Descent: for every k,
+
+Â
+
+Ã
+
+ηLP
+
+k2
+
+F(θk+1) ≤ F(θk) − η 1 − 2 ∇F(θ ) P. (19)
+
+Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:22:23 UTC from IEEE Xplore. Restrictions apply.
+
+2092
+
+IEEE CONTROL SYSTEMS LETTERS, VOL. 10, 2026
+
+2) Summability of preconditioned gradients:
+
+X ∞
+
+k 2 F(θ0) − infθ∈Θ F(θ)
+
+∇F(θ ) P ≤
+
+Á . (20)
+
+k=0 η 1 − 2 ηLP
+
+3) Stationarity: for every K ≥ 1,
+
+j 2 F(θ0) − infθ∈Θ F(θ)
+
+min ∇F(θ ) P ≤
+
+Á . (21)
+
+0≤ j≤K−1
+
+K η 1 − 2 ηLP
+
+In particular, limk→∞ ∇F(θk) P = 0.
+
+Proof: Applying the smoothness bound (17) with ∆θ =
+
+−ηP∇F(θk), we obtain (19) after simpliﬁcation. Since 0 < η <
+
+2/LP, the coeﬃcient is positive, so F(θk) is nonincreasing.
+
+Summing (19) from k = 0 to K − 1 and using infθ∈Θ F(θ) ≤ F (θK )
+
+Â ηLP k 2 0 Ã X K−1
+
+η 1−
+
+∇F(θ ) P ≤ F(θ ) − inf F(θ).
+
+2
+
+θ∈Θ
+
+k=0
+
+Letting K → ∞ gives (20). Dividing by K gives (21), and summability implies ∇F(θk) P → 0.
+
+Algorithm 1 Multi-Step MPPI
+
+Require: Initial parameter θ0, number of samples N, threshold ε
+
+1: Set k = 1.
+
+2: while ∇F(θk) P > ε do
+
+(1)
+
+(N) i.i.d.
+
+3: Sample u , . . . , u ∼ πθk−1 (u)
+
+4: Approximate ∇θF(θk) according to (15).
+
+5: Update θk according to (16).
+
+6: k ← k + 1
+
+7: end while
+
+Theorem 1 shows that the exact multi-step iteration (14) is a descent method for the free-energy objective F(θ): for a suﬃciently small step size, F(θk) decreases monotonically and
+the iterates converge toward stationarity. This result also sug-
+gests a natural stopping criterion based on the preconditioned gradient norm ∇F(θk) P. See Algorithm 1 for a summary of the method.
+
+IV. OPTIMIZATION OVER GAUSSIAN FAMILY WITH FIXED COVARIANCE
+We now specialize the preceding results to the ﬁxedcovariance Gaussian family
+
+πµ(u) = N (u; µ, Σ), Σ 0,
+
+(22)
+
+where the mean µ ∈ Rm is the optimization variable. In this case, the score and log-Hessian are given by
+
+∇µ log πµ(u) = Σ−1(u − µ),
+
+2
+∇µ
+
+log
+
+πµ(u)
+
+=
+
+−Σ−1.
+
+Substituting these expressions into Lemma 1 yields
+
+∇F(µ) = −τΣ−1 Eρµ [u] − µ , ρµ(u) = T (πµ)(u). (23)
+
+Using (23), the exact preconditioned gradient step (14)
+
+becomes
+
+µk+1 = µk + ητPΣ−1 Eρµk [u] − µk .
+
+(24)
+
+Using the ratio-of-expectations representation in (11), the
+
+expectation Eρµk [u] can be approximated by self-normalized importance sampling. Accordingly, if u( j) ∼ N (µk, Σ) and the
+
+normalized weights w¯ j are deﬁned as in (15), a Monte Carlo
+
+implementation of (24) is
+
+0
+
+1
+
+XN
+
+µk+1 = µk + ητPΣ−1 @ w¯ ju( j) − µkA .
+
+(25)
+
+j=1
+
+In particular, by choosing P = 1τ Σ, η = 1, the exact preconditioned gradient update (24) reduces to
+µk+1 = Eρµk [u] = Eπµk [w(u) u] , (26) Eπµk [w(u)]
+where w(u) = exp(− f0(u)/τ)1C(u), and the last equality follows from the ratio-of-expectations in Lemma 1. Correspondingly, the Monte Carlo implementation becomes
+
+XN
+
+µk+1 = w¯ ju( j), u( j) ∼ N (µk, Σ),
+
+(27)
+
+j=1
+
+which is precisely the classical MPPI update.
+
+A.. Convergence Analysis
+We now analyze the exact Gaussian update (24) through the lens of preconditioned gradient descent. Although (24) is well deﬁned for any positive deﬁnite preconditioner P, the choice
+P = 1Σ τ
+is especially natural for two reasons. First, when η = 1, this choice exactly recovers the classical MPPI update, as shown in the previous subsection. Therefore, convergence guarantees established under P = Σ/τ immediately apply to MPPI, as well as to its relaxed version with arbitrary step size η > 0. Second, this preconditioner is intrinsic to the geometry of the ﬁxed-covariance Gaussian family. Indeed, by Lemma 1,
+
+∇2F(µ) = τΣ−1 − τΣ−1Covρµ (u)Σ−1.
+
+Hence, with P = Σ/τ,
+
+P1/2∇2F(µ)P1/2 = τΣ 1/2 ∇2F(µ) τΣ 1/2
+
+= I − Σ−1/2Covρµ (u)Σ−1/2.
+
+(28)
+
+Thus, in the metric induced by P = Σ/τ, the curvature of the reduced objective is determined entirely by the covariance of the tilted distribution ρµ relative to the sampling covariance Σ. In particular, the explicit dependence on the temperature τ disappears after preconditioning. This makes P = Σ/τ the natural scaling for the convergence analysis.
+Accordingly, throughout this subsection we specialize (24) to the update
+
+µk+1 = (1 − η)µk + η Eρµk [u],
+
+(29)
+
+which we refer to as the exact relaxed MPPI update. To state the convergence result, deﬁne
+
+LΣ := sup I − Σ−1/2Covρµ (u)Σ−1/2 .
+
+(30)
+
+µ∈Θ
+
+Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:22:23 UTC from IEEE Xplore. Restrictions apply.
+
+FAZLYAB et al.: MODEL PREDICTIVE PATH INTEGRAL CONTROL AS PRECONDITIONED GRADIENT DESCENT
+
+2093
+
+Fig. 1. Ablation study of the parameters Σ (left) and ﬁ (middle), and comparison with ﬁnite differences (right) on the LQR benchmark.
+
+By (28), LΣ is the operator-norm bound on the Hessian of F
+
+in the metric induced by Σ/τ, and hence the corresponding
+
+smoothness constant in that metric. In the next theorem, we
+
+state the convergence result for (29).
+
+Theorem 2: Consider the ﬁxed-covariance Gaussian fam-
+
+ily (22), and the exact preconditioned gradient update (24).
+
+Assume that the feasible set C ⊂ Rm is bounded, with diameter DΣ−1 := supu,v∈C Σ−1/2(u − v) . Then the metric smoothness
+
+constant (30) satisﬁes
+
+(
+
+)
+
+L D2 Σ ≤ max 1, Σ−1 − 1 . (31)
+
+4
+
+Consequently, the exact relaxed MPPI update (29) satisﬁes the descent and convergence conclusions of Theorem 1 whenever
+0 < η < 2 . (32) LΣ
+Proof: See the proof in the longer version. 1) Implication for MPPI With Unit Step Size: The exact MPPI iteration is recovered by setting η = 1 in (29). Hence, convergence of the exact MPPI iteration follows from Theorem 2 whenever the unit step size satisﬁes the admissibility condition for 0 < 1 < LΣ2 , which is equivalent to LΣ < 2. Using the bound in (31), a suﬃcient condition is therefore DΣ−1 2 < 12. Since DΣ−1 2 ≤ λmin(Σ) D2 , where D is the Euclidean diameter of C, this condition is guaranteed when λmin(Σ) ≥ 12 D2 . Thus, if the covariance matrix is suﬃciently large, then the exact MPPI iteration with η = 1 satisﬁes the descent and convergence guarantees of Theorem 1. In particular, this gives a simple design rule: the exploration covariance must not be too small relative to the diameter of the feasible set. Equivalently, overly concentrated sampling distributions can destroy the global descent guarantee, whereas suﬃciently diﬀuse sampling is enough to ensure it. Remark 1: Theorems 1–2 analyze the exact expectationbased iteration. The sampled update (16) instead uses a selfnormalized importance-sampling estimator, which is generally biased. To see how this aﬀects the descent guarantee, write
+∇cF(θk) = ∇F(θk) + bk + ξk,
+where bk := E[∇cF(θk) | θk] − ∇F(θk) is the bias of the selfnormalized estimator, and E[ξk | θk] = 0 captures its zero-mean random ﬂuctuation. Applying the same smoothness argument
+
+as in Theorem 1,
+
+Â
+
+Ã
+
+E[F(θk+1) | θk] ≤ F(θk) − η 3 − LPη ∇F(θk) P2
+
+4
+
+2 LPη2
+
+2
+
++ η(1 + LPη) bk P +
+
+E[ ξk P | θk].
+
+2
+
+Thus, the exact descent guarantee is preserved up to two terms
+
+controlled by the ﬁnite-sample gradient estimation error. A
+
+complete non-asymptotic analysis of the bias and variance
+
+of the self-normalized estimator is an important direction for
+
+future work.
+
+V. NUMERICAL ANALYSIS
+
+A.. Linear Quadratic Regulator (LQR)
+
+We consider a ﬁnite-horizon LQR trajectory optimization
+
+problem with double-integrator dynamics
+
+Ä
+
+Ä
+
+xt+1 = 1 1 xt + 0.5 ut.
+
+01
+
+1
+
+We deﬁne the cost to be J(u) = t=1 PT xt 2 + ut 2, where horizon T = 10, u := (u0, · · · , uT−1) ∈ R10 is the stacked
+
+control vector, x0 = (2.5, 0). Rolling out the trajectories yields
+
+the quadratic program
+
+min
+
+1 2
+
+u
+
+Qu + c
+
+u,
+
+u∈C
+
+where Q 0, and c can be computed accordingly. The constraint set C enforces both the control bounds |u| ≤ 1 and the state constraints x ∈ [−5, 5]×[−1, 1]. A detailed derivation
+of the resulting QP is provided in the longer version. We set a budget of N = 1000 samples per iteration. Fig. 1 shows the results for diﬀerent choices of the parameters. Fig. 1 illustrates
+the convergence behavior predicted by (32). In the ﬁrst two ﬁgures, we ﬁx one parameter among τ and Σ, and compare the choices of MPPI η = 1 (dashed lines), and suggested by our theories (η = 1/LΣ) (solid lines). In the left plot, we ﬁx τ = 1 and compare two choices of Σ = σ2I, and in the middle plot, we ﬁx Σ = 10−4I, and compare two choices of τ. Since the
+LQR objective is quadratic, LΣ can be computed explicitly. When the Lipschitz constant is small (e.g., LΣ = 0.1), the choice η = 1 becomes conservative, and a larger step size leads
+to a faster convergence rate. We also compare Multi-step MPPI (M-MPPI) with ﬁnite diﬀerences (FD) in the right ﬁgure,
+where our method outperforms FD. More details regarding
+the setup can be found in the longer version.
+
+Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:22:23 UTC from IEEE Xplore. Restrictions apply.
+
+2094
+
+IEEE CONTROL SYSTEMS LETTERS, VOL. 10, 2026
+
+a preconditioned gradient method. In the Gaussian ﬁxedcovariance setting, this recovers classical MPPI exactly and leads to explicit descent and stationarity guarantees, as well as a simple covariance-dependent design rule for unit-step MPPI. These results help demystify MPPI from an optimization viewpoint and open the door to principled extensions of sampling-based control methods. Our analysis focuses on the exact expectation-based iteration; understanding the full ﬁnitesample and receding-horizon closed-loop behavior remains an important direction for future work.
+
+Fig. 2. Comparison of the trajectories chosen by MPPI and 10-step MPPI on the Dubins car benchmark in a cluttered environment. The blue and red lines denote the safe and unsafe trajectories, respectively.
+TABLE I COMPARISON OF RUNTIME, SAMPLE ACCEPTANCE RATE %, AND
+AVERAGE COST OF THE CHOSEN TRAJECTORY FOR VARIOUS METHODS
+
+B.. Dubins Car
+We then consider a trajectory optimization task in a cluttered environment, where a Dubins car must reach a given destination. At each time, the optimization problem is formulated as
+
+XT min
+u∈C t=1
+
+xt − xd Q2 +
+
+ut R2 ,
+
+where T = 20, Q = diag(1, 1, 0.01), R = 0.001, x0 = (0, 0, π/2), and xd = (6, 6, 0). The system dynamics xt = [ptx, pty, θt] are
+
+xt+1 = xt + [v cos(θt), v sin(θt), wt] ∆t,
+
+where v = 4 is the constant velocity and the control wt ∈ − 32 π, 32 π , and we set N = 1024. Fig. 2 shows the trajectory chosen by the algorithm with K = 1 (MPPI) and K = 10. Since
+MPPI does not iterate until convergence, it selects a suboptimal
+path. More details on this setup and comparison with Log-
+MPPI [8] are in Table I, where we show that increasing K
+improves the average cost, at the expense of runtime. The
+reported results are averaged over 3 seeds.
+
+VI. CONCLUSION
+In this letter, we showed that MPPI admits a direct variational and optimization-theoretic interpretation. By lifting constrained trajectory optimization to a KL-regularized problem over distributions, we obtained a free-energy objective whose optimization over a parametric sampling family yields
+
+REFERENCES
+[1] Z. I. Botev, D. P. Kroese, R. Y. Rubinstein, and P. L’ecuyer, “The crossentropy method for optimization,” in Handbook of Statistics, vol. 31. Amsterdam, The Netherlands: Elsevier, 2013, pp. 35–59.
+[2] N. Hansen, S. D. Mu¨ller, and P. Koumoutsakos, “Reducing the time complexity of the derandomized evolution strategy with covariance matrix adaptation (CMA-ES),” Evol. Comput., vol. 11, no. 1, pp. 1–18, Mar. 2003.
+[3] H. Homburger, F. Messerer, M. Diehl, and J. Reuter, “Optimality and suboptimality of MPPI control in stochastic and deterministic settings,” IEEE Control Syst. Lett., vol. 9, pp. 763–768, 2025.
+[4] K. Honda, “Model predictive control via probabilistic inference: A tutorial,” 2025, arXiv:2511.08019.
+[5] W. Jung, U. A. Mishra, N. Ranawaka Arachchige, Y. Chen, D. Xu, and S. Kousik, “Joint model-based model-free diﬀusion for planning with constraints,” 2025, arXiv:2509.08775.
+[6] S. Levine, “Reinforcement learning and control as probabilistic inference: Tutorial and review,” 2018, arXiv:1805.00909.
+[7] M. Miyashita, S. Yano, and T. Kondo, “Mirror descent search and its acceleration,” Robot. Auto. Syst., vol. 106, pp. 107–116, Aug. 2018.
+[8] I. S. Mohamed, K. Yin, and L. Liu, “Autonomous navigation of AGVs in unknown cluttered environments: Log-MPPI control strategy,” IEEE Robot. Autom. Lett., vol. 7, no. 4, pp. 10240–10247, Oct. 2022.
+[9] M. Okada and T. Taniguchi, “Acceleration of gradient-based path integral method for eﬃcient optimal and inverse optimal control,” in Proc. IEEE Int. Conf. Robot. Autom. (ICRA), May 2018, pp. 3013–3020.
+[10] M. Okada and T. Taniguchi, “Variational inference mpc for Bayesian model-based reinforcement learning,” in Proc. Conf. Robot Learn., 2020, pp. 258–272.
+[11] C. Pan, Z. Yi, G. Shi, and G. Qu, “Model-based diﬀusion for trajectory optimization,” in Proc. Adv. Neural Inf. Process. Syst. 37, 2024, pp. 57914–57943.
+[12] J. Staines and D. Barber, “Optimization by variational bounding,” in Proc. ESANN, 2013, pp. 473–478.
+[13] N. Wagener, C.-A. Cheng, J. Sacks, and B. Boots, “An online learning approach to model predictive control,” 2019, arXiv:1902.08967.
+[14] G. Williams, A. Aldrich, and E. Theodorou, “Model predictive path integral control using covariance variable importance sampling,” 2015, arXiv:1509.01149.
+[15] G. Williams, P. Drews, B. Goldfain, J. M. Rehg, and E. A. Theodorou, “Aggressive driving with model predictive path integral control,” in Proc. IEEE Int. Conf. Robot. Autom. (ICRA), May 2016, pp. 1433–1440.
+[16] G. Williams et al., “Information theoretic MPC for model-based reinforcement learning,” in Proc. IEEE Int. Conf. Robot. Autom. (ICRA), May 2017, pp. 1714–1721.
+[17] H. Xue, C. Pan, Z. Yi, G. Qu, and G. Shi, “Full-order samplingbased MPC for torque-level locomotion control via diﬀusion-style annealing,” in Proc. IEEE Int. Conf. Robot. Autom. (ICRA), May 2025, pp. 4974–4981.
+[18] Z. Yi, C. Pan, G. He, G. Qu, and G. Shi, “COVO-MPC: Theoretical analysis of sampling-based MPC and optimal covariance design,” in Proc. 6th Annu. Learn. Dyn. & Control Conf., 2024, pp. 1122–1135.
+
+Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:22:23 UTC from IEEE Xplore. Restrictions apply.
+
+

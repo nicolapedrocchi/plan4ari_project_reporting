@@ -1,0 +1,144 @@
+PLAN4ARI
+# Deliverable D4.1Updated Scientific Plan for Local and Global Autonomous Motion Planning
+DRAFT OUTLINE
+Planning for Artificial Robotic Intelligence and Beyond
+| Project acronym | Plan4ARI |
+| Project duration | 48 months |
+| Work package / activity | Activity 4 - Local and Global Autonomous Motion Planning |
+| Task basis | Task 4.1 Update of the Scientific Plan with the latest State-of-the-Art Methodologies and Tools for Motion Planning |
+| Activity period | M1-M6 |
+| Suggested delivery point | M6 (derived from Task 4.1 end month; confirm) |
+| Document status | Proposed outline - Version 0.1 |
+| Lead beneficiary | To be confirmed |
+| Dissemination level | To be confirmed |
+
+| Working assumption. This outline is inferred from the Plan4ARI Project Description. The official deliverable title, due date, lead beneficiary and dissemination level should be checked against the final Grant Agreement and consortium decisions. |
+
+Source basis: Plan4ARI Project Description, especially Section E.3 (pp. 38-48), with supporting technical sections A.3-A.6.
+# Document control
+| Version | Date | Author / reviewer | Change description |
+| 0.1 | 20 July 2026 | TBC | Initial draft outline |
+| 1.0 | TBC | TBC | Approved deliverable |
+
+# Purpose of this outline
+The following structure is intended as a writing blueprint for the final deliverable. Each numbered heading may be retained in the final report, while the bullets describe the minimum content, evidence and decisions expected.
+# Proposed table of contents at a glance
+| Section | Purpose |
+| 1. Executive summary | Summarise the latest motion-planning advances and the revised Plan4ARI approach. |
+| 2. Objectives, scenarios and baseline architecture | Restate the motion-planning problem and the original split between Open IPC and Core IPC. |
+| 3. Review methodology and comparison criteria | Define a rigorous and application-oriented review process. |
+| 4. Sampling-based optimal planning state of the art | Update the global/local planning options for high-dimensional robots. |
+| 5. Dynamic replanning and human-aware safety | Assess methods that react to scene evolution while reducing safety-induced idle time. |
+| 6. Model Predictive Control for trajectory generation and micro-interpolation | Update the methods suitable for Core IPC reference generation. |
+| 7. Software frameworks and industrial toolchain | Compare available planners, optimisation libraries and integration environments. |
+| 8. Gap analysis and revised architecture | Identify the innovation boundary and update the end-to-end planning stack. |
+| 9. Selected methodologies and fallback options | Provide an auditable method-selection record. |
+| 10. Benchmarking and evaluation plan | Define the experiments that will guide implementation and prove progress. |
+| 11. Integration roadmap, risks and compliance | Translate the updated plan into implementable stages. |
+| 12. Conclusions and approved updates | Close the review with specific decisions and next actions. |
+
+# Detailed writing outline
+# 1. Executive summary
+Section purpose: Summarise the latest motion-planning advances and the revised Plan4ARI approach.
+Selected changes concerning informed sampling, multi-path reuse, dynamic replanning, human-aware planning and MPC micro-interpolation.
+Expected effects on feasibility, optimality, computation time, safety and integration.
+Critical decisions for Tasks 4.2-4.7.
+# 2. Objectives, scenarios and baseline architecture
+Section purpose: Restate the motion-planning problem and the original split between Open IPC and Core IPC.
+Planning for teams of mobile manipulators and industrial arms in dynamic, human-shared environments.
+Offline planning, online replanning and hard-real-time/high-rate reference generation.
+Original use of sample-based informed planning plus Model Predictive Control.
+Joint and Cartesian interfaces, residual degrees of freedom and visual-servoing requirements.
+Project targets: autonomous plan generation, about 30% reduction in interaction-task execution time and safe velocity adaptation.
+# 3. Review methodology and comparison criteria
+Section purpose: Define a rigorous and application-oriented review process.
+Literature and software search sources, inclusion criteria and benchmark hardware.
+Metrics: success rate, initial-solution time, convergence, path cost, replan latency, memory, CPU load, scalability, smoothness and constraint satisfaction.
+Dynamic-scene and multi-agent test categories.
+Reproducibility, open-source maturity, licensing and industrial support.
+# 4. Sampling-based optimal planning state of the art
+Section purpose: Update the global/local planning options for high-dimensional robots.
+RRT/RRT*, PRM and informed variants.
+Admissible informed sets, local exploitation, adaptive exploration/exploitation and asymptotic guarantees.
+Anytime and incremental planning.
+Multi-query and path-reuse/roadmap strategies.
+Multi-robot and mobile-manipulator configuration-space challenges.
+CPU versus GPU approaches and project comparison boundaries.
+# 5. Dynamic replanning and human-aware safety
+Section purpose: Assess methods that react to scene evolution while reducing safety-induced idle time.
+Reactive, proactive and hybrid human-aware planning.
+Prediction uncertainty for human and movable-object motion.
+Safety-aware cost functions informed by ISO/TS 15066 concepts.
+Collision avoidance versus safety-system intervention minimisation.
+Path switching, repair and emergency fallback strategies.
+Interfaces to Activity 3 tracking and Activity 2 task replanning.
+# 6. Model Predictive Control for trajectory generation and micro-interpolation
+Section purpose: Update the methods suitable for Core IPC reference generation.
+MPC formulations for constrained trajectory generation rather than only feedback control.
+Dynamic models, prediction horizons, solver choices and warm starts.
+Joint limits, velocity, acceleration, jerk, torque and workspace constraints.
+Online speed adaptation and exploitation of redundant degrees of freedom.
+Visual-servoing and synchronous sensor input.
+Real-time feasibility, determinism and fallback behaviour.
+# 7. Software frameworks and industrial toolchain
+Section purpose: Compare available planners, optimisation libraries and integration environments.
+OMPL and relevant ROS2/MoveIt planning frameworks.
+Optimisation and MPC solver libraries suitable for C++ and hard real-time constraints.
+Digital-twin and COMAU virtualisation support.
+Containerisation and MI.RA/Dexter integration constraints.
+Logging, benchmarking, CI and traceability.
+Recommended evidence / artefacts
+Framework matrix with algorithm coverage, licence, platform, latency and integration effort.
+# 8. Gap analysis and revised architecture
+Section purpose: Identify the innovation boundary and update the end-to-end planning stack.
+Original method versus current state of the art.
+Updated Open IPC modules for asynchronous planning and scene-aware replanning.
+Updated Core IPC MPC micro-interpolator and timing interfaces.
+Path repository/graph and mixed global-local sampling strategy.
+Safety-aware cost and human-motion input.
+Data flow, thread/process allocation and timing budgets.
+# 9. Selected methodologies and fallback options
+Section purpose: Provide an auditable method-selection record.
+Selected sampling and path-reuse approach.
+Selected dynamic-replanning and safety-aware optimisation approach.
+Selected MPC formulation, solver and model fidelity.
+Fallbacks for infeasible optimisation, missed deadlines or degraded sensing.
+Proof/verification obligations for completeness, optimality, stability or constraint satisfaction.
+# 10. Benchmarking and evaluation plan
+Section purpose: Define the experiments that will guide implementation and prove progress.
+At least 50 application scenarios and more than 100 contexts for computation-time evaluation.
+OMPL planners as baseline; explicit rationale for excluding or separately reporting GPU planners.
+Robot classes, DOF, mobile bases, dynamic obstacles and human paths.
+Metrics for planning, replanning, safety interventions, execution time and tracking performance.
+Ablation studies for mixed sampling, path reuse, safety cost and MPC.
+Targets and statistical analysis.
+# 11. Integration roadmap, risks and compliance
+Section purpose: Translate the updated plan into implementable stages.
+Roadmap through algorithm prototype, MI.RA/Dexter integration and Core IPC deployment.
+Interfaces and dependencies with Activities 2, 3, 5 and 7.
+Real-time, computational, cybersecurity and safety risks.
+Standards and risk-analysis assumptions.
+Decision gates and contingency plan.
+# 12. Conclusions and approved updates
+Section purpose: Close the review with specific decisions and next actions.
+Final list of retained and modified methods.
+Approved benchmark and integration plan.
+Open scientific questions and technology watch list.
+Consortium approval record.
+# Completion checklist
+[ ] The final title, due date, lead beneficiary and dissemination level are confirmed.
+[ ] All claims are traceable to project records, scientific sources or test evidence.
+[ ] Dependencies and contributions from other activities are explicitly acknowledged.
+[ ] KPIs have definitions, baselines, measurement methods and responsible owners.
+[ ] Ethics, GDPR, safety, security and IPR considerations are addressed where applicable.
+[ ] The document has passed internal technical, quality and management review.
+# Suggested annexes
+Annex A - Planner and framework comparison matrix.
+Annex B - Benchmark problem catalogue and robot models.
+Annex C - Safety-aware cost-function assumptions.
+Annex D - Open IPC/Core IPC interface and timing budgets.
+Annex E - Search protocol and reviewed references.
+Annex F - Updated activity roadmap and decision gates.
+# Source mapping
+Primary project-description basis: Section E.3, pp. 42-44; technical baseline in Section A.4, pp. 11-16.
+Boundary note: The document updates the research and benchmark plan. Algorithmic results, MPC implementation and MI.RA/Dexter/Core IPC integration belong to Tasks 4.2-4.7.

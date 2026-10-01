@@ -1,0 +1,30 @@
+\section{Integration roadmap, risks and compliance}\label{sec:roadmap}
+
+\subsection{Mapping onto Tasks 4.2--4.7}
+\begin{itemize}
+\item \textbf{T4.2} (M4--M24): informed sampling-based planner with mixed sampling and multi-path reuse (as proposed); in addition, vectorised CPU primitives, transfer motions for reconfiguration, station-level feasibility (P2--P3) and the MPPI look-ahead (P4), including its guidance by the sampling-based planner.
+\item \textbf{T4.3} (M4--M24): path--velocity MPC micro-interpolator (P5) with speed band, hard limits, Cartesian/joint interfaces and synchronous sensor input (as proposed); interface to the MPPI layer.
+\item \textbf{T4.4} (M25--M30): integration of P1--P4 as dockerised MI.RA/Dexter actions.
+\item \textbf{T4.5} (M31--M36): integration of P5 in the COMAU Core IPC.
+\item \textbf{T4.6} (M4--M36): continuous integration, including the benchmark repository.
+\item \textbf{T4.7} (M1--M6, then continuous): application catalogue, scenarios and protocol (Section~\ref{sec:bench}).
+\end{itemize}
+Interfaces and dependencies: Activity~2 (task alternatives, multi-robot allocation), Activity~3 (registration, human tracking, seam sensing), Activity~5 (motion/neural control in the Core IPC), Activity~7 (demonstrator).
+
+\subsection{Risks}
+\begin{table}[h]
+\centering\small
+\caption{Main technical risks and mitigations.}\label{tab:risks}
+\begin{plangrid}{|L{3.6cm}|Y|}
+\planheadrow \thead{Risk} & \thead{Mitigation} \\ \hline
+Novelty boundary: null-space sampling MPPI alone is not new~\cite{wang2024constrainedpi} & Claim the combination of online null-space look-ahead with solution-class modes, planned transfers and restarts, speed band, task localisation and Open/Core IPC deployment \\ \hline
+Compute budget of MPPI on industrial CPUs & Early micro-benchmark in T4.2; CPU SIMD primitives; GPU as optional track \\ \hline
+Accuracy of mobile platforms on large parts~\cite{zhao2021mobilemachining} & Local registration and seam tracking (Activity 3) as prerequisite \\ \hline
+Process coupling (restart overlap, speed tolerance) & Parameters agreed with welding process experts; parametric in the planner \\ \hline
+KPI comparability (GPU planners excluded from the OMPL comparison) & CPU-first design, separate GPU track \\ \hline
+Certification of stochastic planners & Hard limits and safety enforced only in the deterministic Core IPC; repeatable sampling and logging \\ \hline
+\end{plangrid}
+\end{table}
+
+\subsection{Standards and compliance}
+ISO 10218 and ISO/TS 15066 for collaborative operation (speed and separation monitoring, power and force limiting); welding quality requirements (process qualification, repeatability of the executed trajectory); EU AI Act requirements on transparency and safety of AI components, as foreseen by the Project Description.

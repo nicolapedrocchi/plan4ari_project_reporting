@@ -1,0 +1,555 @@
+Proceedings of Machine Learning Research vol vvv:1–12, 2025
+
+Contingency Constrained Planning with MPPI within MPPI
+
+Leonard Jung Alexander Estornell Michael Everett Northeastern University, Boston, MA 02215, USA
+
+JUNG.LE@NORTHEASTERN.EDU ESTORNELL.A@NORTHEASTERN.EDU
+M.EVERETT@NORTHEASTERN.EDU
+
+arXiv:2412.09777v1 [cs.RO] 13 Dec 2024
+
+Abstract
+For safety, autonomous systems must be able to consider sudden changes and enact contingency plans appropriately. State-of-the-art methods currently find trajectories that balance between nominal and contingency behavior, or plan for a singular contingency plan; however, this does not guarantee that the resulting plan is safe for all time. To address this research gap, this paper presents Contingency-MPPI, a data-driven optimization-based strategy that embeds contingency planning inside a nominal planner. By learning to approximate the optimal contingency-constrained control sequence with adaptive importance sampling, the proposed method’s sampling efficiency is further improved with initializations from a lightweight path planner and trajectory optimizer. Finally, we present simulated and hardware experiments demonstrating our algorithm generating nominal and contingency plans in real time on a mobile robot. Experiment Video Video will be added soon Keywords: Contingency planning, model-predictive control, data-driven optimization, robotics
+1. Introduction
+Autonomous systems in real environments need to be able to handle sudden major changes in the operating conditions. For example, a car driving on the highway may need to swerve to safety if a collision occurs ahead, or a humanoid robot may need to grab hold of a railing if its foot slips on the stairs. Since there may be only a fraction of a second to recognize and respond to such events, this paper aims to develop an approach for always ensuring a contingency plan is available and can be immediately executed, if necessary.
+A key challenge in this problem is to ensure a contingency plan always exists, without impacting the nominal plan too much. In standard approaches, where the nominal planner does not account for contingencies, the system could enter states from which no contingency plan exists; this may be tolerable if the failure event never occurs while the system is in one of those states but could lead to major safety failures in the worst case. Kim et al. (2021) considered these backup plans by adding weighted terms to the cost function, which encourage staying out of these contingencyfree areas, but does not have any guarantee. Alternatively, the methods of Alsterda and Gerdes (2021) and Chen et al. (2022) explicitly plan alternative trajectories through a branching scheme and optimize both a nominal and set of contingency trajectories simultaneously. However, again, these methods must balance between the nominal trajectory cost and the tree of backup plans. Chen et al. (2022); Li et al. (2023); Peters et al. (2024) all addressed risk-aware contingency planning with stochastic interactions with other agents; thus, these algorithms aim to minimize risk and cost over a tree of possible future scenarios, again only providing a balance between aggressive and safe
+. Distribution Statement A. Approved for public release: distribution unlimited . https://github.com/neu-autonomy/Contingency-MPPI
+© 2025 L. Jung, A. Estornell & M. Everett.
+
+JUNG ESTORNELL EVERETT
+
+behavior. Tordesillas et al. (2019) solved a contingency constrained problem by planning both an optimistic plan and a contingency plan that branches off to stay in known-free space. However, for more complicated safety requirements (e.g., a collection of safe regions that must remain reachable within a given time limit), the mixed integer programming problem proposed in that work becomes too expensive to solve in real time.
+This leads to another important challenge: ensuring computational efficiency despite needing to generate both a nominal and a contingency plan from each state along the way. One approach would be to use exact reachability algorithms (e.g., Bansal et al., 2017; Wang et al., 2020) to keep the planner out of contingency-free areas. However, computing the reachable sets is expensive, not strictly necessary, and would still require subsequently finding the contingency trajectories. Instead, this paper proposes to use an inexpensive contingency planner embedded inside the nominal planner. If the contingency planner finds a valid contingency plan, the nominal planner knows that state is acceptable, and the corresponding contingency plan is already available. Meanwhile, if the contingency planner fails to find a trajectory within a computation budget, the nominal planner can quickly (albeit conservatively) update its plans to avoid that state. To handle these discrete contingency events on top of generic nominal planning problems, our method, Contingency-MPPI, builds on model-predictive path integral (MPPI) control.
+To summarize, this paper’s contributions include: (i) a planning algorithm that embeds contingency planning inside a nominal planner to ensure that a contingency plan exists from every state along the nominal plan, (ii) extensions of this planner using lightweight optimization problems to improve the sample-efficiency via better initial guesses, and (iii) demonstrations of the proposed method in simulated environments and on a mobile robot hardware platform to highlight the realtime implementation.
+
+2. Problem Formulation
+
+Denote a general nonlinear discrete-time system
+
+xt+1 = f (xt, ut) with state, xt ∈ Rnx, and control, ut ∈ Rnu at time t. To indicate a trajectory, we use colon notation (e.g., x0:T = {x0, x1, . . . , xT }) and T -
+
+step dynamics xt+T = f (xt, u0:T ). Additionally U ∈ RnuT and X ∈ RnxT indicate the state and control trajectory reshaped into a vector, and Σ ∈ RnuT ×nuT represents the covariance matrix of the reshaped control
+trajectory.
+The contingency-constrained planning problem is
+
+Figure 1: At each step along the nominal plan, a contingency plan must exist to reach a safe state within a time horizon.
+
+to find a nominal trajectory, u0:T , to minimize cost Jnom, along with contingency trajectories {u00:Tc, . . . , uT0:Tc} that drive the system into a safe set, S, within Tc steps, from each state along the nominal trajectory:
+
+min
+
+Jnom(x0, u0:T )
+
+u0:T ,{u00:Tc ,...,uT0:Tc }
+
+s.t.
+
+xt+1 = f (xt, ut)
+
+∃τ
+
+≤
+
+Tc
+
+s.t.
+
+f
+
+(x
+
+i
+
+,
+
+u
+
+i 0:τ
+
+)
+
+∈
+
+S
+
+(1a)
+
+∀t ∈ [0, . . . , T ]
+
+(1b)
+
+∀i ∈ [0, . . . , T ].
+
+(1c)
+
+Other common costs/constraints (e.g., obstacle avoidance, control limits), can be added as desired.
+
+2
+
+CONTINGENCY-MPPI
+
+3. Contingency-MPPI
+
+Ignoring the contingency constraint Eq. (1c), MPPI is a powerful method for solving Eq. (1) when the dynamics or costs are non-convex. This section shows how to extend MPPI to handle Eq. (1c) as well, by nesting another sampling process into MPPI. First, we review the vanilla MPPI algorithm in Section 3.1, then describe our Nested-MPPI in Section 3.2. To increase sampling efficiency, a pathfinding and trajectory optimization step (Section 3.3) is used to seed Nested-MPPI (Section 3.4) with ancillary controllers. This approach is summarized in Fig. 2.
+
+Contingency-MPPI
+
+Path1 PolyDecomp NMPC
+
+Topo
+
+PolyDecomp NMPC
+
+PRM Path2
+
+Patha PolyDecomp NMPC
+
+Goal
+
+Nested MPPI
+
+Low-Level Controller
+
+Perception
+Figure 2: Planning Pipeline. Our Contingency-MPPI first runs (1) TopoRPM to find multiple paths through the environment (Section 3.3.1), (2) NMPC to find control sequences for each path (Section 3.3.2), and (3) Nested-MPPI that utilizes these control sequences as modes (Section 3.2) to find a trajectory for the vehicle to track.
+
+3.1. Background: Model Predictive Path Integral Control
+
+To summarize MPPI following Asmar et al. (2023), consider the entire control trajectory as a single input V ∼ N (U , Σ), sampled from distribution Q with density
+q(V ) = ((2π)nuT |Σ|)− 12 e− 12 (V −U)T Σ−1(V −U), (2)
+
+where U , Σ are the mean and covariance of Q. The objective of MPPI is to minimize the KLdivergence between this proposed distribution, Q, and an (unknown) optimal control distribution Q∗, defined with respect to a cost function of the form
+
+J (X, U ) = EQ[ϕ(X) + c(X) + λ2 U T Σ−1U ]. (3)
+The optimal control distribution Q∗ has density q∗(V ) = 1η (− 1λ S(V ))p(V ), based on a statedependent cost, S(V ) = ϕ(X) + c(X) and a nominal control distribution, P, with density
+
+p(V ) = ((2π)nuT |Σ|)− 12 e− 12 (V −U˜ )T Σ−1(V −U˜ ). (4)
+
+Here, η is a normalizing constant, λ is the inverse temperature, and U˜ is the base control, which is
+usually either zero or a nominal distribution from iterations of adaptive importance sampling. Then, to find the optimal control trajectory we can minimize the KL-divergence between Q and Q∗,
+
+U ∗ = arg min DKL(Q∗||Q).
+
+(5)
+
+U
+
+3
+
+JUNG ESTORNELL EVERETT
+
+Using adaptive importance sampling, the optimal control can be approximated by drawing N samples from a distribution QUˆ with proposed input Uˆ ,
+
+U ∗ = EQ[w(V )V ],
+
+(6)
+
+w(V ) = η1 e− λ1 (S(V )+λ(Uˆ −U˜ )T Σ−1V ) (7)
+
+η = e− λ1 (S(V )+λ(Uˆ −U˜ )T Σ−1V )dV . (8)
+
+(6) finds an (information-theoretic) optimal open-loop control sequence that can be implemented in a receding horizon by shifting one timestep ahead and re-running the algorithm. As in Asmar et al. (2023), we weigh the control cost by a factor γ = λ(1 − α) and shift all sampled trajectory costs by the minimum sampled cost, for numerical stability.
+
+3.1.1. ENFORCING HARD CONSTRAINTS IN MPPI
+
+While MPPI does not explicitly handle constraints, such as avoiding obstacles or the existence
+
+of a contingency plan, one can add terms to the objective with infinite cost when constraints are
+
+violated. For example, with a nominal cost Snom(V ) and N constraints, the augmented cost is
+
+S(V ) = Snom(V ) +
+
+N k=1
+
+Sckonstraint(V
+
+),
+
+where
+
+Sconstraint k (V ) = 0, if constraint k is satisfied . (9) ∞, o.w.
+
+When the constraints are satisfied, the trajectory cost (and its weight in importance sampling) depends only on the nominal cost, such as minimum time or distance to the goal. If the constraints are not satisfied, the trajectory has infinite cost and receives zero weight in importance sampling. Thus, only trajectories meeting all constraints are considered, and their weights depend solely on the nominal cost. If no trajectory satisfies all constraints in an iteration, all samples get zero weight, and the mean control trajectory remains unchanged for the next MPPI iteration. However, if any trajectory met the constraints in the previous step, the executed control trajectory will still be safe
+
+3.2. Nested-MPPI
+
+Unsafe Trajectory due to obstacle collision
+
+Unsafe Trajectory due to some states not having a contingency
+Figure 3: Nested-MPPI computes reachability cost by sampling contingency trajectories (dashed lines) along nominal trajectory rollouts (solid lines). Nominal trajectories 0, 1, and 4 collided with an obstacle or did not find a valid contingency from every state, and thus have +∞ cost.
+4
+
+CONTINGENCY-MPPI
+
+Algorithm 1: Nested-MPPI
+
+Algorithm 2: FindContingencyPlan
+
+1 Input: x0, U , [U a], Σ 2 Output: Nominal & contingency control
+sequences 3 Parameters: K, T, L (nominal); f, G,
+(system); c, ϕ, λ, α (cost)
+
+1 Input: X: State sequence 2 Output: Contingency control sequence &
+score 3 Parameters: Kc, Tc, Lc, Ts (contingency);
+f, G, melite (system/sampling); ε, λ, α (costs)
+
+4 U ′ ← U ; Σ′ ← Σ
+
+4 U′ ← 0
+
+5 for l ← 0 to L − 1 do // AIS loop 5 for i ← 0 to Ts − 1 do
+
+6 for k ← 0 to K − 1 + card([U a]) do 6 for l ← 0 to Lc − 1 do
+
+7
+
+xk,0 ← x0
+
+7
+
+x ← xi
+
+8
+
+Ek ∼ N (0, Σ′)
+
+8
+
+for k ← 0 to Kc − 1 do
+
+9
+
+if k ≤ K − 1 then U = U ′ + Ek 9
+
+if l = 0 then Ek ∼ U(ulb, uub)
+
+// Ancillary Control
+
+else Ek ∼ N (0, Σ)
+
+10
+
+else U = [U a]k−(K−1)
+
+10
+
+for i ← 0 to T − 1 do
+
+11
+
+for i ← 0 to T − 1 do
+
+11
+
+12
+
+xk,i+1 = xk,i + (f + G (u)) ∆t
+
+xk,i+1 = xk,i + (f + G(u′i + ϵ′i,k))∆t
+
+13
+
+U reachk , Sreach ←
+
+12
+
+Sk ← minζ∈S,x∈Xs ∥x − ζ∥
+
+FindContingencyPlan(X k )
+
+13
+
+if l > 0 then Sk +=
+
+14
+
+if Sreach = 0 then
+
+λ(1 − α)U ′T Σ−1(Ek + U ′ − U )
+
+U contingency ← U reachk
+
+14
+
+if l = 0 then
+
+15
+
+Sk ← Sreach + c(X) + ϕ(X) +
+
+λ(1 − α)U ′T Σ−1(Ek + U ′ − U )
+
+16 if l < L − 1 then U ′, Σ′ ← AIS() 15
+
+U best ← selectBest(U , melite, S) U ′, Σ′ ← Mean(U best), Cov(U best)
+else if l < Lc − 1 then
+
+17 ρ ← min(S)
+
+U ′, Σ′ ← AIS()
+
+18 η ←
+
+k=1 K exp
+
+−
+
+1 λ
+
+(Sk
+
+−
+
+ρ)
+
+19 for k ← 0 to K − 1 do
+
+20 U +=
+
+16 if min(ci) < ε then Si,reach ← 0 else Si,reach ← ∞
+17 return U 0′ , i=0 Tsafe−1 Si,reach
+
+1 η
+
+exp
+
+−
+
+1 λ
+
+(Sk
+
+−
+
+ρ)
+
+(Ek + U ′ − U )
+
+21 return U , U contingency
+
+This section introduces Nested-MPPI, which is summarized in Algorithm 1. This algorithm is based on the MPPI in Alsterda and Gerdes (2021) and allows for ancillary controllers as proposed in Trevisan and Alonso-Mora (2024). Our key innovation begins on Line 13, where a second level of MPPI executes in each state along each rollout of the nominal MPPI. This second level, described in Algorithm 2, optimizes for a contingency plan (with a different cost function than the nominal plan) as a way of evaluating the reachability constraint, Eq. (1c).
+
+To both find contingency trajectories and evaluate whether the reachability constraint (1c) is
+
+satisfied for any control sequence, we first roll out each control sequence U i by passing it through
+
+the zero-noise nonlinear dynamics model to get the state sequence Xi. Then, at each state xt
+
+for t = 0, . . . , Ts − 1, we run Lc rounds of adaptive importance sampling MPPI with Nc sam-
+
+ples
+
+and
+
+Tc
+
+timesteps
+
+starting
+
+at
+
+xt
+
+to
+
+generate
+
+contingency
+
+state
+
+[X
+
+s 0
+
+,
+
+.
+
+.
+
+.
+
+,
+
+X
+
+s L×
+
+Nc
+
+]
+
+and
+
+control
+
+[U s0, . . . , U L×Nc s ] trajectories (lines 6-15 in Alg. 2). To encourage these contingency trajectories to
+
+5
+
+JUNG ESTORNELL EVERETT
+
+reach safe states within Tc timesteps, we use state-dependent cost
+
+ccontingency(Xs) = min s ∥x − ζ∥.
+
+(10)
+
+ζ ∈S ,x∈X
+
+Then, as seen in Figure 3, if any of the contingency trajectories successfully reaches a safe state within Tc timesteps, we mark that state xt along Xi as safe (green). If all states along Xi are marked as safe, then we mark Xi and its corresponding control U i as safe; otherwise, we mark the trajectory as unsafe, and add +∞ to its corresponding cost. In Algorithm 2 Line 14, to initialize
+the proposed distribution for contingencies at each state, a number of sample control trajectories are drawn from a uniform distribution along control bounds ut,0:Tc ∼ U (ulb, uub), and the crossentropy method is used on the best m trajectories to determine an initial mean and covariance.
+
+3.3. Improving the Sampling Efficiency of Nested-MPPI: Frontend
+Although Algorithm 1 considers all costs and constraints from Eq. (1), the sampling process can result in many or even all trajectories with infinite costs (if the sampling distribution is far from the optimal distribution), which leads to uninformed updates to the distribution. To remedy this, one may simply sample more U sequences; however, each additional sequence requires computing Sreach, which requires an additional Ts MPPI computations. Thus, rather than simply increasing the number of samples, we propose to approximate locally optimal U and consider them as a new sampling distribution(s) into Algorithm 1, as described in Section 3.4. First, we find several different paths between the start and goal. For each path, we then perform a convex decomposition to find an under approximation of the safe space, and finally perform a nonlinear MPC to solve for a candidate control sequence.
+
+3.3.1. TOPO-PRM
+To find several alternative paths through the workspace, we leverage Topo-PRM proposed in Zhou et al. (2020). As Topo-PRM finds a collection of topologically distinct paths through the environment, our planner can ”explore” the free-space and return multiple promising guiding paths. However as Topo-PRM does not consider safe zones, it may return paths that are not near safe zones, and thus no contingencies exist. Thus, we modify the algorithm to sample randomly from safe states p fraction of the time to bias our roadmap to find paths that include safe states. To further bias the paths towards safe zones, denoting Vmax as the maximum speed of our vehicle in the creation of our workspace occupancy grid, we add pseudo-obstacles by marking occupied voxels that are farther than rmax = VmaxTs∆t away from any given safe zone.
+
+3.3.2. NONLINEAR MPC
+To transform each path into an ancillary control trajectory, we first find the point E that is rmax along the path, and then perform a convex decomposition using the approach from Liu et al. (2017) of the free space along the path from our start point S to E. Next, we find M knot points by discretizing M − 1 points along the path from S to E. Denoting Aip < bi the polyhedral constraint in which point pi lies within, we solve the following nonlinear programming problem to recover a candidate ancillary control trajectory:
+6
+
+CONTINGENCY-MPPI
+
+N
+Uanci = arg min ∥xi − xgoal∥
+X,U i=0
+s.t. Aiβxi < bi xi+1 = f (xi, ui) (11) xlb < xi < xub ulb < ui < uub ∀i ∈ {0, M } x0 = xstart,
+where β ∈ Rnx×nx selects elements of the state space present in the workspace (i.e., pi = βxi).
+
+3.4. Improving the Sampling-Efficiency of Nested-MPPI: Backend
+
+To use each of the control sequences found in Section 3.3, we sample around the control sequences and insert the resulting set of samples 1 as biases to MPPI as in Trevisan and Alonso- 2 Mora (2024). As seen in Alg. 3, we append each of the B control sequences from 3 MPC to a list of ancillary control sequences. Then, in Alg. 1, the control sequence is used 4 as a mean for an individual distribution, V ∼ 5
+6
+N (U anci, Σ), where Σ is the current covariance
+7
+of our MPPI algorithm, and sample Na samples. For the rest of the N − B · Na samples the current MPPI running mean is used (Algorithm 1 Lines 9-10). Intuitively, this is equiva- 8 lent to inserting each bias as a mode in a Gaus- 9 sian mixture model. 10
+11
+4. Experiments
+
+Algorithm 3: Contingency-MPPI
+Input: xs, xg, U init, Σ Output: Nominal & contingency control
+sequences Parameters: f, G, (system); S, O,
+(environment) while task not completed do
+P x, P y ← Topo-PRM(x, S, O) for s ← 0 to B do
+A, b ← PolyDecomp(O); U anci ← NMPC(f, G, A, b) for n ← 0 to Na do
+V ∼ N (U anci, Σ) [U a].append(V) U , U contingency ← Nested-MPPI(xs, U init, [U a], Σinit) return U , U contingency
+
+We demonstrate Contingency-MPPI on a hide-and-seek task in both simulation and hardware to highlight it’s ability to (1) ensure a contingency plan exists at all time and (2) run in real-time within an autonomy stack. Critically, our results show that Contingency-MPPI not only guarantees the existence of contingencies but computes the trajectories as well. At a moment’s notice, our planner can switch to its contingency behavior without needing to replan a new trajectory.
+
+4.1. Implementation Details
+As discussed in Asmar et al. (2023), multiple adaptive importance sampling methods may be used; we chose to use the cross-entropy method for its simplicity and speed. To enable real-time computation, each iteration of lines 6-15 in Alg. 1 is batched using JAX (Bradbury et al., 2018). Additionally,
+
+7
+
+JUNG ESTORNELL EVERETT
+
+Reached Goal Rate (%) ↑ Unsafe States (%) ↓
+Average Timestep To Goal ↓ Finite Cost Sampling (%) ↑
+
+Contingency-MPPI Variants
+
+AIS-MPC MPC Base
+
+92.0 69.3 44.0
+
+0.0
+
+0.0 0.0
+
+62.9 63.1 78.6
+
+53.7 55.0 47.4
+
+MPPI 100.0
+4.7 61.5 N/A
+
+Table 1: Simulation Results over 150 environments. As each environment was randomly generated, a trajectory to the goal with contingency trajectories is not guaranteed to exist.
+
+each iteration of lines 5-16 and 8-13 in Alg. 2 are also batched. Thus, the Nested-MPPI algorithm run time scales roughly by L(T + Ls(Tc)). For longer time horizons, we treated the control sequence and state sequence as a reference trajectory for a lower-level controller (iLQG, Todorov and Li, 2005) to track. To solve the shooting NMPC problem, we used CasADi (Andersson et al., 2019) and SNOPT (Gill et al., 2005).
+
+4.2. Hide and Seek
+
+The experimental environment consists of several safe positions p = [x, y], a start pose, an end
+
+position, and several obstacles. The objective is to control a differential-drive car from the start
+
+pose to the end position in minimum time, while satisfying the reachability constraint. Thus, the
+
+nominal cost is
+T −1
+
+cnom(X) = (xt − xgoal)T Q(xt − xgoal).
+
+(12)
+
+t=0
+
+We assume the location of safe positions is known, but the robot has a limited sensing horizon and thus operates with unknown obstacles. To handle this, an additional constraint is added to the cost function:
+
+cknown(X) = 0 x exists in known space ∀t ∈ {0, . . . , Tsafe − 1} , (13) ∞ o.w
+
+which ensures all states i = 0, . . . , Tsafe in the nominal trajectories remain in the known region.
+
+4.3. Simulation Results
+We ran 3 variants of our algorithm against a set of 150 randomly generated problems: the MPPI algorithm is the original MPPI algorithm considering only the nominal cost, and not the reachability safety constraint; Base algorithm is the Nested-MPPI algorithm; MPC includes MPC seeding with Nested-MPPI; AIS-MPC additionally considers adaptive importance sampling for the branching contingency control trajectories. The proposed methods always provide a contingency path to a safe zone anywhere along its trajectory (0% unsafe states), while MPPI alone enters unsafe states. Additionally, Table 1 highlights the advantage of using the topological NMPC frontend and AIS branched Contingency-MPPI in terms of successful solve, given the same sampling parameters. An example run in Fig. 4 compares AIS-MPC and vanilla MPPI. Our Contingency-MPPI always has a contingency trajectory to a safe zone, while the vanilla MPPI violates this safety condition for
+
+8
+
+CONTINGENCY-MPPI
+Contingency-MPPI
+MPPI
+Safe state: Unsafe State: Contingency: Start: Goal: Safe Region:
+Figure 4: Example run from the simulation environment, showing the path the robot traversed and a single contingency trajectory at each state that would have been able to reach a safe state within Tc timesteps. While Contingency-MPPI guides the nominal plans such that a contingency plan always exists, MPPI drives the systems into unsafe states.
+Figure 5: Zooming into a particular timestep of Contingency-MPPI, there may be several nominal rollouts for which valid contingencies exist for every timestep (3 such rollouts are shown here). several time steps. Fig. 5 provides a closer look at the rollouts under consideration at a particular timestep of AIS-MPC.
+9
+
+JUNG ESTORNELL EVERETT
+
+Contingency-MPPI Goal MPPI
+
+Goal
+
+Safe Zone:
+
+Current Position: Contingency: Best Rollout:
+
+Figure 6: Example from Hardware Experiment. (Left) Best rollout for Contingency-MPPI vs MPPI at t = 0 with contingency trajectories at each timestep. (Right) Snapshot view of robot executing Contingency-MPPI.
+4.4. Hardware Results
+For the hardware experiments, we ran Contingency-MPPI on an Alienware Intel NUC 11 with an i7 processor and RTX 2060 GPU onboard our customized Agile-X Scout Mini platform with an Ouster OS1-32 3D lidar sensor. For robot localization and occupancy map creation, we ran direct lidarinertial odometry (DLIO, Chen et al., 2023) on the same computer as the planner. A frame from an example trial is shown in Fig. 6 with video results in the supplementary material. ContingencyMPPI provides contingencies to the safe zones at every timestep along the nominal plan, while vanilla MPPI’s rollout does not. The hardware experiments were conducted at varying speeds from 1-3 m/s with a varying number of obstacles, and all trials were conducted without a prior obstacle map; thus, our algorithm was capable of running in unknown environments and in real time.
+5. Summary
+This paper presented a method to solve contingency-constrained planning problems, enforcing the existence of a finite-time contingency trajectory at all timesteps along our robot’s planned trajectory. The proposed algorithm, Contingency-MPPI, handles this constraint with adaptive importance sampling along each control trajectory. To improve sampling efficiency, the approach includes a separate MPC process to seed the MPPI modes. Finally, we demonstrate Contingency-MPPI both in simulation and hardware. Future work will consider high-dimensional dynamics, where we expect the required sampling density to greatly increase. Similarly, we plan to investigate incorporating other types of contingency behaviors, such as lane weaving on a highway or staying close to a shoulder along a road.
+Acknowledgments
+This work was supported by award W911NF-24-2-006.
+10
+
+CONTINGENCY-MPPI
+References
+John P Alsterda and J Christian Gerdes. Contingency model predictive control for linear timevarying systems. arXiv preprint arXiv:2102.12045, 2021.
+Joel A E Andersson, Joris Gillis, Greg Horn, James B Rawlings, and Moritz Diehl. CasADi – A software framework for nonlinear optimization and optimal control. Mathematical Programming Computation, 11(1):1–36, 2019. doi: 10.1007/s12532-018-0139-4.
+Dylan M Asmar, Ransalu Senanayake, Shawn Manuel, and Mykel J Kochenderfer. Model predictive optimized path integral strategies. In 2023 IEEE International Conference on Robotics and Automation (ICRA), pages 3182–3188. IEEE, 2023.
+Somil Bansal, Mo Chen, Sylvia Herbert, and Claire J. Tomlin. Hamilton-jacobi reachability: A brief overview and recent advances. In 2017 IEEE 56th Annual Conference on Decision and Control (CDC), pages 2242–2253, 2017. doi: 10.1109/CDC.2017.8263977.
+James Bradbury, Roy Frostig, Peter Hawkins, Matthew James Johnson, Chris Leary, Dougal Maclaurin, George Necula, Adam Paszke, Jake VanderPlas, Skye Wanderman-Milne, and Qiao Zhang. JAX: composable transformations of Python+NumPy programs, 2018. URL http: //github.com/jax-ml/jax.
+Kenny Chen, Ryan Nemiroff, and Brett T. Lopez. Direct lidar-inertial odometry: Lightweight lio with continuous-time motion correction. In 2023 IEEE International Conference on Robotics and Automation (ICRA), pages 3983–3989, 2023. doi: 10.1109/ICRA48891.2023.10160508.
+Yuxiao Chen, Ugo Rosolia, Wyatt Ubellacker, Noel Csomay-Shanklin, and Aaron D. Ames. Interactive multi-modal motion planning with branch model predictive control. IEEE Robotics and Automation Letters, 7(2):5365–5372, 2022. doi: 10.1109/LRA.2022.3156648.
+Philip E. Gill, Walter Murray, and Michael A. Saunders. Snopt: An sqp algorithm for large-scale constrained optimization. SIAM Rev., 47(1):99–131, jan 2005. ISSN 0036-1445. doi: 10.1137/ S0036144504446096. URL https://doi.org/10.1137/S0036144504446096.
+Hunmin Kim, Hyungjin Yoon, Wenbin Wan, Naira Hovakimyan, Lui Sha, and Petros Voulgaris. Backup plan constrained model predictive control. In 2021 60th IEEE Conference on Decision and Control (CDC), pages 289–294, 2021. doi: 10.1109/CDC45484.2021.9683388.
+Tong Li, Lu Zhang, Sikang Liu, and Shaojie Shen. Marc: Multipolicy and risk-aware contingency planning for autonomous driving. IEEE Robotics and Automation Letters, 2023.
+Sikang Liu, Michael Watterson, Kartik Mohta, Ke Sun, Subhrajit Bhattacharya, Camillo J. Taylor, and Vijay Kumar. Planning dynamically feasible trajectories for quadrotors using safe flight corridors in 3-d complex environments. IEEE Robotics and Automation Letters, 2(3):1688–1695, 2017. doi: 10.1109/LRA.2017.2663526.
+Lasse Peters, Andrea Bajcsy, Chih-Yuan Chiu, David Fridovich-Keil, Forrest Laine, Laura Ferranti, and Javier Alonso-Mora. Contingency games for multi-agent interaction. IEEE Robotics and Automation Letters, 9(3):2208–2215, 2024. doi: 10.1109/LRA.2024.3354548.
+11
+
+JUNG ESTORNELL EVERETT
+E. Todorov and Weiwei Li. A generalized iterative lqg method for locally-optimal feedback control of constrained nonlinear stochastic systems. In Proceedings of the 2005, American Control Conference, 2005., pages 300–306 vol. 1, 2005. doi: 10.1109/ACC.2005.1469949.
+Jesus Tordesillas, Brett T Lopez, and Jonathan P How. Faster: Fast and safe trajectory planner for flights in unknown environments. In 2019 IEEE/RSJ international conference on intelligent robots and systems (IROS), pages 1934–1940. IEEE, 2019.
+Elia Trevisan and Javier Alonso-Mora. Biased-mppi: Informing sampling-based model predictive control by fusing ancillary controllers. IEEE Robotics and Automation Letters, 2024.
+Xinrui Wang, Karen Leung, and Marco Pavone. Infusing reachability-based safety into planning and control for multi-agent interactions. In 2020 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), pages 6252–6259, 2020. doi: 10.1109/IROS45743.2020.9341499.
+Boyu Zhou, Fei Gao, Jie Pan, and Shaojie Shen. Robust real-time uav replanning using guided gradient-based optimization and topological paths. In 2020 IEEE International Conference on Robotics and Automation (ICRA), pages 1208–1214, 2020. doi: 10.1109/ICRA40945.2020. 9196996.
+12
+
+

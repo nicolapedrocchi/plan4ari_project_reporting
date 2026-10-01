@@ -1,0 +1,1116 @@
+Variational Inference MPC for Bayesian Model-based Reinforcement Learning
+
+Masashi Okada Panasonic Corp., Japan okada.masashi001@jp.panasonic.com
+
+Tadahiro Taniguchi Ritsumeikan Univ. & Panasonic Corp., Japan
+taniguchi@em.ci.ritsumei.ac.jp
+
+arXiv:1907.04202v2 [cs.LG] 7 Oct 2019
+
+Abstract: In recent studies on model-based reinforcement learning (MBRL), incorporating uncertainty in forward dynamics is a state-of-the-art strategy to enhance learning performance, making MBRLs competitive to cutting-edge modelfree methods, especially in simulated robotics tasks. Probabilistic ensembles with trajectory sampling (PETS) is a leading type of MBRL, which employs Bayesian inference to dynamics modeling and model predictive control (MPC) with stochastic optimization via the cross entropy method (CEM). In this paper, we propose a novel extension to the uncertainty-aware MBRL. Our main contributions are twofold: Firstly, we introduce a variational inference MPC (VI-MPC), which reformulates various stochastic methods, including CEM, in a Bayesian fashion. Secondly, we propose a novel instance of the framework, called probabilistic action ensembles with trajectory sampling (PaETS). As a result, our Bayesian MBRL can involve multimodal uncertainties both in dynamics and optimal trajectories. In comparison to PETS, our method consistently improves asymptotic performance on several challenging locomotion tasks.
+Keywords: model predictive control, variational inference, model-based reinforcement learning
+1 Introduction
+Model predictive control (MPC) is a powerful and accepted technology for advanced control systems such as manufacturing processes [1], HVAC systems [2], power electronics [3], autonomous vehicles [4], and humanoids [5]. MPC utilizes the speciﬁed models of system dynamics to predict future states and rewards (or costs) to plan future actions that maximize the total reward over the predicted trajectories. Especially for industrial applications, the clear explainability of such a decision-making process is advantageous. Furthermore, in some tasks (e.g., games) [6], planning-based policies of this nature could outperform reactive-policies (e.g., full neural network policies).
+Model-based reinforcement learning (MBRL) methods that employ expressive function approximators (e.g., deep neural networks: DNNs) [7, 8, 9] present appealing approaches for MPC. The main difﬁculty in introducing MPC to practical systems is specifying the forward dynamics models of target systems. However, accurate system identiﬁcation is challenging in many advanced applications. Take robotics for example, where robots encounter ﬂoors and walls, and must be able to manipulate some objects, making the dynamics highly non-linear. The main objective of MBRL is to train approximators of complex dynamics through experiences in real systems. The general procedure of MBRL is summarized as; (1. training-step) train the approximate model with a given training dataset, then (2. test-step) execute the actions (or policies) optimized with the dynamics model in a real environment and augment the dataset with the observed results. The above training and test steps are iteratively conducted to collect sufﬁcient and diverse data so as to achieve the desired performance.
+One feature of MBRL is its considerable sample efﬁciency compared to model-free reinforcement learning (MFRL), which directly trains policies through experiences. In other words, MBRL requires much less test time in real environments. In addition, MBRL beneﬁts from the generalizability of the trained model, which can be easily applied to new tasks in the same system. However, the
+3rd Conference on Robot Learning (CoRL 2019), Osaka, Japan.
+
+(a) Vanilla CEM used in PETS [13]: VIMPC(‘CEM’, ‘Gaussian’, False)
+
+(b) PaETS (Ours): VIMPC(‘CEM’, ‘GMM(M=5)’, True)
+
+Figure 1: Toy task examples that illustrate the concept of our method. The objective of this task is to navigate a point mass on the x-y plane by actuating at = (∆x, ∆y) with maximum magnitude ||at|| = 0.05, while avoiding obstacles •. This task is designed to have multiple (sub-)optimal trajectories. (a) A trajectory found by vanilla CEM. (b) Multiple trajectories found by PaETS that approximates the trajectory posterior via variational inference with a Gaussian mixture model. The line-width indicates the magnitude of mixture-coefﬁcients. Exploiting diverse plans encourages active exploration in state-action spaces, improving the optimization performance and training dataset diversity. The notation of VIMPC() is introduced in Sec. 3.
+
+asymptotic performance of MBRL is generally inferior to that of model-free methods. This discrepancy is primarily due to the overﬁtting of dynamics models to the few data available during initial MBRL steps, which is called the model-bias problem [7]. Several studies have demonstrated that incorporating uncertainty in dynamics models can alleviate this issue. The uncertainty-aware modeling is realized by Bayesian inference employing a Gaussian Process [7], dropout as variational inference [10, 11, 12], or neural network ensembles [13, 14, 15].
+Probabilistic ensembles with trajectory sampling (PETS) [13] is one type of uncertainty-aware MBRL. As an MPC-oriented MBRL method, PETS conducts trajectory optimization via the cross entropy method (CEM) [16] by using trajectories probabilistically sampled from the ensemble networks. Experiments have demonstrated that PETS can achieve competitive performance over stateof-the-art MFRL methods like Soft Actor Critic (SAC) [17], while yielding much higher sample efﬁciency. Since our primary interest is MPC and its application to practical systems, this paper mainly focuses on PETS and treats this method as a strong baseline.
+Considering the success of probabilistic dynamics modeling, incorporating uncertainty in optimal trajectories appears very promising for MBRL. However, an optimization scheme that can utilize uncertainty has not yet been discussed. Although several stochastic approaches, including CEM, model predictive path integral (MPPI) [18, 8], covariance matrix adaptation evolution strategy (CMAES) [19], and proportional CEM (Prop-CEM) [20], have been proposed, they are not uncertaintyaware and tend to underestimate uncertainty. In addition, although their optimization procedures are very similar, they have been independently derived. Consequently, theoretical relations among these methods are unclear, preventing us from systematically understanding and reformulating them to be uncertainty-aware in a Bayesian fashion.
+Motivated by these, in this paper, we propose a novel MPC concept for Bayesian MBRL. The organization and contributions of this paper are summarized as follows. (1) In Sec. 3, we introduce a novel MPC framework, variational inference MPC (VI-MPC), which generalizes and reformulates various stochastic MPC methods in a Bayesian fashion. The key observations for deriving this framework are organized in Sec. 2, where we point out that general stochastic optimization methods can be regarded as the moment matching of the optimal trajectory posterior, which appear in a Bayesian MBRL formulation. (2) In Sec. 4, we propose a novel instance of the framework, called probabilistic action ensembles with trajectory sampling (PaETS). Toy task examples and the concept of our method are exhibited in Fig. 1. (3) In Sec. 5, we demonstrate that our method consistently outperforms PETS via experiments with challenging locomotion tasks in the MuJoCo physics simulator [21].
+2
+
+2 Model-based Reinforcement Learning as Bayesian Inference
+
+In this section, we describe MBRL as a Bayesian inference problem using control as inference
+
+framework [22]. Fig. 2 displays the graphical model for the formulation, with which an MBRL
+
+procedure can be re-written in a Bayesian fashion: (1. training-step) do inference of p(θ|D). (2. test-
+
+step) do inference of p(τ |O1:T = 1), then, sample actions from the posterior and execute the actions
+
+in
+
+a
+
+real
+
+environment.
+
+We
+
+denote
+
+a
+
+trajectory
+
+as
+
+τ
+
+:=
+
+{
+
+(st
+
+,
+
+at
+
+)}
+
+T t=1
+
+,
+
+where
+
+st
+
+and
+
+at
+
+respectively
+
+represent state and action. Given a state-action pair at time t, the next state can be predicted by
+
+a forward-dynamics model st+1 ∼ p(st+1|st, at, θ) parameterized with θ. The posterior of θ is
+
+inferred from training dataset D, where D = {(st, at, st+1)} consists of states and actions observed
+
+during the test step. To formulate optimal control as inference, we auxiliarly introduce a binary
+
+random variable Ot ∈ {0, 1} to represent the optimality of (st, at). Given p(θ|D), trajectory
+
+optimization can be expressed as an inference problem:
+
+p(τ |O) ∝
+
+T
+
+T
+
+p(Ot = 1|st, at) · p (s1)
+
+p (st+1|st, at, θ) · p(θ|D) dθ, (1)
+
+t=1
+
+t=1
+
+:=pD (θ)
+
+:=p(O|τ )
+
+:=p(s|a,θ)
+
+where uninformative action prior (i.e., p(at) = U: uniform distribution) is supposed. For readability, O1:T = 1 is simply denoted as O. For the same reason, we omit the subscripts of sequences a1:T , s1:T . In the remainder of the paper, this simpliﬁed notation is employed. In Sec. 2.1–2.2, we review how these inference problems have been approximately handled in previous works.
+
+2.1 Inference of Forward-dynamics Posterior pD(θ)
+
+Given a sufﬁciently parameterized expressive model, i.e.,
+
+DNNs, one of the most practical and promising schemes for
+
+approximating the posterior pD(θ) is to utilize neural network
+
+ensembles [13, 14, 15]. This process approximates the pos-
+
+terior as a set of particles pD(θ)
+
+1 E
+
+iE δ(θ − θi), where
+
+δ is Dirac delta function and E is the number of networks.
+
+Each particle θi is independently trained by stochastic gradient
+
+descent so as to (sub-)optimize log pD(θ) ∝ log p(D|θ)p(θ).
+
+Although this approximation is incompletely Bayesian, this
+
+scheme has several useful features. First, we can simply im-
+
+plement this process in standard deep learning frameworks.
+
+Furthermore, the ensemble model successfully involves mul-
+
+timodal uncertainty in the exact posterior.
+
+…
+Given @ test-step Latent @ training-step
+Figure 2: Graphical model for Bayesian MBRL.
+
+Another possible way to infer pD(θ) is dropout as variational inference [10, 11, 12], which approximates pD(θ) as a Gaussian distribution q(θ). It is proofed that the variational inference problem: argminq KL(q(θ)||pD(θ)) approximately equivalent to training networks with dropout, where KL(·||·) denote Kullback-Leibler (KL) divergence. Although this scheme is also simple and theo-
+retically supported, approximation by a single Gaussian distribution tends to underestimate uncertainty (or multimodality) in the posterior. To remedy this problem, α-divergence dropout has been proposed [23], which replaces KL-divergence to α-divergence so as to prevent q(θ) from overﬁtting a single mode. However, as long as q(θ) is Gaussian, the multimodality cannot be managed well.
+
+In our preliminary experiments of MBRL, we have tested the above two schemes and observed that the ensemble performs much better than (α-)dropout (this result is summarized in Sec. A). This result provides us with the insight that capturing multimodality in the posterior has crucial effects in MBRL literature. Therefore, in this paper, we also employ this ensemble scheme to approximate pD(θ) in the same way as our baseline: PETS [13]. In Sec. 4, we also attempt to incorporate multimodality in the posterior p(τ |O).
+
+2.2 Moment Matching of Trajectory Posterior p(τ |O)
+This section clariﬁes the connection between trajectory optimization and the posterior approximation problem. The key observation delineated here is that several MPC methods, including CEM used in PETS and MPPI, can be regarded as the moment matching of the posterior.
+
+3
+
+Table 1: Optimization algorithms derived by moment matching of p(τ |O) and different f deﬁni-
+tions; 1 indicates an indicator function, g : R → N denotes rank-preserving transformation.
+
+f (r(τ ))
+
+MPPI [18] ∝ er(τ )
+
+CEM [16]
+1 [r(τ ) > rthd]
+
+Prop-CEM [20] r(τ ) − rmin
+rmax − rmin
+
+CMA-ES [19]
+∝ log g(r(τ )) · 1 [r(τ ) > rthd]
+
+Given an inferred model posterior pD(θ), we can sample trajectories from (1).1 Let us approximate the action posterior with a Gaussian distribution q(a; µ, Σ). The mean of posterior action sequence µ can be estimated by moment matching:
+
+µ = E [a · p(τ |O)] = Es∼p(s|a,θ),θ∼pD(θ),a∼U [a · p(O|τ )] = Ea∼U [a · W(a)] , (2)
+
+Es∼p(s|a,θ),θ∼pD(θ),a∼U [p(O|τ )]
+
+Ea∼U [W(a)]
+
+where
+
+W (a) := Est+1∼p(st+1|st,at,θ),θ∼pD(θ) [p(O|τ )] .
+
+(3)
+
+Eq. (2) can be viewed as a weighted average where each sampled action is weighted by the likelihood of optimality W(a). In the same way, we can also estimate the variance of the posterior Σ = Ea∼U (a − µ)2W(a) /Ea∼U [W(a)].
+
+In practice, sampling from uniform distribution U is quite inefﬁcient and requires almost inﬁnite samples. Hence, let us consider iteratively estimating the parameters by incorporating importance sampling. Let µ(j), Σ(j) be the estimated parameters at iteration j; we can rearrange (2) as
+
+µ(j+1) ← {RHS of (2)} × q(a; µ(j), Σ(j)) = Ea∼q(a;µ(j),Σ(j)) [a · W(a)] . (4)
+
+q(a; µ(j), Σ(j))
+
+Ea∼q(a;µ(j),Σ(j)) [W (a)]
+
+It is worth noting that a similar iterative law can also be derived by solving the optimization problem argmaxq(a;µ,Σ) E [log p(O|τ )] by mirror descent [24, 25]. To connect this inference problem to trajectory optimization, we deﬁne the optimality likelihood with trajectory reward r(τ ) and a monotonically increasing function f (·), as p(O|τ ) := f (r(τ )). If we deﬁne f (r(τ )) ∝ er(τ) the same as [22, 26], an optimization algorithm similar to MPPI [18, 8, 25] is recovered. As summarized in Table 1, other similarities to well-known optimization algorithms, including CEM, can be observed with different optimality deﬁnitions. 2
+There is a discrepancy between (4) and the CEM implementation in [13]; in which W (a) = f (E[r(τ )]) is used instead of W(a) = E[f (r(τ ))]. Since f is a convex function, Jensen’s inequality holds in this case, thus W ≥ W . The equality holds when f (·) is constant, implying that W W for low-variance r(τ ) and W > W for high-variance (or more uncertain) r(τ ). Namely, W (a) underestimates the optimality likelihood if a generates uncertain trajectories. Since we have experimentally observed that this uncertainty avoidance behavior by W demonstrates higher optimization performance than W (see Sec. B), this paper heuristically employs the use of W .
+In practice, expectation operators E[·] should be implemented on digital computers through the Monte Carlo integration with K sampled actions and P trajectories for each action: µ(j+1)
+k=1 K [ak · W (ak)]/ k=1 K [W (ak)] and W (ak) f P i=1 1 P r(τk,i) .
+
+3 Variational Inference MPC: From Moment Matching to Inference
+Given uncertainty in a dynamics model, it is natural to suppose that optimal trajectories are also uncertain. However, as exhibited in the previous section, PETS employs the moment matching of the trajectory posterior, ignoring almost uncertainty in optimal trajectories. In this section, we newly introduce a variational inference MPC (VI-MPC) framework to formulate MBRL as fully Bayesian and involve uncertainty both in the dynamics and optimalities.
+1 Trajectory sampling methods with pD(θ) have been discussed and experimented in [13]. In this paper, we employ the TS1 method suggested in the reference (see 3–6 in Alg. 1).
+2 We implicitly assume the existence of step-wise likelihood p(Ot|st, at) corresponding to each deﬁnition. Since another graphical model with a single uniﬁed optimality can be deﬁned, the existence is not critical.
+
+4
+
+Let us consider a variational inference problem: KL (qθ(τ )||p(τ, θ|O)). We assume the variational distribution qθ(τ ) is decomposed to qθ(τ ) = q(a)p(s|a, θ)pD(θ); hence, we introduce p(τ, θ|O)(= p(O|τ )p(s|a, θ)pD(θ)) as a posterior, which takes the similar decomposable form as qθ(τ ). This assumption forces optimal state transitions to be controlled only by p(st+1|st, at, θ) [22]. As shown in Sec. C.1, this inference problem can be transformed to the maximization problem:
+argmaxqθ(τ) E [log p(O|τ ) − log q(a)]. A notable property is that this objective has an entropy regularization term − log q(a), which encourages q(a) to have broader shape to capture more
+uncertainty. For the sake of convenience, we introduce a tunable hyperparameter α(> 0) to
+1
+the optimality likelihood p(O|τ ) → p α (O|τ ). Then the above objective can be transformed as
+argmaxqθ(τ) E [log p(O|τ ) − α log q(a)]. By applying mirror descent [27] to this optimization problem, we can derive an update law for q(a) (see Sec. C.2 for the detailed derivation):
+
+q(j+1)(a)
+
+←
+
+q(j)(a)
+
+·
+
+W
+
+1
+(a) λ
+
+·
+
+(q(j)(a))−κ
+
+Eq(j)(a) W (a) λ1 · (q(j)(a))−κ ,
+
+(5)
+
+where λ(> 0), κ(> 0) are hyperparameters and α is absorbed into them. λ is inverted step-size to control optimization speed and κ is the weight of the entropy regularization term q−κ.
+
+Eq. (5) suggests a novel and general MPC framework, which we call variational inference MPC (VI-MPC). To realize a speciﬁc VI-MPC method, we specify the following parameters: (1) optimality deﬁnition (or f (·); see Table 1), (2) variational distribution model q, and (3) entropy regularization κ > 0 or κ = 0. We did not include λ into the speciﬁcations since it is highly dependent on the optimality deﬁnition (see Sec. G). In this paper, we describe the above speciﬁcations as VIMPC(<optimality def>, <variational dist>, <max ent>). For example, we respectively express vanilla CEM and MPPI as VIMPC(‘CEM’, ‘Gaussian’, False) and VIMPC(‘MPPI’, ‘Gaussian’, False). In Sec. 4, we propose a new instance of VI-MPC to incorporate multimodal uncertainty in the posterior.
+
+4 Probabilistic Action Ensembles with Trajectory Sampling
+
+As reviewed in Sec. 2.1, previous methods have successfully involved multimodality in pD(θ) with network ensembles. If this multimodality in pD(θ) is given, other distributions depending on pD(θ), including p(O|τ ), would also be multimodal. In other words, there are various possible optimal trajectories (or actions) like Fig. 1. It is obvious that VIMPC(*, ‘Gaussian’, *) will still easily fail to capture multimodality because of overﬁtting to a single mode. Inspired by the success of the ensemble approach for dynamics modeling, we propose a novel VI-MPC method that introduces action ensembles with a Gaussian mixture model (GMM), i.e., VIMPC(*, ‘GMM(M=*)’, *), which we call PaETS (Probabilistic Action Ensembles with Trajectory Sampling).
+
+PaETS deﬁnes the variational distribution q(a) as
+
+M
+
+q(j)(a) := q(a; φ(j)) = πm(j)N (a; µm (j), Σm (j)),
+
+(6)
+
+m=1
+
+where
+
+φ(j)
+
+:=
+
+(j) (j) (j) M
+{(πm , µm , Σm )}m=1
+
+and
+
+M
+
+is
+
+the
+
+number
+
+of
+
+components
+
+of
+
+the
+
+mixture
+
+model.
+
+Now, we derive the iteration scheme to update the parameters of GMM. At ﬁrst, drawing K samples
+
+from q(j)(a), we approximate q(j)(a) as a discretized distribution (or a set of particles):
+
+K
+
+q(j)(a; φ) q(a; W(j)) := wk(j)δ(a − ak),
+
+(7)
+
+k=1
+
+where W(j) := {wk(j)}k=1 K . Just after sampling, the weight of each particle is uniform: W(j) = 1/K. By substituting this approximated distribution to (5), the update law for the particle weights is derived as
+K
+wk(j+1) ← W (ak) λ1 · (q(j)(ak))−κ W (ak ) λ1 · (q(j)(ak ))−κ. (8)
+k =1
+
+Then we estimate φ(j+1), which maximizes the observation probability of the weighted particles:
+
+K
+φ(j+1) = argmaxφ log p({(wk(j+1), ak)}k=1 K |φ) = argmaxφ wk(j+1) log q(ak; φ). (9)
+k=1
+
+5
+
+Algorithm 1: PaETS
+
+Input: State s1, GMM param. φ(1) and pD(θ)
+
+Output: Optimized GMM param. φ(U+1)
+
+1 for j ← 1 to U do
+
+2
+
+Sample actions {ak ∼ q(a; φ(j))}k=1 K
+
+3 Sample states {{{
+
+4
+
+θk,i,t ∼ pD(θ) // TS1 method
+
+5
+
+sk,i,t+1 ∼ p(st+1|ak,t, sk,i,t, θk,i,t),
+
+6 }t=1 T −1}i=1 P }k=1 K
+
+7 Eval. {W (ak) f ( i=1 P r(τk,i))}k=1 K
+
+8 Calc. {wk(j+1)}k=1 K by (8)
+
+9
+
+Update φ(j+1) by (10)
+
+Algorithm 2: MBRL with PaETS
+
+Data: initial variance Σinit
+
+1 Init. D with a random controller for one trial
+
+2 repeat
+
+3
+
+Infer pD(θ) // train ensemble DNNs
+
+4 {µm ← N (a; 0, Σinit)}m=1 M // rand. init.
+
+5
+
+{(Σm, πm) ← (Σinit, 1/M )}M m=1
+
+6 for n ← 1 to H do
+
+7
+
+φ ←Exec. Alg. 1(sn, φ, pD(θ))
+
+8
+
+Sample a ∼ q(a; φ)
+
+9
+
+Send a1 to actuators and observe sn+1
+
+10
+
+D ← D ∪ {(sn, a1, sn+1)}
+
+11 {µm ← {µm,2:T , 0}}m=1 M // warm-start
+
+12
+
+{(Σm, πm) ← (Σinit, 1/M )}M m=1
+
+13 until the MPC-policy performs well
+
+By taking the derivative ∇φ log p(·|φ) = 0 and borrowing the concept of the EM algorithm [28], we get the update laws of φ(j+1) which take the weight-average form like (4) (see Sec. D for the complete deﬁnition):
+
+µm (j+1), Σm (j+1), πm(j+1) ←
+
+K
+
+K
+
+ωm,k (j+1)ak, ωm,k (j+1)(ak − µm (j+1))2,
+
+k=1
+
+k=1
+
+Nm . (10) m=1 M Nm
+
+Fig. 8 in Sec. E illustrates how this method works in a toy optimization task.
+
+In summary, PaETS and MBRL utilizing it are respectively described in Algs. 1 and 2, where U is the number of iterations for optimization and H is the length of the task episode. At 4 in Alg. 2, µms are initialized independently at random. At 12, Σms and πms are reset to be initial values, encouraging exploration for the next timestep and preventing q(a; φ) from degenerating to a single mode. If we set M = 1, these procedures are almost equivalent to those of PETS. The use of GMM (M > 1)
+does not increase computational complexity signiﬁcantly
+(see Sec. F).
+
+(a) HalfCheetah
+
+(b) Ant
+
+(c) Hopper
+
+(b) Walker2d
+
+Figure 3: Evaluated locomotion tasks simulated in MuJoCo.
+
+5 Experiments
+5.1 Comparison to State-of-the-art Methods
+The main objective of this experiment is to demonstrate that PaETS has advantages over the state-ofthe-art MBRL baseline: PETS [13]. In this experiment, PaETS and PETS (or vanilla CEM) were implemented using our same codebase with different parameters, i.e., VIMPC(‘CEM’, ‘GMM(M=5)’, True) for PaETS, and VIMPC(‘CEM’, ‘GMM(M=1)’, False) for PETS. We also evaluated another MBRL baseline with MPPI [8], realized as VIMPC(‘MPPI’, ‘GMM(M=1)’, False). These above methods share the settings for pD(θ) inference (training of network ensembles). The state-ofthe-art MFRL method SAC [17], was also evaluated to compare asymptotic performance.3 Fig. 3 illustrates the simulated locomotion tasks evaluated in this experiment, which are complex and challenging due to their high non-linearity. Other details about our implementation and experimental settings are described in Sec. G and Sec. H. Fig. 4 presents the experimental results, in which PaETS consistently exhibits better asymptotic performance than that of the MBRL baselines. In addition, PaETS outperforms or is comparable to SAC while requiring signiﬁcantly fewer samples (about x10 more sample efﬁcient).
+3We used the open-source code: https://github.com/pranz24/pytorch-soft-actor-critic
+
+6
+
+Episode Reward Episode Reward
+
+15000 10000 5000
+
+PaETS (Ours) PETS [Chua et al., 2018]
+(a) HalfCheetah
+
+MPPI [Williams et al., 2017] SAC [Haarnoja et al., 2018]
+6000 (b) Ant
+4000 2000
+
+0
+
+0
+
+104 105 106
+
+104
+
+105
+
+106
+
+4000 (c) Hopper
+
+6000 (d) Walker2d
+
+2000 4000 2000
+
+0
+
+0
+
+104 105 106
+
+104
+
+105
+
+106
+
+Time-steps
+
+Time-steps
+
+Figure 4: Learning curves for different tasks and algorithms. These are averaged results of 8 (for
+
+MBRL) and 20 (for SAC) trials with different random seeds. We stopped the training when convergence was observed or after reaching the speciﬁed test steps (500 for MBRL and 5, 000 for SAC).
+
+The asymptotic performances (averages of the last 10 test steps) are depicted in dashed lines.
+
+Episode Reward Episode Reward
+
+=0
+
+= 0.25
+
+14000 (a) HalfCheetah
+
+13000 n.s.
+
+12000
+
+= 0.5
+6000 5500 5000 4500
+
+= 0.75
+(b) Ant
+n.s.
+
+4000 (c) Hopper
+3000 n.s.
+2000
+
+n.s.
+
+6000 (d) Walker2d n.s.
+
+4000 n.s.
+2000
+
+M=1
+
+M=5
+
+M=1
+
+M=5
+
+Figure 5: Asymptotic performance comparison with varying M s and κs. These are averaged results over 8 different MBRL trials and the last 10 test steps. The error bars denote conﬁdence intervals (95%). Symbols ‘**’ and ‘n.s.’ respectively mean p < 0.01 and p ≥ 0.01 in Welch’s t-test.
+
+5.2 Ablation Study
+This experiment clariﬁes which component of PaETS (GMM and entropy-regularization) contributed to the overall improvement. Fig. 5 expresses the results of this ablation study and Welch’s t-test for some selected representative pairs. From this ﬁgure, one can observe that the use of GMM (M = 5) signiﬁcantly improves performance. The effect of the regularization (κ > 0) is relatively small, but not negligible. In certain tasks, setting κ to particular values could improve the performance. In the case of M > 1, the regularization sheds light on actions sampled from low πm, thus encouraging q(a; φ) to be multimodal. In some tasks which requires rather delicate controls (e.g., Hopper, Walker2d), the effect of κ seems less signiﬁcant. Fig. 6 examines sensitivity with the number of mixture components M , for which M = 5 achieved the highest performance. If inﬁnite or enough samples are given (K 0), it would be reasonable to set M to be large enough to capture multimodality. However, in practice, K is ﬁnite and could be small enough due to computational constraints. In this case, larger M makes it difﬁcult to approximate q(a; φ) as a set of particles q(a; W), resulting in degradation of the optimization performance.
+7
+
+6 Related Work
+
+Dynamics Posterior Inference Recent MBRL
+
+methods, MB-MPO (Model-Based Meta-PolicyOptimization) [15] and ME-TRPO (Model Ensem-
+
+14000
+
+Episode Reward
+
+ble Trust Region Optimization) [14], also employ network ensembles to model dynamics, but they uti-
+
+13000
+
+lize the ensembles differently than we do: to train
+
+policy networks, not MPC.
+
+12000
+
+Trajectory Optimization Sequential MonteCarlo based MPC, described as VIMPC(*,
+
+M=1 M=3 M=5 M=7
+
+‘Particles’, False), has been introduced in [29], but it requires well-designed proposal distribution to sample particles for the next iteration j + 1. Another particle-based method has been
+
+Figure 6: Asymptotic performance comparison with varying M s. Only the HalfCheetah task is evaluated in this test.
+
+derived [26] by utilizing the control as inference
+
+framework. However, this method relies on not only a dynamics model, but also policy and value
+
+functions to manage particles, so MFRL methods must be incorporated.
+
+Recent studies have demonstrated that entropy regularization is a promising strategy in policy training [30, 31, 32, 17]. However, to the best of our knowledge, the introduction of entropy regularization to MPC is novel along with explicit multimodal expression to successfully realize their synergistic effect.
+
+Ref. [33] also systematically organizes the stochastic MPC methods from the perspective of online learning, but uncertainty-aware discussions from a Bayesian viewpoint are not conducted.
+
+Bayesian Reformulation Ref. [34] proposes a novel approach to generative adversarial imitation
+
+learning (GAIL) [35], which reformulates general GAIL in a Bayesian fashion and utilizes ensem-
+
+bles to infer discriminator posteriors. Another Bayesian reformulation of GAIL integrates imitation
+
+and
+
+reinforcement
+
+learning
+
+by
+
+introducing
+
+another
+
+optimality
+
+(i.e.,
+
+imitation
+
+optimality
+
+OI
+t
+
+)
+
+[36].
+
+7 Conclusion & Discussions
+This paper introduces a novel VI-MPC framework that systematically generalizes and reformulates various stochastic MPC methods in a Bayesian fashion. We also devise a novel instance of this framework, called PaETS, which can successfully incorporate multimodal uncertainty in optimal trajectories. By combining our method and the recent uncertainty-aware dynamics modeling with neural network ensembles, our Bayesian MBRL is able to involve multimodalities both in dynamics and optimalities. In addition, our method is a quite simple extension of general stochastic methods and requires no signiﬁcant additional computational complexity. Our experiments demonstrate that PaETS can improve asymptotic performance compared to the leading MBRL baseline PETS, and thus substantially enhances MBRL potential to be more competitive to the state-of-the-art MFRL.
+Considering the simplicity and generalizability of VI-MPC and PaETS, we expect that our concept is applicable to a variety of tasks, such as traditional MPC with deterministic dynamics and advanced MPC with latent dynamics from pixels by Deep Planning Network [37]. By introducing a categorical mixture model as a variational distribution, application to combinational optimizations is also feasible. In fact, our ongoing work includes experiments of discrete MPC for a practical system.
+A question that remains is how to determine VI-MPC speciﬁcations. As implied in Fig. 4, the best optimality deﬁnition could be task dependent (e.g., MPPI outperformed vanilla CEM in the Ant but not in other tasks). The regularization weight κ also has task dependency as shown in Fig. 5. It would be challenging but interesting future work to add the parameters to the graphical model in Fig. 2 as latent variables to infer promising parameters along with optimal trajectories, like inﬁnite GMM [38]. Another appealing endeavor for future work is to introduce the concept of parallel tempering [39] in Markov Chain Monte Carlo. By adaptively varying different temperatures (λ in our case) of ensemble actions, we can expect the ensemble diversity to improve.
+
+8
+
+Acknowledgments
+We thank Vishwajeet Singh, Hiroki Nakamura and Akira Kinose for their cooperation in this study during their student-internship periods. Most of the experiments were conducted in ABCI (AI Bridging Cloud Infrastructure), built by the National Institute of Advanced Industrial Science and Technology, Japan.
+References
+[1] F. D. Vargas-Villamil and D. E. Rivera. Multilayer optimization and scheduling using model predictive control: application to reentrant semiconductor manufacturing lines. Computers & Chemical Engineering, 24(8):2009–2021, 2000.
+[2] A. Afram and F. Janabi-Shariﬁ. Theory and applications of HVAC control systems–a review of model predictive control (MPC). Building and Environment, 72:343–355, 2014.
+[3] S. Vazquez, J. Leon, L. Franquelo, J. Rodriguez, H. A. Young, A. Marquez, and P. Zanchetta. Model predictive control: A review of its applications in power electronics. IEEE Ind. Electron. Mag., 8(1):16–31, 2014.
+[4] B. Paden, M. Cˇ a´p, S. Z. Yong, D. Yershov, and E. Frazzoli. A survey of motion planning and control techniques for self-driving urban vehicles. IEEE Trans. Intell. Veh., 1(1):33–55, 2016.
+[5] S. Kuindersma, R. Deits, M. Fallon, A. Valenzuela, H. Dai, F. Permenter, T. Koolen, P. Marion, and R. Tedrake. Optimization-based locomotion planning, estimation, and control design for the Atlas humanoid robot. Autonomous Robots, 40(3):429–455, 2016.
+[6] D. Silver, A. Huang, C. J. Maddison, A. Guez, L. Sifre, G. Van Den Driessche, J. Schrittwieser, I. Antonoglou, V. Panneershelvam, M. Lanctot, et al. Mastering the game of Go with deep neural networks and tree search. Nature, 529(7587):484, 2016.
+[7] M. Deisenroth and C. E. Rasmussen. PILCO: A model-based and data-efﬁcient approach to policy search. In ICML, 2011.
+[8] G. Williams, N. Wagener, B. Goldfain, P. Drews, J. M. Rehg, B. Boots, and E. A. Theodorou. Information theoretic MPC for model-based reinforcement learning. In ICRA, 2017.
+[9] A. Nagabandi, G. Kahn, R. S. Fearing, and S. Levine. Neural network dynamics for modelbased deep reinforcement learning with model-free ﬁne-tuning. In ICRA, 2018.
+[10] Y. Gal and Z. Ghahramani. Dropout as a bayesian approximation: Representing model uncertainty in deep learning. In ICML, 2016.
+[11] Y. Gal, J. Hron, and A. Kendall. Concrete dropout. In NeurIPS, 2017.
+[12] G. Kahn, A. Villaﬂor, V. Pong, P. Abbeel, and S. Levine. Uncertainty-aware reinforcement learning for collision avoidance. arXiv preprint arXiv:1702.01182, 2017.
+[13] K. Chua, R. Calandra, R. McAllister, and S. Levine. Deep reinforcement learning in a handful of trials using probabilistic dynamics models. In NeurIPS, 2018.
+[14] T. Kurutach, I. Clavera, Y. Duan, A. Tamar, and P. Abbeel. Model-ensemble trust-region policy optimization. In ICLR, 2018.
+[15] I. Clavera, J. Rothfuss, J. Schulman, Y. Fujita, T. Asfour, and P. Abbeel. Model-based reinforcement learning via meta-policy optimization. In CoRL, 2018.
+[16] Z. I. Botev, D. P. Kroese, R. Y. Rubinstein, and P. LEcuyer. The cross-entropy method for optimization. In Handbook of statistics, volume 31, pages 35–59. Elsevier, 2013.
+[17] T. Haarnoja, A. Zhou, P. Abbeel, and S. Levine. Soft actor-critic: Off-policy maximum entropy deep reinforcement learning with a stochastic actor. In ICML, 2018.
+9
+
+[18] G. Williams, P. Drews, B. Goldfain, J. M. Rehg, and E. A. Theodorou. Aggressive driving with model predictive path integral control. In ICRA, 2016.
+[19] N. Hansen, S. D. Mu¨ller, and P. Koumoutsakos. Reducing the time complexity of the derandomized evolution strategy with covariance matrix adaptation (CMA-ES). Evolutionary computation, 11(1):1–18, 2003.
+[20] S. Goschin, A. Weinstein, and M. Littman. The cross-entropy method optimizes for quantiles. In ICML, 2013.
+[21] E. Todorov, T. Erez, and Y. Tassa. MuJoCo: A physics engine for model-based control. In IROS, 2012.
+[22] S. Levine. Reinforcement learning and control as probabilistic inference: Tutorial and review. arXiv preprint arXiv:1805.00909, 2018.
+[23] Y. Li and Y. Gal. Dropout inference in bayesian neural networks with alpha-divergences. In ICML, 2017.
+[24] M. Miyashita, S. Yano, and T. Kondo. Mirror descent search and its acceleration. Robotics and Autonomous Systems, 106:107–116, 2018.
+[25] M. Okada and T. Taniguchi. Acceleration of gradient-based path integral method for efﬁcient optimal and inverse optimal control. In ICRA, 2018.
+[26] A. Piche, V. Thomas, C. Ibrahim, Y. Bengio, and C. Pal. Probabilistic planning with sequential monte carlo methods. In ICLR, 2018.
+[27] S. Bubeck et al. Convex optimization: Algorithms and complexity, volume 8, chapter 4. Now Publishers, Inc., 2015.
+[28] J. A. Bilmes et al. A gentle tutorial of the EM algorithm and its application to parameter estimation for gaussian mixture and hidden markov models. International Computer Science Institute, 4(510):126, 1998.
+[29] N. Kantas, J. Maciejowski, and A. Lecchini-Visintini. Sequential monte carlo for model predictive control. In Nonlinear model predictive control, pages 263–273. Springer, 2009.
+[30] A. Abdolmaleki, R. Lioutikov, J. R. Peters, N. Lau, L. P. Reis, and G. Neumann. Model-based relative entropy stochastic search. In NeurIPS, 2015.
+[31] A. Abdolmaleki, B. Price, N. Lau, L. P. Reis, and G. Neumann. Deriving and improving CMA-ES with information geometric trust regions. In GECCO, 2017.
+[32] T. Haarnoja, H. Tang, P. Abbeel, and S. Levine. Reinforcement learning with deep energybased policies. In ICML, 2017.
+[33] N. Wagener, C.-A. Cheng, J. Sacks, and B. Boots. An online learning approach to model predictive control. In Robotics: Science and Systems, 2019.
+[34] W. Jeon, S. Seo, and K.-E. Kim. A bayesian approach to generative adversarial imitation learning. In NeurIPS, 2018.
+[35] J. Ho and S. Ermon. Generative adversarial imitation learning. In NeurIPS, 2016.
+[36] A. Kinose and T. Tadahiro. Integration of imitation learning using GAIL and reinforcement learning using task-achievement rewards via probabilistic generative model. arXiv preprint arXiv:1907.02140, 2019.
+[37] D. Hafner, T. Lillicrap, I. Fischer, R. Villegas, D. Ha, H. Lee, and J. Davidson. Learning latent dynamics for planning from pixels. In ICML, 2019.
+[38] C. E. Rasmussen. The inﬁnite gaussian mixture model. In NeurIPS, 2000.
+[39] S. Brooks, A. Gelman, G. Jones, and X.-L. Meng. Handbook of Markov Chain Monte Carlo, chapter 11. CRC press, 2011.
+[40] E. Theodorou, J. Buchli, and S. Schaal. A generalized path integral control approach to reinforcement learning. Journal of Machine Learning Research, 11:3137–3181, 2010.
+10
+
+A Preliminary Experiment for Uncertainty Modeling
+Fig. 7 shows the result of a preliminary experiment, in which different uncertainty modeling approaches were evaluated on the HalfCheetah task. For all trials, vanilla CEM was introduced for trajectory optimization. This result suggests that (α-)dropout is insufﬁcient to capture uncertainty in dynamics, resulting in worse local optima.
+
+Episode Reward
+
+14000
+
+PETS (Ensemble)
+
+12000
+
+-dropout
+
+dropout
+
+10000
+
+8000
+
+6000
+
+4000
+
+2000
+
+0 100000 200000 300000 400000
+Time-steps
+
+Figure 7: Comparison of uncertainty modeling approaches: ensemble and (α-)dropout.
+
+B Comparison Between W and W
+
+We evaluated the impact of W and W on the optimization performance of (vanilla) CEM and MPPI, the results of which are summarized in Table 2, where W gained much higher rewards than W.
+
+Table 2: Episode reward of HalfCheetah task with W and W . A common dynamics model (sufﬁciently trained ensemble neural network by MBRL) was employed for this test. Ten different trials were conducted and the results were averaged.
+
+CEM
+
+W
+
+W
+
+5603.24 ± 541.31 11843.05 ± 295.80
+
+MPPI
+
+W
+
+W
+
+2789.03 ± 647.82 9765.27 ± 231.04
+
+C Derivations
+
+C.1 Derivation of the Variational Inference Objective
+
+By using the assumption of qθ(τ ) = q(a)p(s|a, θ)pD(θ), the KL-divergence can be transformed as
+
+KL (qθ(τ )||p(τ, θ|O)) = qθ(τ ) log qθ(τ ) dτ dθ (11) p(τ, θ|O)
+
+= qθ(τ ) log q(a)p(s|a, θ)pD(θ) dτ dθ (12) p(O|τ )p(s|a, θ)pD(θ)
+
+= −Eqθ(τ) [log p(O|τ ) − log q(a)] .
+
+(13)
+
+11
+
+C.2 Derivation of (5)
+
+In this section, we simply denote qa as q(a) and qτ as q(τ )(= qap(s|a, θ)pD(θ)) for readability. Let us consider the optimization problem:
+
+argminqτ J = argminqτ Eqτ [− log p(O|τ ) + α log qa] .
+
+(14)
+
+By applying mirror descent [27], the iterative update law of qτ(j+1) is given as
+
+qτ(j+1) = argminqτ ∇qτ J , qτ + β · KL(qτ ||qτ(j)) + γ 1 − qτ · dτ dθ ,
+
+(15)
+
+where ·, · is the inner-product operator, β is a hyper-parameter related to the step-size, and γ is the Lagrange multiplier for the constraint qτ · dτ dθ = 1. The arguments in the argmin operator can be rearranged as
+
+qτ · − log p(O|τ ) + α log qa + β log qa − β log qa(j) − γ dτ dθ + γ,
+
+(16)
+
+where, we used the relations:
+
+∇qτ J , qτ = J ,
+
+(17)
+
+KL(qτ ||qτ(j)) = qτ log (j) qτ dτ dθ = qτ log (j) qa dτ dθ. (18)
+
+qτ
+
+qa
+
+The integrand of (16) can be organized as
+
+qτ · log
+
+qα+β
+a (j)
+
+∝ qτ · log
+
+qa
+
+1
+
+−γ
+
+(j) β
+
+p(O|τ )e−γ (qa )β
+
+p(O|τ ) α+β · e α+β · (qa ) α+β
+
+(19)
+
+p(s|a, θ)pD(θ)qa
+
+= qτ · log
+
+(j)
+
+1
+
+−γ
+
+(j) −α (20)
+
+(p(s|a, θ)pD(θ)qa ) · p(O|τ ) α+β · e α+β · (qa ) α+β
+
+qτ
+
+= qτ · log (j)
+
+1
+
+−γ
+
+(j) −α .
+
+qτ · p(O|τ ) α+β · e α+β · (qa ) α+β
+
+(21)
+
+Integrating the above equation yields,
+
+(16)
+
+=
+
+KL(qτ ||qτ(j)
+
+1
+· p(O|τ ) α+β
+
+−γ
+· e α+β
+
+· (qa(j)) α−+αβ ) + γ.
+
+(22)
+
+By minimizing this equation, we get:
+
+qτ(j+1) = qτ(j) · p(O|τ ) α+1 β · e α−+γβ · (qa(j)) α−+αβ .
+
+(23)
+
+The Lagrange multiplier can be removed using the constraint qτ(j+1) · dτ dθ = 1:
+
+γ
+e α+β = Eq(j) τ
+
+p(O|τ ) α+1 β · (qa(j)) α−+αβ 
+
+(24) 
+
+ = Ea∼qa (j) Es∼p(s|a,θ),θ∼pD(θ)
+
+1
+p(O|τ ) α+β
+
+·(q(j) a ) α−+αβ  .
+
+(25)
+
+(∗)
+
+Considering the discussion in Sec. 2.2 and Sec. B, we compute (∗) as
+
+1
+
+1
+
+(∗) f (E[r(τ )]) α+β = W (a) α+β .
+
+(26)
+
+Substituting (25) to (23) results in:
+
+qτ(j+1) =
+
+qτ(j) · p(O|τ ) α+β 1 · (qa(j)) α+β −α
+
+1
+
+(j) −α .
+
+Ea∼q(j) a W (a) α+β · (qa ) α+β
+
+(27)
+
+Marginalizing (s, θ), we ﬁnally obtain:
+
+qa(j+1) =
+
+qa(j) · W (a) α+β 1 · (qa(j)) α+β −α
+
+1
+
+(j) −α .
+
+Ea∼q(j) a W (a) α+β · (qa ) α+β
+
+(28)
+
+In (5), we replaced λ := α + β, κ := α/(α + β).
+
+12
+
+D Complete Deﬁnition of PaETS
+
+ηm(ak) := πm(j)N (ak; µm (j), Σm (j))
+
+M
+πm(j)N (ak; µm (j), Σm (j))
+m =1
+
+ωm,k (j+1) := ηm(ak)wk(j+1)
+
+K
+ηm(ak )wk(j+1)
+k =1
+
+:=Nm
+
+K
+µm (j+1) ← ωm,k (j+1)ak
+k=1
+
+K
+Σm (j+1) ← ωm,k (j+1)(ak − µm (j+1))2
+k=1
+
+πm(j+1) ← Nm
+
+M
+Nm.
+m=1
+
+(29) (30)
+(31) (32) (33)
+
+E Optimization of Toy Objective Function by PaETS
+
+Fig. 8 illustrates how PaETS optimizes q(a; φ(j)) in a toy multimodal objective function.
+
+j=1
+
+j=2
+
+j=3
+
+(j)
+
+(j + 1)
+
+j=4
+
+j=5
+
+j=6
+
+Figure 8: The optimization process of a 2D multimodal objective function by PaETS (VIMPC(‘MPPI’, ‘GMM(M=2)’, True)), in which two distribution components are successfully optimized to ﬁt the two modals. • depict particles that approximates q(a; φ(j)).
+F Computational Complexity
+The main computational bottleneck of PaETS (and PETS) is the execution of 3–6 in Alg. 1, in which total K × P trajectories must be sampled. In our experiment, K and P were respectively set as K = 500, P = 20 as in [13]. Compared to PETS, PaETS requires additional procedures like action sampling from GMM ( 2) and GMM parameter update ( 9). However, these additional procedures are easily parallelizable on GPUs, and their computation times are much shorter than the above mentioned bottleneck. In the experiments with our early prototype in TensorFlow, it took about 57 ms for M = 5 and 55 ms for M = 1 (equivalent to PETS) to execute one iteration of the for-loop in Alg. 1 on a single NVIDIA RTX2080 GPU. The above execution time does not
+13
+
+meet the real-time constraints (e.g., 30 Hz). However, considering the success of the real-time implementation of MPPI in [18, 8], we believe real-time implantation of our method is feasible with optimized implementation using compiled language, low-level GPU APIs, and thorough tuning of hyperparameters (e.g., K, P and DNN complexity).
+
+G Implementation Notes
+
+Cross Entropy Method It is general technique to adaptively determine rthd in Table 1 so that only the top-e% samples satisﬁes the threshold condition. We employ this technique and the eliteness ratio is set to be e = 10%. λ has no effect on CEM optimization since f (·) takes binary values.
+
+MPPI Reward normalization heuristics, as suggested in [40], were also introduced for our MPPI implementation as
+
+1
+
+1
+
+r(τk) − min{r(τk )}Kk =1
+
+W (ak) λ = exp ·
+
+K
+
+K
+
+,
+
+(34)
+
+λ max{r(τk )}k =1 − min{r(τk )}k =1
+
+where
+
+r(τk )
+
+=
+
+1 P
+
+i=1 P r(τk,i). λ was set to be λ = 0.1 as also suggested in [40].
+
+Entropy Regularization The value of κ is very sensitive to task settings, especially for the dimensionalities of action spaces. To make κ insensitive, we introduced the following normalization trick inspired by the above heuristics. First, we rearrange (8) as
+
+wk(j+1) ∝ W (a) λ1 exp κ · (− log q(j)(ak)) . (35)
+
+Then, we replace − log q(j)(ak) to normalized one:
+
+− log q(j)(ak) →
+
+− log q(j)(ak) − min{− log q(j)(ak )}Kk =1
+
+(j)
+
+K
+
+(j)
+
+K ∈ [0, 1]. (36)
+
+max{− log q (ak )}k =1 − min{− log q (ak )}k =1
+
+By applying these heuristics, the range of entropy bonus is limited to [1, eκ], where the action with the lowest probability among K samples gains the highest entropy bonus of eκ.
+
+H Experimental Setup
+
+We used MuJoCo tasks modiﬁed from standard OpenAI Gym tasks.4 Table 3 summarizes the task
+
+settings, where vx, ϕ and z respectively denote the velocity, orientation angle, and height of the
+
+agents. Penalty functions Φ, Ψ are newly introduced to encourage the agents to move forward in
+
+the proper form. Instead, done ﬂags used originally for early task stopping are removed. Φ, Ψ are
+
+deﬁned as
+
+2
+
+Φ(z, zdes) = e−(z−zdes) ,
+
+(37)
+
+1 + cos(2ϕ)
+
+Ψ(ϕ) =
+
+.
+
+(38)
+
+2
+
+We modiﬁed the range of actions (i.e., torques) from [−1, 1] to [−5, 5] to exaggerate uncertainties in the optimal trajectory posteriors.
+
+Task
+HalfCheetah Ant
+Hopper Walker2d
+
+Table 3: MuJoCo task settings.
+
+Reward Function
+vx · 2 1+sign(cos(ϕ)) − 0.1 · ||at||2 vx · Φ(z, zdes) − 10−3 · ||at||2 vx · Φ(z, zdes) · Ψ(ϕ) − 10−3 · ||at||2 vx · Φ(z, zdes) · Ψ(ϕ) − 10−3 · ||at||2
+
+st ∈ R18 R28 R12 R18
+
+at ∈ R6 R8 R3 R6
+
+Misc.
+— zdes = 0.75 zdes = 1.2 zdes = 1.2
+
+Table 4 summarizes the shared parameter settings for MBRL (PaETS, PETS, and MPPI). For SAC, we used the default parameters from the original codebase.
+4https://github.com/openai/gym
+
+14
+
+Table 4: MBRL parameters.
+
+T : prediction horizon κ: weight of entropy regularizer
+K: # sampled actions P : # trajectories for each action
+U : # optimization-iterations H: # episode length E: # neural networks hidden nodes activation function optimizer
+learning rate batch-size
+
+HalfCheetah Ant Hopper
+
+30
+
+30
+
+60
+
+0.5
+
+0.25 0.5
+
+500
+
+20
+
+5
+
+1000
+
+5
+
+(200, 200, 200, 200)
+
+Swish
+
+Adam
+
+10−3
+
+160
+
+Walker2d
+45 0.5
+
+I Diversity Analysis of D
+In this section, we analyzes the diversity of training data D collected by different MPC-policies. The distributions (histograms) of the data samples are illustrated in Fig. 9, in which the dimension of a sample (s, a) was reduced by t-SNE. This ﬁgure suggests that incorporating uncertainty both in the dynamics and optimalities can improve the diversity of D (i.e., coverage of state-action space).
+
+PETS (CR=58.1%)
+
+PaETS (CR=61.5%)
+
+dropout (CR=44.0%)
+
+-dropout (CR=52.7%)
+
+Figure 9: Comparison of training data distributions collected by different MPC-policies. CR (cover ratio) indicates the ratio of non-zero bins in each 2D histogram.
+
+15
+
+

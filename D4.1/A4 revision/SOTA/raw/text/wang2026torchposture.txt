@@ -1,0 +1,2065 @@
+Robotics and Computer–Integrated Manufacturing 101 (2026) 103315 Contents lists available at ScienceDirect
+Robotics and Computer-Integrated Manufacturing
+journal homepage: www.elsevier.com/locate/rcim
+
+Innovation in robot welding trajectory control: Online synchronous planning of welding paths and torch postures for structures with unknown spatial geometries
+Hao Wang a, Xiujun Wang b, Chunguo Liu a, Chao Chen a, Xiaohui Zhao a,*
+a Key Laboratory of Automobile Materials, School of Materials Science and Engineering, Jilin University, Changchun 130025, China b Inner Mongolia Institute of Special Equipment Inspection and Research, Chifeng 024000, China
+
+ARTICLE INFO
+Keywords: Robot GMAW Welding path planning Torch posture planning Line laser vision
+
+ABSTRACT
+To address the limitations of existing welding trajectory planning schemes, which predominantly focus on welding paths while neglecting collaboration of torch postures and overly rely on prior models or idealized assumptions, an innovative solution for online synchronous planning of welding paths and torch postures for structures with unknown spatial geometries was developed. The GMAW system assisted by line laser vision was independently designed and implemented. The camera calibration leveraging the circular tangential gradient orthogonal method (CTGOM) and adaptive particle swarm optimization (APSO) was formulated. Optical plane calibration and hand-eye calibration were then sequentially performed, achieving an average absolute error of 0.1111 mm in the robot’s perception of spatial targets. The cascaded 3D inverse modeling framework for spatial joints was established, successively employing YOLOv11, context information-based iterative centerline extraction algorithm (CIICEA), Pauta criterion and K-means-based quasi-uniform cubic B-spline fitting algorithm (K-QCBFA). The approach for online planning of robot welding trajectories based on point cloud geometric differentiation was proposed. By constructing local differential geometries from groove cross-sectional planes and base metal tangent planes, the full six-degree-of-freedom welding trajectories (XB, YB, ZB, RX, RY , RZ) for unknown spatial geometries were planned synchronously online. The root mean square error (RMSE) for online planning of welding paths in butt and fillet joints was 0.0829 mm and 0.1334 mm, respectively, while that for torch postures was 0.7782◦ and 0.8064◦, respectively. The proposed welding trajectory planning scheme demonstrates exceptional adaptability to complex spatial geometries, multi-layer multi-pass welding, and diverse joint configurations.
+
+1. Introduction
+In the evolution from teaching-playback welding to autonomous welding, mechanical, arc, infrared, ultrasonic, electromagnetic, and optical sensors have been extensively integrated into welding systems to endow welding robots or specialized machines with the capability to dynamically perceive spatial targets [1,2]. Although these sensors have significantly improved welding intelligence in key areas such as workpiece positioning [3,4], arc starting and extinguishing point detection [5–7], joint type identification [8,9], welding path fitting [10,11], and welding path tracking [12–15], most existing approaches remain confined to the path control for special spatial structures without addressing the autonomous planning and adjustment of torch postures.
+
+This limitation poses a critical barrier to achieving full six-degree-of-freedom trajectory control required for arbitrary 3D complex structures. In particular, for engineering structural components such as centrifuges, excavators, hydrogenation reactors, and ships, conventional path-level approaches with fixed torch postures are increasingly inadequate to meet the urgent demand for efficient and high-precision autonomous welding.
+In intelligent robot welding, the welding trajectory (XB, YB, ZB, RX, RY, RZ) represents a full six-degree-of-freedom combination of the welding path and torch posture. The welding path (XB, YB, ZB) determines the spatial curve of the wire tip movement, ensuring continuous filler metal deposition while enhancing welding efficiency [16]. The torch posture (RX, RY, RZ) directly affects arc stability, molten pool
+
+* Corresponding author. E-mail address: zhaoxiaohui@jlu.edu.cn (X. Zhao).
+https://doi.org/10.1016/j.rcim.2026.103315 Received 18 January 2026; Received in revised form 3 April 2026; Accepted 17 April 2026 Available online 24 April 2026 0736-5845/© 2026 Published by Elsevier Ltd.
+
+H. Wang et al.
+fluidity and welding process safety, necessitating real-time dynamic adjustment in coordination with the welding path to achieve stable and reliable welding [17]. Only through the online collaborative planning and control of both the welding path and torch posture can the requirements for highly adaptive and reliable intelligent welding be fully satisfied. In complex and dynamic welding environments, robustly achieving these objectives remains a core challenge requiring urgent breakthroughs [18].
+Currently, intelligent robot welding commonly employs the static preset mode of torch posture, relying solely on the welding path as the fundamental basis for trajectory control. Robot teaching programming guides the welding torch through the teach pendant, recording and storing the coordinates of key trajectory points prior to welding for subsequent welding execution [19,20]. However, the determination of the welding path and torch posture during this process relies heavily on manual experience and operational precision. By capturing the surface of the workpiece to be welded using monocular or binocular vision and employing image processing techniques, welding paths can be effectively extracted prior to welding [4,21]. Li et al. [22,23] utilized the monocular camera to capture the planar seam region, subsequently acquiring the coordinates of each point along the welding path through image processing. Dinham et al. [24,25] captured the profile of planar seams using binocular stereo vision, extracted key feature points to perform stereo matching, and thereby determined spatial welding paths. However, this path recognition approach is susceptible to interference from workpiece reflections, residual spatter, and illumination variations, and its application in online planning for spatial seam trajectories is limited by the lack of accurate depth information. By continuously scanning the joint area using line laser vision, the high-density 3D point cloud is acquired to reconstruct the complete geometric morphology of the joint, thereby enabling high-precision identification of the welding path prior to welding [26,27]. Liu et al. [28] planned multi-layer and multi-pass welding paths for intersection line joints based on the morphological point cloud acquired by the line laser sensor and utilized the preset sensor scanning orientation as the reference for the torch posture throughout the welding process. Zhang et al. [29] converted the 3D point cloud of the joint, acquired by the line laser sensor, into the 2D grayscale image for feature extraction, and reconstructed the spatial welding path using the cubic spline function. Although line laser vision enables the acquisition of global geometric morphologies of joints to be welded before welding, studies [28,29] did not leverage the geometric information for autonomous planning of the torch posture. Real-time detection of welding path deviations using active or passive vision, combined with dynamic correction, enables high-precision welding during the process [30]. Shen et al. [31,32] employed active vision, namely line laser sensors, to extract the offset between the groove center and the torch, enabling real-time path correction during the welding process of straight and curved seams. Conversely, Zou et al. [33,34] utilized passive vision, specifically monocular industrial cameras, to detect the deviation between the groove center and the arc center, dynamically adjusting the torch position accordingly. However, such path tracking methods typically focus on detecting and dynamically compensating for the horizontal and vertical deviations of the welding torch, whereas autonomous recognition and control of torch posture are frequently overlooked due to high implementation complexity.
+Compared to the static preset mode of torch posture, the dynamic adaptive mode has emerged as a key direction for breakthroughs in intelligent robot welding. However, the online adaptive control of torch posture involves complex challenges such as multivariable coupling and spatial geometric modeling, resulting in significantly higher technical complexity than the online control of the welding path. Zou et al. [35, 36] achieved adaptive adjustment of the torch posture by acquiring the 3D point cloud of the joint and computing the real-time attitude angles of the torch relative to the workpiece. However, this method requires the preset of the initial welding path and torch posture. Should the workpiece geometry be unknown or deviate from the hypothetical model, this
+
+Robotics and Computer-Integrated Manufacturing 101 (2026) 103315
+trajectory control approach frequently fails. Jia et al. [37] established the mathematical model of T-type off-axis non-groove intersecting joint, achieving autonomous planning of welding trajectories for intersecting joints by analyzing laser point clouds of the joint surface. However, this method relies heavily on prior geometric knowledge, such as pipe radiuses and offset distances, which limits its adaptability to unknown or varying geometries. Wang et al. [38] employed the line laser sensor to pre-scan spatial seams and extracted seam centerlines through point cloud registration and RANSAC algorithm. Based on this, the six-degree-of-freedom welding trajectory incorporating yaw, pitch, and roll angles was generated. Although this method eliminates reliance on real-time tracking, it configures the three rotational angles as decoupled parameters rather than deriving a holistically coordinated posture from groove geometry through coupled optimization. Furthermore, its practicality is restricted to single-pass butt joints, which restricts scalability to multi-layer, multi-pass or fillet joint configurations.
+In summary, research on the static preset mode of torch posture has dominated the field of welding trajectory recognition and control. While some studies have investigated dynamic adaptive schemes for torch posture, these efforts still exhibit the following shortcomings: reliance on preset welding trajectories; failure to achieve synergistic recognition and control of both welding path and torch posture; predominantly focus on planar seams or simple spatial seams with known 3D models. Evidently, existing research struggles to provide reliable adaptive collaborative planning solutions for both welding paths and torch postures for unknown spatial geometries.
+Given the strengths of line laser vision, namely non-contact operation, robust interference resistance, and capability for 3D spatial target recognition, this study employs it as the core technical approach and systematically implements the end-to-end workflow spanning morphology perception, trajectory planning, and autonomous welding, aiming to establish a highly robust and precise intelligent robot welding solution for diverse complex spatial geometries. The main contributions of this paper are as follows:
+(1) The line laser vision-assisted robot GMAW system was designed, comprising a hardware platform integrating core components such as a vision sensor, an industrial PC and a Yaskawa welding robot, alongside control software for multi-task execution covering joint geometry perception, online welding trajectory planning, and intelligent welding. (2) The traditional camera calibration method has been optimized, subsequently integrated with light plane calibration based on backprojected point clouds and spherical geometry-based hand-eye calibration, thereby enabling the GMAW system to accurately perceive the 3D coordinates of spatial targets. (3) An innovative online planning approach was proposed for the welding trajectory of unknown spatial geometries based on point cloud geometric differentiation, enabling autonomous generation of both the welding path and torch posture. (4) The proposed online welding trajectory planning approach was validated using structures of unknown spatial configurations. Comprehensive experiments, encompassing joint 3D morphological reconstruction, online six-degree-of-freedom trajectory planning, and welding execution, were conducted. The adaptability of the robot GMAW system was thoroughly evaluated in actual industrial scenarios.
+The following section of this paper is arranged as follows: Section 2 describes the robot GMAW system. The methodology for calibrating the robot GMAW system is introduced in Section 3. Section 4 elaborates the inverse modeling framework for the 3D morphologies of spatial joints and introduces the online welding trajectory planning approach based on point cloud geometric differentiation. Section 5 validates the performance of the proposed online welding trajectory planning scheme using structures with unknown spatial geometries. Section 6 summarizes
+
+2
+
+H. Wang et al.
+the main conclusions of this study.
+2. Robot GMAW system assisted by line laser vision
+2.1. Hardware platform
+As illustrated in Fig. 1, the hardware platform for intelligent robot welding primarily comprises a line laser vision sensor, a Yaskawa welding robot (AR1440), an arc welder (RD350S), a robot control cabinet (YRC1000), and an industrial PC. The self-developed line laser vision sensor consists of a CMOS camera, a red semiconductor laser, and a narrowband optical filter. The industrial PC, the line laser sensor, the robot control cabinet, and the arc welder are interconnected via TCP/IP. Furthermore, all welding specimens in this study were fabricated from Q235 steel, using a shielding gas mixture of 80% Ar + 20% CO₂. The solid welding wire used was THQ-50C with a diameter of 1.2 mm.
+2.2. Control software
+As illustrated in Fig. 2, the control software for intelligent robot welding, developed using the Yaskawa SDK, comprises five functional modules: display of original line laser stripe image, visualization of 3D morphology of the joint, welding trajectory presentation, real-time monitoring of robot motion parameters, and welding operation control. The control software employs C++ for its core functions, with the interactive interface developed using Qt 6.8.2. The system operates through the following workflow: scanning the joint using the line laser, reverse-engineering the 3D morphology of the joint, planning the welding path and torch posture online, and finally directing the robot to execute the welding operation.
+
+Robotics and Computer-Integrated Manufacturing 101 (2026) 103315
+
+3. System calibration
+
+Once the line laser vision-assisted robot GMAW system is con­
+
+structed, the spatial relationships among the pixel coordinate system
+
+(OPXPYP), the camera coordinate system (OCXCYCZC), the tool coordi­
+
+nate system (OHXHYHZH) and the robot base coordinate system
+
+(OBXBYBZB) are established, as illustrated in Fig. 3. The transformation
+
+relationship between the pixel coordinates (u, v) of a spatial point P in
+
+the OPXPYP and its world coordinates (xB, yB, zB) in the OBXBYBZB is:
+
+⎡⎤
+
+⎡⎤
+
+⎡
+
+u⎤
+
+xB
+
+⎢ ⎢
+
+yB
+
+⎥ ⎥
+
+[ R ] [ ] − 1⎢ B TB RH TH ⎢ zC⋅K ⎢ ⎥ ⎣ v ⎥⎦ ⎥
+
+⎣ zB ⎦ = 0T 1 ⋅ 0T 1 1 ⋅⎣ ⎦ (1)
+
+1
+
+1
+
+where K denotes the camera intrinsic parameter matrix comprising (fx, fy, uo, vo). RH ∈ R 3 × 3 and TH ∈ R 3denote the rotation matrix and
+translation vector, respectively, for the transformation from the OCXCYCZC to the OHXHYHZH. RB ∈ R 3 × 3 and TB ∈ R 3 represent the rotation matrix and translation vector, respectively, for the transformation from the OHXHYHZH to the OBXBYBZB, which are derived from the six kinematic parameters (XB, YB, ZB, RX, RY, RZ) of the robot motion read from the teach pendant.
+To solve Eq. (1), the light plane equation A ∗ xC + B ∗ yC + C ∗ zC − D = 0 is formulated, where (A, B, C, D) are the optical plane parameters. Furthermore, owing to the presence of tangential and radial distortion between the ideal image coordinates (x∗I , y∗I ) and the actual image coordinates (xI, yI), the camera distortion parameters (k1, k2, k3, p1, p2) must be determined during camera calibration.
+The calibration process of line laser vision-assisted robot GMAW system is summarized in Fig. 4, comprising camera calibration, optical plane calibration, and hand-eye calibration. Camera intrinsic
+
+Fig. 1. Hardware platform for intelligent robot welding. 3
+
+H. Wang et al.
+
+Robotics and Computer-Integrated Manufacturing 101 (2026) 103315
+
+Fig. 2. Control software for intelligent robot welding.
+
+Fig. 3. 3D coordinate recognition principle of welding assisted by line laser vision.
+
+parameters (fx, fy, uo, vo) and distortion parameters (k1, k2, k3, p1, p2) are determined during camera calibration. Optical plane parameters (A, B, C, D) are determined during optical plane calibration, while the handeye transformation matrix (RH, TH) is computed in the hand-eye calibration. Collectively, these enable the robot to dynamically perceive the 3D coordinates of arbitrary spatial points using laser sensing, following this procedure: (1) acquisition of line laser images; (2) correction of image distortions using the calibrated distortion parameters; (3) extraction of pixel coordinates (u, v) of the feature points; (4) computation of the 3D coordinates (xB, yB, zB) in OBXBYBZB by substituting (u, v), intrinsic parameters, optical plane parameters, robot motion parameters at the time of imaging, and the (RH, TH) into Eq. (1).
+
+3.1. Camera calibration leveraging CTGOMand APSO
+Camera calibration is performed using the spatial geometric information of checkerboard corner points, as illustrated in Fig. 5. The calibration procedure consists of the following steps: (1) acquisition of 24 checkerboard images at distinct robot postures, followed by image preprocessing; (2) detection of corner points; (3) computation of homography matrices; (4) initial estimation of camera parameters via the linear algorithm; and (5) refinement of camera parameters through nonlinear optimization. Accurate localization of checkerboard corner points and nonlinear optimization of camera parameters are particularly critical, as they directly determine the accuracy of camera calibration. This paper therefore focuses on innovative enhancements in these two
+
+4
+
+H. Wang et al.
+
+Robotics and Computer-Integrated Manufacturing 101 (2026) 103315
+
+Fig. 4. Calibration process of line laser vision-assisted robot GMAW system.
+
+Fig. 5. Camera calibration. (a) Acquisition for chessboard images. (b) Chessboard images captured under different robot postures.
+
+key stages.
+3.1.1. AGC for checkerboard images Both overexposure and underexposure reduce the contrast of
+checkerboard images, thereby significantly compromising the accuracy of corner extraction. To evaluate contrast enhancement performance, adaptive gamma correction (AGC) and adaptive histogram equalization (AHE) were applied. As illustrated in Fig. 6, compared to AHE, the edge blurring of the corner points in the checkerboard image after AGC processing is significantly reduced. Under varying exposure conditions, the checkerboard images enhanced by AGC are presented in Fig. 7. The
+
+above analysis demonstrates that AGC is essential for captured checkerboard images, as it effectively enhances the visibility of key corner points within the image.
+3.1.2. High-precision sub-pixel corner extraction based on CTGOM Accurate extraction of corner points in checkerboard images is a
+fundamental prerequisite for high-precision camera calibration. However, conventional corner detection methods, such as the Harris and FAST methods, commonly suffer from limitations in positioning accuracy and sensitivity to image noise. To address these challenges, this paper proposes an innovative high-precision sub-pixel corner extraction
+
+5
+
+H. Wang et al.
+
+Robotics and Computer-Integrated Manufacturing 101 (2026) 103315
+
+Fig. 6. Processing results of different contrast enhancement methods. (a) Original image. (b) AHE. (c) AGC.
+
+Fig. 7. Results of AGC for images under different exposures. (a) Underexposure checkerboard image. (b) AGC for (a). (c) Overexposed checkerboard image. (d) AGC for (c).
+
+strategy based on the circular tangential gradient orthogonal method (CTGOM). The method constructs a geometric circle centered at the initial corner point, computes the tangential intensity gradient components at points along the circumference, and selects the four points with the largest gradient magnitudes. These points are then grouped into two diagonal pairs. Leveraging the spatial orthogonality constraint between the tangential direction at each point and the radial vector pointing from its diagonal counterpart to the circle center, the least-squares optimization model is formulated to determine the optimal corner location. The principle of CTGOM is illustrated in Fig. 8, with its core steps
+
+outlined as follows:
+
+(
+
+)
+
+The initial corner point q = x0, y0 is detected by the FAST, and a
+
+circle P(θ) with a radius of r is constructed with it as the center:
+
+⎧ ⎨ x(θ) = x0 + rcosθ
+
+⎩ y(θ) = y0 + rsinθ (2) θ ∈ [0, 2π)
+
+The tangential vector at any point on the circle is:
+
+Fig. 8. Principle of CTGOM. (a) Initial corner point extraction. (b) Sub-pixel corner point extraction. 6
+
+H. Wang et al.
+
+dP →
+
+= T (θ) = (− sin θ, cos θ)
+
+(3)
+
+dθ
+
+The tangential intensity gradient at each point on the circle is:
+
+→ gt(θ) = ∇I(x(θ), y(θ))⋅ T (θ)
+
+= − ∂I ⋅sin θ + ∂I⋅cosθ (4)
+
+∂x
+
+∂y
+
+= − Ix⋅sin θ + Iy⋅cosθ
+
+The tangential vectors corresponding to the four points (p1p2, p3, p4)
+
+exhibiting the maximum absolute values of the tangential intensity
+
+→→→
+
+→
+
+gradient gt(θ) are denoted as T (θ1), T (θ2), T (θ3) and T (θ4), respec­
+
+tively. Due to corner point localization errors, the tangential vectors at
+
+these points fail to achieve perfect orthogonality with the radial vectors
+
+pointing from their respective diagonal counterparts to the circle center,
+
+resulting in non-zero dot products. That is:
+
+⎧→
+
+⎪⎪ ε1 = T (θ1) • (q − p3)
+
+⎪⎨ →
+
+ε2 = T (θ2) • (q − p4)
+
+→
+
+⇒Aq − b = ε
+
+(5)
+
+⎪⎪⎪ ε3 = T (θ3) • (q − p1)
+
+⎩→
+
+ε4 = T (θ4) • (q − p2)
+
+The ideal corner point q is the one that minimizes the error εi across all selected points. To achieve this, the least-squares optimization approach is applied to solve Eq. (5). Eq. (5) is rewritten in the form of the two-norm:
+
+min ‖ Aq − b‖2 = min (Aq − b)T(Aq − b)
+
+(6)
+
+where:
+
+⎡
+
+⎤
+
+− sin θ1 cos θ1
+
+A ⎢ 4 × 2 = ⎢ − ⎣ sin θ2 cos θ2 ⎥⎥⎦ (7)
+
+− sin θ3 cos θ3
+
+− sin θ4 cos θ4
+
+⎡
+
+⎤
+
+− sin θ1⋅x3 + cos θ1⋅y3
+
+b ⎢ 4 × 1 = ⎢ − ⎣ sin θ2⋅x4 + cos θ2⋅y4 ⎥⎥⎦ (8)
+
+− sin θ3⋅x1 + cos θ3⋅y1
+
+− sin θ4⋅x2 + cos θ4⋅y2
+
+The least-squares minimization process in the two-norm form is formulated as follows:
+
+∂ ‖ Aq − b‖2 = 2AT(Aq − b) = 0 (9) ∂q
+
+ATAq = ATb
+
+(10)
+
+Robotics and Computer-Integrated Manufacturing 101 (2026) 103315
+
+q∗ = ( ATA)− 1ATb
+
+(11)
+
+Using Eq. (11), the updated point q∗ is adopted as the new circle center, and the radius is iteratively reduced. The algorithm is then applied in an iterative manner to refine the corner localization with progressively higher precision.
+The corner detection results of the checkerboard image using CTGOM are presented in Figs. 9–10 and Table 1. As shown in Fig. 9, the method successfully localizes all 88 corners within the checkerboard image with high accuracy. The localized enlargement of the extracted result reveals that the detected corner positions closely align with the theoretical positions, thereby validating the high precision and effectiveness of CTGOM. Moreover, Fig. 10 illustrates the error distribution of the corners extracted by CTGOM. For comparative evaluation, this study incorporates the Harris method and the traditional grayscale gradient orthogonal method (TGGOM), which corresponds to MATLAB’s built-in sub-pixel corner detection method. As evident from Fig. 10, CTGOM exhibits smaller fluctuations in both horizontal and vertical errors, significantly outperforming the other two methods. From Table 1, the average absolute horizontal and vertical errors of the corner points extracted by CTGOM are 0.0881 pixels and 0.0962 pixels, respectively. By employing an explicit circular geometric constraint model and selecting four tangential gradient extrema as geometric features, CTGOM achieves strong robustness against local image noise, thereby enhancing corner detection accuracy. This constitutes the core mathematical principle underlying CTGOM.
+
+3.1.3. Solution for homography matrix based on DLT-SVD
+
+The calculation process of the homography matrix (H ∈ R 3 × 3) is
+
+illustrated in Fig. 11. The transformation relationship between the pixel
+
+coordinates (ui, vi) of all corner points within the checkerboard plane
+
+and their corresponding world coordinates (Xi, Yi) is given by:
+
+⎡⎤ ⎡
+
+⎤⎡ ⎤ ⎡ ⎤
+
+ui
+
+h11 h12 h13 Xi
+
+Xi
+
+λi⎣ vi ⎦ = ⎣ h21 h22 h23 ⎦⎣ Yi ⎦ = H⎣ Yi ⎦
+
+(12)
+
+1
+
+h31 h32 h33 1
+
+1
+
+where λi denotes a non-zero scale factor. Eq. (12) could be reformulated
+
+as the linear system of equations using the direct linear transformation
+
+(DLT). That is:
+
+{ − Xih11 − Yih12 − h13 + uiXih31 + uiYih32 + uih33 = 0 − Xih21 − Yih22 − h23 + viXih31 + viYih32 + vih33 = 0
+
+(13)
+
+For n pairs of matched points, the 2n × 9 linear system Ah = 0 could be constructed. To suppress noise interference and enhance solution accuracy, significantly more than four pairs of matched points (n≫4) are
+
+Fig. 9. Results of corner extraction using CTGOM. 7
+
+H. Wang et al.
+
+Robotics and Computer-Integrated Manufacturing 101 (2026) 103315
+
+Fig. 10. Errors in corner extraction using different algorithms. (a) Errors of the corners on the XP axis of the pixel coordinate system. (b) Errors of the corners on the YP axis of the pixel coordinate system.
+
+Table 1 Performance comparison for different corner extraction algorithms.
+
+Characteristics
+
+Harris
+
+TGGOM
+
+CTGOM
+
+Average absolute horizontal errors (Pixel)
+Average absolute vertical errors (Pixel)
+Precision level Model assumptions
+Solution method Noise immunity
+
+0.9097
+0.9193
+Pixel level Local grayscale autocorrelation model
+Non-iteration Sensitive
+
+0.1232
+
+0.0881
+
+0.1291
+
+0.0962
+
+Sub-pixel level Gradient vector orthogonal constraint model
+Iteration Moderate
+
+Explicit circular geometric constraint model
+Strong
+
+typically employed, rendering the equation system Ah = 0
+
+overdetermined (2n > 9). Consequently, the problem naturally transforms into seeking an optimal solution in the least-squares, specifically, finding a vector h that minimizes the objective function ‖ Ah‖2. This solution is obtained via singular value decomposition (SVD) of the coefficient matrix A, expressed as A = UΣVT. U and V are unitary matrices, and Σ is the diagonal matrix whose entries are the singular values arranged in descending order. The optimal h corresponds to the column of V associated with the smallest singular value, namely, the last column of V. Reshaping this vector into the 3 × 3 matrix yields the homography matrix H.
+3.1.4. Solution for initial camera parameters based on DLT-SVD After obtaining the homography matrices Hi = K[Ri|ti] from multiple
+checkerboard images, a linear system of equations is formulated to estimate the camera’s intrinsic matrix K. By defining the auxiliary matrix B = K− TK− 1 and utilizing the column vectors (h1(i), h1(i)) extracted from each Hi, two linear constraints on the intrinsic parameters in K can be derived:
+
+Fig. 11. Calculation process for the homography matrix. 8
+
+H. Wang et al.
+⎧ ( (i))T (i) ⎨ h1 Bh1 = 1 ⎩ ( (i))T (i)
+h1 Bh2 = 0
+
+(14)
+
+For each homography matrix Hi, two linear equations are generated
+
+to implement the DLT, resulting in an overdetermined equation system
+
+Ab − c = 0. The six unknown elements of matrix B are then estimated by
+
+applying SVD to this system. Once B is determined, the camera’s
+
+intrinsic matrix K can be recovered through Cholesky decomposition or
+
+matrix factorization. Furthermore, the rotation matrix Ri and translation
+
+vector ti corresponding to each captured checkerboard image can also be
+
+computed:
+
+⎧
+
+⎪⎪
+
+B13
+
+⎪⎪ u0 = −
+
+⎪⎪⎪
+
+B11
+
+⎪⎪⎪⎪⎪ B23
+
+⎪⎪ v0 = −
+
+⎪⎪⎨
+
+B22
+
+√̅̅̅̅̅̅̅
+
+⎪⎪
+
+1
+
+⎪⎪ fx =
+
+⎪⎪
+
+B11
+
+⎪⎪⎪⎪ √̅̅̅̅̅̅̅
+
+⎪⎪⎪⎪⎪⎪⎩ fy = 1
+
+B22
+
+(15)
+
+⎧
+
+⎪⎪
+
+1
+
+⎪⎪ λi = ⃒⃒ (i)⃒⃒
+
+⎪⎪ ⃒⃒K− 1h ⃒⃒
+
+⎪⎪
+
+1
+
+⎪⎪
+
+⎪⎪ (i)
+
+− 1 (i)
+
+⎨ r1 = λiK h1
+
+⎪ (i)
+
+− 1 (i)
+
+⎪⎪ r2 = λiK h2
+
+⎪⎪
+
+⎪⎪ (i) (i) (i)
+
+⎪⎪ r3 = r1 × r2
+
+⎪⎪
+
+⎪⎩
+
+− 1 (i)
+
+ti = λiK h3
+
+(16)
+
+where h1(i), h2(i) and h3(i) denote the column vectors of Hi, while r1(i), r2(i) and r3(i)represent the column vectors of the rotation matrix Ri.
+
+3.1.5. Nonlinear optimization for camera parameters based on APSO When optimizing the camera distortion parameters and the intrinsic
+parameters using the adaptive particle swarm optimization (APSO), an objective function must be constructed. Assuming N (N = 24 in this study) images are captured under varying positions and postures of the camera, with M corner points extracted from each image, the objective function can be formulated as:
+
+∑N ∑ M
+
+fobj = min
+
+‖pij −
+
+i=1 j=1
+
+̂pij( K, D, Rj, tj)‖2
+
+(17)
+
+where pij denotes the actual pixel coordinates (Uij, Vij) of the j-th corner
+
+(
+
+)
+
+point in the i-th image. ̂pij K, D, Rj, tj represents the reprojected pixel
+
+coordinates (uij, vij) computed using the current estimates of the intrinsic
+
+parameters K, distortion parameters D, and extrinsic parameters (Ri, ti).
+
+APSO randomly initializes the population based on the initial solution
+
+and dynamically adjusts the inertia weight (w) and learning factors (c1
+
+and c2) during iteration to achieve a balanced trade-off between global
+
+exploration and local exploitation. The evolution factor E is employed to
+
+assess the current state of the population:
+
+⎧ ⎪⎨ dg − dmin , if dmax > dmin E = ⎪⎩ dmax − dmin
+1, otherwise
+
+(18)
+
+where dmin, dmax and dg denote the minimum Euclidean distance, maximum Euclidean distance, and global optimal distance among particles, respectively. Consequently, the evolution factor E is normalized within the range of [0, 1]. Emax = 1 represents the state of maximum
+
+Robotics and Computer-Integrated Manufacturing 101 (2026) 103315
+
+diversity (global exploration), whereas Emin approaches 0 as the swarm
+
+converges (local exploitation). The parameter adaptation strategy is as
+
+follows:
+
+⎪⎧ 1
+
+⎪⎪
+
+w(E) =
+
+− 2.6E ∈ [0.4, 0.9]
+
+⎪⎪
+
+1 + 1.5e
+
+⎪⎪
+
+⎨ c ( ) 1(E) = c1,imitial + c1,final − c1,imitial ⋅ Emax − E
+
+⎪⎪
+
+Emax − Emin
+
+⎪⎪
+
+⎪⎪⎪⎩ c ( ) 2(E) = c2,initial + c2,final − c2,initial ⋅ Emax − E
+
+Emax − Emin
+
+(19)
+
+In each iteration, particles continuously update their velocity and
+
+position by tracking the individual historical best and the population’s
+
+global best positions, progressively converging toward the global
+
+optimal solution. The maximum number of iterations is set to 500. To
+
+evaluate convergence during iteration, a fitness function is computed in
+
+each iteration based on the reprojection error, defined as follows:
+
+√̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅
+
+√ √1 ffitness = √
+
+∑N ∑ M [(
+
+)2 (
+
+)2]
+
+Uij − uij + Vij − vij
+
+N ∗ M i=1 j=1
+
+(20)
+
+To further evaluate the performance of the APSO-based nonlinear optimization approach for camera parameters, comparative experiments were conducted using differential evolution (DE), genetic algorithm (GA), adaptive genetic algorithm (AGA), and particle swarm optimization (PSO). Fig. 12 illustrates the convergence behaviors and fitness evolution trajectories of these algorithms in solving camera calibration parameters. Results indicate that GA suffers from premature convergence due to fixed control parameters, resulting in an early loss of population diversity. While exhibiting a relatively high initial fitness (1.0291 pixels), it ultimately stabilized at 0.6607 pixels. DE rapidly identifies near-optimal solutions through its differential mutation mechanism but demonstrates limited refinement capability in later stages, achieving a final fitness of 0.4406 pixels. AGA mitigates GA’s premature convergence via adaptive parameter adjustment, with fitness continuously decreasing to 0.2008 pixels, thereby significantly outperforming standard GA. PSO achieves fast initial convergence by leveraging both individual best and global best information, with an initial fitness of 0.8907 pixels. However, it experiences diminished exploration ability in later iterations, converging to a final fitness of 0.1445 pixels. APSO not only converges faster but also attains the lowest final fitness of 0.1094 pixels by dynamically adjusting the inertia weight and learning factors, demonstrating superior stability and global search capability. Overall, the algorithm performance ranking is APSO > PSO > AGA > DE > GA. Owing to its comprehensive advantages in accuracy, and convergence speed, APSO is selected in this study for the nonlinear optimization of camera parameters.
+
+3.1.6. Performance analysis for camera calibration methods In the checkerboard image corner detection stage, a high-precision
+sub-pixel corner extraction algorithm based on CTGOM is proposed. In the nonlinear camera parameter estimation stage, an APSO-based nonlinear optimization algorithm is employed. CTGOM and APSO constitute the core methodology for camera calibration in this paper. To further evaluate the performance advantages of the proposed method, comparative experiments are conducted using the TGGOM+APSO approach, the linear transformation method, Zhang’s method [39], the calibration toolbox method, and the method proposed by Lü et al. [40]. The camera calibration results of these methods are summarized in Table 2. Due to inherent algorithmic limitations, the linear transformation method and Zhang’s method [39] are unable to estimate all camera intrinsic parameters (e.g., distortion coefficients). In contrast, the remaining methods successfully achieve full parameter estimation, including both intrinsic and extrinsic parameters.
+To comprehensively evaluate the performance of the six camera calibration methods, this paper conducts a systematic analysis by
+
+9
+
+H. Wang et al.
+
+Robotics and Computer-Integrated Manufacturing 101 (2026) 103315
+
+Fig. 12. Convergence performance of five nonlinear algorithms.
+
+Table 2 Camera calibration results using different methods.
+
+Methods
+
+fx
+
+fy
+
+Linear transformation Zhang’s method [39] Calibration toolbox TGGOM+APSO Lü et al. [40] CTGOM+APSO
+
+7926.3564 7308.0899 7942.9901 8013.2540 8012.7963 8213.0364
+
+7925.8134 7309.3960 7938.4077 8007.8623 8008.1056 8207.0480
+
+u0
+1274.4059 1317.9136 1298.6098 1299.5780 1301.6512 1302.1394
+
+v0
+906.1201 1016.8794 1148.1749 1158.2877 1148.9225 1167.9541
+
+k1
+​ − 0.4051 − 0.4846 − 0.4960 − 0.4928 − 0.5242
+
+k2
+​ − 0.4316 − 0.2225 0.0952 − 0.2945 0.4777
+
+k3
+​ ​ 4.1132 − 6.6748 7.1207 − 19.4298
+
+p1 (× 10–5)
+​ ​ − 8.05469 − 8.78209 − 8.23523 − 9.62629
+
+p2 (× 10–5)
+​ ​ 1.09431 1.09071 94.703 97.625
+
+combining the reprojection error distribution (Fig. 13) with multiple accuracy indicators (Table 3). The results demonstrate that all nonlinear optimization methods significantly outperform the traditional linear transformation method, fully validating the necessity of modeling nonlinear effects such as lens distortion in camera calibration. The reprojection error distribution of the linear transformation method (Fig. 13(a)) is the most dispersed, exhibiting numerous high-error outliers and poor calibration stability. The Zhang’s method [39] (Fig. 13 (b)) and the calibration toolbox approach (Fig. 13(c)) improve parameter estimation accuracy through the incorporation of nonlinear optimization strategies, resulting in a more concentrated error distribution. Furthermore, the fusion methods further enhance the convergence quality. While the TGGOM+APSO (Fig. 13(d)) and Lü et al. [40] (Fig. 13 (e)) improve camera calibration accuracy, both remain constrained by the precision of initial corner localization. In contrast, the CTGOM+APSO (Fig. 13(f)) achieves superior overall performance, with a RMSE of 0.1094 pixels, a mean absolute error (MAE) of 0.0814 pixels, a mean absolute percentage error (MAPE) of 0.0084%, and a maximum deviation (MaxDev) of 0.4568 pixels. Notably, TGGOM+APSO, Lü et al. [40], and CTGOM+APSO all employ the adaptive particle swarm optimization principle, with performance differences primarily stemming from the corner extraction stage. CTGOM significantly enhances feature localization accuracy by integrating geometric constraints with gradient-based optimization, thereby providing more reliable inputs for subsequent camera parameter estimation. These findings clearly indicate that, in camera calibration, the accuracy of front-end corner detection fundamentally determines the upper bound of back-end optimization performance. In summary, CTGOM+APSO achieves significant improvements in calibration accuracy through the synergistic integration of high-precision feature extraction and adaptive nonlinear optimization.
+
+3.2. Light plane calibration based on back-projected point clouds
+
+The intersection of two non-parallel planes along a straight line
+
+constitutes the fundamental geometric principle underlying the light
+
+plane calibration method based on back-projected point clouds, as
+
+illustrated in Fig. 14. One plane is the checkerboard calibration plate,
+
+while the other is the laser plane to be calibrated. By translating and
+
+rotating the calibration board across multiple distinct spatial postures,
+
+the laser line is projected onto different positions on the target plane,
+
+enabling the acquisition of 3D back-projected point clouds Pn =
+
+(
+
+)T
+
+xci, yci, zci in the camera coordinate system. Substituting these 3D
+
+points into the plane equation Ax + By + Cz + D = 0 yields an over­
+
+determined linear equation:
+
+∑n Q = ‖ Axci + Byci + Czci + D‖2
+i=1
+
+(21)
+
+The normal equations are obtained by taking the partial derivatives
+
+of the objective function with respect to each parameter and setting
+
+them to zero:
+
+⎡∑
+
+2
+xci ⎢
+
+⎢∑
+
+⎢ ⎢
+
+xci yci
+
+⎢∑
+
+⎢ ⎢
+
+xci zci
+
+⎣∑
+
+∑ xci yci
+∑
+2
+yci ∑
+yci zci ∑
+
+∑ xci zci
+∑ yci zci
+∑
+2
+zci ∑
+
+∑⎤
+
+xci ⎥⎡ ⎤
+
+∑ ⎥A
+
+yci ⎥⎥⎢ B ⎥
+
+∑
+
+⎥⎢⎣
+
+⎥ ⎦
+
+=
+
+0
+
+zci
+
+⎥ ⎥
+
+C
+
+⎦D
+
+(22)
+
+xci
+
+yci
+
+zci
+
+n
+
+The parameters of the light plane are determined by solving the homogeneous equation using SVD. The resulting light plane equation is 0.006858 ∗ xC − 0.995088 ∗ yC + 0.098756 ∗ zC + 40.972365 = 0.
+
+3.3. Hand-eye calibration based on spherical geometry
+
+The hand-eye transformation is established by utilizing the charac
+
+10
+
+H. Wang et al.
+
+Robotics and Computer-Integrated Manufacturing 101 (2026) 103315
+
+Fig. 13. Distributions of reprojection errors for different camera calibration methods. (a) Linear transformation. (b) Zhang’s method [39]. (c) Calibration toolbox. (d) TGGOM+APSO. (e) Lü et al. [40]. (f) CTGOM+APSO.
+
+Table 3 Accuracy analysis for different camera calibration methods.
+
+Algorithm
+
+RMSE MAE
+
+MAPE (%) MaxDev
+
+Linear transformation Zhang’s method [39] Calibration toolbox TGGOM+APSO Lü et al. [40] CTGOM+APSO
+
+0.2918 0.1528 0.1509 0.1419 0.1228 0.1094
+
+0.1441 0.1196 0.1182 0.1137 0.0930 0.0814
+
+0.0142 0.0117 0.0116 0.0116 0.0096 0.0084
+
+9.7959 0.7856 0.7975 0.5021 0.4740 0.4568
+
+MinDev
+0.0001 0.0000 0.0001 0.0000 0.0000 0.0000
+
+teristics of spherical geometry. This approach employs a standard sphere with a diameter of 30 mm and precision grade of ISO 3290 G10 as the calibration target. During the translational scanning process, in which the robot rotation matrix RB is held constant while its translation vector TB varies incrementally, an overdetermined linear system of equations with respect to RH is formulated. During the rotational scanning process,
+
+where RB changes progressively while TB remains fixed, a separate
+
+overdetermined linear system concerning TH is similarly established.
+
+Both subproblems are solved using SVD, yielding the complete hand-eye
+
+transformation matrix. The calibration procedure has been thoroughly
+
+described and experimentally validated in prior work [41], and hence
+
+the detailed derivation is omitted in this paper. The hand-eye calibration
+
+results derived from the experiments conducted in this study are as
+
+follows:
+
+⎡
+
+⎤
+
+[
+
+] − 0.9978 − 0.0613 0.0256 4.0855
+
+RH TH = ⎢⎢⎣ 0.0612 − 0.9981 − 0.0015 − 64.6565 ⎥⎥⎦ (23)
+
+01
+
+0.0256 0.0001 0.9997 46.1074
+
+0
+
+0
+
+0
+
+1
+
+3.4. System accuracy analysis To evaluate the spatial target recognition accuracy of the line laser
+
+11
+
+H. Wang et al.
+
+Robotics and Computer-Integrated Manufacturing 101 (2026) 103315
+
+Fig. 14. Optical plane calibration. (a) principle of optical plane calibration. (b) process of optical plane calibration.
+
+vision-assisted robot GMAW system developed herein, a high-precision metal trapezoidal calibration block with a well-defined geometric structure (Fig. 15) was employed for system error assessment. The calibration block provides eight spatial feature points, whose 3D coordinates in the OBXBYBZB are determined by integrating their image pixel coordinates with the calibrated system parameters, as summarized in Table 4. Due to the inherent difficulty in obtaining precise theoretical world coordinates for individual points in 3D space, system accuracy is evaluated by comparing the actual measured inter-point distances against their corresponding theoretical values. The results demonstrate that all measurement errors are confined within ±0.17 mm, with an average absolute error of 0.1111 mm. This precision significantly surpasses conventional industrial welding requirements for spatial positioning accuracy, where a tolerance of ≤ 0.6 mm is typically specified. Furthermore, the results provide strong validation of the effectiveness of the integrated system and the multi-module collaborative calibration method designed herein for practical engineering applications.
+
+4. Online trajectory planning for robot welding
+The online planning of welding paths and torch postures for workpieces with unknown spatial geometries remains a critical challenge in intelligent welding. Current research is largely confined to welding paths, failing to achieve effective collaborative recognition and control of both the welding path and the torch posture. Moreover, these approaches are typically restricted to structures with known geometric models or single-type joints. The trajectory planning strategies often depend on prior geometric knowledge or idealized assumptions, which limits their adaptability to complex, variable, irregular, or non-standard workpieces encountered in actual industrial scenarios. To this end, a novel online trajectory planning approach for robot welding based on point cloud geometric differentiation is innovatively proposed herein. This approach does not heavily rely on prior knowledge of geometric models, but instead directly processes the 3D point cloud data of unknown joints obtained through the line laser sensor. Subsequently, by leveraging the principles of point cloud geometric differentiation, the approach dynamically computes the robot six-degree-of-freedom motion sequence (XB, YB, ZB, RX, RY, RZ), enabling the online, synchronous,
+
+Fig. 15. System error analysis. (a) 3D calibration block. (b) measurement schematic diagram for system errors. 12
+
+H. Wang et al.
+
+Table 4 Measurement results of system errors.
+
+Points
+
+Pixel coordinates
+
+World coordinates (mm)
+
+a b c d e f g h Average
+
+(724, 813) (1004, 814) (1013, 815) (725, 814) (1853, 824) (1567, 820) (1574, 820) (1854, 824) absolute error
+
+(1267.7461, (1247.9278, (1227.7482, (1197.1738, (1268.7527, (1248.9404, (1228.7483, (1199.1912,
+
+34.0525, − 774.9947) 23.9819, − 755.0286) 23.7585, − 755.2128) 34.0708, − 774.4380) − 5.8220, − 776.8055) 4.1598, − 756.4690) 3.9875, − 756.4032) − 5.8318, − 776.8391)
+
+Robotics and Computer-Integrated Manufacturing 101 (2026) 103315
+
+Indices
+ae bf cg Dh ab cd ef gh 0.1111 mm
+
+Measured distance (mm)
+39.9283 19.9001 19.8320 40.0257 29.8802 37.5599 30.0955 37.2514
+
+Theoretical distance (mm)
+40 20 20 40 30 37.4166 30 37.4166
+
+Errors (mm)
+− 0.0717 − 0.0999 − 0.1680 0.0257 − 0.1198 0.1433 0.0955 − 0.1652
+
+continuous, and smooth generation of both the welding path and torch posture.
+4.1. 3D morphology reverse modeling for joints
+4.1.1. Location and classification for joint ROIs Direct geometric morphological reconstruction from large-field-of-
+view laser images corrupted by substantial interference typically suffers from low computational efficiency and limited robustness. To overcome these challenges, YOLOv11 is introduced to efficiently localize and classify regions of interest (ROIs) within laser stripes. YOLOv11 maintains a lightweight architecture while achieving highprecision object detection, real-time segmentation, and posture estimation, thereby significantly broadening its applicability in complex visual tasks [42,43]. As illustrated in Fig. 16, the YOLOv11 architecture comprises four primary components: input, backbone, neck, and head. The input employs multi-scale resizing, affine transformation, and color augmentation to improve model generalization. The backbone extracts multi-scale semantic features through an enhanced C3k2 module, which integrates a cross-stage partial (CSP) structure and dual convolutional pathways, and further incorporates fast spatial pyramid pooling (SPPF) and the novel cross-stage spatial attention (C2PSA) module to strengthen sensitivity to small targets and critical regions. The neck facilitates the fusion of high-level semantics and low-level spatial details through the feature pyramid network (FPN). Through decoupling operations, the head independently outputs class confidence, object scores, and bounding box coordinates. These architectural designs enable YOLOv11 to accurately and efficiently identify joint ROIs under complex background conditions, thereby providing a robust foundation for subsequent high-precision reconstruction.
+To ensure that YOLOv11 can accurately localize and classify the joint
+
+ROIs even under extreme imaging conditions such as overexposure and underexposure, laser stripe images of various joint specifications, captured under varying exposure levels, viewing angles, interference patterns, were collected and utilized. Representative original samples are shown in Fig. 17. The dataset comprised 1500 images of butt joints and 1500 images of fillet joints. The ratio of images within the training, validation, and test sets was 7:2:1. Notably, to effectively prevent data leakage, the dataset splitting strategy employed in this study was applied specifically to image sets collected during independent experiments, rather than the entire image pool. This ensures that no image in the test set (Fig. 18) shares the identical background, lighting condition, or specific workpiece instance with any image in the training set (Fig. 17), effectively eliminating frame-to-frame correlation leakage. To further enhance generalization, Mosaic data augmentation was employed online during training to ensure the model learns invariant features rather than memorizing specific samples. The online detection performance of the trained YOLOv11 for arbitrary joint ROIs is illustrated in Fig. 18. Results demonstrate that despite variations in illumination, stripe orientation, and background noise, the YOLOv11 consistently achieves precise localization of joint ROIs and accurate classification of joint types within these regions. As presented in Table 5, YOLOv11 achieves both precision and recall of 1.0, indicating the absence of false positives and false negatives in its predictions. The mAP@0.5 scores for both butt joints and fillet joints reach 0.995, reflecting high accuracy in joint type classification and high precision in ROI localization. Notably, the model requires only 4.7 ms per inference, corresponding to a detection frame rate of up to 213 Hz, which fully satisfies the stringent real-time requirements for joint ROI identification and extraction in practical industrial applications.
+
+Fig. 16. Inference structure of YOLOv11 in the research. 13
+
+H. Wang et al.
+
+Robotics and Computer-Integrated Manufacturing 101 (2026) 103315
+
+Fig. 17. Joint laser stripe images. (a1)-(a5) Butt joints. (b1)-(b4) fillet joints.
+
+Fig. 18. Extraction results for ROIs under various operational scenarios. (a1)-(a6) ROIs of butt joints. (b1)-(b6) ROIs of fillet joints.
+
+Table 5 Performance of YOLOv11 on extracting ROIs.
+
+ROIs
+
+Precision
+
+Recall
+
+mAP@0.5
+
+mAP@.5:.95
+
+FPS
+
+(%)
+
+(%)
+
+(%)
+
+(%)
+
+(Hz)
+
+Butt
+
+0.999
+
+1
+
+0.995
+
+0.788
+
+213
+
+joint
+
+Fillet
+
+1
+
+1
+
+0.995
+
+0.876
+
+joint
+
+4.1.2. Laser stripe centerline extraction To address the challenge of high-precision laser stripe centerline
+extraction in complex welding environments, a context informationbased iterative centerline extraction algorithm (CIICEA) is innovatively proposed, as illustrated in Fig. 19. The algorithm initially applies Otsu thresholding to the joint ROIs to enhance the purity of the target, with the resulting binary segmentation shown in Fig. 19(b). Building upon this preprocessing step, sub-pixel accurate centerline extraction is achieved through an iterative refinement procedure, the details of which
+
+are outlined in the following steps:
+
+(1) From the Imgi after threshold segmentation, extract the set of non-zero grayscale pixels, denoted as IDiPDI:
+
+i
+IDPDI
+
+=
+
+{(u,
+
+v)|Imgi(u,
+
+v)〉0}
+
+(24)
+
+(2)
+
+Perform
+
+Gaussian
+
+interpolation
+
+on
+
+each
+
+column
+
+of
+
+pixels
+
+in
+
+i
+IDPDI
+
+to generate the continuous point cloud IDi0 (Fig. 20).
+
+n
+
+(
+
+)
+
+( ) ∑ ()
+
+G xg − xj
+
+f xg = ωj⋅f xj , ωj = ∑n (
+
+)
+
+j=1
+
+j=1G xg − xj
+
+(25)
+
+( ) ( ( xg − xj)2) G xg − xj = exp − 2σ2 , σ = 0.35 (26)
+
+14
+
+H. Wang et al.
+
+Robotics and Computer-Integrated Manufacturing 101 (2026) 103315
+
+Fig. 19. Context information-based iterative centerline extraction algorithm. (a) Original ROIs. (b) ROIs after threshold segmentation. (c) Principle of CIICEA.
+
+Fig. 20. Results of Gauss interpolation: (a) Pixel point clouds in PDI. (b) Pixel point clouds after Gauss interpolation.
+
+() where ωj and f xj represent the weight and gray value of the known point xj respectively. xg is the point to be interpolated, which is determined according to the principle of equal spacing.
+
+where
+
+fi
+k− 1
+
+is
+
+computed
+
+from
+
+i
+IDk− 1
+
+using
+
+gray
+
+centroid
+
+algorithm.
+
+Furthermore, leveraging contextual information, the initial estimate is
+
+set
+
+as
+
+fi
+0
+
+= f i−
+k
+
+1.
+
+(3)
+
+Based
+
+on
+
+the
+
+previous
+
+centerline
+
+fi
+k−
+
+1,
+
+iteratively
+
+update
+
+the
+
+pixel
+
+domain:
+
+⎧
+
+⎨ fi − λkd
+
+i
+
+k− 1
+
+IDk :
+
+, λ = 0.8, d = 8
+
+⎩ fi + λkd
+k− 1
+
+(27)
+
+(4) The iteration terminates when the geometric discrepancy be­
+
+tween
+
+the
+
+centerlines
+
+from
+
+two
+
+consecutive
+
+iterations,
+
+denoted
+
+as
+
+fi
+k
+
+and
+
+fi
+k−
+
+1,
+
+is
+
+below
+
+the
+
+predefined
+
+threshold
+
+Ic.
+
+(⃒
+
+⃒)
+
+D
+
+⃒f i −
+k
+
+fi ⃒
+k− 1
+
+< Ic, Ic = 0.5
+
+(28)
+
+where D() denotes the variance function. The centerline extraction results obtained using CIICEA are presented in Figs. 21–22. It can be observed that CIICEA is capable of efficiently and accurately extracting
+15
+
+H. Wang et al.
+
+Robotics and Computer-Integrated Manufacturing 101 (2026) 103315
+
+Fig. 21. Results of extracting centerlines of butt joints using CIICEA. (a1-a2) Original ROIs under various interferences. (b1-b2) ROIs after threshold segmentation. (c1-c5) Process of extracting centerlines. (d1-d2) Mapping relationship of laser stripes and extracted centerlines.
+
+Fig. 22. Results of extracting centerlines of fillet joints using CIICEA. (a1-a2) Original ROIs under various interferences. (b1-b2) ROIs after threshold segmentation. (c1-c4) Process of extracting centerlines. (d1-d2) Mapping relationship of laser stripes and extracted centerlines.
+
+the laser stripe centerline, even without employing sophisticated image preprocessing techniques such as grayscale transformation,
+
+morphological processing, edge detection, or removal of the smallest connected components. Following each iteration, the region of interest
+
+16
+
+H. Wang et al.
+undergoes progressive compression while image interference is gradually eliminated. This iterative refinement process fundamentally accounts for CIICEA’s robustness against complex noise sources, including light spots, stripe burrs, and specular reflections.
+To further validate the superior performance of the proposed CIICEA, comparative experiments were conducted using the gray centroid algorithm and skeleton extraction algorithm, as illustrated in Fig. 23. From Fig. 23(b1)-(b2), relying solely on pixel compression and thinning operations, the skeleton extraction algorithm often fails to accurately extract the centerline in regions with significant pixel grayscale fluctuations. From Fig. 23(c1)-(c2), the centerline extracted by the gray centroid algorithm exhibits a significant deviation from the true stripe center, and this discrepancy becomes increasingly pronounced with increasing background noise interference. In contrast, the proposed CIICEA algorithm successfully captures the precise stripe centerline. Furthermore, CIICEA demonstrates not only high accuracy but also excellent computational efficiency. Experimental results indicate that CIICEA processes each image frame in approximately 55.88 ms, achieving a real-time processing rate of 18 Hz, thereby fully satisfying the industrial requirements for rapid and accurate centerline extraction.
+4.1.3. Laser stripe centerline filtering Certain light points within the laser stripe centerline extracted solely
+based on pixel grayscale characteristics inevitably deviate from their theoretical positions under intense interference. These outliers can severely compromise both the quality and accuracy of joint morphology reconstruction and must therefore be removed. To this end, an outlier removal method based on the Pauta criterion [41] is employed to filter each centerline. A point xi is identified as an outlier and removed if its residual satisfies |vi| > 3σ. Fig. 24 illustrates a segment of surface morphology reconstruction. Outliers within the 3D point cloud (Fig. 24 (a)) were precisely filtered out, with the filtered results depicted in Fig. 24(b).
+4.1.4. Laser stripe centerline fitting The number of discrete pixel points along the centerline is con­
+strained by camera resolution, resulting in point cloud density insufficient for morphological reconstruction. Although filtering removes outliers from the centerline point cloud, it may leave discontinuous voids at these locations, exacerbating the incompleteness of the centerline. Such damaged centerlines also fail to meet morphological reconstruction requirements. Therefore, a K-means-based quasi-uniform cubic B-spline fitting algorithm (K-QCBFA) is designed for interpolating point clouds of laser centerlines, operating on the following principle:
+
+Robotics and Computer-Integrated Manufacturing 101 (2026) 103315
+
+(1) Employing the K-means algorithm to partition the discrete points
+
+pn
+
+into
+
+K
+
+clusters
+
+pK
+n
+
+K(K, n
+
+K
+
+=
+
+1, 2, ⋯),
+
+the
+
+clustering
+
+principle
+
+is
+
+determined by minimizing the intra-cluster Euclidean distance ED:
+
+(
+
+)
+
+∑K ∑
+
+ED = arg min
+
+‖ x − μi‖2
+
+(29)
+
+i=1 x∈Si
+
+where
+
+μi
+
+denotes
+
+the
+
+centroid
+
+of
+
+the
+
+i-th
+
+cluster
+
+pK
+n
+
+K.
+
+(2)
+
+The
+
+pK
+n
+
+K
+
+within
+
+the
+
+K-th
+
+cluster
+
+are
+
+subjected
+
+to
+
+quasi-uniform
+
+cubic B-spline fitting:
+
+( ) ∑ n K
+
+()
+
+FK tK =
+
+KK K
+pi ⋅Bi,e t , e = 4
+
+i=0
+
+(30)
+
+K ( K) where Bi,e t is the cubic B-spline basis function.
+(3) By integrating the fitted curves FK( tK) from each cluster, the complete centreline FImgi is obtained.
+Results of centerline fitting using K-QCBFA are presented in Fig. 25. These results demonstrate that the proposed algorithm can effectively analyze and extract clustering characteristics from point clouds, adaptively adjusting and allocating nodes. This adaptability not only prevents overfitting of B-spline curves but also ensures that the fitted spatial curves accurately conform to the spatial geometric distribution of the original discrete point cloud, as illustrated in Fig. 25(a) and Fig. 25(c). Fig. 25(b) displays the results of polynomial fitting [44]. Owing to the inherent limitations of polynomial functions in capturing global trend within complex geometries, they exhibit relatively large fitting errors. In contrast, the spatial curves generated by K-QCBFA (Fig. 25(a)) achieve higher accuracy and reliability.
+4.1.5. Online reconstruction for 3D joint morphology The centerline FImgi fitted in the pixel coordinate system based on the
+calibration results of the robot GMAW system can be transformed into the robot base coordinate space. Based on the sampling sequence, the centerline point cloud after coordinate transformation is sequentially organized and integrated in real time within the robot base coordinate system, enabling online reconstruction of the joint’s 3D geometric
+
+Fig. 23. Comparative experiments for extracting centerlines. (a1-a2) Centerlines extracted by CIICEA. (b1-b2) Centerlines extracted by the skeleton extraction algorithm. (c1-c2) Centerlines extracted by the gray centroid algorithm.
+17
+
+H. Wang et al.
+
+Robotics and Computer-Integrated Manufacturing 101 (2026) 103315
+
+Fig. 24. Centerline filtering. (a) Joint point clouds based on unfiltered centerlines. (b) Joint point clouds based on filtered centerlines.
+
+Fig. 25. Centerline fitting. (a) K-QCBFA fitting. (b) Polynomial fitting. (c) Point clouds corresponding to centerlines after K-QCBFA fitting.
+
+morphology. Fig. 26 depicts two representative cases of reverse modeling for joint 3D morphology. The original joint geometry, the insitu real-time reconstruction process, and the final reconstructed 3D morphology are shown in Fig. 26(a1)-(a2), Fig. 26(b1)-(b2), and Fig. 26 (c1)-(c2), respectively. It is evident that the reconstructed 3D joint morphology, achieved through the integration of the laser stripe ROI extraction algorithm YOLOv11, the centerline extraction algorithm CIICEA, the Pauta criterion-based centerline filtering method, and the KQCBFA fitting algorithm, not only preserves fine local geometric details but also accurately captures the overall morphological characteristics.
+4.2. Trajectory planning approach based on point cloud geometric differentiation
+The principle of online trajectory planning for robot welding based on point cloud geometric differentiation is illustrated in Figs. 27–28. To robustly capture local joint morphology, a sliding window-based differentiation sampling strategy is employed along the laser scanning direction. Spatial point cloud samples (Li− 1~Li+1, i>1), each composed of three consecutive frames of line laser stripes, are sequentially extracted.
+
+This tri-frame structure utilizes the spatial variation between adjacent scans to construct a stable local reference, thus effectively mitigating sensor noise. Within these samples, the welding path and welding torch posture are automatically generated.
+4.2.1. Online planning for welding paths For the butt joint, the point cloud sample is displayed in Fig. 27. PBLi,
+PGLi, PGRi and PBRi denote the left base metal tangent plane, the left groove tangent plane, the right groove tangent plane, and the right base metal tangent plane, respectively. These planes are fitted from the line laser point cloud within their corresponding intervals. The center point of the intersection line of planes PBLi and PGLi is GLi. The groove crosssectional plane PSi is perpendicular to the plane PBLi and to the intersection line of the planes PBLi and PGLi through the point GLi. The intersection point of the three planes PSi, PGRi and PBRi is denoted as GRi. The intersection point of the planes PSi, PGLi and PGRi is GBi.
+For the fillet joint, the point cloud sample is depicted in Fig. 28. Similarly, PBLi, PGLi and PBRi denote the left base metal tangent plane, the left groove tangent plane, and the right base metal tangent plane, respectively. The center point of the intersection line of planes PBLi and
+
+18
+
+H. Wang et al.
+
+Robotics and Computer-Integrated Manufacturing 101 (2026) 103315
+
+Fig. 26. 3D morphology reverse modeling for joints. (a1)-(a2) Original joint morphology. (b1)-(b2) In-situ real-time reconstruction process. (c1)-(c2) Results of the reconstruction.
+
+Fig. 27. Principle of online autonomous planning for welding trajectories of butt joints. (a) Autonomous planning for welding paths. (b) Autonomous planning for postures of welding torches. (c) Schematic diagram of point cloud sampling.
+
+PGLi is GLi. The groove cross-sectional plane PSi is perpendicular to the plane PBLi and to the intersection line of the planes PBLi and PGLi through the point GLi. The intersection point of the planes PSi, PGLi and PBRi is GBi. Point GRi lies on the intersection line of plane PSi and plane PBRi, and the line segment GLiGBi is equal to the line segment GBiGRi.
+The weld pass layout is designed based on equal height and equal area, enabling the coordinates of welding points for each layer and pass
+
+within the plane PSi to be determined by translating the 3D coordinates of the groove feature points GLi and GRi within this plane, according to the groove angle and depth. Figs. 27–28 illustrate the local geometric derivation principle used to compute one welding path point at a given spatial point cloud sample. The complete continuous welding paths are then generated by performing this calculation sequentially along the scanning direction.
+
+19
+
+H. Wang et al.
+
+Robotics and Computer-Integrated Manufacturing 101 (2026) 103315
+
+Fig. 28. Principle of online autonomous planning for welding trajectories of fillet joints. (a) Autonomous planning for welding paths. (b) Autonomous planning for postures of welding torches. (c) Schematic diagram of point cloud sampling.
+
+4.2.2. Online planning for torch postures
+
+For butt joints and fillet joints, the principle of online planning for
+
+the torch posture remains consistent. Theoretically, the axis of the
+
+welding torch lies within the groove cross-sectional plane PSi and is
+
+collinear
+
+with
+
+the
+
+bisector
+
+of
+
+∠GLiGBiGRi.
+
+The
+
+direction
+
+vector
+
+→ v i(viX,
+
+viY, viZ) of this bisector is determined by the three points GLi, GBi and
+
+GRi. Notably, the robot employs the Roll-Pitch-Yaw angle sequence to
+
+represent the torch posture. The procedure for calculating the Euler
+
+angles (RX, RY, RZ), which describe the torch posture relative to the
+
+Cartesian coordinate axes, is as follows:
+
+⎡
+
+⎤
+
+xix yix zix
+
+Ri = ⎣ xiy yiy ziy ⎦
+
+(31)
+
+xiz yiz ziz
+
+⎧
+
+(
+
+)
+
+⎨ RiX = arctan2(r32, r33) = arctan2 yiz, ziz
+
+⎩ RiY = arcsin(− r31) = arcsin(− ( xiz) ) RiZ = arctan2(r21, r11) = arctan2 xiy, xix
+
+(32)
+
+⎧ ⎨
+
+̂xiH
+
+=((xix, yix, zix))
+
+⎩ ̂yiH = ( xiy, yiy, ziy) ̂ziH = xiz, yiz, ziz
+
+(33)
+
+(
+
+)(
+
+)(
+
+)
+
+where xix, yix, zix , xiy, yiy, ziy , xiz, yiz, ziz are the direction vectors
+
+of each axis of the tool coordinate system OiHXiHYiHZiH. Since the ZiH axis
+
+of the tool coordinate system is collinear with the welding torch axis
+
+→ ( v i(viX,viY,viZ)),
+
+̂ziH
+
+could
+
+be
+
+determined
+
+by
+
+Eq.
+
+(34).
+
+Since
+
+̂xiH
+
+∈
+
+PSi
+
+and
+
+̂xiH⊥→v i, ̂xiH could be determined by Eq. (35). Since ̂yiH⊥̂xiH and
+
+̂yiH⊥̂ziH, ̂yiH could be determined by Eq. (37).
+
+→(
+
+)
+
+√̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅
+
+̂ ⃒ v i⃒ vix viy viz
+
+2
+
+2
+
+2
+
+ziH = ⃒ ⃒ = , , , Lv = vix + viy + viz
+
+⃒→ ⃒ Lv Lv Lv
+
+⃒ v i⃒
+
+(34)
+
+→ x0
+
+̂xiH = ⃒ ⃒
+
+(35)
+
+⃒⃒→
+
+⃒ ⃒
+
+⃒ x 0⃒
+
+where:
+
+⎡
+
+⎤
+
+̂i ̂j ̂k (
+
+)
+
+→ x0
+
+=
+
+⎣ zix
+
+ziy
+
+ziz ⎦ = ziyCi − zizBi, zizAi − zixC, zixBi − ziyAi
+
+Ai Bi Ci
+
+where (Ai, Bi, Ci) are the coefficients of the plane equation PSi.
+
+⎡
+
+⎤
+
+̂i ̂j ̂k
+
+⎢
+
+⎥
+
+̂yiH
+
+=
+
+̂ziH
+
+×
+
+̂xiH
+
+=
+
+⎢ ⎣
+
+zix
+
+ziy
+
+ziz
+
+⎥ ⎦
+
+( = ziyxiz −
+
+zizxiy, zizxix −
+
+xix xiy xiz )
+zixxiz, zixxiy − ziyxix
+
+(36) (37)
+
+4.2.3. Analysis of online planning accuracy for welding trajectories To validate the accuracy of the online welding trajectory planning
+approach based on point cloud geometric differentiation, specimens (Fig. 26(a1) and Fig. 26(a2)) with known spatial precise geometries were selected as test subjects. The butt joint has a groove angle of 60◦ and a groove depth of 6 mm, while the fillet joint has a groove angle of 40◦ and a groove depth of 7.3601 mm. The accuracy of trajectory planning is evaluated using the groove center point as the reference. The online-planned welding paths are presented in Figs. 29–30, where the red curve represents the planned welding path, and the blue curve denotes the theoretical path. The origin of the tool coordinate system is defined at the 10 mm dry extension point of the welding wire, which has undergone TCP calibration using the 25-point method. The origin of the tool coordinate system is precisely controlled to align with the groove center, and the theoretical path is obtained through multi-point coordinate measurement and curve fitting. The planning results of the butt joint welding path (Fig. 29(a)) demonstrate that the planned welding path closely aligns with the theoretical path. Fig. 29(b) illustrates the planning error of the welding path along each axis, alongside the 3D distance between corresponding spatial points on the planned and theoretical paths. From Fig. 29(b), the planning errors along each axis remain consistently within ±0.35 mm, and the 3D deviation between the planned path and theoretical path stay within ±0.38 mm. The
+
+20
+
+H. Wang et al.
+
+Robotics and Computer-Integrated Manufacturing 101 (2026) 103315
+
+Fig. 29. Planned welding paths of butt joints. (a) welding paths. (b) errors.
+
+Fig. 30. Planned welding paths of fillet joints. (a) welding paths. (b) errors. 21
+
+H. Wang et al.
+planning results of the fillet joint welding path (Fig. 30(a)) demonstrate that the online-planned welding path closely aligns with the theoretical path. From Fig. 30(b), the planning errors along each axis remain consistently within ±0.78 mm, and the 3D deviation between the planned path and theoretical path stay within ±0.79 mm.
+The online-planned torch postures are presented in Fig. 31 and Fig. 33, where the blue curves represent the planned postures and the red curves denote the theoretical postures. The planning errors of torch postures for butt and fillet joints are plotted separately in Fig. 32 and Fig. 34. Notably, in the planning results of the RX component (Fig. 31(a) and Fig. 33(a)), RX exhibits a sudden transition from − 180◦ to 180◦ This angular discontinuity is normal. Although a numerical jump of 360◦ occurs, the actual robot rotational motion remains continuous. From Figs. 31–34, the online planned welding torch posture largely coincides with the theoretical posture. From Fig. 32, the deviation between the planned and theoretical torch postures at each Euler angle for butt joints consistently fluctuates within ±2◦ From Fig. 34, the deviation between the planned and theoretical torch postures at each Euler angle for fillet joints consistently fluctuates within ±2.1◦
+The online planning errors of the welding trajectory are comprehensively summarized in Tables 6 and 7. Regarding welding path planning for butt joints, the RMSE in the XB, YB, and ZB directions are 0.1101 mm, 0.0720 mm, and 0.0665 mm, respectively. Regarding welding path planning for fillet joints, the RMSE in the XB, YB, and ZB directions are 0.2574 mm, 0.0529 mm, and 0.0900 mm, respectively.
+
+Robotics and Computer-Integrated Manufacturing 101 (2026) 103315
+Additionally, the RMSE of the 3D distance between corresponding spatial points on the planned and theoretical paths for butt and fillet joints are 0.1474 mm and 0.2777 mm, respectively. With regard to torch posture planning, the RMSE of the Euler angles RX, RY, and RZ are 0.9226◦, 0.6226◦, and 0.8194◦ for the butt joint, and 1.0771◦, 0.5198◦, and 0.8222◦ for the fillet joint, respectively. The consistently low errors not only validate the high accuracy of the proposed point cloud geometric differentiation-based approach for online robot welding trajectory planning, but also confirm its practical feasibility.
+In summary, the online welding trajectory planning approach based on point cloud geometric differentiation demonstrates significant metric performances, ensuring both stability and high precision of welding operations. By leveraging spatial geometric differentiation techniques, this approach effectively mitigates errors arising from the nonparallelism between the laser stripe and the groove cross-section, enabling high-precision planning for welding paths and torch postures under complex and variable actual operational scenarios. This technical advantage is challenging to achieve with the methods described in literature [29,45–47]. Moreover, by overcoming the limitations of traditional approaches relying on prior models or idealized assumptions, the approach significantly enhances the autonomous capability for online welding trajectory planning.
+
+Fig. 31. Planned torch postures of butt joints. (a) RX. (b) RY. (c) RZ. 22
+
+H. Wang et al.
+
+Robotics and Computer-Integrated Manufacturing 101 (2026) 103315
+
+Fig. 32. Planning precision for torch postures of butt joints.
+
+Fig. 33. Planned torch postures of fillet joints. (a) RX. (b) RY . (c) RZ.
+
+5. Experiments and results
+5.1. Online welding verification experiments
+To verify the intelligent welding performance of the line laser visionassisted robot GMAW system, the butt joint (Specimen A) and fillet joint (Specimen B) with unknown spatial geometries are selected as test subjects. These specimens are randomly placed in the welding platform,
+
+as illustrated in Fig. 35. The joint cross-sectional geometric profiles of Specimens A and B, captured by the line laser vision system, are presented in Fig. 36. Following the weld pass layout planning principle of equal height and equal area, the process parameters employed for welding specimens using the robot GMAW system are listed in Table 8. Based on these established parameters (Table 8), the system successfully achieved autonomous weld pass layout planning, as depicted in Fig. 37.
+Results of the reverse modeling of 3D morphologies of specimens A
+
+23
+
+H. Wang et al.
+
+Robotics and Computer-Integrated Manufacturing 101 (2026) 103315
+
+Fig. 34. Planning precision for torch postures of fillet joints.
+
+Table 6 Precision analysis for online planning welding paths.
+
+Joint type
+
+Objectives
+
+RMSE (mm)
+
+MAE (mm)
+
+MaxDev (mm)
+
+Butt joint
+Fillet joint
+
+XB -axis YB -axis ZB -axis 3D distance XB -axis YB -axis ZB -axis 3D distance
+
+0.1101 0.0720 0.0665 0.1474
+0.2574 0.0529 0.0900 0.2777
+
+0.0929 0.0641 0.0586 0.1366
+0.2210 0.0433 0.0745 0.2477
+
+0.3283 0.1585 0.1594 0.3734
+0.7729 0.1509 0.2786 0.7851
+
+MinDev (mm)
+0.0000 0.0003 0.0000 0.0341
+0.0005 0.0002 0.0000 0.0332
+
+Table 7 Precision analysis for online planning torch postures.
+Joint type Objectives RMSE (◦) MAE (◦) MaxDev (◦)
+
+Butt joint
+
+RX
+
+RY
+
+RZ
+
+Fillet joint RX
+
+RY
+
+RZ
+
+0.9226 0.6226 0.8194 1.0771 0.5198 0.8222
+
+0.7567 0.5428 0.6285 0.9012 0.4449 0.6938
+
+1.9851 1.7788 1.9978 2.0225 1.8440 1.5301
+
+MinDev (◦)
+0.0005 0.0014 0.0006 0.0011 0.0009 0.0005
+
+and B are presented in Fig. 38. Despite these workpieces being placed randomly on the welding platform, the reconstructed 3D point cloud exhibits structural integrity, with no voids and rich surface detail, faithfully reproducing the actual geometric topographies of the joints.
+The online welding path (XB, YB, ZB) planning results for Specimens A and B are presented in Figs. 39–40. Experimental results demonstrate that the 20 online-planned welding paths are all smooth, continuous, and free from anomalies such as broken lines, kinks, or local oscillations, thereby fully illustrating the high precision of the system in generating welding paths for irregular joints with unknown spatial geometries. The planned paths strictly adhere to the differential geometric characteristics of the joint surface, ensuring natural and seamless transitions in 3D space. Meanwhile, the online torch posture (RX, RY, RZ) planning results for Specimens A and B are displayed in Figs. 41–42. Experimental results demonstrate that the online-planned torch postures exhibit smooth and continuous spatial variation, with no occurrence of abrupt angular changes, jitter, or singular configurations. This posture characteristic not only fulfills the robot welding requirements for controlling arc spatial morphology and molten pool stability, but also effectively prevents potential safety incidents. Furthermore, the complete set of sixdegree-of-freedom welding motion parameters (XB, YB, ZB, RX, RY, RZ) for the root pass welding of Specimens A and B is tabulated in Table 9. The aforementioned welding trajectory planning results collectively validate the engineering applicability of the intelligent GMAW system for online generation of welding trajectories for irregular joints with
+
+unknown spatial geometries. Based on the online-planned trajectories for each weld pass
+(Figs. 39–42), the automatic welding results of Specimens A and B performed by the intelligent robot GMAW system are presented in Figs. 43–44. During welding, the system control software (Fig. 2) retrieves the trajectory data stream (XB, YB, ZB, RX, RY, RZ) of each weld pass and commands the welding torch to move from the teaching origin to the first waypoint (arc starting point). Upon reaching this point, welding commences using the pre-determined process parameters and continues sequentially along the programmed trajectories until the final waypoint (arc stopping point). The inter-pass cooling strategy is implemented. After completion of each weld pass, the workpiece is allowed to cool to a specified temperature before the subsequent pass is initiated. To further validate the performance of the robot GMAW system, the geometric morphology of each layer is sampled, as shown in Figs. 43–44. The sampling results indicate that the filler metal in each layer is sufficient and the spatial position is precise, which confirms the accuracy of the online planning scheme for the welding path and the torch posture. Furthermore, the contour curves of the filler metal in each layer are deliberately combined into one graph, as depicted in Fig. 45. Taking Specimen A (Fig. 45(a)) as an example, the first layer corresponds to the root pass. As the welding torch is inclined toward the thicker base material, the deposited bead exhibits a morphology that is lower on the left and higher on the right, which aligns well with empirical observations in practical welding. From the second pass onward, as the weld bead progressively aligns with the thicker base metal at an upward-left angle, the filler metal profile exhibits a left-high, rightlow configuration. This is corroborated by the actual laser-scanned contour striations of the weld layer. The fourth layer serves as the cap pass, where the filler metal surface appears smooth and flat, with no visible undercut or depression, indicating high forming quality.
+The comprehensive experimental results demonstrate that the joint grooves are uniformly filled with deposited metal, with no observable defects such as underfill or excessive weld reinforcement. The high geometric forming accuracy achieved in the multi-layer and multi-pass welding process confirms the practical applicability and engineering value of the intelligent robot GMAW system for structures with unknown spatial geometries.
+5.2. Method efficiency analysis
+To systematically evaluate the performance of the proposed scheme in welding trajectory planning, multi-dimensional comparisons with existing mainstream schemes are conducted, with results summarized in Table 10. Compared to traditional static preset mode of torch posture [4, 24,27,30], the proposed approach overcomes reliance on preset torch postures, achieving autonomous collaborative planning of welding paths and torch postures. This significantly enhances adaptability to complex spatial geometries. Furthermore, compared with methods based on differences between adjacent laser point clouds [35,36,38], the
+
+24
+
+H. Wang et al.
+
+Robotics and Computer-Integrated Manufacturing 101 (2026) 103315
+
+Fig. 35. Specimens to be welded. (a) Specimen A. (b) Specimen B.
+
+Fig. 36. Joint cross-sectional geometrics. (a) Specimen A. (b) Specimen B.
+
+Table 8 Welding process parameters.
+
+Specimen
+
+N
+
+Mi
+
+Ii (A)
+
+Specimen A 4 1 2 3 4
+Specimen B 4 1 2 3 4
+
+124.97 120.41 142.35 143.86 121.67 145.16 156.95 171.33
+
+Ui (V)
+16.91 17.05 16.55 16.55 17.02 16.57 17.33 18.29
+
+vif (m/min)
+5.83 5.88 5.70 5.70 5.87 5.71 5.98 6.32
+
+vw
+i
+
+(cm/min)
+
+30 30 30 30 30 30 30 30
+
+proposed planning scheme eliminates the need for pre-assembling the initial welding trajectory or decoupling the control of the three posture angles as independent variables, and it more effectively mitigates errors arising from the non-parallelism between the laser stripe and the groove cross-section. Compared with the scheme relying on prior geometric models [37], the proposed planning scheme does not require prior
+
+knowledge of the 3D parameters of the welded workpiece, such as the pipe radius. The proposed scheme achieves a significant breakthrough in dynamic adaptive welding trajectory planning, centered on the concept of point cloud geometric differentiation. By directly leveraging scanned 3D point clouds, the welding path and torch posture are autonomously, synchronously, and cooperatively generated. As demonstrated in Table 10, the scheme exhibits comprehensive advantages. The planning scheme is applicable to unknown complex spatial geometries, supports multiple joint types, and has been validated through multi-layer and multi-pass welding. Collectively, these capabilities address critical gaps in existing research, establishing a robust and generalized scheme for intelligent welding trajectory planning in non-ideal industrial environments.
+The quantitative performance comparison between the proposed scheme and state-of-the-art approaches is summarized in Table 11. Notably, the proposed scheme was validated on structures with unknown spatial geometries, which are inherently more complex than the plane or simple curve joints used in the comparative literature. Even
+
+25
+
+H. Wang et al.
+
+Robotics and Computer-Integrated Manufacturing 101 (2026) 103315
+
+Fig. 37. Results of autonomous planning for weld pass layouts. (a) Specimen A. (b) Specimen B.
+
+Fig. 38. 3D topographies of joints. (a) Specimen A. (b) Specimen B.
+
+under such challenging conditions, it achieves substantial improvements in both welding path and torch posture planning accuracy. For welding path planning, since Zou et al. [35] and Wang et al. [38] did not report explicit precision metrics, quantitative comparison was conducted solely against Hong et al. [36]. Specifically, the proposed scheme achieves mean planning errors of 0.0929 mm, 0.0641 mm, and 0.0586 mm along XB, YB, and ZB, respectively, representing reductions of 38.07%, 50.69%, and 69.16% relative to Hong et al. [36]. For torch posture planning, the average error in RY is 0.5428◦, representing reductions of 61.23%, 55.87%, and 54.77% relative to Hong et al. [36], Zou et al. [35], and Wang et al. [38], respectively. The average error in RZ is 0.6285◦, corresponding to reductions of 60.72%, 41.81%, and 16.20% over the same baselines. These results demonstrate that the proposed
+
+welding trajectory planning scheme based on point cloud geometric differentiation achieves high-precision and high-reliability online planning for structures with unknown spatial geometries, thereby validating its strong geometric generalization capability and practical engineering robustness.
+5.3. Limitations and future work
+While the proposed welding trajectory planning scheme demonstrates robust performance in online synchronous planning of welding paths and torch postures, several limitations inherent to the current framework must be acknowledged alongside corresponding future research directions. First, the scheme’s reliance on distinct groove
+
+26
+
+H. Wang et al.
+
+Robotics and Computer-Integrated Manufacturing 101 (2026) 103315
+
+Fig. 39. Online planning results for welding paths of butt joints.
+
+Fig. 40. Online planning results for welding paths of fillet joints.
+
+Fig. 41. Online planning results for torch postures of butt joints.
+
+morphology renders it currently inapplicable to non-grooved joints without significant modification. To address this, an adaptive trajectory planning module capable of switching between grooved and nongrooved joints should be developed. Second, under extreme conditions involving intense ambient illumination or highly reflective surfaces, the
+
+extraction of laser stripe centerlines suffers from substantial degradation in accuracy, thereby compromising the precision of trajectory planning. Deep learning-based denoising techniques to enhance environmental robustness should be explored. Third, although real-time processing is achieved for standard welding speeds, computational latency increases
+
+27
+
+H. Wang et al.
+
+Robotics and Computer-Integrated Manufacturing 101 (2026) 103315
+
+Fig. 42. Online planning results for torch postures of fillet joints.
+
+Table 9 The full six-degree-of-freedom welding motion parameters of the robot.
+
+Specimen
+
+XB (mm)
+
+YB (mm)
+
+Specimen A Specimen B
+
+1403.4386 1402.8802 1402.3218 ⋅⋅⋅⋅⋅⋅
+1211.1109 1210.4944 1209.8780 1387.6583 1387.2536 1386.8489 ⋅⋅⋅⋅⋅⋅
+1247.5786 1247.1463 1246.7140
+
+139.4364 139.2709 139.0754
+95.0994 94.9565 94.8615 115.9230 115.5874 115.6442
+51.0693 50.8051 50.5438
+
+ZB (mm)
+− 195.8103 − 195.6442 − 195.3565
+− 161.8104 − 162.2249 − 162.4152 − 186.6526 − 186.3078 − 186.0697
+− 182.8425 − 183.1308 − 183.2892
+
+RX (◦)
+− 132.68 − 130.07 − 134.31
+156.13 155.05 155.87 − 150.58 − 153.37 − 154.77
+143.31 141.96 142.54
+
+RY (◦)
+10.91 10.91 11.06
+3.96 4.48 3.25 − 76.45 − 76.91 − 76.49
+− 75.03 − 75.54 − 74.26
+
+RZ (◦)
+− 76.23 − 77.44 − 76.39
+− 83.12 − 82.18 − 82.60 − 69.41 − 69.87 − 69.70
+− 64.28 − 64.83 − 67.04
+
+Fig. 43. Welding results for Specimen A. (a) 1st layer. (b) 2nd layer. (c) 3rd layer. (d) 4th layer.
+
+with point cloud density and joint complexity, posing challenges for ultra-high-speed applications. GPU acceleration and parallel computing architectures are promising targeted optimizations. Collectively, these limitations define the current boundaries of the proposed welding trajectory planning scheme, while the outlined future work provides a clear roadmap toward broader industrial applicability and enhanced system resilience.
+
+6. Conclusion
+By synchronously planning welding paths and torch postures online, the proposed scheme effectively addresses the challenge of adaptive welding for structures with unknown spatial geometries. The main conclusions of this paper include:
+(1) The high-precision robot GMAW system based on line laser vision is developed, with the comprehensive calibration strategy
+
+28
+
+H. Wang et al.
+
+Robotics and Computer-Integrated Manufacturing 101 (2026) 103315
+
+Fig. 44. Welding results for Specimen B. (a) 1st layer. (b) 2nd layer. (c) 3rd layer. (d) 4th layer.
+
+Fig. 45. Filling effects of each layer. (a) Specimen A. (b) Specimen B.
+
+Table 10 Qualitative comparison of the performance of welding trajectory planning schemes in related work.
+
+Relevant works
+
+Model
+
+Planning theory
+
+Autonomous path planning
+
+Autonomous posture planning
+
+Applicable scene
+
+Multijoint type
+
+multi-layer and multi-pass welding
+
+Wang et al. The static preset
+
+/
+
+/
+
+/
+
+/
+
+/
+
+/
+
+[4]
+
+mode of torch posture
+
+Xu et al.
+
+[27]
+
+Dinham
+
+et al. [24]
+
+Ma et al.
+
+[30]
+
+Hong et al. The dynamic
+
+Differences between
+
+×*
+
+√ *
+
+Zigzag-line
+
+×
+
+×
+
+[36]
+
+adaptive mode of
+
+adjacent laser point
+
+welding seams
+
+Zou et al.
+
+torch posture
+
+clouds
+
+×*
+
+√ *
+
+Simple geometric seams,
+
+×
+
+×
+
+[35]
+
+such as straight or arc
+
+Wang et al.
+
+√
+
+√**
+
+seams
+
+×
+
+×
+
+[38]
+
+Jia et al.
+
+Prior geometric model
+
+√
+
+√
+
+Intersection seams
+
+×
+
+×
+
+[37]
+
+Our scheme
+
+Point cloud geometric
+
+√
+
+√
+
+seams with unknown
+
+√
+
+√
+
+differentiation
+
+complex spatial geometries
+
+* The initial welding path and torch posture must be preset through teaching or offline programming, after which the torch posture is subject to real-time control. ** The torch posture is decoupled and controlled as an independent variable.
+
+implemented. The proposed camera calibration leveraging CTGOM and APSO achieves an accuracy improvement exceeding 10.9121% over conventional methods. The optical plane is calibrated using back-projected point clouds, while hand-eye calibration is performed with the standard sphere. With the spatial target recognition error as low as 0.1111 mm, the system provides precise 3D perception for subsequent online welding trajectory planning. (2) The approach for online planning of robot welding trajectories based on point cloud geometric differentiation is formulated. The 3D
+
+morphology reverse modeling framework for geometric joints is established, integrating the laser stripe ROI extraction algorithm YOLOv11, the centerline extraction algorithm CIICEA, the Pauta criterion-based centerline filtering method, and the K-QCBFA fitting algorithm. By constructing local differential geometries from groove cross-sectional planes and base metal tangent planes, the welding path and torch posture are autonomously and synchronously generated online. For butt joints, the online planning achieves RMSE values of 0.0829 mm, 0.1004 mm, and 0.0859 mm in XB, YB, and ZB,
+
+29
+
+H. Wang et al.
+
+Robotics and Computer-Integrated Manufacturing 101 (2026) 103315
+
+Table 11 Quantitative comparison of the performance of welding trajectory planning schemes in related work.
+
+Relevant works
+
+XB (mm)
+
+YB (mm)
+
+ZB (mm)
+
+RX (◦)
+
+RY (◦)
+
+RZ (◦)
+
+Average error Hong et al.
+[36] Zou et al. [35] Wang et al.
+[38] Our scheme Max error Hong et al.
+[36] Zou et al. [35] Wang et al.
+[38] Our scheme
+
+0.15
+/ /
+0.0929
+0.32
+/ /
+0.3283
+
+0.13
+0.0641 0.24
+0.1585
+
+0.19
+0.0586 0.3
+0.1594
+
+/
+0.43 0.28
+0.7567
+/
+1.50 0.57
+1.9851
+
+1.40
+1.23 1.20
+0.5428
+1.80
+2.44 2.87
+1.7788
+
+1.60
+1.08 0.75
+0.6285
+1.90
+2.35 2.18
+1.9978
+
+respectively, with corresponding errors of 0.9226◦, 0.6226◦, and 0.8194◦ in the RX, RY, and RZ. For fillet joints, the RMSE values are 0.1069 mm, 0.1334 mm, and 0.2097 mm in XB, YB, and ZB, and 1.0771◦, 0.5198◦, and 0.8222◦ in the RX, RY, and RZ, respectively. This online welding trajectory planning approach is applicable not only to butt and fillet joints, but also to varying plate thicknesses, weld layers, and weld passes, thereby eliminating the need for CAD models or manual teaching required by conventional schemes. (3) The comprehensive performance of the constructed robot welding system is verified using the butt and fillet joints with unknown geometries. Results demonstrate that the system is capable of autonomously generating welding trajectories online, thereby contributing a reliable and intelligent solution for existing welding paradigms. (4) The welding trajectory planning scheme still faces limitations in sensor precision, adaptability to highly reflective materials, and dynamic process control during welding. Future research should focus on enhancing sensor hardware design, developing imaging algorithms robust to high reflectivity, and integrating real-time trajectory control mechanisms with thermal deformation awareness, thereby enabling comprehensive improvements in system accuracy, generalization capability, and industrial applicability.
+CRediT authorship contribution statement
+Hao Wang: Writing – review & editing, Writing – original draft, Methodology, Investigation, Formal analysis, Data curation, Conceptualization. Xiujun Wang: Validation, Formal analysis, Data curation. Chunguo Liu: Methodology, Investigation, Conceptualization. Chao Chen: Resources, Project administration, Investigation. Xiaohui Zhao: Resources, Investigation, Funding acquisition.
+
+Declaration of competing interest
+The authors declare that they have no known competing financial interests or personal relationships that could have appeared to influence the work reported in this paper.
+Acknowledgements
+This work was supported by the National Natural Science Foundation of China (No. 52275338).
+Data availability
+Data will be made available on request.
+
+References
+[1] A. Rout, B. Deepak, B. Biswal, Advances in weld seam tracking techniques for robotic welding: a review, Robot. Comput. Integr. Manuf. 56 (2019) 12–37, https://doi.org/10.1016/j.rcim.2018.08.003.
+[2] L. Yang, Y. Liu, J. Peng, Advances techniques of the structured light sensing in intelligent welding robots: a review, Int. J. Adv. Manuf. Technol. 110 (2020) 1027–1046, https://doi.org/10.1007/s00170-020-05524-2.
+[3] X. Wang, Z. Xie, X. Zhou, J. Gao, F. Li, X. Gu, Adaptive path planning for the gantry welding robot system, J. Manuf. Process. 81 (2022) 386–395, https://doi.org/ 10.1016/j.jmapro.2022.07.005.
+[4] W. Wang, H. Sun, C. Chen, K. Zhang, Autonomous path generation for side-seal welding of composite plate billets based on binocular vision and lightweight network VGG16-UNet, Robot. Comput. Integr. Manuf. 94 (2025) 102969, https:// doi.org/10.1016/j.rcim.2025.102969.
+[5] G. Li, Y. Hong, J. Gao, B. Hong, X. Li, Welding seam trajectory recognition for automated skip welding guidance of a spatially intermittent welding seam based on laser vision sensor, Sensors 20 (13) (2020) 3657, https://doi.org/10.3390/ s20133657.
+[6] H. Liu, Y. Tian, L. Li, Y. Lu, F. Xi, One-shot, integrated positioning for welding initial points via co-mapping of cross and parallel stripes, Robot. Comput. Integr. Manuf. 84 (2023) 102602, https://doi.org/10.1016/j.rcim.2023.102602.
+[7] J. Fan, S. Deng, F. Jing, C. Zhou, L. Yang, T. Long, M. Tan, An initial point alignment and seam-tracking system for narrow weld, IEEE Trans. Ind. Inf. 16 (2020) 877–886, https://doi.org/10.1109/TII.2019.2919658.
+[8] S. Chen, D. Yang, J. Liu, Q. Tian, F. Zhou, Automatic weld type classification, tacked spot recognition and weld ROI determination for robotic welding based on modified YOLOv5, Robot. Comput. Integr. Manuf. 81 (2023) 102490, https://doi. org/10.1016/j.rcim.2022.102490.
+[9] J. Zeng, G.Z. Cao, Y.P. Peng, S.D. Huang, A weld joint type identification method for visual sensor based on image features and SVM, Sensors 20 (2020) 471, https:// doi.org/10.3390/s20020471.
+[10] W. Fang, X. Xu, X. Tian, A vision‑based method for narrow weld trajectory recognition of arc welding robots, Int. J. Adv. Manuf. Technol. 121 (2022) 8039–8050, https://doi.org/10.1007/s00170-022-09804-x.
+[11] C. Zhu, Z. Zhu, Z. Ke, T. Zhang, Internal parameters calibration of vision sensor and application of high precision integrated detection in intelligent welding based on plane fitting, Sensors 22 (2022) 2117, https://doi.org/10.3390/s22062117.
+[12] Y. Zou, M. Zhu, X. Chen, A robust detector for automated welding seam tracking system, J. Dyn. Sys. Meas. Control. 143 (7) (2021) 071001, https://doi.org/ 10.1115/1.4049547.
+[13] Y. Zou, X. Chen, G. Gong, J. Li, A seam tracking system based on a laser vision sensor, Measurement 127 (2018) 489–500, https://doi.org/10.1016/j. measurement.2018.06.020.
+[14] X. Li, X. Li, S.S. Ge, M.O. Khyam, C. Luo, Automatic welding seam tracking and identification, IEEE Trans. Ind. Electron. 64 (9) (2017) 7261–7271, https://doi. org/10.1109/TIE.2017.2694399.
+[15] X. Zhao, Y. Zhang, H. Wang, Y. Liu, B. Zhang, S. Hu, Research on trajectory recognition and control technology of real-time tracking welding, Sensors 22 (2022) 8546, https://doi.org/10.3390/s22218546.
+[16] G. He, H.H. Teo, L.K. Moey, Review of path planning of welding robot based on spline curve, J. Mech. Eng. Sci. 18 (2024) 9928–9948, https://doi.org/10.15282/ jmes.18.1.2024.10.0785.
+[17] H. Lee, C. Ji, J. Yu, Effects of welding current and torch position parameters on bead geometry in cold metal transfer welding, J. Mech. Sci. Technol. 32 (2018) 4335–4343, https://doi.org/10.1007/s12206-018-0831-3.
+[18] F. Xu, Y. Xu, H. Zhang, S. Chen, Application of sensing technology in intelligent robotic arc welding: a review, J. Manuf. Process. 79 (2022) 854–880, https://doi. org/10.1016/j.jmapro.2022.05.029.
+[19] H. Eto, H.H. Asada, Seamless manual-to-autopilot transition: an intuitive programming approach to robotic welding, in: 28th IEEE International Conference on Robot and Human Interactive Communication, 2019, pp. 1–7, https://doi.org/ 10.1109/RO-MAN46459.2019.8956403.
+[20] T. Zhou, A. Mohammad, T. Zeng, D. Axinte, I. Wright, R. March, Teaching robots to weld by leveraging human expertise, Robot. Comput. Integr. Manuf. 95 (2025) 103027, https://doi.org/10.1016/j.rcim.2025.103027.
+[21] A. Singh, V. Kalaichelvi, R. Karthikeyan, Performance analysis of object detection algorithms for robotic welding applications in planar environment, Int. J. Comput. Integr. Manuf. 36 (2023) 1–26, https://doi.org/10.1080/ 0951192X.2022.2162601.
+[22] D. Li, H. Chen, Y. Sheng, L. Yang, Dual-station intelligent welding robot system based on CCD, Meas. Sci. Technol. 30 (2019) 045401, https://doi.org/10.1088/ 1361-6501/ab02d7.
+[23] Y. Ma, J. Fan, Z. Zhou, S. Zhao, F. Jing, M. Tan, WeldNet: a deep learning based method for weld seam type identification and initial point guidance, Expert Syst. Appl. 238 (2024) 121700, https://doi.org/10.1016/j.eswa.2023.121700.
+[24] M. Dinham, G. Fang, Autonomous weld seam identification and localisation using eye-in-hand stereo vision for robotic arc welding, Robot. Comput. Integr. Manuf. 29 (2013) 288–301, https://doi.org/10.1016/j.rcim.2013.01.004.
+[25] X. Li, J. Ma, S. Yao, G. Chi, G. Zhang, A dual-modal robot welding trajectory generation scheme for motion based on stereo vision and deep learning, Materials 18 (2025) 2593, https://doi.org/10.3390/ma18112593.
+[26] G. Zhang, J. Huang, Y. Wu, G. Yang, S. Di, H. Yuan, X. Cao, K. Shin, A novel 3D complex welding seam tracking method in symmetrical robotic mag welding process using a laser vision sensing, Symmetry 15 (2023) 1093, https://doi.org/ 10.3390/sym15051093.
+
+30
+
+H. Wang et al.
+[27] F. Xu, Z. Hou, R. Xiao, Y. Xu, Q. Wang, H. Zhang, A novel welding path generation method for robotic multi-layer multi-pass welding based on weld seam feature point, Measurement 216 (2023) 112910, https://doi.org/10.1016/j. measurement.2023.112910.
+[28] K. Liu, Z. Sheng, X. Yang, R. Xiao, H. Chen, Laser scanning-based robot welding path planning for complex saddle-shaped weld seams, Weld. World. 69 (2024) 1385–1399, https://doi.org/10.1007/s40194-024-01881-8.
+[29] K. Zhang, M. Yan, T. Huang, J. Zheng, Z. Li, 3D reconstruction of complex spatial weld seam for autonomous welding by laser structured light scanning, J. Manuf. Process. 39 (2019) 200–207, https://doi.org/10.1016/j.jmapro.2019.02.010.
+[30] Y. Ma, J. Fan, H. Yang, H. Wang, S. Xing, F. Jing, M. Tan, An efficient and robust complex weld seam feature point extraction method for seam tracking and posture adjustment, IEEE Trans. Ind. Inform. 19 (2023) 10704–10715, https://doi.org/ 10.1109/TII.2023.3241595.
+[31] H. Shen, T. Lin, S. Chen, L. Li, Real-time seam tracking technology of welding robot with visual sensing, J. Intell. Robot Syst. 59 (2010) 283–298, https://doi.org/ 10.1007/s10846-010-9403-1.
+[32] J. Guo, Z. Zhu, B. Sun, T. Zhang, A novel field box girder welding robot and realization of all-position welding process based on visual servoing, J. Manuf. Process. 63 (2021) 70–79, https://doi.org/10.1016/j.jmapro.2020.04.054.
+[33] M. Zhu, Q. Ma, R. Lei, J. Weng, Y. Shi, Intelligent monitoring and fuzzy control of MIG welding seam tracking based on passive visual sensing, Weld. World. 69 (2025) 1437–1445, https://doi.org/10.1007/s40194-025-01938-2.
+[34] L. Xia, J. Zhou, R. Xue, X. Li, H. Liu, Real-time seam tracking during narrow gap GMAW process based on the wide dynamic vision sensing method, J. Manuf. Process. 101 (2023) 820–834, https://doi.org/10.1016/j.jmapro.2023.06.045.
+[35] Y. Zou, J. Chen, X. Wei, Research on a real-time pose estimation method for a seam tracking system, Opt. Laser. Eng. 127 (2020) 105947, https://doi.org/10.1016/j. optlaseng.2019.105947.
+[36] B. Hong, A. Jia, Y. Hong, X. Li, J. Gao, Y. Qu, Online extraction of pose information of 3D zigzag-line welding seams for welding seam tracking, Sensors 21 (2021) 375, https://doi.org/10.3390/s21020375.
+[37] Z. Jia, T. Wang, L. Li, J. He, Laser vision-based automatic trajectory planning technology for spatial intersecting joint weld, Int. J. Precis. Eng. Manuf. 21 (2020) 45–55, https://doi.org/10.1007/s12541-019-00248-0.
+
+Robotics and Computer-Integrated Manufacturing 101 (2026) 103315
+[38] H. Wang, Y. Rong, S. Xiang, J. Xu, Y. Peng, Y. Huang, 3D curve weld seam path and posture planning based on line laser sensors, Robot. Comput. Integr. Manuf. 94 (2025) 102985, https://doi.org/10.1016/j.rcim.2025.102985.
+[39] Z. Zhang, A flexible new technique for camera calibration, IEEE Trans. Pattern Anal. Mach. Intell. 22 (2000) 1330–1334, https://doi.org/10.1109/34.888718.
+[40] X. Lü, L. Meng, L. Long, P. Wang, Comprehensive improvement of camera calibration based on mutation particle swarm optimization, Measurement 187 (2022) 110303, https://doi.org/10.1016/j.measurement.2021.110303.
+[41] H. Wang, S.Y. Qi, T.J. Zang, C. Chen, X.H. Zhao, Y. Liu, In-situ surface inspection for wire-arc directed energy deposition integrating 3D topography reconstruction, defect detection and roughness measurement, Opt. Laser Technol. 187 (2025) 112871, https://doi.org/10.1016/j.optlastec.2025.112871.
+[42] E.H.I. Eliwa, T. Abd El-Hafeez, Advancing crop health with YOLOv11 classification of plant diseases, Neural Comput. Appl. 37 (2025) 15223–15253, https://doi.org/ 10.1007/s00521-025-11287-2.
+[43] Y. Li, H. Yan, D. Li, H. Wang, Robust miner detection in challenging underground environments: an improved YOLOv11 approach, Appl. Sci. 14 (2024) 11700, https://doi.org/10.3390/app142411700.
+[44] M. Liu, X. Bai, S. Xi, H. Dong, R. Li, H. Zhang, X. Zhou, Detection and quantitative evaluation of surface defects in wire and arc additive manufacturing based on 3D point cloud, Virtual Phys. Prototyp. 19 (1) (2024) e2294336, https://doi.org/ 10.1080/17452759.2023.2294336.
+[45] T. Wang, Q. Li, J. He, X. Li, A novel initial weld point positioning and path planning method for robot welding based on passive light stereo vision and structured light vision, Int. J. Precis. Eng. Manuf. 26 (2025) 2903–2927, https:// doi.org/10.1007/s12541-025-01278-7.
+[46] D. Curiel, A. Su´arez, F. Veiga, E. Aldalur, P. Villanueva, Advanced welding automation: intelligent systems for multipass welding in butt double V-groove and tee double bevel configurations, MethodsX 13 (2024) 103027, https://doi.org/ 10.1016/j.mex.2024.103027.
+[47] W. Ren, K. Huang, J. Feng, Y. Feng, J. Lin, J. Zheng, A novel laser vision-based robotic welding path extraction and tracking method for intersecting curves, Measurement 258 (2026) 119207, https://doi.org/10.1016/j. measurement.2025.119207.
+
+31
+
+

@@ -1,0 +1,499 @@
+Trajectory Distribution Control for Model Predictive Path Integral Control using Covariance Steering
+Ji Yin, Zhiyuan Zhang, Evangelos Theodorou, Panagiotis Tsiotras
+
+arXiv:2109.12147v3 [cs.RO] 3 Jun 2022
+
+Abstract— This paper presents a novel control approach for autonomous systems operating under uncertainty. We combine Model Predictive Path Integral (MPPI) control with Covariance Steering (CS) theory to obtain a robust controller for general nonlinear systems. The proposed Covariance-Controlled Model Predictive Path Integral (CC-MPPI) controller addresses the performance degradation observed in some MPPI implementations owing to unexpected disturbances and uncertainties. Namely, in cases where the environment changes too fast or the simulated dynamics during the MPPI rollouts do not capture the noise and uncertainty in the actual dynamics, the baseline MPPI implementation may lead to divergence. The proposed CC-MPPI controller avoids divergence by controlling the dispersion of the rollout trajectories at the end of the prediction horizon. Furthermore, the CC-MPPI has adjustable trajectory sampling distributions that can be changed according to the environment to achieve efﬁcient sampling. Numerical examples using a ground vehicle navigating in challenging environments demonstrate the proposed approach.
+I. INTRODUCTION
+As autonomous vehicles and other robots become increasingly popular, one of the major concerns is whether humans can trust the robots’ ability to complete their assigned tasks safely. For autonomous vehicles, for example, neglecting or misinterpreting the disturbances during driving can lead to serious consequences within milliseconds. The demand for safety has led many researchers develop robust control and planning algorithms for autonomous robotic systems. For example, sampling-based planning algorithms that consider uncertainty and collision probability in the vertex selection or evaluation processes have been proposed in [1], [2], [3], [4], and optimization-based planning algorithms that consider systematic disturbances and chance constraints explicitly by solving optimization problems have been developed in [5], [6], [7], [8].
+In this paper, we propose an MPC-based robust trajectory planning approach that deals with environmental and plant uncertainty, while providing guarantees on the dispersion of the closed-loop system future trajectories. Model Predictive Control (MPC) is an algorithmic, optimization-based control design [9] that has gained popularity for autonomous vehicle control over the past years [10], [11]. The traditional deterministic MPC approaches are model-based and generate trajectories assuming there are no uncertainties in the dynamics. As a result, MPC controllers are typically not robust to model parameter variations. To improve the performance of MPC controllers by taking system uncertainty into account,
+The authors are with the D. Guggenheim School of Aerospace Engineering, Georgia Institute of Technology, GA. E-mail: {jyin81, nickzhang, evangelos.theodorou, tsiotras}@gatech.edu
+
+Robust MPC (RMPC) controllers have been proposed to handle deterministic uncertainties residing in a given compact set. RMPC generates control commands by considering worst-case scenarios, thus the resulting trajectories can be conservative. Reference [12] provides an extensive review summarizing all types of RMPC controllers. To achieve more aggressive planning, Stochastic MPC (SMPC) utilizes the probabilistic nature of the system uncertainty to account for the most likely disturbances, instead of considering only the worst-case disturbance, as with the RMPC [13], [14]. There are two classes of SMPC approaches in the literature. The ﬁrst one is based on the analytical solutions of some optimization problem, such as [15], [16], [17], while the second approach relies on randomization to solve optimization problems, such as [18], [19], [20]. The proposed CCMPPI controller is somewhere in-between these two, as it analytically computes a controlled dynamics by considering the model uncertainty and then generates the optimal control using randomized roll-outs of the controlled dynamics. This is discussed in greater detail in Section IV.
+Most of current MPC implementations assume linear system dynamics and formulate the resulting MPC task as a quadratic optimization problem, which helps MPC meet the strict real-time requirements required for safe control. However, these approaches depend on simpliﬁed linear models that may not capture accurately the dynamics of the real system. Model Predictive Path Integral (MPPI) control [21] is a type of nonlinear MPC algorithm that solves repeatedly ﬁnite-horizon optimal control tasks while utilizing nonlinear dynamics and general cost functions. Speciﬁcally, MPPI is a simulation-based algorithm that samples thousands of trajectories around some mean control sequence in real-time, by taking advantage of the parallel computing capabilities of modern Graphic Processing Units (GPUs). It then produces an optimal trajectory along with its corresponding control sequence by calculating the weighted average of the cost of the ensuing sampled trajectories, where the weights are determined by the cost of each trajectory rollout. One of the advantages of the MPPI approach over more traditional MPC controllers is that it does not restrict the form of the cost function of the optimization problem [22], which can be non-quadratic and even discontinuous.
+Despite its appealing characteristics, the MPPI algorithm may encounter problems when implemented in practice. In particular, when the mean control sequence lies inside an infeasible region, all the resulting MPPI sampled trajectories are concentrated within the same region, as illustrated in Figure 1, and this may lead to a situation where the trajectories violate the constraints. Two cases this may happen are: ﬁrst,
+
+Fig. 1. MPPI Divergence; from [23].
+when the MPPI algorithm diverges because the environment changes too fast; and, second, when the algorithm fails because the predicted dynamics do not capture the noise and uncertainty of the actual dynamics. The reason the MPPI algorithm may perform poorly under the previous two cases is because it fails to take into account the disturbances (either from the dynamics or from the environment) so that all sampled trajectories end up violating the constraints. Figure 1 shows the inﬂuence of the noise on MPPI sampled trajectories. In this ﬁgure, the gray curves are the MPPI sampled trajectories, the red curves show the boundaries of the trajectory sampling distribution, and the green curve represents the simulated trajectory of the robot following the optimal control sequence given the current distribution. In Figure 1(a) the autonomous vehicle has sampling distribution mostly inside the track initially. In Figure 1(b), the vehicle ends up in an unexpected pose due to unforeseen disturbances after it executes the control command. This further leads to the situation depicted in Figure 1(c), where the algorithm diverges because all of the sampled trajectories violate the constraints.
+To mitigate the previous shortcomings of the MPPI algorithm, prior works apply a controller to track the output of the MPPI controller in order to keep the actual trajectory as close as possible to the predicted nominal trajectory. These approaches separate the planning and control tasks so that MPPI acts similarly to a path planner. For example, in [23] an iterative Linear Quadratic Gaussian (iLQG) controller was used to track the planned trajectory provided by MPPI. In [24] the authors propose a method that utilizes a tracking controller with L1 augmentation to compensate for the mismatch between the nominal dynamics and the true dynamics. However, these methods do not improve the performance of the MPPI algorithm if there are signiﬁcant changes in the environment within a short interval of time. The proposed CC-MPPI algorithm tries to address some of these shortcomings by improving the performance of the MPPI algorithm under the scenarios mentioned above. This is achieved by introducing adjustable trajectory sampling distributions, and by directly controlling the evolution of these trajectory distributions to avoid an uncontrolled dispersion at the end of the control horizon.
+II. PROBLEM FORMULATION
+The goal of the proposed Covariance-Controlled MPPI (CC-MPPI) controller is to make the distributions of the sampled trajectories more ﬂexible than the ones generated by MPPI, such that the CC-MPPI algorithm samples more
+
+efﬁciently and with a smaller probability to be trapped in
+local minima when the optimal trajectory from the previous
+time step lies inside some high-cost region, as illustrated in
+Figure 1(c). To this end, we introduce a desired terminal state covariance Σf for the states of the dynamics (1b) at the ﬁnal time step N as a hyperparameter for the CC-
+MPPI controller. The key idea is that the distribution of the
+sampled trajectories can be adjusted by a suitable choice of Σf together with the control disturbance variance Σ . Denoting by v = [v0, . . . , vN−1] ∈ RnuN , the CC-MPPI controller solves the following optimization problem,
+
+min J(v) =
+v N −1
+E φ(xN ) +
+k=0
+subject to,
+
+1 q(xk) + 2 vkRvk
+
+(1a) ,
+
+xk+1 = F (xk, vk + k),
+
+(1b)
+
+x(0) = x0, k ∼ N (0, Σ ),
+
+(1c)
+
+E [xN xN ] − E [xN ] E [xN ] Σf ,
+
+(1d)
+
+at each iteration, where the state terminal cost φ(xN ) and the state portion of the running cost q(xk) can be arbitrary functions. The objective function (1a) minimizes the expectation of the state and control costs with xk being a random vector subject to the dynamics (1b).
+
+III. MPPI ALGORITHM REVIEW
+The MPPI controller, as described in [22], minimizes (1a) subject to (1b) and (1c). As in Problem (1), the terminal cost φ(xN ) and the state portion of the running cost q(xk) of the MPPI can be arbitrary functions.
+As in an MPC setting, the MPPI algorithm samples M trajectories during each optimization iteration. Let v = [v0, . . . , vN−1] ∈ RnuN be the mean control sequence, u(m) = u0(m), . . . , uN−1 (m) ∈ RnuN be the actual control
+sequence, and let (m) = 0(m), . . . , N−1 (m) ∈ RnuN , k(m) ∼ N (0, Σ ), be the control disturbance sequence corresponding to the mth sampled trajectory x0(m), . . . , xN−1 (m) at the current iteration, such that u(m) = v + (m), where m = 1, . . . , M . The cost for the mth sampled trajectory is given by [20]
+N −1
+Sm = φ(xN(m)) + q˜(xk(m), vk, k(m)), (2)
+k=0
+where q˜(xk(m), vk, k(m)) is the cost for the mth sampled trajectory at the kth step, given by
+q˜(xk(m), vk(m), k(m)) = q(xk(m))+ 1 − ν−1 (m) (m) (m) (m) 1 (m) (m) (3)
+2 k R k + vk R k + 2 vk Rvk ,
+where ν is the ratio between the covariance of the injected disturbance (m) and the covariance of the disturbance of the original dynamics. The term 21 vk(m) Rvk(m) in (3) is the cost for the disturbance-free portion of the control input, and
+
+both 2 k 1−ν−1 (m) R k(m) and vk(m) R k(m) in (3) penalize large control disturbances and smooth out the resulting control signal. The weights ωm (m = 1, . . . , M ) of the mth sampled
+trajectory are chosen as [25]
+
+1 ωm = exp − λ (Sm − β) , (4)
+
+where, β = minm=1,...,M Sm, and where λ determines how selective is the weighted average of the sampled trajectories. Note that the constant β does not inﬂuence the solution, and it is introduced to prevent numerical instability of the algorithm. The MPPI algorithm generates the optimal control sequence and the mean sequence of the next iteration v using the following equations,
+
+M
+
+M
+
+v = ωmu(m)/ ωm.
+
+(5)
+
+m=1
+
+m=1
+
+In Section IV we discuss how the CC-MPPI controller satisﬁes the terminal constraint (1d), and then present the complete CC-MPPI algorithm.
+
+IV. COVARIANCE-CONTROLLED MPPI
+In this section, we introduce the proposed CC-MPPI controller. Section IV-A discusses the linearization of the dynamics (1b), and Section IV-B uses this linearization to achieve the terminal constraint (1d). Section V presents the proposed CC-MPPI algorithm that solves the optimization Problem (1).
+
+A. Linearized Model
+
+We start by linearizing system (1b) along some reference
+
+trajectory using the approach outlined in [26]. The refer-
+
+ence trajectory of the ﬁrst optimization iteration can be an
+
+arbitrary trajectory; starting with the second iteration, the
+
+reference trajectory of the current iteration is the trajectory
+
+generated by the optimal control sequence from the previous
+
+iteration. To this end, let wr =
+
+wr
+0
+
+,
+
+.
+
+.
+
+.
+
+,
+
+w
+
+r N
+
+−
+
+1
+
+be the
+
+reference control sequence at the current iteration, and let
+
+xr
+
+=
+
+[
+
+x
+
+r 0
+
+,
+
+.
+
+.
+
+.
+
+,
+
+x
+
+r N
+
+]
+
+be the corresponding reference state
+
+sequence, such that
+
+xk+1 r = F (xrk, wkr ), k = 0, . . . , N − 1. (6)
+
+The dynamical system in (6) can then be approximated in the vicinity of (xr, wr) with a discrete-time, linear time-varying
+(LTV) system as follows
+
+xk+1 = Akxk + Bkuk + dk,
+
+(7)
+
+where xk and uk are the state and control input respectively to the LTV system at step k, and
+
+∂F Ak = ∂xk xk=xrk,uk=wkr ,
+
+∂F Bk = ∂uk xk=xrk,uk=wkr , (8)
+
+dk
+
+=
+
+F
+
+(x
+
+r k
+
+,
+
+wkr
+
+)
+
+−
+
+Ak xkr
+
+−
+
+Bkwkr ,
+
+(9)
+
+where Ak and Bk are the system matrices, and dk is the residual term of the linearization.
+
+B. Covariance-Controlled Trajectory Sampling
+As with the baseline MPPI algorithm, the CC-MPPI algorithm simulates M trajectories during each iteration. Let u = [u0, . . . , uN−1] be the control sequence of the mth CCMPPI sampled trajectory during the current iteration of the algorithm where we drop the superscript m for simplicity. The optimal control sequence from the previous iteration which is also the reference control sequence of the current iteration w = [w0 . . . , wN−1] is injected with artiﬁcial noise = [ 0, . . . , N−1] and a feedback term Kkyk is added, such that
+
+uk = wk + k + Kkyk,
+
+k ∼ N (0, Σ ),
+
+(10)
+
+where yk follows the dynamics,
+
+yk+1 = Akyk + Bk k, y0 = 0,
+
+(11)
+
+where y0 = 0 since we assume perfect observation of the initial state [17]. Substituting (10) into (7) yields,
+
+xk+1 = Akxk + Bk(wk + Kkyk) + dk + Bk k, (12)
+where xk is the state of the mth CC-MPPI sampled trajectory at step k, and dk is the residual term of the linearization at step k as deﬁned in (9). Let x0 be the state at the beginning of the current iteration. We can then rewrite the system in (12) in the compact form,
+
+x = Ax0 + B(w + Ky) + Cd + B ,
+
+(13)
+
+where x = [x0, . . . , xN ] ∈ Rnx(N+1), w = [w0, . . . , wN−1] ∈ RnuN y = [y0, . . . , yN ] ∈ Rnx(N+1), d = [d0, . . . , dN−1] ∈ RnxN , = [ 0, . . . , N−1] ∈ RnxN and the augmented system matrices A, B, C, K are deﬁned similarly as in [7]. In order to compute K to satisfy the terminal covariance constraint (1d), the CC-MPPI considers a constrained LQG problem (14) at each optimization iteration as follows
+
+min J(x, w, K) =
+
+K
+
+(14a)
+
+E x Q¯x + (w + Ky) R¯(w + Ky) ,
+
+subject to,
+
+x = Ax0 + B(w + Ky) + Cd + B , EN (E [xx ] − E [x] E [x] )EN Σf ,
+
+(14b) (14c)
+
+where EN = [0, . . . , 0, I] ∈ Rnx×nx(N+1), the augmented cost parameter matrices Q¯ = blkdiag(Q, . . . , Q, Qf ) ∈ Rnx(N+1)×nx(N+1) and R¯ = blkdiag(R, . . . , R) ∈ RnuN×nuN . Since E [ ] = 0 and y0 = 0, we have E [w + Ky] = w. It follows from (11) and (13) that
+
+x¯ = E [x] = Ax0 + Bw + Cd,
+
+(15)
+
+and,
+
+x˜ = x − E[x] = BKy + B = (I + BK)B . (16)
+
+The cost function J(x, w, K) in (14) can then be converted to the following equivalent form [8]
+
+J(x¯, x˜,w, K) = tr(Q¯E[x˜x˜ ])
+
+¯
+
+¯
+
+¯
+
+(17)
+
++ x¯ Qx¯ + tr(RE [Kyy K ]) + w Rw.
+
+The reference control sequence w is ﬁxed and is given by the optimal control sequence from the previous CC-MPPI iteration, which implies that x¯ is ﬁxed and is given by (15). For the optimization problem in (14), we can then drop the terms representing constant values in (17) and obtain the cost
+JΣ(x˜, K) = tr(Q¯E[x˜x˜ ]) + tr(R¯E [Kyy K ]). (18)
+Substituting (16) into (18), and using the fact that E[ ] = Σ , yields,
+JΣ(K) = tr (I + BK) Q¯(I + BK) + K R¯K BΣ¯ B , (19)
+where Σ¯ = blkdiag(Σ , ..., Σ ) ∈ RnuN×nuN . Substituting (13) into (14c), we obtain,
+Σf EN (I + BK)BΣ¯ B (I + BK) EN . (20)
+
+Finally, Problem (14) can be converted into the following convex optimization problem,
+
+min JΣ(K) subject to (20).
+
+(21)
+
+K
+
+The problem (21) can be easily solved by a convex optimization solver such as Mosek [27] to obtain K. Note that the last diagonal term Qf in Q¯ can be viewed as a soft terminal state constraint that can be tuned to control the terminal covariance
+in situations where a hard constraint (20) is not preferred. It follows from (10) that the control sequence of the mth sampled trajectory is u = w + + Ky. We then rollout the sampled trajectories using u and the dynamical model (1b).
+The complete CC-MPPI algorithm is detailed in Section V.
+
+V. THE CC-MPPI ALGORITHM
+The CC-MPPI algorithm is given in Algorithm 1. Line 2 obtains the current estimate of the state x0 at the beginning of the current optimization iteration. Lines 3 to 5 rollout the reference trajectory x using the discrete-time nonlinear dynamical model F . Line 6 linearizes the model F along x and its corresponding control sequence w as described in (6), (7), (8), (9), and calculates the augmented dynamical model matrices A, B, C along with the linearization residual term d. Line 7 computes the feedback gain K for the closed-loop system in (13) by solving the convex optimization problem (21). Lines 8 to 23 sample the control sequences, perform the rollouts and evaluate the sampled trajectories with the running cost (3). Speciﬁcally, lines 12 to 18 introduce sample trajectories of the close-loop dynamics and sample trajectories of zero-mean input, so that the algorithm can balance between smoothness of trajectories and low control cost [22]. Line 24 computes the optimal control sequence w following (4) and (5). Line 25 sends the ﬁrst control command w0 of the optimal control sequence to the actuators. Line 26 removes w0, and duplicates wN−1 at the end of the horizon for w.
+
+VI. RESULTS
+In this section, we show via a series of numerical examples that the proposed CC-MPPI algorithm outperforms the baseline MPPI algorithm in critical situations described
+
+Algorithm 1: CC-MPPI Algorithm
+
+Given: γ, λ, Σ , Σf , α : CC-MPPI Parameters;
+
+Input : w : Initial control sequence
+
+1 while task not complete do
+
+2 x0 ← GetStateEstimate();
+
+3 for k ← 0 to N − 1 do
+
+4
+
+xk+1 ← F (xk, wk);
+
+5 end
+
+6 A, B, C, d ← DynamicsLinearization(F, x, w); 7 K = CovarianceControl(Σf , Σ , B, Q¯, R¯);
+
+8 for m ← 1 to M do
+
+9 x0(m) ← x0, y0(m) ← 0;
+
+10 Sample (m) ← 0(m), . . . , N−1 (m) ;
+
+11
+
+for k ← 0 to N − 1 do
+
+12
+
+if m < (1 − α)M then
+
+13 vk(m) ← wk + Kkyk(m);
+
+14
+
+else
+
+15 vk(m) ← 0
+
+16
+
+end
+
+17 uk(m) ← vk(m) + k(m); 18 xk+1 (m) ← F (xk(m), uk(m)); 19 yk+1 (m) ← Akyk(m) + Bk k(m); 20 Sm ← Sm + q˜(xk(m), vk(m), k(m));
+
+21
+
+end
+
+22 Sm ← Sm + φ(xN(m)); 23 end
+
+24 w = CalculateOptimalControl(Sm, u(m));
+
+25 ExecuteCommand(w0);
+
+26 Initialize(w);
+
+27 end
+
+in Section II. The terminal covariance Σf in (20) for the CC-MPPI should be determined based on the environment. Please also refer to the accompanied video1 for a demonstra-
+tion of more simulation examples.
+
+A. Vehicle Model
+We assume that the injected artiﬁcial noise (m) in CCMPPI and MPPI algorithms is signiﬁcantly greater than the inherent noise of the vehicle model, such that the model noise is negligible. We model the vehicle using a single-track bicycle model
+
+x˙ = v cos(β + φ),
+
+φ˙ =
+
+v ,
+
+lr sin β
+
+y˙ = v sin(β + φ), v˙ = δT ,
+
+(22a) (22b)
+
+where tan β = lr/(lf + lr) tan δs and the parameters lr, lf are distances from the CoM to the rear and front wheels, respectively. The x, y are position coordinates of a ﬁxed world coordinate frame. The φ is the vehicle yaw angle, and v is velocity at CoM with respect to the world coordinate frame. The δT and δs are throttle and steering inputs to
+
+1https://www.youtube.com/watch?v=cZq4tnBTIqc
+
+Fig. 2. Track schematic
+
+the model, respectively. We discretize the system (22) with the Euler method, xk+1 = F (xk, uk) = xk + f (xk, uk)∆t, where k = 0, . . . , N − 1 and time step ∆t = 0.02 s.
+
+B. Controller Setup
+
+Assuming that the model noise is much smaller than the
+injected noise (m), it follows that ν−1 ≈ 0 in (3). It then follows from (3) that the running cost q˜(xk(m), vk(m), k(m)) for the kth step of the mth sampled trajectory takes the form,
+
+q˜(xk(m), vk(m), k(m)) = q(xk(m))+
+
+k 1 (m) R k(m) + vk(m) R k(m) + 1 vk(m)
+
+2
+
+2
+
+Rvk(m),
+
+(23)
+
+for k = 0, . . . , N − 1, m = 1, . . . , M, where we take the state-dependent cost q(xk(m)) as,
+
+q(x) = µbdry(x) + c1µobs(x).
+
+(24)
+
+The term µbdry(x) in (24) is the boundary cost which prevents the vehicle from leaving the track, and it is given by
+
+µbdry(x) = 0, if WithinBoundary(x), 2000, Otherwise. (25)
+
+The term c1µobs(x) in (24) penalizes collisions with obstacles, where c1 is a weighting coefﬁcient. We choose two different forms of µobs(x) in our simulations. The ﬁrst is discontinuous on the obstacles’ edges,
+
+µobs(x) = 0, if ri > di(x), 10, Otherwise, (26)
+
+and the second is continuous on the obstacles’ edges,
+
+P
+
+µobs(x) = max(ri − di(x), 0),
+
+(27)
+
+i=1
+
+where di(x) describes the distance from the vehicle’s CoM to the center of the ith circular obstacle, and ri is the radius of the ith obstacle. We take ri = 0.1 m for all of the P circular
+obstacles in this section. In our simulations, the terminal cost φ(xN(m)) for the MPPI and CC-MPPI controllers has the form,
+
+φ(x) = c2(1 − s(x)) + 500e2(x).
+
+(28)
+
+The ﬁrst term in (28) is the progress cost, where c2 is a weighting coefﬁcient and s(x) represents the distance between the current vehicle state and the terminal state of the sample trajectory along the track centerline. The term e(x) in (28) is the vehicle’s lateral deviation from the track centerline (see Figure 2). For both the MPPI and the CC-MPPI controllers, we set the control horizon to N = 15, the value for λ = 1, the number of sampled trajectories to
+
+Fig. 3. Responses of the MPPI and CC-MPPI to an unpredictable obstacle.The grey curves are the sampled trajectories, the green curves represent the predicted optimal trajectories generated by the controllers, and the black points show the actual trajectories taken by the vehicle.
+M = 4096, the portion of uncontrolled sampled trajectories to α = 0.2, and the control cost matrix to R = 0.01I. The parameter values discussed here are shared by all the controller setups in the simulations of this section.
+C. Planning in Fast-changing Environment: Unpredictable Obstacles
+This experiment tests the CC-MPPI controller’s ability to respond to emergencies owing to unpredictable appearance of obstacles. We test the CC-MPPI against a baseline MPPI controller in an environment where an obstacle suddenly appears in the traveling direction of an autonomous vehicle. In this simulation, the CC-MPPI and MPPI controllers were injected with noises having the same covariance Σ = diag(0.0049, 0.0012), and the same weighting coefﬁcients c1 = 712.5 and c2 = 3.3 in their trajectory costs. Figure 3 demonstrates that the MPPI controller fails to ﬁnd a feasible solution and results in a collision with the obstacle. Figure 3 further shows that the CC-MPPI has a more effective trajectory sampling distribution strategy, which leads the vehicle to take a feasible trajectory that avoids collision.
+D. Aggressive Driving in a Cluttered Environment
+To further examine the performance of the CC-MPPI controller in more complicated environments, we run simulations using a CC-MPPI controller and an MPPI controller on a race track environment with obstacles densely scattered on the track. The track has a constant width of 0.6 m, the centerline has a length of 10.9 m and each turn of the centerline has radius 0.3 m. Each obstacle has radius 0.1 m and uses the continuous obstacle cost (27). Both controllers are set to achieve minimum lap time while avoiding collisions with cluttered obstacles, and have the same covariance Σ = diag(0.49, 0.12) for their injected noises. We perform a grid search by varying the cost weight c1 in (24) which corresponds to avoiding collisions with obstacles, and the
+
+TABLE I CC-MPPI AND MPPI GRID SEARCH PARAMETER VALUES
+
+Cost Parameter Min Max Interval
+
+c1
+
+75 450
+
+37.5
+
+c2
+
+1.65 2.97 0.33
+
+TABLE II CC-MPPI VS. MPPI OF DIFFERENT SETTINGS
+
+Controller CC-MPPI
+MPPI
+
+Avg. laptime(s) 4.20 6.44
+
+No. collision/lap 2.68 2.86
+
+Success rate 98.18% 30.78%
+
+Fig. 4. MPPI and CC-MPPI trajectories on a race track. The trajectories in red are generated by the CC-MPPI, and the trajectories in green are generated by the MPPI using the same injected noise covariance as the CC-MPPI.
+cost weight c2 in (28) for optimizing the vehicle velocity along the track centerline. Table I shows the grid search parameters. Figure 5 presents the results of the grid search in a scatter plot showing the distribution of lap times and average number of collisions. Table II summarizes the grid search and shows the statistics over all the simulations.
+We deﬁne a failure to be the situation when the vehicle comes to a complete stop, or when the vehicle is too far away from the track centerline (> 1 m). If the vehicle ﬁnishes 20 laps without a failure, the simulation is considered a success. Figure 5 shows that the data points corresponding to CC-MPPI occupy the bottom part of the scatter plot, which indicates that the CC-MPPI generates trajectories that are signiﬁcantly faster than those by the MPPI controller. Table II shows that the CC-MPPI achieves 34.78% smaller average lap time, 6.34% fewer collisions and 218.97% higher success rate than the MPPI in simulations. Moreover, the two data points in the red circles in Figure 5 are produced by MPPI and CC-MPPI with the same set of c1 and c2 values, and Figure 4 visualizes the trajectories that correspond to these two data points. We see that the CC-MPPI generates a more aggressive driving maneuver than the MPPI, which helps explain why the CC-MPPI achieves a signiﬁcantly smaller average lap time.
+The performance of CC-MPPI, however, comes with an increased computational overhead. Using our implementation, the CC-MPPI controller runs at 13Hz, while the MPPI controller runs at 97Hz. All simulations were done on a
+
+Fig. 5. Lap time and number of collisions distribution. Each point in this ﬁgure shows the average lap time and average number of collisions over 20 laps in a simulation using one pair of c1 and c2 from Table I. The orange points are produced by the MPPI controller and the cyan points are by the CC-MPPI controller.
+desktop computer equipped with an i9 3.5GHz CPU, and an RTX3090 GPU. The main computational bottleneck of CCMPPI is the computation of the feedback gain K at each iteration. Possible remedies include updating the feedback gain asynchronously, computing the feedback gains offline and storing them in a lookup table, or using a faster, dedicated convex optimization solver that is more suitable for real-time implementation [28], [29], [30].
+VII. CONCLUSIONS AND FUTURE WORK
+We have proposed the Covariance-Controlled Model Predictive Path Integral (CC-MPPI) algorithm that incorperates covariance steering within the MPPI algorithm. The CCMPPI algorithm has adjustable trajectory sampling distributions which can be tuned by changing the terminal covariance constraint Σf in (1d) and the covariance of the injected noise Σ in (1c), which makes it more ﬂexible and robust than the MPPI algorithm. In the simulations, we showed that the CC-MPPI explores the environment and samples trajectories more efﬁciently than MPPI for the same level of exploration noise (Σ ). This results in the vehicle responding faster to unpredictable obstacles and avoid collisions better in a cluttered environment than MPPI. The CC-MPPI performance can be further improved if Σ and Σf are tuned based on the information of the surrounding environment.
+In the future, we plan to design policies to choose judiciously the terminal covariance constraint Σf and the injected noise covariance Σ on-the-ﬂy. These policies should evaluate the environment and assign Σf , Σ for the CC-MPPI controller, such that the trajectory sampling distribution of the controller can be tailored to carry out informed and efﬁcient sampling in any environments.
+
+REFERENCES
+[1] R. Pepy and A. Lambert, “Safe path planning in an uncertainconﬁguration space using RRT,” in IEEE/RSJ International Conference on Intelligent Robots and Systems, Nov. 2006, pp. 5376 – 5381.
+[2] N. A. Melchior and R. Simmons, “Particle RRT for path planning with uncertainty,” in Proceedings 2007 IEEE International Conference on Robotics and Automation, 2007, pp. 1617–1624.
+[3] Y. Huang and K. Gupta, “Collision-probability constrained prm for a manipulator with base pose uncertainty,” in IEEE/RSJ International Conference on Intelligent Robots and Systems, 2009, pp. 1426–1432.
+[4] G. Kewlani, G. Ishigami, and K. Iagnemma, “Stochastic mobilitybased path planning in uncertain environments,” in IEEE/RSJ International Conference on Intelligent Robots and Systems, 2009, pp. 1183– 1189.
+[5] I. M. Balci and E. Bakolas, “Covariance steering of discrete-time stochastic linear systems based on Wasserstein distance terminal cost,” IEEE Control Systems Letters, vol. 5, no. 6, pp. 2000–2005, 2021.
+[6] M. Goldshtein and P. Tsiotras, “Finite-horizon covariance control of linear time-varying systems,” in 56th IEEE Conference on Decision and Control (CDC), 2017, pp. 3606–3611.
+[7] K. Okamoto and P. Tsiotras, “Optimal stochastic vehicle path planning using covariance steering,” IEEE Robotics and Automation Letters, vol. 4, no. 3, pp. 2276–2281, 2019.
+[8] K. Okamoto, M. Goldshtein, and P. Tsiotras, “Optimal covariance control for stochastic systems under chance constraints,” IEEE Control Systems Letters, vol. 2, no. 2, pp. 266–271, 2018.
+[9] P. Tsiotras and M. Mesbahi, “Toward an algorithmic control theory,” Journal of Guidance, Control, and Dynamics, vol. 40, pp. 1–3, 02 2017.
+[10] U. Rosolia and F. Borrelli, “Learning how to autonomously race a car: A predictive control approach,” IEEE Transactions on Control Systems Technology, vol. 28, no. 6, pp. 2713–2719, 2020.
+[11] A. Liniger, X. Zhang, P. Aeschbach, A. Georghiou, and J. Lygeros, “Racing miniature cars: Enhancing performance using stochastic MPC and disturbance feedback,” in American Control Conference, Seattle, WA, 2017, pp. 5642–5647.
+[12] A. A. Jalali and V. Nadimi, “A survey on robust model predictive control from 1999-2006,” in International Conference on Computational Inteligence for Modelling Control and Automation and International Conference on Intelligent Agents Web Technologies and International Commerce (CIMCA’06), 2006, pp. 207–207.
+[13] A. Mesbah, “Stochastic model predictive control: An overview and perspectives for future research,” IEEE Control Systems Magazine, vol. 36, no. 6, pp. 30–44, 2016.
+[14] M. Farina, L. Giulioni, and R. Scattolini, “Stochastic linear model predictive control with chance constraints – a review,” Journal of Process Control, vol. 44, pp. 53–67, 08 2016.
+[15] M. Cannon, B. Kouvaritakis, and D. Ng, “Probabilistic tubes in linear stochastic model predictive control,” Systems & Control Letters, vol. 58, pp. 747–753, 2009.
+[16] M. Cannon, B. Kouvaritakis, and X. Wu, “Probabilistic constrained MPC for multiplicative and additive stochastic uncertainty,” IEEE Transactions on Automatic Control, vol. 54, no. 7, pp. 1626–1632, 2009.
+[17] K. Okamoto and P. Tsiotras, “Stochastic model predictive control for constrained linear systems using optimal covariance steering,” 2019, arXiv:1905.13296.
+[18] D. Bernardini and A. Bemporad, “Scenario-based model predictive control of stochastic constrained linear systems,” in Proceedings of the 48h IEEE Conference on Decision and Control, Shanghai, China, 2009, pp. 6333–6338, held jointly with the 28th Chinese Control Conference.
+[19] G. C. Calaﬁore and L. Fagiano, “Robust model predictive control via scenario optimization,” IEEE Transactions on Automatic Control, vol. 58, no. 1, pp. 219–224, 2013.
+[20] G. Williams, A. Aldrich, and E. A. Theodorou, “Model predictive path integral control: From theory to parallel computation,” Journal of Guidance, Control, and Dynamics, vol. 40, no. 2, pp. 344–357, 2017.
+[21] G. Williams, N. Wagener, B. Goldfain, P. Drews, J. M. Rehg, B. Boots, and E. A. Theodorou, “Information theoretic MPC for model-based reinforcement learning,” in IEEE International Conference on Robotics and Automation (ICRA), Singapore, 2017, pp. 1714–1721.
+[22] G. Williams, P. Drews, B. Goldfain, J. M. Rehg, and E. A. Theodorou, “Information-theoretic model predictive control: Theory and applica-
+
+tions to autonomous driving,” IEEE Transactions on Robotics, vol. 34, no. 6, pp. 1603–1622, 2018. [23] G. Williams, B. Goldfain, P. Drews, K. Saigol, J. M. Rehg, and E. A. Theodorou, “Robust sampling based model predictive control with sparse objective information,” in Robotics: Science and Systems, Pittsburgh, PA, 2018, pp. 42–51. [24] J. Pravitra, K. A. Ackerman, C. Cao, N. Hovakimyan, and E. A. Theodorou, “L1-adaptive MPPI architecture for robust and agile control of multirotors,” in IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), 2020, pp. 7661–7666. [25] G. Williams, B. Goldfain, P. Drews, J. M. Rehg, and E. A. Theodorou, “Autonomous racing with autorally vehicles and differential games,” 2017, arXiv:1707.04540. [26] P. Falcone, M. Tufo, F. Borrelli, J. Asgari, and H. E. Tseng, “A linear time varying model predictive control approach to the integrated vehicle dynamics control problem in autonomous systems,” IEEE Conference on Decision and Control, pp. 2980–2985, 2007. [27] MOSEK ApS, The MOSEK Optimization Toolbox for MATLAB Manual. Version 8.1., 2017. [Online]. Available: http://docs.mosek. com [28] Y. Mao, M. Szmuk, and B. Ac¸ikmes¸e, “A tutorial on real-time convex optimization based guidance and control for aerospace applications,” in Annual American Control Conference (ACC), 2018, pp. 2410–2416. [29] J. Mattingley and S. Boyd, “CVXGEN: a code generator for embedded convex optimization,” Optimization and Engineering, vol. 13, no. 1, pp. 1–27, 2012. [30] D. Dueri, J. Zhang, and B. Ac¸ikmes¸e, “Automated custom code generation for embedded, real-time second order cone programming,” IFAC Proceedings Volumes, vol. 47, no. 3, pp. 1605–1612, 2014.
+
+

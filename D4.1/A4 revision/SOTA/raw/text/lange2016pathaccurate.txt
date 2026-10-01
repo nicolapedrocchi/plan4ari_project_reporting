@@ -1,0 +1,453 @@
+82
+
+IEEE ROBOTICS AND AUTOMATION LETTERS, VOL. 1, NO. 1, JANUARY 2016
+
+Path-Accurate Online Trajectory Generation for Jerk-Limited Industrial Robots
+Friedrich Lange and Alin Albu-Schäffer
+
+Abstract—Standard industrial controllers of robot arms deﬁne constraints on the velocity, the acceleration, and the jerk and abort execution in case any of them is violated. In addition to satisfying these constraints, the presented method tries to generate a trajectory that is path-accurate, i.e., that exactly tracks the 6-dof shape of the desired path in axis space. Furthermore, the computed trajectory is as close as possible to the original robot program. This is reached by forward scaling and backtracking until a feasible trajectory is obtained. In contrast to previous work, blending of subsequent segments of the desired path is prevented by interpolation of the arc length instead of direct position interpolation. Because of its time-efﬁciency the algorithm can be applied in each sampling step, e.g., every 4 ms for a standard KUKA robot with RSI interface. Experimental results demonstrate the approach.
+Index Terms—Trajectory generation, motion control of manipulators, industrial robots.
+I. INTRODUCTION
+T RAJECTORY generation is required for all robotic motion. Commonly it is executed ofﬂine, optimizing both, the geometrical path that solves the task and the velocity proﬁle of the tool center point (tcp) when tracking this path [1]–[5]. Such a computation may be time consuming. In contrast, for online methods the computing time is restricted, resulting in simpler methods. Online trajectory generation is required if the robot program is interpreted during its execution or if the desired path has changed, e.g. because a workpiece is misplaced.
+For online trajectory generation, ﬁrst the path is computed, i.e., a sequence of positions and orientations, or axis positions, and a rule on how to interpolate between them, e.g. by straight lines or circles. In order to be generic, in this letter we assume that the path is represented by a sequence of axis positions, where the distances between them are so small that the intermediate course does not matter. Thus we do not assume a differentiable or continuous path.
+Second, a feasible trajectory is generated, which means that a velocity proﬁle is added to the path. This step is treated in this letter. Feasible means that the constraints on the velocity, the acceleration, and the jerk are met. Most robot manufacturers
+Manuscript received August 12, 2015; accepted November 23, 2015. Date of publication December 9, 2015; date of current version January 11, 2016. This paper was recommended for publication by Associate Editor L. Villani and Editor P. Rocco upon evaluation of the reviewers’ comments.
+F. Lange is with the Robotics and Mechatronics Center, German Aerospace Center (DLR), 82234 Wessling, Germany (e-mail: friedrich.lange@dlr.de).
+A. Albu-Schäffer is with the Robotics and Mechatronics Center, German Aerospace Center (DLR), 82234 Wessling, Germany, and also with the Department of Informatics, Technical University Munich, 85748 Garching, Germany (e-mail: alin.albu-schaeffer@dlr.de).
+Digital Object Identiﬁer 10.1109/LRA.2015.2506899
+
+deﬁne allowed ranges for the axis positions and their derivatives. For safety, tolerable load, moderate wear, and minimal excitation of oscillations, the robot motion is aborted whenever any of these constraints is violated. Otherwise the commanded position, i.e., the ﬁrst sampling step of the generated trajectory, is sent to the position controllers of the robot.
+Most trajectory generation methods minimize the execution time of the robot, as e.g. Refs. [6]–[14], denoted as timeoptimal path parametrization (TOPP). In contrast, here the goal is a trajectory that, perhaps after a temporary slowdown, is synchronized with the original robot program, as in Ref. [15]. This is crucial when multiple robots or devices share the same working space.
+In addition, it is assumed that the updated desired path has to be tracked exactly since otherwise a collision may happen or the contact force may increase excessively. This means that the generated motion has to be path-accurate. For safety not only the Cartesian positions are tracked but also the orientation. This is done by acting in the axis space with e.g. 6 degrees of freedom (dof). It should be mentioned that path accuracy is not always reachable without prediction. For example, high curvature of the path is only possible at low speed since otherwise acceleration limits are exceeded. Besides, without exact knowledge of the robot dynamics, it is not guaranteed that the desired path is really tracked. Therefore the compensation of deviations caused by the robot’s dynamics, as in [7], [16]–[18], is left for future work.
+The authors have previously presented a method that in most cases satisﬁes both, the robot constraints as well as the path accuracy [19]. However, in special cases there might be undesired blending of corners of the desired path, i.e., a large corner cut. This is a violation of path accuracy. Therefore, in this letter the method is modiﬁed by a different interpolation method denoted as arc length interpolation (ALI), to be distinguished from the direct position interpolation (DPI) of [19].
+Instead of the 6-dof positions with DPI, ALI interpolates a scalar parameter s which is denoted as arc length. Its use for the generation of path-accurate trajectories is well known [2], [6]–[8], [11], [13], [16], [20], [21]. However, in these methods, in general, the kinematic constraints of the robot along the desired path are converted to constraints of s. Then the trajectory generation is solved as a one-dimensional problem whose solution is ﬁnally mapped to the axis space. The conversion of the constraints is not directly possible with a desired path that is given by the sampled positions. Thus in this letter another approach is presented that iteratively combines forward scaling and backtracking of the axis positions.
+
+2377-3766 © 2015 IEEE. Personal use is permitted, but republication/redistribution requires IEEE permission.
+See http://www.ieee.org/publications_standards/publications/rights/index.html for more information. Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:15:53 UTC from IEEE Xplore. Restrictions apply.
+
+LANGE AND ALBU-SCHÄFFER: PATH-ACCURATE ONLINE TRAJECTORY GENERATION
+
+83
+
+Forward scaling with ALI has already been presented for the dual problem of stopping along a given path [22]. That task is simpler, as it does without prediction and thus without backtracking. Now that method is extended to the generic case.
+The letter is organized as follows: Next, the task is formulated. Section III outlines the method of [19]. Then Section IV replaces the interpolation which is used there. Finally Section V compares the different approaches in experiments using a KUKA industrial robot.
+II. NOTATION AND PROBLEM FORMULATION
+Notation: Derivatives are computed by backward differences, omitting the sampling time T0. This results in a simple but unusual notation which is explained in the Appendix, similar to [15]. Vectors of all axes are denoted by bold face letters whereas single axes are in normal face with the index as last subscript, e.g. qdi(k) with i ∈ {1, . . . , 6}.
+Task: The task is to modify a sequence of given desired positions qd(k) = (qd1(k), . . . , qd6(k))T of sampling steps k in such a way that at the current time step k the resulting commanded positions qc(k) = (qc1(k), . . . , qc6(k))T preferably satisfy the following conditions:
+1) Feasibility
+For all axes i ∈ {1, . . . , 6}, the velocity vci(k) = qci(k) − qci(k − 1), the acceleration aci(k) = vci(k) − vci(k − 1), and the jerk jci(k) = aci(k) − aci(k − 1) satisfy the constraints
+
+III. ITERATIVE TRAJECTORY GENERATION
+A. Trajectory Generation by Forward Scaling
+1) Velocity Constraint: At the current time step k, ﬁrst of all it is checked whether the desired position can directly be taken as command qc(k) = qd(k). Otherwise the velocity is scaled. This applies if the desired position qd(k) violates (1) in at least one axis i, i.e., |vdci(k)| > v¯i with vdci(k) = qdi(k) − qci(k − 1). Scaling the velocity between time step (k − 1) and k probably results in a path-accurate trajectory since the path is not modiﬁed but the time proﬁle of its execution.
+The modiﬁcation is executed in two steps. First, the scaling factor α is computed from all limited components as
+
+α = min (v¯i/|vdci(k)|).
+
+(6)
+
+i, |vdci(k)|>v¯i
+
+This computation is always possible and results in 0<α<1. Then the velocity of all axes is scaled using
+
+qc(k) = qc(k − 1) + αvdc(k).
+
+(7)
+
+2) Acceleration Constraint: The velocity is scaled as well
+if the desired position violates (2) in at least one axis i, i.e., |adci(k)| > a¯i with adci(k) = qdi(k) − 2qci(k − 1) + qci(k − 2). (7) gives
+
+|qci(k − 1) + αvdci(k) − 2qci(k − 1) + qci(k − 2)| ≤ a¯i (8)
+
+and hence the scaling factor is
+
+|vci(k)| = |qci(k) − qci(k − 1)| ≤ v¯i
+
+(1)
+
+|aci(k)| = |qci(k) − 2qci(k − 1) + qci(k − 2)| ≤ a¯i (2)
+
+|jci(k)| = |qci(k) − 3qci(k − 1) + 3qci(k − 2)
+
+− qci(k − 3)| ≤ ¯ji,
+
+(3)
+
+where ±v¯i, ±a¯i, and ±¯ji are the (symmetric) limits for the velocity, the acceleration, and the jerk.
+
+2) Path Accuracy
+If a position qc(k) is on the desired path, the next position qc(k + 1) will be on the desired path as well. The desired path is deﬁned by the sampled positions qd(·) and the straight lines between them, i.e.,
+qc(k) = (1 − β)qd(k + κ − 1) + βqd(k + κ) (4)
+with κ ∈ Z and 0 ≤ β < 1.
+
+3) Synchronization
+
+Even if qd(k) is not feasible, there is at least a single κ1 ∈ N for which the commanded trajectory reaches the desired
+trajectory, i.e.,
+
+qc(k + κ1) = qd(k + κ1).
+
+(5)
+
+This denotes that qc hangs qd at time step k + κ1. Equation (5) implies that the sequence qd(k) does not only
+represent the desired path but also the time steps k in which the
+respective positions are desired.
+
+α = min ±a¯i + vci(k − 1) . (9)
+
+i, |adci(k)|>a¯i
+
+vdci(k)
+
+The sign of ±a¯i is positive if adci(k) > a¯i, it is negative if adci(k) < −a¯i. Otherwise axis i does not contribute to the computation of α since the component i of (2) is satisﬁed.
+If the result is 0 ≤ α ≤ 1, (7) satisﬁes (2) in all axes. Then
+the modiﬁcation is path-accurate. Unfortunately, a scaling in an axis i1 ∈ {1, . . . , 6} may cause
+a limitation in another axis i2 ∈ {1, . . . , 6}, since the elements of qc(k), which are modiﬁed according to (7), have to be used in (2) for veriﬁcation. Simply speaking, if the velocity has to
+be reduced because of a big desired acceleration in axis i1, the reduction of the velocity of axis i2 may exceed the maximum deceleration. Therefore all scaling is repeated iteratively, where the qdi(k) for the computations in the next iteration step are taken from the qci(k) of the previous iteration step. The iterative execution of (7) and (9) ends when a solution with 0 ≤ α ≤ 1 is
+found that satisﬁes the constraint (2) for all axes i, or when α is
+not within the allowed range. The number of steps of this iter-
+ation is not greater than the number of axes. The modiﬁcation
+of the desired trajectory will not be path-accurate if a solution with 0 ≤ α ≤ 1 cannot be found.
+3) Jerk Constraint: Scaling is required also if (3) is exceeded by at least a single axis, i.e., |jdci(k)| > ¯ji with jdci(k) = qdi(k) − 3qci(k − 1) + 3qci(k − 2) − qci(k − 3). As with the acceleration, it is ﬁrst tried to modify the desired
+trajectory in a path-accurate way, i.e., by scaling the velocity.
+(7) gives
+
+Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:15:53 UTC from IEEE Xplore. Restrictions apply.
+
+84
+
+IEEE ROBOTICS AND AUTOMATION LETTERS, VOL. 1, NO. 1, JANUARY 2016
+
+C. Inhibition of Overshooting by Backtracking
+
+Fig. 1. Modiﬁcation of a 2 dof path by direct scaling (DS) the acceleration at the corner of the desired path in order to comply with acceleration limits (not path-accurate). The markers denote the sampled positions.
+
+|qci(k − 1) + αvdci(k) − 3qci(k − 1) + 3qci(k − 2) − qci(k − 3)| ≤ ¯ji. (10)
+
+Thus the scaling factor
+
+α = min ( ±¯ji + vci(k − 1) + aci(k − 1) ) (11)
+
+i, |jdci(k)|>¯ji
+
+vdci(k)
+
+Direct scaling and the corresponding path inaccuracies can be avoided in the case that the desired trajectory is known in advance. Then the forward scaling of Section III-A can be done predictively. If no feasible solution is found for a time step k + κ, a modiﬁcation of preceding positions is possible, e.g. qc(k + κ − 1), instead of computing qc(k + κ) by direct scaling. This generally inhibits overshooting after reaching the desired trajectory with a too high velocity or acceleration. The consideration of preceding time-steps is called backtracking. In contrast to direct scaling it is path-accurate.
+For brevity, k + κ is denoted as k in the following. Constraints of the velocity according to (1) need no backtracking, since (6) and (7) always give a feasible commanded position. Constraints on the acceleration according to (2) can be resolved by modifying qdi(k ) and qci(k − 1), in order to result in a feasible aci(k ). This is done using
+
+can be computed and inserted in (7). As with the acceleration, this has to be repeated until a solution with 0 ≤ α ≤ 1 is found
+that satisﬁes all constraints. Similar to (9), in (11) the maximum jerk ±¯ji has a positive
+sign if jdci(k) > ¯ji and it has a negative sign if jdci(k) < −¯ji. Otherwise axis i does not contribute to the determination of the
+scaling factor.
+
+B. Direct Scaling as a Last Resort
+
+If no feasible axis positions qc(k) exist from Section III-A, an alternative solution is computed. It satisﬁes all kinematic constraints mentioned in Section III-A, but the resulting trajectory is not path-accurate. This algorithm is denoted as direct scaling (DS) of the acceleration and the jerk.
+If an acceleration limit (2) is exceeded, the scaling is done for all axes using
+
+qc(k) = qc(k − 1) + vc(k − 1) + αadc(k) (12)
+
+(cf. (33) with i = 1), where the scaling factor α is computed from the constrained axes by
+
+α = min (a¯i/|adci(k)|).
+
+(13)
+
+i, |adci(k)|>a¯i
+
+This modiﬁcation of the desired position is always possible, since 0 < α < 1, provided that an acceleration limit is violated. Scaling the acceleration results in a position between that one which would be reached with zero acceleration and the desired position which is not reachable, see Fig. 1.
+If a jerk limit (3) is exceeded, the scaling is done for all axes using
+
+qc(k) = qc(k − 1) + vc(k − 1) + ac(k − 1) + αjdc(k) (14)
+
+(cf. (35) with i = 1), and
+
+α = min (¯ji/|jdci(k)|)
+
+(15)
+
+i, |jdci(k)|>¯ji
+
+computed from the constrained axes only. This results in 0 < α < 1, provided that a jerk constraint is violated before the direct scaling (DS).
+
+qbai(k ) = qci(k − 1) + α(qdi(k ) − qci(k − 1)) (16)
+
+qbai(k − 1) = qci(k − 2) + (1 + α)(qci(k − 1)
+
+− qci(k − 2))/2.
+
+(17)
+
+qdi(k ) is the desired position or a position that has been computed previously by backtracking. qci(k − 1) has been computed by forward scaling or previous iteration steps of
+backtracking.
+Equation (17) has been chosen such that with α from (13), (16)–(17) result in |abai(k )| = |qbai(k ) − 2qbai(k − 1) + qci(k − 2)| ≤ a¯i with |abai(k )| = a¯i for the most constrained axis.
+Similarly, constraints on the jerk according to (3) can be resolved by modifying qdi(k ), qci(k − 1), and qci(k − 2), in order to result in a feasible jci(k ). This is done by
+
+qbji(k ) = qci(k − 1) + α(qdi(k ) − qci(k − 1)) (18)
+
+qbji(k − 1) = qci(k − 2) + (1 + 2α)(qci(k − 1)
+
+− qci(k − 2))/3
+
+(19)
+
+qbji(k − 2) = qci(k − 3) + (2 + α)(qci(k − 2)
+
+− qci(k − 3))/3,
+
+(20)
+
+where (19) and (20) have been chosen such that with α from (15), (18)–(20) result in |jbji(k )| = |qbji(k ) − 3qbji(k − 1) + 3qbji(k − 2) − qci(k − 3)| ≤ ¯ji with |jbji(k )| = ¯ji for the most constrained axis.
+
+D. Iterative Procedure
+In order to result in feasible and path-accurate trajectories, forward scaling and backtracking are executed iteratively. The procedure is as follows:
+• Try qc = qd and check the constraints (1), (2), and (3) predictively, i.e., for k + κ instead of k, with κ = 0, . . . , κ¯, where κ¯ denotes the number of future time-steps for which the desired trajectory qd(k + κ) is available.1
+1κ¯ is at least in the order of magnitude of the number of time steps that are needed to stop down from the current velocity v(k). A bigger value does not compromise the procedure but needs additional computing power.
+
+Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:15:53 UTC from IEEE Xplore. Restrictions apply.
+
+LANGE AND ALBU-SCHÄFFER: PATH-ACCURATE ONLINE TRAJECTORY GENERATION
+
+85
+
+If needed, do forward scaling according to Sect. III-A. If this is successful, continue with the next value of κ. • Otherwise do backtracking according to Sect. III-C at time-step k + κ. Then continue at the ﬁrst modiﬁed sampling step, i.e., time-step k + κ − 1 or k + κ − 2, depending on the kind of backtracking. For this, all modiﬁed values qbai or qbji from backtracking are transferred to the qdi of the respective time steps, since these are required for a subsequent or future check of the constraints or a forward scaling. The iteration ends when • κ¯ is reached (success), • k + κ − 1 < 0 respectively k + κ − 2 < 0 is reached (failure), • or when the maximum computing time is exceeded (failure). In the case of a failure, a feasible solution is reached nevertheless by direct scaling according to Section III-B. This is required e.g. if κ¯ is too small or if the desired trajectory is recomputed during high speed motion.
+E. Discussion
+
+Fig. 2. Example with a path error due to a delay during nonlinear motion:
+After starting in time step k − 1, qd(k) (black +) cannot be reached because of the acceleration limit. Instead, qc(k) is computed. In the next step, DPI computes qc(k + 1) (red x) by scaling the line from qc(k) to qd(k + 1) (black +). In the same way, qc(k + 2) lies between qc(k + 1) and qd(k + 2). With ALI, qc(k) is computed as with DPI, using (27) for qfa1(k) and (31). Then (29) for qfa1(k + 1) and (32) computes qc(k + 1) (orange #) between the previous executed position qc(k) and the next desired position, which in this case is qd(k) (black +) and not qd(k + 1). Then qc(k + 2) is computed by (27) for qfa1(k + 2) and/or qfa2(k + 2) and (31) between two desired positions qd(k) and qd(k + 1). qd(k + 2) has no inﬂuence. Similarly, qd(k + 3) is determined. Thus there is no path error at the sampled positions qc. For
+simplicity, jerk limits are not considered in this example.
+
+The method presented so far always results in a feasible trajectory. But it is not ensured that a path-accurate trajectory is found within the given computing time. This can be improved heuristically by multiplying the scaling factor α in forward scaling by cf ≈ 0.9, provided that α < 1.
+The reached path accuracy may be inferior to what is expected, especially in the following cases:
+1) If the desired trajectory has been lost, subsequent positions are not guaranteed to reach the desired path. (This case is not comprised in the above deﬁnition of path accuracy.)
+2) The position resulting from scaling vdc(k) lies always on the straight line between qc(k − 1) and qd(k). So it may be off the path if the latter is curved and these two points are far from each other. Fig. 2 shows an example.
+3) But even if the interpolation is done within single steps of qd, the desired path can be lost by repeated forward and backward interpolation during an iteration. Finally the commanded path is signiﬁcantly smoothed with respect to the desired path.
+Section IV provides a solution for the last two points, as shown in Fig. 2.
+
+blending appears only between adjacent sampling points of the ﬁnal trajectory. This cannot be prevented.
+Arc length interpolation may be applied always when an interpolation is done in the preceding sections. This concerns (7), (16)–(17), and (18)–(20). Then, if a constraint of an axis i is violated, the following steps are executed:
+1) The reachable axis position q#∗i(k ) is computed that satisﬁes the limit, with # ∈ {f, b} and ∗ ∈ {v, a, j}. Other than in Section III, (7) is replaced by
+
+qfvi(k ) = qci(k qfai(k ) = qci(k qfji(k ) = qci(k
+
+− 1) ± v¯i − 1) + vci(k − 1) + vci(k
+
+− 1) ± a¯i − 1) + aci(k
+
+(21)
+(22) − 1) ± ¯ji,
+(23)
+
+if the respective constraint is violated by qdi(k ). In this way the singularity of vdci(k ) = 0 does not appear. The sign of the limit ±v¯i, ±a¯i, or ±¯ji is such that the modiﬁcation with respect to qdi(k ) is minimal. Equations (16)–(17) and (18)–(20) are adopted without
+change, but the α are not the minimal values from (13)
+and (15) respectively, but individually
+
+α = a¯i/|adci(k)|
+
+(24)
+
+IV. ARC LENGTH INTERPOLATION (ALI)
+The desired path is given as sampled positions qd(k + κ), which are connected by straight lines. In order to better preserve the desired path, a scalar path coordinate s(k + κ) is computed, also denoted as arc length. When the scalar trajectory has been ﬁnally determined as a sequence s(k + κ) with κ = 0, . . . , κ¯, the spatial trajectory qc(k + κ) can be computed from qd(k + κ) by a single interpolation. This is denoted as arc length interpolation (ALI).
+The result is illustrated in Fig. 2. It shows that all sampling points of the commanded trajectory are on the desired path. The
+
+or
+
+α = ¯ji/|jdci(k)|.
+
+(25)
+
+2) A scalar parameter s∗i(k ) is computed from this axis position q#∗i(k ), as explained in Section IV-A. For simplicity, s is deﬁned here by the elapsed time of the desired trajectory, meaning that a position qd(k ) has the value s = k . The exact deﬁnition is given in Section IV-A. It is a linear interpolation between subsequent sampling
+points of the desired trajectory or between the previously
+executed position and the next sampled desired position.
+
+Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:15:53 UTC from IEEE Xplore. Restrictions apply.
+
+86
+
+IEEE ROBOTICS AND AUTOMATION LETTERS, VOL. 1, NO. 1, JANUARY 2016
+
+3) It is checked whether s∗i(k ) < s(k ). In this case the new value is taken as s(k ). So with ALI, the minimum of the computed s∗i(k ) is selected.
+s(k ) = min(svi(k ), sai(k ), sji(k )), (26)
+i
+This corresponds to the minimum of the factor α with DPI, according to (6), (9), or (11). 4) The resulting position qc(k ) is computed. qc(k ) is not used for a recursive computation as with DPI, since all forward scaling and backtracking steps are done on the basis of s and not of previously computed qc. So, except for the ﬁnal computation of qc(k), the qc(k ) serve only for checking the constraints in further steps of 1), using qc(k ) instead of qd(k ).
+
+A. Computation of the Arc Length and the Resulting Position
+
+The difference between ALI and DPI is that interpolation of s(·) is not simply done by s(k) = s(k − 1) + α(s(k) − s(k − 1)), similar to (7), but by an equation that computes s(k) from the reachable positions q#∗i(k).
+In order to comprise forward scaling as well as backtracking, the task is formulated to interpolate q#∗i(k − k1) in the interval between qci(k − k2) and qdi(k − k1). Then for forward scaling, k2 = 1, whereas backtracking the acceleration or the jerk needs k2 = 2 and k2 = 3 respectively. k1 = 0 is used for (21)–(23), (16), and (18). Equations (17) and (19) correspond
+to k1 = 1, whereas k1 = 2 is taken for (20). s∗i(k − k1) is computed from the q#∗i(k − k1) using
+
+s∗i(k
+
+− k1) = s∗i(k − k1)
++ q#∗i(k − k1) − qdi(s∗i(k − k1)) , qdi(s∗i(k − k1) + 1) − qdi(s∗i(k − k1)) (27)
+
+where s is the largest integer not greater than s.
+Equation (27) is computed by trial and error, trying s∗i(k − k1) = s(k − k1), s(k − k1) − 1, . . . , s(k − k2) + 1, until a s∗i(k − k1) ﬁts to the interval
+
+s∗i(k − k1) ≤ s∗i(k − k1) < min(s(k − k1), s∗i(k − k1) + 1). (28)
+
+Fig. 3. Flow chart of ALI during forward scaling.
+
+solutions of s∗i(k − k1) exist, the biggest one is taken, since it represents the smallest change with respect to the desired trajectory, which corresponds to s∗i(k − k1) = k − k1.
+The axis positions of the arc length s(k − k1) can be computed using
+
+qc(k − k1) = qd(s(k − k1)) + (s(k − k1)
+
+(31)
+
+− s(k − k1)) · (qd(s(k − k1) + 1) − qd(s(k − k1))),
+
+or
+
+In the beginning, all values s(k ) are initialized by k . Before each computation of (27), s(k − k1) is reduced to s(k − k1 + 1), whenever the latter is lower.
+If no solution is found by (27) and (28),
+
+s∗i(k − k1) = s(k − k2)
+
+(29)
+
++ (q#∗i(k −k1)−qci(k − k2)) · (s(k −k2)+1−s(k −k2)) qdi(s(k −k2)+1)−qci(k −k2)
+
+qc(k − k1) = qc(k − k2)
+
+(32)
+
++ (s(k −k1)−s(k −k2)) · (qd(s(k −k2)+1)−qc(k −k2)) , s(k −k2)+1−s(k −k2)
+
+if s(k) < s(k − k2) + 1. This results in qc(k − k1) = q#∗i(k − k1) for the most limiting constraint ∗i.
+The simpliﬁed procedure with k = k, k1 = 0, and k2 = 1 is
+illustrated in Fig. 3.
+
+may give a feasible s∗i(k − k1), with
+
+s(k − k2) ≤ s∗i(k − k1)< min(s(k − k1), s(k − k2)+1). (30)
+At most k − k1 − s(k − k2) + 1 equations (27) or (29) have to be tested for computing s∗i(k − k1). In case multiple
+
+B. Discussion
+Other than with previous work, ALI is not a complete trajectory generation method but an add-on to the approach of Section III, improving the path accuracy.
+
+Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:15:53 UTC from IEEE Xplore. Restrictions apply.
+
+LANGE AND ALBU-SCHÄFFER: PATH-ACCURATE ONLINE TRAJECTORY GENERATION
+
+87
+
+Fig. 5. KUKA robot with force sensor and pin which is in contact.
+Fig. 4. Example of backtracking in an iteration step l in which the s(k − k1, l − 1) are not given by the sampling steps anymore. By backtracking the acceleration with α = 0, qbai(k , l) according to (16) and thus s(k , l) and qc(k , l) are adopted from s(k − 1, l − 1) and qc(k − 1, l − 1) of the previous iteration step l − 1. But there is no unique sai(k − 1, l) from the two qbai(k − 1, l) according to (17), marked by x. The lesser sai(k − 1, l) is adopted as updated s(k − 1, l) and results in the updated qc(k − 1, l). DPI would result in updated positions marked by x, thus leaving the path.
+
+The main features of ALI are as follows: • Whereas DPI always interpolates between qc(k − 1) and
+qd(k ), ALI selects the appropriate segment and interpolates there. So no corner cut exists, as in 2) of the list of
+Section III-E. The only blending appears between subsequent sampled positions qc(k − 1) and qc(k ). ALI and DPI are identical if there is only a single segment of qd(·) between s(k − 1) and k . The different cases are illustrated in Fig. 2. • For integral s(k ), qc(k ) = qd(s(k )). Otherwise qc(k ) is on the straight line between neighboring points of qd or the previously executed position qc(k − k2) and qd(s(k − k2) + 1). • All iterative scaling only modiﬁes the scalar arc length s(·). Thus the original desired trajectory is not affected.
+Consequently, no smoothing is present, as in 3) of the list in Section III. The ﬁnal commanded trajectory qc(·) is computed from the s(·) and the qd(·) and not iteratively updated from preliminary qc(·). • In contrast to Section III-C, backtracking with ALI does
+not always result in a feasible trajectory. This is explained
+in the following and a solution is found.
+Backtracking with DPI according to (16)–(17) or (18)–(20)
+guarantees that qba(k ) or qbj(k ) are feasible. In particular, α = 0 results in abac(k ) = qba(k ) − 2qba(k − 1) + qc(k − 2) = 0 or jbjc(k ) = qbj(k ) − 3qbj(k − 1) + 3qbj(k − 2) − qc(k − 3) = 0, since the individual axes are all backtracked similarly. But the same factor α may give different values s∗i(k − 1) (see Fig. 4) or sji(k − 2). Consequently, the updated s(k − 1) and s(k − 2) may result in aci(k ) = abaci(k ) or jci(k ) = jbjci(k ).
+Therefore, backtracking with ALI is repeated, as forward
+scaling is repeated in Section III whenever scaling because of an
+
+Fig. 6. Desired and commanded trajectories using different methods.
+axis i1 has caused a new limitation in an axis i2. Convergence can be speeded up by multiplying α with a decreasing factor, e.g. cb = 1 − 0.03l, where l ∈ N is the iteration index. In this way, feasible backtracking is usually achieved rapidly.
+If, nevertheless, repeated backtracking does not converge to a feasible set of s(k ), s(k − 1), and s(k − 2), a solution is enforced by several scalings with α = 0, until the result is feasible. This is true at the latest for s(k ) = s(k − 1) = s(k − 2) = s(k − 3), since then the interpolation is within a single interval, as in Section III. The number of such backtracking steps is in the order of magnitude of s(k ) − s(k − 3).
+V. EXPERIMENTS
+In the ﬁrst experiment the robot tool moves horizontally, overlayed by a vertical motion until a reaction force is measured when touching the table (see setup in Fig. 5). This happens in time step 3184 in Fig. 6, much earlier than expected. Then the future desired trajectory is recomputed such that the desired force will be executed with the original desired horizontal
+
+Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:15:53 UTC from IEEE Xplore. Restrictions apply.
+
+88
+
+IEEE ROBOTICS AND AUTOMATION LETTERS, VOL. 1, NO. 1, JANUARY 2016
+
+Fig. 7. Desired and commanded paths using a force sensor. Each symbol marks a sampled position.
+
+Fig. 8. Desired and commanded paths using a predictive sensor (5 times as fast as Fig. 7). Each symbol marks a sampled position.
+
+TABLE I ASSUMED LIMITS OF THE INDIVIDUAL AXES IN RAD/(SAMPLING STEP),
+RAD/(SAMPLING STEP)2, AND RAD/(SAMPLING STEP)3 (BEFORE FILTERING)
+motion. This approach is explained in detail in [23]. It results in a step function since the actual position at which the force is sensed is delayed with respect to the so far desired trajectory.
+Fig. 6 shows the experimental results of the ﬁrst three axes of a KUKA KR16 robot that is controlled at 250 Hz via RSI Ethernet from an external computer. It displays that the desired velocity of axis 1 remains constant whereas the desired trajectories of axes 2 and 3 are signiﬁcantly changed after the impact. Fig. 7 shows the paths in the plane of axes 2 and 3. Table I displays the used limits of velocities, accelerations and jerks.
+When the desired trajectory is changed (because of a sensed contact), all tested methods succeed in a feasible trajectory. In the ﬁrst steps they are even identical. The steps 3184 to 3186 are not path-accurate, because the axes 2, 3, and 5 cannot be accelerated fast enough.
+Then the method without backtracking, i.e., DPI with only forward scaling according to Sections III-A and III-B, executes maximum acceleration until the desired trajectory is reached. Thereafter, as far as the jerk limit allows, the deceleration is maximum. In this way a poorly damped oscillation around the desired path is executed. The robot motion may even become unstable if the limits of the jerk are very restrictive. So this “classical” approach is not suitable. The resulting path is shown in Fig. 7.
+In contrast, with DPI with backtracking there is no overshooting since the acceleration is reduced in time. Tracing the experiment discloses that time steps 3184 to 3186 require direct scaling (DS). In step 3187 the following steps of forward scaling (f) and backtracking (b) are done in order to comply with the constraints in brackets: f(a2(3187)), f(a1(3188), a2(3188), a3(3188)), f(a3(3189)), b(a2(3190), a3(3190), a5(3190)), b(a2(3189)), b(j2(3189), j3(3189)), f(a2(3191)), b(a3(3191)), f(a1(3192), a2(3192)), f(a2(3193)), and b(j2(3194), j3(3194)). Then the modiﬁed trajectory is feasible until time step 3208 =
+
+3187 + κ¯ and qc(3187) is executed. Similarly, backtracking is performed in each of the next sampling steps.
+The result of the Reﬂexxes Motion Library [24] is similar to this. It is obtained by computing trajectories from qc(k − 1), vc(k − 1), and ac(k − 1) to qd(k + κ) and vd(k + κ). This is done by tentatively calling the function RMLPosition for κ = 0, . . . , κ¯ until the target is reached within at most κ time steps.2 The intermediate time steps k, . . . , k + κ − 1 are not considered, i.e., path accuracy does not matter.
+Forward scaling and backtracking with ALI decelerates signiﬁcantly and thus reaches the desired trajectory later than with the other methods (Fig. 6), but at an earlier position of the desired path (Fig. 7).
+In a second experiment the task is repeated 5 times faster, where, instead of the force-torque sensor, a distance sensor is simulated. This sensor can measure the table position in advance, thus predict a changed desired trajectory that keeps a minimum distance. The predictive approach decelerates early enough, such that there is no overshooting (Fig. 8). This cannot be exploited when using any of the two methods without backtracking.
+In this experiment, backtracking with DPI shows substantial blending at the vertex, caused by up to 30 iteration steps. In contrast, ALI reproduces the desired path exactly, which is only possible by a stricter deceleration, resulting in a delay k − s(k) of up to 9.5 sampling steps, using not more than 56 iteration steps for each trajectory.
+The experiment veriﬁes that, in combination with a predictive sensor with little noise, the presented approach with ALI can preserve the shape of the desired path according to the deﬁnition of path accuracy in Section II.
+The video attachment gives an impression of both experiments. However, the different methods cannot be distinguished there.
+VI. CONCLUSION
+The letter presents a trajectory generator that in each sampling step continues the so far commanded robot motion on the currently desired path, complying with constraints on the velocity, the acceleration, and the jerk, and ﬁnally synchronizing
+2Note that this is different to the intended usage. In addition, the used backward computation of the derivatives is not adequate for the approach of the library. Therefore the apparent overshooting and offset when using the Reﬂexxes Motion Library are no deﬁciency of that library.
+
+Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:15:53 UTC from IEEE Xplore. Restrictions apply.
+
+LANGE AND ALBU-SCHÄFFER: PATH-ACCURATE ONLINE TRAJECTORY GENERATION
+
+89
+
+with the desired trajectory. The method is applicable to industrial robots with standard robot programs, which in this way are online-modiﬁed locally.
+Trajectory generation is done by forward scaling and backtracking, using either direct position interpolation (DPI) or arc length interpolation (ALI), where the latter results in better path accuracy. If no other solution is found, direct scaling (DS) always gives a feasible position command.
+The method can be extended to comply with other constraints, e.g. torque constraints or limitations on Cartesian level. This can be treated similarly, but with time-variant limits.
+Further extensions are possible in order to speed up the convergence. This will be the focus of future work.
+
+APPENDIX
+Without loss of generality, the sampling time T0 is expressed in sampling steps instead of seconds. This results in T0 = 1. Then it can be omitted in the equations, meaning that for rotational axes all quantities are dimensionless. For example the acceleration a is expressed in radians per squared sampling steps instead of rad/s2.
+In addition, as in [19], all derivatives are computed by backward differences, e.g. a(k) = v(k) − v(k − 1) = q(k) − 2q(k − 1) + q(k − 2). With a(k + 1) = · · · = a(k + i) this results in
+
+q(k + i) = q(k) + iv(k) + i(i + 1)/2 a(k + i) (33)
+
+and
+
+v(k + i) = v(k) + ia(k + i).
+
+(34)
+
+For small i, this representation differs with respect to the common equation q(k + i) = q(k) + iv(k) + i2/2 a. For i = 1 the difference is a factor of 2 for the acceleration. But this
+representation is consistent with the backward differences.
+Similar to the acceleration, the jerk is deﬁned by j(k) = a(k) − a(k − 1) = q(k) − 3q(k − 1) + 3q(k − 2) − q(k − 3). With j(k + 1) = · · · = j(k + i) this results in
+
+q(k + i) = q(k) + iv(k) + i(i + 1)/2 a(k)
+
++ i(i + 1)(i + 2)/6 j(k + i)
+
+(35)
+
+and
+
+v(k + i) = v(k) + ia(k) + i(i + 1)/2 j(k + i), (36)
+
+thus differing up to a factor of 6 from q(k + i) = q(k) + iv(k) + i2/2 a + i3/6 j. This discrepancy is solved by adapting the limits a¯ and ¯j.
+
+REFERENCES
+[1] K. Erkorkmaz and Y. Altintas, “High speed CNC system design—Part I: Jerk limited trajectory generation and quintic spline interpolation,” Int. J. Mach. Tools Manuf., vol. 41, no. 9, pp. 1323–1345, Jul. 2001.
+[2] F. Debrouwere et al., “Time-optimal path following for robots with trajectory jerk constraints using sequential convex programming,” in Proc. IEEE Int. Conf. Robot. Autom. (ICRA), Karlsruhe, Germany, May 2013, pp. 1908–1913.
+
+[3] M. Lawitzky, M. Kimmel, P. Ritzer, and S. Hirche, “Trajectory generation under the least action principle for physical human-robot cooperation,” in Proc. IEEE Int. Conf. Robot. Autom. (ICRA), Karlsruhe, Germany, May 2013, pp. 4270–4275.
+[4] T. Kunz and M. Stilman, “Probalistically complete kinodynamic planning for robot manipulators with acceleration limits,” in Proc. IEEE/RSJ Int. Conf. Intell. Robots Syst. (IROS), Chicago, IL, USA, Sep. 2014, pp. 3713– 3819.
+[5] J. Schultz and T. D. Murphey, “Real-time trajectory generation for a planar crane using discrete mechanics,” in IEEE/RSJ Int. Conf. Intell. Robots Syst. (IROS)/Workshop Real-Time Motion Gener. Control Constraint Robot Program., Chicago, IL, USA, Sep. 2014 [Online]. Available: http://cs.stanford.edu/people/tkr/iros2014/papers/IROS 2014 ws_05.pdf.
+[6] Y. Bestaoui, “On-line motion generation with velocity and acceleration constraints,” Robot. Auton. Syst., vol. 5, pp. 279–288, Mar. 1989.
+[7] O. Dahl and L. Nielsen, “Torque limited path following by on-line trajectory time scaling,” IEEE Trans. Robot. Autom., vol. 6, no. 5, pp. 554–561, Oct. 1990.
+[8] Z. Shiller and H.-H. Lu, “Computation of path constrained time optimal motions with dynamic singularities,” ASME J. Dyn. Syst. Meas. Control, vol. 114, pp. 34–40, Jan. 1992.
+[9] R. Haschke, E. Weitnauer, and H. Ritter, “On-line planning of timeoptimal, jerk-limited trajectories,” in Proc. IEEE/RSJ Int. Conf. Intell. Robots Syst. (IROS), Nice, France, Sep. 2008, pp. 3248–3253.
+[10] X. Broquére, D. Sidobre, and I. Herrera-Aguilar, “Soft motion trajectory planner for service manipulator robot,” in Proc. IEEE/RSJ Int. Conf. Intell. Robots Syst. (IROS), Nice, France, Sep. 2008, pp. 2808–2813.
+[11] J. Mattmüller and D. Gisler, “Calculating a near time-optimal jerkconstrained trajectory along a speciﬁed smooth path,” Int. J. Adv. Manuf. Technol., vol. 45, pp. 1007–1016, 2009.
+[12] T. Kröger and F. M. Wahl, “Online trajectory generation: Basic concepts for instantaneous reactions to unforeseen events,” IEEE Trans. Robot., vol. 26, no. 1, pp. 94–111, Feb. 2010.
+[13] M. H. Ghasemi, N. Kashiri, and M. Dardel, “Near time-optimal control of redundant manipulators along a speciﬁed path with jerk constraint,” Adv. Robot., vol. 25, pp. 2319–2339, 2011.
+[14] Q. Pham, “A general, fast, and robust implementation of the time-optimal path parameterization algorithm,” IEEE Trans. Robot., vol. 30, no. 6, pp. 1533–1540, Dec. 2014.
+[15] C. Guarino Lo Bianco and F. Ghilardelli, “A discrete-time ﬁlter for the generation of signals with asymmetric and variable bounds on velocity, acceleration, and jerks,” IEEE Trans. Ind. Electron., vol. 61, no. 8, pp. 4115–4125, Aug. 2014.
+[16] C. Guarino Lo Bianco and O. Gerelli, “Online trajectory scaling for manipulators subject to high-order kinematic and dynamic constraints,” IEEE Trans. Robot., vol. 27, no. 6, pp. 1144–1152, Dec. 2011.
+[17] S. Pchelkin, A. Shiriaev, A. Robertsson, and L. Freidovich, “Integrated time-optimal trajectory planning and control design for industrial robot manipulator,” in Proc. IEEE/RSJ Int. Conf. Intell. Robots Syst. (IROS), Tokyo, Japan, Nov. 2013, pp. 2521–2526.
+[18] R. Gill, D. Kulic´, and C. Nielsen, “Robust path following for robot manipulators,” in Proc. IEEE/RSJ Int. Conf. Intell. Robots Syst. (IROS), Tokyo, Japan, Nov. 2013, pp. 3412–3418.
+[19] F. Lange and M. Suppa, “Predictive path-accurate scaling of a sensorbased deﬁned trajectory,” in Proc. IEEE Int. Conf. Robot. Autom. (ICRA), Hong Kong, China, May/Jun. 2014, pp. 754–759.
+[20] A. Amthor, S. Zschäk, C. Ament, A. Lorenz, and J. Werner, “Method and device for real-time-capable forth-order path planning for generating continuous target trajectories free of jerk jumps,” International Patent WO002010136586A1, 2010.
+[21] C. Guarino Lo Bianco and F. Ghilardelli, “Real-time planner in the operational space for the automatic handling of kinematic constraints,” IEEE Trans. Autom. Sci. Eng., vol. 11, no. 3, pp. 730–739, Jul. 2014.
+[22] F. Lange and M. Suppa, “Trajectory generation for immediate pathaccurate stopping of industrial robots,” in Proc. IEEE Int. Conf. Robot. Autom. (ICRA), Seattle, WA, USA, May 2015, pp. 2021–2026.
+[23] F. Lange, W. Bertleff, and M. Suppa, “Force and trajectory control of industrial robots in stiff contact,” in Proc. IEEE Int. Conf. Robot. Autom. (ICRA), Karlsruhe, Germany, May 2013, pp. 2912–2919.
+[24] Reﬂexxes GmbH, 2015 [Online]. Available: http://www.reﬂexxes.ws/, accessed on, 2015.
+
+Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:15:53 UTC from IEEE Xplore. Restrictions apply.
+
+

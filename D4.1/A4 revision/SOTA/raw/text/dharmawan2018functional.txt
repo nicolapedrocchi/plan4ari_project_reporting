@@ -1,0 +1,523 @@
+2018 3rd International Conference on Advanced Robotics and Mechatronics (ICARM)
+
+Maximizing Robot Manipulator’s Functional Redundancy via Sequential Informed Optimization
+Audelia G. Dharmawan, Suhasini Padmanathan, Yi Xiong, Inigo F. Ituarte, Shaohui Foong, and Gim Song Soh
+
+Abstract— This paper proposes Sequential Informed Optimization (SIO) method, a computationally-efﬁcient approach for a globally-optimal task-constrained motion planning. It builds upon the idea of using the knowledge of the preceding robot’s task and globally-optimum conﬁguration as the intellectual initial guess to guide and plan for the subsequent robot’s motion. The proposed approach can be used with any standard constrained nonlinear optimization method. The abilities of the method to plan the globally-optimum motion for a functionally-redundant manipulator, i.e. robot executing ‘soft’ task constraints, are demonstrated in the numerical simulations.
+I. INTRODUCTION Additive manufacturing (AM) is a technology that has been recently gaining attention due to its potential to enable innovation in the design process, reduced manufacturing cost, and shorter time to market [1]. Typically the setup consists of a motion system, a head source, and a feedstock to built a part layer by layer through process-speciﬁc motion control. For large-scale metal manufacturing, the combination of an electric arc as the head source, wire as the feedstock, and robotic system for AM purpose (referred to as WAAM [2], as shown in Fig. 1) is rather common and has been investigated since the 1990s.
+Fig. 1. Illustration of a robotic WAAM (Wire Arc Additive Manufacturing) printing large-scale thin-walled metallic structures. The end-effector rotation about the approach direction (indicated by the arrow) is irrelevant to the completion of the task, creating a functional redundancy.
+*The authors gratefully acknowledge the support of SUTD Digital Manufacturing and Design Centre (https://dmand.sutd.edu.sg)
+The authors are with the Singapore University of Technology and Design, Engineering Product Development Pillar, 8 Somapah Road, Singapore 487372. Corresponding email: sohgimsong@sutd.edu.sg
+
+The main challenge faced by this approach is the effect of residual stress as introduced by the heat input of the arc source, leading to part distortion once it is unclamped. To overcome this, it requires the consideration of a variety of process-related kinematic constraints into its motion planner. An advantage of using a 6-DOF (degree of freedom) robot manipulator for WAAM is its functional redundancy, as its end-effector rotation about the approach direction is irrelevant to the completion of the task. A robot manipulator with m DOF is said to be functionally redundant when only a number of r components in its operational space are of concern for the speciﬁc task, with r < m [3]. The extra DOF thus creates an inﬁnite number of robot conﬁgurations which can accomplish the task. The redundant DOF can be exploited in the robot motion planning to optimize a desired performance criterion by selecting the robot conﬁguration.
+In the past, Jacobian pseudo-inverse method has been used to resolve redundancy particularly in robotic welding application [4]. However, this method is considered a local optimization where the resulting output may not be the global optimum depending on the initial robot conﬁguration. Another approach is using genetic algorithm (GA) [5], which is capable of producing globally-optimum solutions. However, GA suffers from long computational time and thus has limited usage for online implementation. Other alternative approach is through the use of constrained optimization [6]. Similar to the Jacobian pseudo-inverse approach, this approach is also very prone to falling into local minima depending on the initial guess.
+The common issue in typical optimization approaches is the difﬁculty in choosing the initial guess that leads to the globally-optimum solution. One way is to solve the optimization problem using multiple initial guesses. However, this has a drawback of longer computational time and does not guarantee a global solution. Thus, a compromise must be made between obtaining the globally-optimum solution and the computational cost. Another approach is through using fewer ‘intellectual’ guesses. For example in [7], a heuristic approach is used by solving a simpliﬁed problem which helps to generate more useful initial guesses for the more complex ﬁnal problem. This is fundamentally a similar idea as numerical continuation method [8].
+One issue in the above-mentioned solutions is that it is not easy to construct and solve the simpler problem. Thus in [9], we proposed the sequential expanded lagrangian homotopy (SELH) method that makes use of the knowledge of the preceding task and globally-optimum robot conﬁguration as the simpler problem to guide and solve the optimal robot
+
+978-1-5386-7066-8/18/$31.00 ©2018 IEEE
+
+334
+
+Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:18:12 UTC from IEEE Xplore. Restrictions apply.
+
+2018 3rd International Conference on Advanced Robotics and Mechatronics (ICARM)
+
+motion for the subsequent task. In this way, the simpler problem has already been constructed and solved, it leads to the globally-optimum solution, and it is also computationally efﬁcient. This paper builds upon the results of our earlier work of using the prior knowledge of the robot’s globallyoptimum conﬁguration and generalize it to solve constrained nonlinear optimization robot motion planning problem.
+II. SEQUENTIAL INFORMED OPTIMIZATION In this section, we describe the proposed idea of Sequential Informed Optimization (SIO) for a computationally-efﬁcient globally-optimal task-contrained motion planning. Informed optimization here means that instead of blindly using random values as initial guesses, the information of the preceding optimal robot’s conﬁguration is utilized to determine its subsequent optimal conﬁguration. Our rationale is that if the previous robot’s conﬁguration is already globally optimal, using it as the initial guess will more likely lead to the globally-optimum solution for the next task. One limitation for this is that the starting robot conﬁguration which fulﬁls the ﬁrst task in the task sequence needs to be solved for global optimality. Nevertheless, this can be obtained ofﬂine ﬁrst even through simple exhaustive search, which we term here as ‘global initalization’ step. Once this is done, the determination of the of the next optimal conﬁguration can be obtained, leading to a computationally-efﬁcient globallyoptimal task-constrained motion planner.
+A. Task-Constrained Optimization Function Deﬁne the series of n discrete task points along the print
+path, Ti with i = 1, ..., n, where Ti is the desired end-effector pose. Each discrete task constraint is characterized by the optimization problem
+minimize f (i)(xi)
+x
+subject to hk(i)(xi) = 0, k = 1, 2, . . . , 7 (1) Now since the starting globally-optimum conﬁguration of the robot (i.e. x1) has been initialized, this solution can then be used as the intellectual initial guess to solve for x2. The concept can then be performed sequentially up to the ﬁnal task Tn, which is illustrated in Fig. 2. Using this approach, the globally-optimum solution can be efﬁciently computed
+Fig. 2. Illustration of the proposed Sequential Informed Optimization (SIO) approach.
+
+for each task constraint and the intellectual guess is easy to obtain as well. The advantage of this proposed approach compared to the previous SELH approach [9], which is based on numerical continuation method, is that it can be used with any standard constrained nonlinear optimization method. Furthermore, the fact that the approach is applicable not only to polynomial systems (i.e. more general), it can be used to solve the robot’s joint angles directly, which can further reduce the computational time.
+III. EXAMPLE FORMULATION
+In this section, we formulate the optimization problem of the optimum motion planning of a functionally-redundant robot. Two cost functions were used which are targeted to optimize the robot accuracy during welding. One is based on the robot’s manipulability and the other on its joint velocities. The robot manipulator used in this example is the 6-DOF ABB welding robot IRB1660ID as shown in Fig 3.
+
+Fig. 3. Geometric Parameters and Frames of ABB IRB1660ID.
+
+A. Objective Function
+1) Manipulability: The manipulability measure [10] has been shown in the literature to be useful and used as the performance criteria for robot motion planning particularly in welding application [4], [5], [6], [11], [12]. Robot manipulability is obtained by
+
+w = det(J(θ)J(θ)T )
+
+(2)
+
+where J(θ) is the Jacobian matrix that associates the robot joint velocities to the end-effector velocities and θ is the robot’s joint angles. For the ABB robot, this is obtained as
+
+w = a2 (d4c3 − a3s3) μ s5
+
+(3)
+
+where
+
+μ = a1 + d4c23 − a2s2 − a3s23
+
+(4)
+
+978-1-5386-7066-8/18/$31.00 ©2018 IEEE
+
+335
+
+Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:18:12 UTC from IEEE Xplore. Restrictions apply.
+
+2018 3rd International Conference on Advanced Robotics and Mechatronics (ICARM)
+
+and si = sin(θi), ci = cos(θi), sij = sin(θi + θj), and cij = cos(θi + θj). The robot’s geometric parameters can be found in Fig. 3. Since the objective is to maximize the
+manipulability, the cost function becomes
+
+f
+
+=
+
+−w2
+
+=
+
+−a22
+
+(d4c3
+
+− a3s3)2
+
+μ2
+
+2
+s5
+
+(5)
+
+2) Joint Velocity: Minimizing the joint velocities can indirectly minimize the joint jerk which may reduce vibration and increase the robot’s operational accuracy. Minimizing the joint velocities can be achieved by minimizing the difference between the subsequent and current joint angles, which can be calculated as
+
+6
+
+f = (xj,i − xj,i−1)2, i = 1, 2, . . . , n
+
+(6)
+
+j=1
+
+where i is the task sequence and j is the robot’s joint number.
+
+B. Soft Task Constraint
+
+For the WAAM application, the approach direction of the
+
+weld torch orientation will be kept constant in the direction
+
+of gravity pull, leaving a redundant rotation (γ) about the
+
+approach direction. The ‘soft’ task constraint, which denotes
+
+the robot end-effector pose relative to the world frame, is
+
+then formulated as
+
+⎡
+
+⎤
+
+− cos γ sin γ 0 dx
+
+[T ] = ⎢⎢⎣ sin γ cos γ 0 dy⎥⎥⎦ (7)
+
+0
+
+0 −1 dz
+
+0
+
+0 01
+
+where dx, dy, and dz represent the discretized coordinates along the print path. Given the robot base frame [G] relative to the world frame and the end-effector frame [H] relative to the tool ﬂange frame, the formula that constrains the tool ﬂange frame relative to the robot’s base frame to fulﬁl the tasks is thus given by
+
+⎡
+
+⎤
+
+R11 R12 R13 Px
+
+6 ⎢⎢R21 R22 R23 Py ⎥⎥
+
+−1
+
+−1
+
+[T0 ] = ⎣
+
+⎦ = [G] [T ][H] (8)
+
+R31 R32 R33 Pz
+
+0 0 01
+
+C. Optimization Problem
+Using the formulated cost function and task constraint, the optimization problem statement is expressed as
+
+minimize f (x)
+x
+
+subject to hk(x) = 0, k = 1, 2, . . . , 7
+
+(9)
+
+where the variables to be optimized are x = (x1, x2, . . . , x8) = (θ1, θ2, θ3, θ4, θ5, θ6, μ, γ) with equality constraints
+
+derived from the robot’s kinematics (see Appendix):
+
+h1
+
+=
+
+2
+Px
+
++
+
+2
+Py
+
+−
+
+μ2
+
+h2 = Py − s1μ
+
+h3 = 2|a2|
+
+a2
+3
+
++
+
+d2
+4
+
+c3 cos(w1) − s3 sin(w1)
+
+−
+
+(μ
+
+−
+
+a1)2
+
++
+
+(Pz
+
+−
+
+d1)2
+
+−
+
+2
+a2
+
+−
+
+2
+a3
+
+−
+
+2
+d4
+
+h4 = v1(d1 − Pz) − u1(Pxc1 + Pys1 − a1) − s2(v12 + u21)
+
+h5 = R13c1c23 + R23s1c23 − R33s23 − c5
+
+h6 = R13s1 − R23c1 + s4s5
+
+h7 = R12c1c23 + R22s1c23 − R32s23 − s5s6
+
+(10)
+
+where
+u1 = a2 + a3c3 + d4s3 v1 = d4c3 − a3s3 w1 = tan−1 d| 4 a3|
+
+IV. NUMERICAL SIMULATIONS
+In this section, numerical simulations are performed to demonstrate the performance and capability of the proposed method. We examine the approach on printing a layer of two different print tasks (illustrated by the two printed structures in Fig. 1), a small square thin-walled print job and a large rectangular thin-walled print job which pushes the robot to its reach limit. The small square thin-wall measures 50 x 50 cm2 while the large rectangular thin-wall measures 1.6 x 0.9 m2. The continuous print task is discretized at 5-cm resolution for the numerical simulations. The motion planning optimization problem as in Eq. 9 is solved using Sequential Quadratic Programming (SQP). The ground truth solutions are obtained through exhaustive search to validate the results obtained by SIO. In terms of the resulting manipulability measure, the value is also compared with when the γ rotation of the endeffector is ﬁxed instead of optimized.
+Fig. 4 shows the results for the small print task while Fig. 5 shows the results for the large print task. The ground truth results from exhaustive search intermittently swap between robot’s ‘elbow right’ and ‘elbow left’ solutions as they yield comparable manipulability measure values. Owing to the sequential intellectual intial guess which guides the motion planning for the subsequent task, the proposed SIO approach is able to smoothen the results to obtain the closest comparable globally-optimum solutions.
+As seen from the results, the SIO approach is able to obtain the correct globally-optimum solutions as compared to the gound truth results. The seemingly erroneous γ angle results at the end of the large print job are due to the 360◦ offset of the angle values; they are indeed giving the correct results. The average computational time to produce the subsequent optimum conﬁguration for each new task point is around 20 ms, i.e. for a functionally-redundant robot, the SIO approach is capable of providing an online motion planning with a 50 Hz feedback loop frequency. As compared to leaving the end-effector rotation as ﬁxed, the manipulability measure can be comparably optimized using the approach as can
+
+978-1-5386-7066-8/18/$31.00 ©2018 IEEE
+
+336
+
+Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:18:12 UTC from IEEE Xplore. Restrictions apply.
+
+2018 3rd International Conference on Advanced Robotics and Mechatronics (ICARM)
+
+Fig. 4. Motion planning results for the small square thin-walled print job with manipulability measure cost function.
+
+Fig. 5. Motion planning results for the large rectangular thin-walled print job with manipulability measure cost function.
+
+be seen from the cost function plot. It is thus very useful to motion plan the functionally-redundant robot based on a desired performance criteria.
+For the joint velocities minimization, only the results for small print task are presented and discussed here as similar to the manipulability measure optimization, the large print task yields about the same outcomes. Fig. 6 shows the velocity motion planning results of each robot’s joint while Fig. 7 shows the plot comparison of the average joint velocities, acceleration, and jerk between the ﬁxed and optimized endeffector orientation in the robot’s motion planning. As shown
+
+from the plot, the motion planning with joint velocities minimization does minimize the joint velocities for the functionally-redundant robot. Although the joint velocities sometimes might still be higher for certain robot’s joint and print points (e.g. robot’s joint #6), the average velocities, acceleration, and jerk of each joint are predominantly lower than the motion planning without optimization. Furthermore, the overall mean velocity, acceleration, and jerk across all six robot joints are comparably lower as a result of the optimization approach. This further shows the viability of the proposed approach.
+
+978-1-5386-7066-8/18/$31.00 ©2018 IEEE
+
+337
+
+Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:18:12 UTC from IEEE Xplore. Restrictions apply.
+
+2018 3rd International Conference on Advanced Robotics and Mechatronics (ICARM)
+
+Fig. 6. Motion planning results for the small square thin-walled print job with joint velocities cost function.
+
+Fig. 7. Comparison of joint velocities, acceleration, and jerk results between ﬁxed orientation and joint velocities minimization motion planning.
+Although in this paper the approach was speciﬁcally applied to optimize the manipulability measure and joint velocities, there are also other possible cost functions that can be useful for functionally-redundant robot, for example the conﬁguration that minimizes the possible inaccuracy of the robot [13]. As seen in Fig. 6, some joint angles were penalized more than the other. Hence in the future, the authors are also interested in exploring weighted cost function using the SIO approach.
+
+V. CONCLUSIONS
+An approach to efﬁciently compute the globally-optimum solutions to the problem of task-constrained motion planning and redundancy resolution is explored in this paper. The proposed Sequential Informed Optimization (SIO) approach takes advantage of the knowledge of the preceding robot’s globally-optimal conﬁguration as the intellectual initial guess to the subsequent motion planning optimization problem in the task sequence. In this way, the globally-optimum solutions can be efﬁciently searched without the need of randomly trying countless initial guesses. The approach can be applied to any constrained nonlinear optimization method. Numerical simulations demonstrate the viability of the approach in obtaining the globally-optimum solutions, with the ability of providing a real-time feedback loop at 50 Hz due to its quick computational time.
+
+APPENDIX: ROBOT KINEMATICS
+
+The robot’s geometric parameters are as shown in Fig. 3.
+
+The Denavit-Hartenberg (DH) parameters is stated in Table I
+
+and the forward kinematics which transforms the base frame
+
+to the tool ﬂange frame is obtained as
+
+⎡
+
+⎤
+
+R11 R12 R13 Px
+
+6
+
+1 2 3 4 5 6 ⎢⎢R21 R22 R23 Py ⎥⎥
+
+[T0 ] = [T0 ][T1 ][T2 ][T3 ][T4 ][T5 ] = ⎣
+
+⎦
+
+R31 R32 R33 Pz
+
+0 0 01
+
+(11)
+
+where [Tji] = [X(αj, aj)][Z(θi, di)] is the transformation matrix from frame j to frame i, with [Z(θ, d)] as the
+
+screw displacements that rotate about and slide along the
+
+z-axis by θ and d respectively and [X(α, a)] as the screw
+
+displacements that rotate about and slide along the x-axis
+
+by α and a respectively, and
+
+978-1-5386-7066-8/18/$31.00 ©2018 IEEE
+
+338
+
+Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:18:12 UTC from IEEE Xplore. Restrictions apply.
+
+2018 3rd International Conference on Advanced Robotics and Mechatronics (ICARM)
+
+R11 = −s1(c5c6s4 + c4s6) + c1(−c6(c4c5s23 + c23s5) + s23s4s6) R21 = −c6(c4c5s1s23 − c1c5s4 + c23s1s5) + (c1c4 + s1s23s4)s6 R31 = c6s23s5 + c23(−c4c5c6 + s4s6) R12 = c5s1s4s6 + c4(−c6s1 + c1c5s23s6) + c1(c6s23s4 + c23s5s6) R22 = c1(c4c6 −c5s4s6)+s1(c6s23s4 +(c4c5s23 +c23s5)s6) R32 = −s23s5s6 + c23(c6s4 + c4c5s6) R13 = c1c23c5 − (c1c4s23 + s1s4)s5 R23 = c23c5s1 + (−c4s1s23 + c1s4)s5 R33 = −c5s23 − c23c4s5 Px = c1(a1 + d4c23 − a2s2 − a3s23) Py = s1(a1 + d4c23 − a2s2 − a3s23) Pz = d1 − a2c2 − a3c23 − d4s23
+
+The inverse kinematics of the robot is obtained as
+
+⎡⎤ θ1
+⎢⎥
+
+⎡tan px −1 py / tan px −1 py + π⎤
+
+⎢⎢θ ⎢ 2⎥⎥ ⎢ ⎥ ⎢⎢ tan−1 SS2 ⎥ CC2 ⎥⎥
+
+⎢θ3⎥ ⎢± cos−1 k3 − tan−1 d4 ⎥
+
+⎢⎥ ⎢
+
+k2
+
+|a3| ⎥
+
+⎢ ⎥=⎢
+
+−1 SS4
+
+⎥
+
+(12)
+
+⎢θ4⎥ ⎢
+
+tan CC4
+
+⎥
+
+⎢⎥ ⎢
+
+⎥
+
+⎢⎢θ5⎥⎥
+
+⎢ ⎣
+
+± cos−1 CC5
+
+⎥ ⎦
+
+⎣⎦ θ6
+
+tan CC6 −1 SS6
+
+where
+
+k2 = 2|a2|
+
+a2
+3
+
++
+
+d2
+4
+
+k3
+
+=
+
+p2
+x
+
++
+
+p2
+y
+
++ (pz
+
+− d1)2
+
+− 2pxa1c1
+
+− 2pya1s1
+
++
+
+a2
+1
+
+−
+
+a2
+2
+
+−
+
+a3
+3
+
+−
+
+d2
+4
+
+u1 = a2 + a3c3 + d4s3
+
+v1 = d4c3 − a3s3
+
+y1 = pxc1 + pys1 − a1
+
+y2 = −(pz − d1) SS2 = (v1y2 − u1y1)/(v12 + u21)
+
+CC2 = (y1 + u1SS2)/v1
+
+CC5 = r13c1c23 + r23s1c23 − r33s23
+
+SS4 = −(r13s1 − r23c1)/s5
+
+CC4 = −(r13c1s23 + r23s1s23 + r33c23)/s5
+
+SS6 = (r12c1c23 + r22s1c23 − r32s23)/s5
+
+CC6 = −(r11c1c23 + r21s1c23 − r31s23)/s5
+
+TABLE I DH PARAMETERS OF ABB ROBOT.
+
+i
+
+θi
+
+di
+
+αi
+
+ai
+
+1
+
+θ1
+
+d1 −π/2 a1
+
+2 θ2 + π/2 0
+
+0
+
+a2
+
+3
+
+θ3
+
+0 π/2 a3
+
+4
+
+θ4
+
+d4 −π/2 0
+
+5
+
+θ5
+
+0 π/2 0
+
+6
+
+θ6
+
+0
+
+-
+
+-
+
+REFERENCES
+[1] D. Ding, Z. Pan, D. Cuiuri, and H. Li, “Wire-feed additive manufacturing of metal components: technologies, developments and future interests,” Int. J. Adv. Manuf. Technol., vol. 81, no. 1-4, pp.465-481, 2015.
+[2] S. W. Williams, F. Martina, A. C. Addison, J. Ding, G. Pardal, and P. Colegrove, “Wire + Arc Additive Manufacturing”, Mater. Sci. Technol., vol. 32, no. 7, pp. 641-647, 2016.
+[3] L. Sciavicco, and B. Siciliano. Modelling and control of robot manipulators. Springer Science & Business Media, 2012.
+[4] L. Huo and L. Baron, “The joint-limits and singularity avoidance in robotic welding,” Industrial Robot: An International Journal, vol. 35, no. 5, pp.456-464, 2008.
+[5] L. Wu, K. Cui, and S. B. Chen, “Redundancy coordination of multiple robotic devices for welding through genetic algorithm,” Robotica, vol. 18, no. 6, pp.669-676, 2000.
+[6] S. Ahmad and S. Luo, “Coordinated motion control of multiple robotic devices for welding and redundancy coordination through constrained optimization in Cartesian space,” IEEE Trans. Robot. Autom., vol. 5, no. 4, pp.409-417, 1989.
+[7] W. F. Carriker, P. K. Khosla, and B. H. Krogh, “An approach for coordinating mobility and manipulation,” in Proc. IEEE Int. Conf. Sys. Eng., pp. 59-63, 1989.
+[8] L. T. Watson and R. T. Haftka, “Modern homotopy methods in optimization,” Comput. Methods Appl. Mech. Eng., vol. 74, no. 3, pp.289-305, 1989.
+[9] A. G. Dharmawan, S. Foong, and G. S. Soh, “Task-Constrained Optimal Motion Planning of Redundant Robots via Sequential Expanded Lagrangian Homotopy,” J. Mech. Robot., 2018.
+[10] T. Yoshikawa, “Manipulability of robotic mechanisms,” Int. J. Robot. Res., vol. 4, no. 2, pp.3-9, 1985.
+[11] A. G. Dharmawan, B. W. C. Sedore, G. S. Soh, S. Foong, and K. Otto, “Robot base placement and kinematic evaluation of 6R serial manipulators to achieve collision-free welding of large intersecting cylindrical Pipes,” in Proc. ASME Int. Des. Eng. Tech. Conf. Comput. Inf. Eng. Conf. (IDETC/CIE), pp. V05CT08A010, 2015.
+[12] A. G. Dharmawan, S. Foong, and G. S. Soh, “Simultaneous Optimal Robot Base Placement and Motion Planning Using Expanded Lagrangian Homotopy,” in Proc. ASME Dyn. Sys. Control Conf. (DSCC), pp. V002T24A010, 2016.
+[13] B. W. C. Sedore, A. G. Dharmawan, G. S. Soh, S. Foong, and K. Otto, “Pose accuracy of a mobile robotic system mounted on scaffold structures,” in Proc. 14th IFToMM World Congress, pp. 282-288, 2015.
+
+978-1-5386-7066-8/18/$31.00 ©2018 IEEE
+
+339
+
+Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:18:12 UTC from IEEE Xplore. Restrictions apply.
+
+

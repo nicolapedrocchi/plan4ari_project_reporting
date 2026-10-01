@@ -1,0 +1,641 @@
+Real-Time Dynamics-Based Torque-Sampling MPPI for Compliant and Force Aware Manipulation
+Euncheol Im1,2, Taehyun Kim1,2, Yonghwan Oh1, Myotaeg Lim2, Yisoo Lee1,†
+
+arXiv:2609.02020v1 [cs.RO] 2 Sep 2026
+
+Abstract— This study proposes a novel Model Predictive Path Integral (MPPI)-based task-space control framework. The proposed framework explicitly solves rigid-body dynamics within a real-time MPC formulation and enforces safety constraints, enabling accurate motion and force control that yields compliant behaviors for safe and effective physical interaction of robotic manipulators in unstructured environments. By leveraging MPPI, the proposed framework efficiently handles nonlinear dynamics that are difficult to solve with conventional MPC approaches in real-time. Furthermore, we develop a torquesampling-based control architecture that enables efficient exploitation of GPU-based parallelization, resulting in effective compliant and force-aware behaviors. As a result, the proposed framework achieves a solver update rate of over 166 Hz with a 0.18 s prediction horizon, and its performance is validated through real-world experiments on a 7-DoF manipulator.
+I. INTRODUCTION
+As robotic manipulators expand from structured factories to unstructured daily environments, the ability for safe and flexible physical interaction is essential. Force control and compliance capabilities are essential for safe physical interaction, particularly in the presence of unexpected collisions and contact-rich tasks. Dynamics-based control methods, such as inverse dynamics controllers [1], have been extensively studied and shown to be effective from a reactive control perspective [2]. However, these approaches often lead to locally optimal solutions that may violate physical limits and safety-related constraints.
+To address this challenge, Model Predictive Control (MPC) has been widely adopted due to its ability to generate optimal trajectories while satisfying complex constraints [3]. However, explicitly incorporating full rigid-body dynamics into the optimization loop to ensure dynamic feasibility incurs substantial computational cost, owing to the nonlinear and high-dimensional nature of the system, which poses a major challenge for real-time control [4]–[8].
+Quadratic Programming (QP)-based MPC methods have been widely studied for their computational tractability; however, due to the high computational burden, they typically rely on simplifying assumptions such as treating contact forces [9] or system dynamics [6] as constant over the
+*This work was supported by the National Research Foundation of Korea (NRF) grant funded by the Korea government(MSIT) (RS-2024-00339632), by the Korea Institute of Science and Technology (KIST) Institutional Programs under grant numbers 26E0041, and by Hyundai Motor Company and Kia.
+1The Center for Humanoid Research, Korea Institute of Science and Technology (KIST), 02792 Seoul, South Korea
+2The School of Electrical Engineering, Korea University, 02841 Seoul, South Korea
+†Corresponding author: Yisoo Lee yisoo.lee@kist.re.kr.
+
+prediction horizon and linearizing inherently nonlinear dynamics [10]. Despite these approximations, the resulting optimization often remains computationally expensive, leading to short prediction horizons and low update frequencies in practice. In contrast, Differential Dynamic Programming (DDP)-based MPC methods [11]–[13] aim to reduce model approximations and enable full dynamic control with enhanced computation efficiency; however, these methods remain limited by sensitivity to initialization, convergence to local minima, and the requirement for strictly differentiable cost functions.
+To overcome the limitations of optimization- and differential-based MPC methods, sampling-based MPC approaches such as Model Predictive Path Integral (MPPI) have emerged as a promising alternative for various robotic applications [14]–[16]. MPPI employs a sampling-based formulation that naturally handles nonlinear dynamics and non-smooth or discontinuous cost functions, while GPUbased parallelization enables highly efficient computation. However, existing MPPI approaches for robotic manipulation are largely limited to kinematic-level tasks, with sampling typically performed over joint-space variables such as positions [17], velocities [18], or accelerations [19], [20].
+Despite the advantages, extending MPPI to explicitly account for full rigid-body dynamics and perform torque-level optimization remains unexplored in manipulation. Several studies have leveraged numerical simulators, such as Isaac Gym [21] for manipulation [18] and MJPC [22] or Brax [23] for locomotion [24], [25], to estimate future system states. However, these simulator-based approaches may be unable to operate at short control time-steps due to discretization errors [7] and often remain computationally intensive, which limits their applicability to real-time torque-level optimization in manipulation scenarios.
+In this study, we propose a novel MPPI-based manipulation framework that enables accurate motion and force control with compliant behavior while satisfying various constraints. To the best of our knowledge, this work represents the first implementation of MPPI-based manipulation that explicitly incorporates full rigid-body dynamics. The contributions of this work are as follows. First, we propose a real-time dynamics-based MPPI framework that directly samples and optimizes joint torques using a tailored GPUparallelized solver. Leveraging highly efficient computation, the proposed method achieves an experimentally validated prediction horizon of approximately 0.18 s with an update frequency of 166 Hz on a real robotic system, placing it among the fastest dynamics-based MPC approaches capable
+
+of both motion and force control reported to date. Second, we demonstrate through real-world experiments that the proposed framework enables stable and responsive manipulation with dynamics-based capabilities, including hybrid motionforce control, compliance, and feedforward force regulation, under physical interaction scenarios.
+
+II. PRELIMINARIES: MODEL PREDICTIVE PATH INTEGRAL
+MPPI [14], [15] control is a sampling-based stochastic optimal control method that computes optimal control inputs by minimizing a cost function over a finite time horizon. It uses a stochastic system model given by
+
+xt+1 = f (xt, vt),
+
+(1)
+
+where xt ∈ Rnx and vt ∈ Rnu are the state and control input vectors at time t, respectively, and nx and nu denote the number of states and control inputs. The control input is
+represented as
+
+vt = ut + δut, δut ∼ N (0, Σu),
+
+(2)
+
+where ut is the nominal control input at time t and δut is zero-mean Gaussian noise with covariance Σu, representing disturbances injected into the control input.
+The optimal control problem (OCP) aims to find a sequence of control inputs u0:T −1 that minimizes the total cost over a finite horizon T :
+
+T −1
+
+min S = ϕ(xT ) + ℓ(xt, vt),
+
+(3)
+
+u0:T −1
+
+t=0
+
+where ϕ(xT ) is the terminal cost and ℓ(xt, ut) is the running cost encoding intermediate objectives such as minimizing control effort, avoiding obstacles, state limitation, or maintaining stability. In traditional gradient-based optimal control, the above problem is solved by iteratively computing derivatives of the dynamics and cost functions. In contrast, MPPI solves this OCP in a sampling-based manner, where a total of K noisy control sequences, i.e., rollouts, are evaluated in parallel, and the optimal sequence is updated using an importance-weighted average, as defined by:
+
+ωk = exp(−S˜k/λ),
+
+(4a)
+
+∗
+
+∗
+
+ut ← ut,prev +
+
+k=1 K ωk δuk,t , k=1 K ωk
+
+(4b)
+
+where ωk denotes the importance weight, and S˜k = Sk −
+
+Smin is the shifted cost of the k-th trajectory, introduced to
+
+prevent numerical overflow or underflow without affecting
+
+the optimality of the algorithm. Here, Sk is the cost of the k-
+
+th trajectory, Smin = minj∈{1,...,K} Sj is the minimum cost
+
+among all trajectories, and λ is the temperature parameter.
+
+δuk,t is the sampled noise for the k-th trajectory. After
+
+computing the optimal control input sequence, the first
+
+control
+
+input
+
+u∗
+0
+
+is
+
+applied
+
+to
+
+the
+
+system,
+
+while
+
+the
+
+remaining
+
+sequence is used to warm-start the next optimization loop by
+
+serving as the nominal control sequence in (2).
+
+GPU memory (constant) Li = {i−1ri, i−1Ri, irc,i, iRc,i, mi, Ic,i, diag(a)}
+
+i−1ri, i−1Ri
+
+GPU thread τ k,t Forward
+Dynamics
+Eq.(6)
+
+q¨k,t
+
+qk,t, q˙ k,t
+
+Eq.(7)
+
+Forward Kinematics
+
+Jk,t, J˙ k,t,
+
+irc,i, iRc,i, mi, Ic,i, diag(a)
+
+Compute Dynamics
+
+Mk,t, hk,t Pee,k,t
+
+Fig. 1. Algorithm flow of the GPU-based dynamics solver. Robot parameters (Li) are stored in the GPU constant memory, including joint transforms (i−1ri, i−1Ri) and Center of Mass (CoM) offsets (irc,i, iRc,i), where r and R denote the relative position vector and rotation matrix between
+adjacent frames, respectively. Each GPU thread propagates the joint state (qk,t, q˙ k,t) and computes the end-effector pose Pee,k,t, the Jacobian matrix Jk,t, and the dynamics terms (Mk,t, hk,t) at every time step for an independent rollout.
+
+III. PROPOSED METHOD
+In this section, we present the proposed torque-sampling MPPI framework. The central feature of this framework is the integration of an analytic rigid-body model directly into the optimization process, allowing joint torques to be treated as primary control inputs. This torque-level formulation provides a principled foundation for incorporating forcerelated objectives and supports integrated motion and force control within a single predictive architecture.
+
+A. Analytic Dynamics for Torque-Sampling Rollouts
+The proposed framework employs a torque-level sampling strategy, where control sequences are generated by perturbing the nominal torque: uk,t = τ t + δτ k,t. Compared to joint acceleration sampling, direct joint torque sampling enables inherent compliance during physical interactions and allows for the seamless integration of force-related objectives within the optimization loop. To evaluate the cost of each sampled sequence, the framework predicts future states by propagating the robot’s configuration over a prediction horizon. Given that the control inputs are sampled at the torque level, the framework requires the computation of joint accelerations through forward dynamics before integrating them to update the robot’s state. This relationship is governed by the robot’s rigid-body dynamics:
+
+M(q)q¨ + h(q, q˙ ) = τ + τ ext,
+
+(5)
+
+where M(q) ∈ Rn×n is the inertia matrix and h(q, q˙ ) ∈ Rn is the bias force vector comprising Coriolis, centrifugal, and gravitational effects. The term τ ext = JT (q)Fext ∈ Rn represents the projected external joint torque, where J(q) ∈ R6×n is the end-effector Jacobian matrix and Fext ∈ R6 is the external wrench. The projected torque τ ext is assumed to
+be constant over the prediction horizon. To update the state
+for each time step, the joint acceleration q¨k,t is explicitly
+computed by solving (5) for the sampled torque:
+
+q¨k,t = M−1(qk,t−1)(uk,t + τ ext − h(qk,t−1, q˙ k,t−1)). (6)
+
+The joint velocity and position are then updated using an explicit Euler integration scheme with time step dt:
+
+q˙ k,t = q˙ k,t−1 + q¨k,tdt,
+
+qk,t = qk,t−1 + q˙ k,tdt. (7)
+
+q0, q˙ 0, τ ext, M0, h0, u, δτ
+
+... k=K
+
+k = 3 t = 1 qK,1, q˙ K,1t = 2 qK,2, q˙ K,2
+
+qK,T −1, q˙ K,T −1
+
+k = 2 MSUB
+
+MSUB
+
+···
+
+k = 1t = 1
+
+q¨K,1, τt K=,1 2
+
+q¨K,2, τ K,2
+
+q¨K,T −1, τtK=,T −T1
+
+t=1
+
+q1,1, q˙ 1,1 t = 2
+
+q1,2, q˙ 1,2
+
+q1,T −1, q˙ 1,T −1 t = T
+
+t = 1 MSUB q1,1, q˙ 1,1 t = 2MSUB q1,2, q˙ 1,2
+
+· · ·q1,T −1, q˙ 1,T −1 tM=SUTB
+
+MSUqB1,1, q˙q¨11,,11,, τ 1,1 MSUBq1,2, qq¨˙11,2,,2,τ 1,2 · q· 1·,T −1q¨,1,q˙T −1,1T, −τ 11,T −1 MSUB
+
+MSUB
+
+q¨1,1, τ 1,1MMSSUUBB
+
+q¨1,2, τ 1,2 · · ·
+
+q¨1,T −1, τ 1,T −1 MMSSUUBB
+
+M1,1, h1,1,
+
+M1,2, h1,2,
+
+M1,T −1, h1,T −1,
+
+J1,1
+
+J1,2
+
+J1,T −1
+
+t=T MSUB
+
+MSUB
+1. Control input update Eq.(2)
+
+2. State update with analytic dynamics
+Fig. 1
+
+3. Calculate cost function
+Eq.(9)
+
+MPPI
+
+N (0, Σu) δu(δτ )
+
+Parallel rollout kernel
+
+q0, q˙ 0, τ ext M0, h0
+
+S1,··· ,K
+
+Calculate importance EEqq..((44aa))
+weight ω1,··· ,K
+
+Calculate optimal
+input trajectory
+
+u∗ = u + δu∗ Eq.(4b)
+
+∗
+u0
+Real World
+GPU : GPU block MSUB : MPPI Step
+Update Block
+
+Fig. 2. Overview of the control structure of the proposed method, where the orange-colored blocks represent GPU computations and the green-colored blocks represent CPU computations. Specifically, the MPPI Step Update Block (MSUB) computes forward dynamics and cost functions at each timestep for every rollout trajectory to incorporate robot model dynamics.
+
+For simplicity, M(qk,t−1) and h(qk,t−1, q˙ k,t−1) are abbreviated as Mk,t−1 and hk,t−1 in the following.
+To maintain high fidelity throughout the prediction horizon, Mk,t and hk,t are re-computed at every time step t using the analytic rigid-body model. This recursive integration process is implemented directly within custom CUDA kernels to satisfy the high computational throughput required for high-frequency control. As illustrated in Fig. 1, each GPU thread is assigned to an individual rollout to perform forward kinematics; this process determines the link-wise Jacobian matrices and their derivatives, as well as the end-effector pose Pee. The inertia matrix is constructed by accumulating the transformed link inertias and mass properties:
+
+n
+
+M=
+
+⊤
+Jr,i
+
+¯Ii
+
+Jr,i
+
++
+
+⊤
+mi Jc,i Jc,i
+
++ diag(a),
+
+(8)
+
+i=1
+
+where
+
+¯Ii
+
+=
+
+Ri
+
+IG
+i
+
+R⊤
+i
+
+is
+
+the
+
+link
+
+inertia
+
+tensor
+
+rotated
+
+into
+
+the
+
+base
+
+frame,
+
+IG
+i
+
+is
+
+the
+
+inertia
+
+tensor
+
+of
+
+link
+
+i
+
+about
+
+its center of mass expressed in the link-local frame, Ri
+
+is the cumulative rotation matrix from the base frame to
+
+link i, Jr,i and Jc,i are the rotational and center-of-mass translational Jacobians of link i, and diag(a) denotes the
+
+armature of each joint. Following a similar accumulation
+
+structure, h is derived from the link-wise Jacobian matrices
+
+and their time derivatives. Since all rollouts share identical
+
+robot parameters but differ only in the sampled torque se-
+
+quences, fixed quantities—such as link masses and kinematic
+
+chains—are stored in the GPU’s constant memory, enabling
+
+parallel computation without inter-thread communication.
+
+This optimized implementation allows for the simultaneous
+
+computation of thousands of rollout trajectories, ensuring the
+
+real-time feasibility required for high-frequency torque-level
+
+MPPI control.
+
+B. Cost Function Design for Hybrid Control
+The proposed torque-sampling MPPI framework explicitly incorporates end-effector force objectives through forcebased cost terms, unlike conventional MPPI formulations that focus solely on motion control. We define ℓ(xt, vt)
+
+as a weighted sum of task-related objectives and physical constraints:
+
+ℓ(xt, vt) = Ctask + Cconstraint,
+
+(9)
+
+where the task cost Ctask is further decomposed into motion and force control components:
+
+Ctask = Cmotion + Cforce.
+
+(10)
+
+The motion control cost Cmotion penalizes deviations from the desired end-effector trajectory in SE(3):
+
+Cmotion = Wpos∥pdes − pee∥2 + Wori∥log(RTdesRee)∥2, (11)
+where pee, Ree denote the current end-effector position and orientation, and pdes, Rdes are the desired targets. The log map extracts the rotation vector error. The force cost is
+formulated as:
+
+Cforce = Wforce∥Fdes − Fee∥2 + Wreg∥Fee∥2. (12)
+
+In both (11) and (12), the weighting terms W(·) are diagonal
+
+matrices used to specify axis selection and priority. To
+
+ensure a physically consistent mapping for the end-effector force Fee = J¯T τ , J¯T is defined as the transpose of the dynamically consistent generalized inverse [1], where J¯ is
+
+given by:
+
+J¯ = M−1JT (JM−1JT )−1.
+
+(13)
+
+This formulation accounts for the system inertia, enabling
+
+precise task-space force estimation while maintaining decou-
+
+pling from null-space torques. Finally, to ensure safety and
+
+kinematic feasibility, we incorporate constraint costs defined
+
+as:
+
+Cconstraint = Cjoint + Ccollision.
+
+(14)
+
+The joint cost Cjoint enforces kinematic feasibility through position and velocity limit penalties, while regularizing the redundant motions of the 7-DoF manipulator to promote balanced postures and prevent convergence to biased local solutions. The detailed formulations of these costs follow standard practices as described in [20]. The collision avoidance cost, Ccollision, accounts for both self-collisions and
+
+collisions with external objects. It is formulated using an indicator function I(·), which imposes a penalty when the distance falls below the safety threshold:
+
+L
+Ccollision = wcollision I(di < dth,i),
+i=1
+
+(15)
+
+where wcollision is a scalar collision penalty weight. The indicator function I(·) returns 1 if the condition is satisfied and 0 otherwise. Here, L denotes the number of predefined collision pairs (i.e., link-to-link and link-to-object). For the i-th pair, di is the minimum distance computed using the method in [26], and dth,i is the corresponding safety threshold.
+The overall control loop, illustrated in Fig. 2, is executed
+in parallel on the GPU to ensure real-time performance. At each time step, K random control noise samples δτ k,t are generated and used to propagate the analytic dynamics
+according to (6) and (7). Following this parallel rollout, the
+costs are evaluated, and the optimal control input is updated
+using the importance sampling rules in (4). The sampling
+strategy used in this work follows that of [20].
+
+IV. EXPERIMENTS RESULTS
+A. Experimental Setup
+Real-world experiments are conducted on a 7-DoF Franka Research 3 (FR3). The experimental system consists of a GPU-based MPPI controller and a real-time communication interface running on separate computing platforms. A desktop PC (i9-10900KF, RTX 2070 Super) performs the MPPI computation, while an Intel NUC13 (i7, 32 GB RAM) functions as a bridge between the robot and the MPPI PC. The NUC is connected to the robot via the Franka Control Interface (FCI) at 1 kHz, and it communicates with the MPPI controller via ZeroMQ [27]. In this setup, the NUC transmits the robot’s state to the MPPI PC and relays the updated torque commands back to the robot. The MPPI controller provides updated torque commands at an average rate of approximately 166 Hz. The key hyperparameters used in the MPPI controller are summarized in Table I. While we verified that the solver can process up to 1,024 rollouts in real time, K = 128 was empirically selected as it provided sufficient convergence for the given tasks without unnecessary computational redundancy. To bridge the frequency gap between the solver updates and the 1 kHz FCI control loop, a zero-order hold (ZOH) was applied to the MPPI torque commands.
+
+B. Control Performance Verification
+To evaluate the tracking performance and inherent compliance of the proposed torque-sampling MPPI, we conducted a hybrid motion-force control experiment in free-space, subjecting the robot to external perturbations. The desired task was defined as a step reference: a target force of Fx,d = 10 N along the x-axis, and target positions of yd = 0.0 m and zd = 0.38 m, while maintaining the initial orientation. During the operation, several external perturbations were applied to
+
+TABLE I MPPI PARAMETERS FOR DIFFERENT EXPERIMENTAL CONDITIONS
+
+Parameter K T dt
+Wpos Wori Wf orce Wreg wcollision
+
+Free-space 128 30
+0.006 s
+diag(0, 5×106, 5×106) diag(5×105)
+diag(30, 0, 0, 0, 0, 0) diag(1) 30,000
+
+Contact 128 30
+0.006 s
+diag(5×106, 5×106, 0) diag(5×105)
+diag(0, 0, 30, 0, 0, 0) diag(1) 30,000
+
+the end-effector to evaluate compliance and force control capabilities. First, while maintaining a desired force along the x-axis, the end-effector motion was intentionally obstructed along the same direction at approximately t = 3–4.5 s to assess the response under motion blocking in the forcecontrolled axis. Subsequently, external forces were manually applied in the world frame’s +z, +y, and −y directions at approximately t = 7 s, 11.5 s, and 17 s, respectively.
+The resulting performance is depicted in Fig. 3, where the end-effector force is estimated via the torque projection, Fee = J¯T τ , as derived earlier. Under nominal free-space conditions, the controller successfully tracks the desired force and pose, demonstrating robust performance even under the applied perturbations. To quantitatively evaluate the tracking performance in the absence of external disturbances, we computed the average L2-norm errors over the converged interval (t = 4.5–6 s), after the removal of motion blocking and prior to disturbance application. During this interval, the mean L2-norm position error in the position-controlled axes (y, z) was 0.0137 m, while the mean orientation error was 0.0208 rad. When external disturbances are applied, the manipulator responds compliantly in the direction of the applied force and promptly converges back to the desired force and pose once the disturbance is removed.
+C. Hybrid Motion–Force Control under Maintained Contact
+To evaluate the proposed framework in contact-rich scenarios, we conducted a hybrid motion–force control experiment involving maintained contact with a rigid object. While the framework was successfully validated on both flat and curved surfaces, we focus here on a cylindrical water bottle, which presents a more challenging scenario due to its curved surface and local geometric irregularities; results for the flat surface experiments are provided in the supplementary material. To handle this contact, force control was applied along the z-axis with Fz,d = −4 N, while the y-axis followed a linear trajectory from 0.06 m to −0.1 m. All other task-space degrees of freedom were regulated to their initial values. The experimental results in Fig. 5 are presented starting from t = 5 s, including the final portion of the approach phase and the subsequent maintained contact. During the interval 5 ≤ t < 7.5 s, the end-effector was maintained at a fixed offset above the object using only the task cost Ctask. Upon activating the force-related cost Cforce at t = 7.5 s,
+
+Force [N]
+
+20 10
+0 -20
+0
+0.5
+0.0
+
+(i)
+
+(ii)
+
+motion block EE push +z
+
+x-axis
+
+(iii) EE push +y
+
+(iv) EE push -y
+
+Fd Fx
+
+5
+
+10
+
+15
+
+20
+
+Time [s]
+
+(a) Force tracking performance
+
+yd
+
+zd
+
+y
+
+z
+
+Orientation[rad] Position [m]
+
+(i)
+
+(ii)
+
+(iii)
+
+(iv)
+
+2
+
+rolld
+
+pitchd
+
+yawd
+
+roll
+
+pitch
+
+yaw
+
+0
+
+0
+
+5
+
+10
+
+15
+
+20
+
+Time [s]
+
+(b) Position and orientation tracking performance
+
+Fig. 3. Experimental results in free space. (a) shows the end-effector force tracking, and (b) presents the end-effector position and orientation. Shaded regions indicate externally applied disturbances at the end-effector: (i) intentional motion blocking along the x-axis, (ii) external push in the +z direction, (iii) external push in the +y direction, and (iv) external push in the −y direction, all expressed in the world frame.
+
+the controller transitioned to hybrid control, with sustained contact established at approximately t = 7.67 s. Once contact is established, Fig. 5(a) demonstrates that the controller reliably maintains the contact state against the curved surface throughout the contact phase. The force control performance was quantified by a mean absolute error of 1.80 N over this interval (t ≥ 7.67 s). This error is primarily attributed to the unmodeled curvature of the surface and the absence of explicit force feedback. Crucially, despite the absence of prior geometric information and dedicated force sensors, our framework achieves stable contact, demonstrating that forceaware behavior emerges directly from the torque-sampling optimization. While maintaining this contact force, Fig. 5(b) also demonstrates stable pose tracking during the interaction phase. To quantify this performance, we computed the mean L2-norm errors over the hybrid control interval (t ≥ 7.67 s), resulting in 0.012 m in position (x, y) and 0.0921 rad in orientation. These results verify that the proposed framework can effectively manage the trade-off between force and motion objectives in contact-rich manipulation.
+D. Dynamic Obstacle Avoidance
+The real-time reactivity and safety of the proposed framework were validated through a dynamic obstacle avoidance scenario shown in Fig. 6. The robot was commanded to exert a constant force of Fy,d = −4 N while maintaining its posture. To perceive the environment, an Intel RealSense L515 tracked the obstacle’s position at approximately 20 Hz. During the task, a dynamic obstacle (a mustard container)
+
+t=7.67s
+
+z y
+
+t=16.3s
+
+t=17.3s
+
+t=25s
+
+Fig. 4. Sequential snapshots of the hybrid motion–force control experiment on a cylindrical container (water bottle). The snapshots illustrate maintained contact and motion along a curved surface at representative time instants.
+
+Force [N]
+
+10
+0 -4 -10
+5.0
+
+Force control Fd Fz
+7.5 10.0 12.5 15.0 17.5 20.0 22.5 Time [s]
+(a) Force tracking performance
+
+0.5
+
+xd
+
+yd
+
+x
+
+y
+
+0.0
+
+Orientation[rad] Position [m]
+
+2
+
+rolld
+
+pitchd
+
+yawd
+
+roll
+
+pitch
+
+yaw
+
+0 5.0 7.5 10.0 12.5 15.0 17.5 20.0 22.5
+Time [s]
+
+(b) Position and orientation tracking performance
+
+Fig. 5. Experimental results of hybrid motion–force control. (a) shows the end-effector force tracking, and (b) presents the end-effector position and orientation during maintained contact.
+
+was moved in the +y-direction, intersecting the robot’s path. As shown in Fig. 6, the robot autonomously transitioned its motion toward the +y-direction to prevent a collision, momentarily contradicting the primary force command directed toward the −y-axis. This behavior is governed by the high priority assigned to the collision cost weight wcollision, ensuring that safety takes precedence over task execution. For efficient collision detection, the obstacle and robot links were modeled as simplified cylinders with a safety threshold of di = 0.2 m. This experiment shows the framework’s capability to manage dynamic obstacles while maintaining responsive real-time control.
+V. CONCLUSIONS
+In this paper, we propose a computationally streamlined torque-sampling MPPI framework that integrates rigid-body dynamics directly into the optimization loop. By evaluating analytic forward dynamics within GPU-parallelized rollouts, the proposed method effectively ensures physical fidelity with a small time-step size while simultaneously achieving a prolonged prediction horizon. This breakthrough addresses
+
+Path incursion
+
+Reactive motion Fy,d = 4N
+
+z y
+
+Fig. 6. Experimental results of dynamic obstacle avoidance during hybrid motion-force control. The robot maintains force control on the negative direction of y-axis while Ccollision handles collision avoidance.
+
+the fundamental trade-off discussed throughout this work, enabling a high solver update rate of 166 Hz and a predictive window of 0.18 s. Experimental results on a 7-DoF manipulator validate the proposed framework across diverse scenarios, including disturbance rejection in free-space motion and contact-rich tasks. By directly incorporating rigidbody dynamics into torque sampling, the method enables compliant and force-aware behavior while satisfying taskspace constraints, achieving high-frequency updates with extended prediction horizons without sacrificing dynamic fidelity.
+In future work, we plan to extend this framework to include object dynamics to enable more sophisticated in-hand manipulation and multi-arm collaborative tasks. As these interactions involve complex contact forces, we also aim to address the effects on MPPI caused by dynamic uncertainty and physical contact.
+REFERENCES
+[1] O. Khatib, “A unified approach for motion and force control of robot manipulators: The operational space formulation,” IEEE Journal on Robotics and Automation, vol. 3, no. 1, pp. 43–53, 2003.
+[2] Y. Lee, N. Tsagarakis, C. Ott, and J. Lee, “A generalized index for fault-tolerant control in operational space under free-swinging actuation failure,” IEEE Robotics and Automation Letters, vol. 7, no. 2, pp. 1486–1493, 2022.
+[3] J. Schulman, Y. Duan, J. Ho, A. Lee, I. Awwal, H. Bradlow, J. Pan, S. Patil, K. Goldberg, and P. Abbeel, “Motion planning with sequential convex optimization and convex collision checking,” The International Journal of Robotics Research, vol. 33, no. 9, pp. 1251–1270, 2014.
+[4] Y. Tassa, T. Erez, and E. Todorov, “Synthesis and stabilization of complex behaviors through online trajectory optimization,” in 2012 IEEE/RSJ International Conference on Intelligent Robots and Systems. IEEE, 2012, pp. 4906–4913.
+[5] M. Neunert, M. Sta¨uble, M. Giftthaler, C. D. Bellicoso, J. Carius, C. Gehring, M. Hutter, and J. Buchli, “Whole-body nonlinear model predictive control through contacts for quadrupeds,” IEEE Robotics and Automation Letters, vol. 3, no. 3, pp. 1458–1465, 2018.
+[6] J. S. Terry, L. Rupert, and M. D. Killpack, “Comparison of linearized dynamic robot manipulator models for model predictive control,” in 2017 IEEE-RAS 17th International Conference on Humanoid Robotics (Humanoids). IEEE, 2017, pp. 205–212.
+[7] C. Khazoom, S. Hong, M. Chignoli, E. Stanger-Jones, and S. Kim, “Tailoring solution accuracy for fast whole-body model predictive control of legged robots,” IEEE Robotics and Automation Letters, 2024.
+
+[8] J. Norby, A. Tajbakhsh, Y. Yang, and A. M. Johnson, “Adaptive complexity model predictive control,” IEEE Transactions on Robotics, vol. 40, pp. 4615–4634, 2024.
+[9] T. Gold, A. Vo¨lz, and K. Graichen, “Model predictive interaction control for robotic manipulation tasks,” IEEE Transactions on Robotics, vol. 39, no. 1, pp. 76–89, 2022.
+[10] M. Bednarczyk, H. Omran, and B. Bayle, “Model predictive impedance control,” in 2020 IEEE international conference on robotics and automation (ICRA). IEEE, 2020, pp. 4702–4708.
+[11] S. Kleff, A. Meduri, R. Budhiraja, N. Mansard, and L. Righetti, “Highfrequency nonlinear model predictive control of a manipulator,” in 2021 IEEE International Conference on Robotics and Automation (ICRA). IEEE, 2021, pp. 7330–7336.
+[12] S. Kleff, E. Dantec, G. Saurel, N. Mansard, and L. Righetti, “Introducing force feedback in model predictive control,” in 2022 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS). IEEE, 2022, pp. 13 379–13 385.
+[13] A. Jordana, S. Kleff, J. Carpentier, N. Mansard, and L. Righetti, “Force feedback model-predictive control via online estimation,” in 2024 IEEE International Conference on Robotics and Automation (ICRA). IEEE, 2024, pp. 11 503–11 509.
+[14] G. Williams, A. Aldrich, and E. A. Theodorou, “Model predictive path integral control: From theory to parallel computation,” Journal of Guidance, Control, and Dynamics, vol. 40, no. 2, pp. 344–357, 2017.
+[15] G. Williams, P. Drews, B. Goldfain, J. M. Rehg, and E. A. Theodorou, “Information-theoretic model predictive control: Theory and applications to autonomous driving,” IEEE Transactions on Robotics, vol. 34, no. 6, pp. 1603–1622, 2018.
+[16] Y. Seo, D. Kim, J. Bak, Y. Oh, and Y. Lee, “Extremely fast computation of com trajectory generation for walking leveraging mppi algorithm,” in 2023 IEEE-RAS 22nd International Conference on Humanoid Robots (Humanoids). IEEE, 2023, pp. 1–7.
+[17] B. Sundaralingam, S. K. S. Hari, A. Fishman, C. Garrett, K. Van Wyk, V. Blukis, A. Millane, H. Oleynikova, A. Handa, F. Ramos et al., “Curobo: Parallelized collision-free robot motion generation,” in 2023 IEEE International Conference on Robotics and Automation (ICRA). IEEE, 2023, pp. 8112–8119.
+[18] C. Pezzato, C. Salmi, E. Trevisan, M. Spahn, J. Alonso-Mora, and C. H. Corbato, “Sampling-based model predictive control leveraging parallelizable physics simulations,” IEEE Robotics and Automation Letters, 2025.
+[19] M. Bhardwaj, B. Sundaralingam, A. Mousavian, N. D. Ratliff, D. Fox, F. Ramos, and B. Boots, “Storm: An integrated framework for fast joint-space model-predictive control for reactive manipulation,” in Conference on Robot Learning. PMLR, 2022, pp. 750–759.
+[20] D. Kim, E. Im, Y. Kim, M. Lim, and Y. Lee, “Single-instance sampling for computationally efficient and accurate real-time task space mppi control,” IEEE Transactions on Robotics, vol. 41, pp. 6327–6344, 2025.
+[21] V. Makoviychuk, L. Wawrzyniak, Y. Guo, M. Lu, K. Storey, M. Macklin, D. Hoeller, N. Rudin, A. Allshire, A. Handa et al., “Isaac gym: High performance gpu-based physics simulation for robot learning,” arXiv preprint arXiv:2108.10470, 2021.
+[22] T. Howell, N. Gileadi, S. Tunyasuvunakool, K. Zakka, T. Erez, and Y. Tassa, “Predictive sampling: Real-time behaviour synthesis with mujoco,” arXiv preprint arXiv:2212.00541, 2022.
+[23] C. D. Freeman, E. Frey, A. Raichuk, S. Girgin, I. Mordatch, and O. Bachem, “Brax–a differentiable physics engine for large scale rigid body simulation,” arXiv preprint arXiv:2106.13281, 2021.
+[24] J. Alvarez-Padilla, J. Z. Zhang, S. Kwok, J. M. Dolan, and Z. Manchester, “Real-time whole-body control of legged robots with model-predictive path integral control,” in IEEE International Conference on Robotics and Automation, 2025. [Online]. Available: https://arxiv.org/abs/2409.10469
+[25] H. Xue, C. Pan, Z. Yi, G. Qu, and G. Shi, “Full-order sampling-based mpc for torque-level locomotion control via diffusion-style annealing,” arXiv preprint arXiv:2409.15610, 2024.
+[26] V. J. Lumelsky, “On fast computation of distance between line segments,” Information Processing Letters, vol. 21, no. 2, pp. 55–61, 1985.
+[27] P. Hintjens, ZeroMQ: messaging for many applications. ” O’Reilly Media, Inc.”, 2013.
+
+

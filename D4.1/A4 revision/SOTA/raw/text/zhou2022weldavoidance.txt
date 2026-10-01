@@ -1,0 +1,1221 @@
+Robotics and Computer–Integrated Manufacturing 78 (2022) 102413 Contents lists available at ScienceDirect
+Robotics and Computer-Integrated Manufacturing
+journal homepage: www.elsevier.com/locate/rcim
+
+Online obstacle avoidance path planning and application for arc welding robot
+Xin Zhou a, Xuewu Wang a,*, Zuhong Xie a, Fang Li b, Xingsheng Gu a,*
+a Key Laboratory of Smart Manufacturing in Energy Chemical Process, Ministry of Education, East China University of Science and Technology, Shanghai, China b School of Materials Science and Engineering, Shanghai Jiaotong University, Shanghai
+
+ARTICLE INFO
+Keywords: Arc welding 7-DOF welding robot Online path planning Obstacle avoidance Lazy-PRM
+
+ABSTRACT
+The offline path planning problem for arc welding robots becomes increasingly difficult to achieve with the increasing product complexity and the open work environment, such as the welding tasks in ship formation. Most research considers the path planning problem without time limitations or other constraints that conform to the actual production process. During the welding process, the placement of workpieces seriously affects the efficiency of finding feasible paths for the welding robots for weld tasks that cannot be repeated accurately. Thus, in the flow welding workshop, the improved lazy Probabilistic Roadmap (PRM) algorithm based online collisionfree path planning method is proposed to finish the welding tasks of general stiffened plates at an arbitrary position on the workbench within the robot’s reach. The work environment is built with the grid method to reduce the computational dimension of collision detection. The local path planner is implemented by the lazyPRM algorithm with the repulsive force field to rapidly search the collision-free path for the welding robot with specific safe distances. The robot posture adjustment strategy is also applied to the collision detection process to adjust some poses of the robot at candidate paths to be feasible. The improved path planning method is tested on both the simulated environment and actual application scenario and proved to be suitable for the path planning problem of the arc welding robot. The results of this study have been integrated into a computer approach, which can accelerate the motion planning process and reduce human efforts.
+
+1. Introduction
+In the past few decades, intelligent path planning attracts plenty of attention since the multi-degree-of-freedom (DOF) robots with high flexibility are widely used in industrial production and manufacturing to enhance the efficiency and quality of production, such as welding, painting, grinding, and assembling, etc. [1]. Traditional welding manufacturing based on offline planning commands welding robots to operate repetitive welding tasks on the workbench. However, as product complexity increases and the open working environment, the offline path planning of the welding robot becomes inapplicable to accomplish the arc welding tasks under specific requirements. For instance, in the welding tasks of shipbuilding, welding robots usually work in a relatively large area, and the working environment of the welding robot is always changing since the workpiece is placed at a slightly different position each time. Due to specific sizes and weights of stiffened plates, no fixture is required to fix the workpiece during the welding process, and the change of workpiece position and corresponding work
+
+environment may cause the potential path planned offline in advance will collide. Besides, the path planning problem of welding robots, especially for high-dimensional manipulators, under the static working environment usually requires manual teaching or programming resulting in a heavy computation burden, time-consuming, low accuracy, and flexibility which is not suitable for commercial applications [2]. In this case, the online path planning of the welding robot in shipbuilding is an urgent problem to be solved to carry out a feasible collision-free path rapidly and complete the assigned tasks.
+Path planning problem can be defined as the optimal collision-free trajectory planning scheme which moves the robot from the start point to the goal point under specific constraints. A well-known approach to solving offline collision-free path planning problems is the probabilistic sampling-based algorithm, which explores the configuration space using independently and identically distributed random samples instead of the explicit construction of the configuration space. The representative algorithms include the probabilistic roadmap (PRM) algorithm [3–6], the rapidly exploring random tree (RRT*) algorithm
+
+* Corresponding authors. E-mail addresses: wangxuew@ecust.edu.cn (X. Wang), xsgu@ecust.edu.cn (X. Gu).
+https://doi.org/10.1016/j.rcim.2022.102413 Received 21 October 2021; Received in revised form 27 May 2022; Accepted 3 July 2022 Available online 9 July 2022 0736-5845/© 2022 Elsevier Ltd. All rights reserved.
+
+X. Zhou et al.
+[7–9], the fast matching tree (FMT*) algorithm [10,11], and Batch informed trees (BIT) algorithm [12], etc. And they have been proved to possess probabilistic completeness and asymptotically optimality. Moreover, other intelligent optimization methods such as genetic algorithm (GA) [13,14], (ACO) algorithm [15] and particle swarm optimization (PSO) algorithm [16] are introduced in the path planning problem to find an optimal collision-free path for the robot. The intelligent optimization methods aim to transform the path planning problems of the multi-DOF robot into an optimization problem and then find the optimal path by iterations. But, intelligent optimization algorithms have difficulties in efficiently solving the online path planning problem, such as slow convergence, hard to jump out of the local optima, and further affecting the solution search efficiency.
+However, most algorithms have trouble utilizing the actual problems directly. Most methods simply abstract manipulators as lines, and collision is detected between lines or the tool center point (TCP) of the robot and obstacles without considering the body constraints of the robot during motion planning. Therefore, the modeling accuracy of the multi-DOF manipulator in collision detection will seriously affect the collision detection, resulting in the degradation of obstacle avoidance and path optimization capabilities of the algorithm. Yangmin Xie et al. [17] introduced an improved distorted configuration (DC) space method for a 3-DOF robot path planning considering the demands on automatic planning, convex space preservation and path optimization, where the automatic collapse point generation algorithm collapsed the obstacles in the configuration space, node growing algorithm was used to ensure the boundary and convex property of the distorted space. And the trajectory optimization method was added to shorten the path obtained from the DC-space approach. Gang Chen et al. [18] proposed an improved PRM algorithm with three stages to quickly plan a short and safe trajectory in the presence of obstacles in its workspace, especially for the workspace that contains narrow passages. A new sampling method and virtual force field were applied to the algorithm to construct the roadmap, and the connection strategy guarantees a high-connectivity roadmap. The algorithm was tested on 6-DOF and 8-DOF robots, and simulation results proved it was available for manipulators of any degree of freedom. Wenxiang Gao et al. [19] presented an offline collision-free motion planning algorithm by considering the task redundancy existing in manufacturing when the welding environment has a narrow passage or dense obstacles. In the proposed algorithm, the trajectory of the robot end-effector with specific poses was optimized by minimizing the torch angular cost, and the sampling strategy was developed to improve the search efficiency. Jingjing Xu et al. [20] provided a pseudo-distance algorithm for collision detection of manipulators to implement the motion control of the robot under both the static and dynamic obstacle environment with complex shapes. The convex-plane-polygons-based distance algorithm was applied to the collision-free trajectory planning of the robot to show its effectiveness on the robot motion control.
+Although these algorithms perform well on collision-free path planning problems and have been improved in recent years, they are still not good at responding the situations if unexpected obstacles occur or the working environment changes. Therefore, path planning algorithms usually combine the artificial potential field (APF) methods [21] to solve the online path planning with obstacle avoidance, which could adjust the robot to move towards the target point and backward when near the obstacles based on the attractive and repulsive forces generated by APF, respectively. Gang Chen et al. [22] proposed a collision-free path planning method with two stages. Collision detection is accomplished by testing the intersection of the axis-aligned bounding box trees based on the established point-cloud model, while path planning is achieved to adjust the preplanned path by the D* algorithm in real-time. Besides, Zhihao Xu et al. [23] transformed the motion planning problem into quadratic programming (QP) problem considering the predefined task, physical constraints and feasible space constraints. Then they established the recurrent neural network to solve the QP problem online. Other methods also have been extensively studied, such as applying the
+
+Robotics and Computer-Integrated Manufacturing 78 (2022) 102413
+deep Q-Network algorithm to the path planning problem of robots for both static and dynamic environments [24], using the trained machine learning model to represent one of the redundant controllers in dynamic path planning problems [25], the combination of the electromagnetic field and deep neural networks [26] to solve the real-time path planning algorithm of robots. Such intelligent algorithms have better flexibility and scientificity than traditional methods, but they are mostly applied to robot trajectory planning which needs a significant amount of experimental data to train the model.
+As described above, plenty of simulations have been done to research the welding path optimization [27], offline path planning of the multi-DOF robot [28,29], the online trajectory planning of industrial robots [30,31], few of them considered the complete processing of the welding tasks on industrial robots. In the actual shipbuilding welding workshop, different workpieces need to be processed in turn, which means the robot has limited time to plan a collision-free transition path after scanning the current workpiece and working environment. Because the placement of the workpiece is random within the reachable workspace of the welding robot at each processing, it is challenging since the approach must be highly efficient and accurate to solve the path planning problem under a changing environment that satisfies the specific motion constraints. Fortunately, the digital model of each workpiece is known before processing, so the relative offset distance and rotation amount of the workpiece can be obtained by the infrared laser scanning, and the corresponding model in the simulation program can be adjusted immediately to improve the calculation accuracy and reduce the computation cost. This operation also facilitates rapid planning of collision-free paths and enhances the efficiency of the welding robot. Once the workpiece position changes, the work environment is adjusted immediately, and the path is quickly replanned.
+As a result, a PRM framework-based path planning method with the repulsive field strategy is proposed in this paper to generate a collisionfree welding transition path as soon as possible in the open work environment. Compared with other existing welding robot path planning researches, the contributions are listed as follows:
+• An automatic path planning algorithm is proposed for collision-free path planning. The proposed algorithm aims to avoid collisions and reduce the computing time of collision detection based on both the repulsive field and the lazy-PRM framework [32]. Additionally, the improved random sampling method helps the algorithm find feasible paths with a relatively high probability in the case of a small number of sampling points. The detailed content is described in Section 3.
+• The robot posture adjustment strategy is also applied to the algorithm when the end-effector collides with obstacles, which can slightly adjust the pose of the end-effector and add new transition points to increase the feasibility of paths.
+• The online path detection and replanning method is introduced to deal with the path planning problem in a different environment with different welding workpieces. The laser scanning sensor can be utilized to capture the position of the workpiece to help the algorithm adjusts the simulated environment, check the feasibility of predefined paths, and replan the path if it is infeasible.
+The improvements in the algorithms and strategies are necessary in order to better cope with the collision-free path planning problems of welding robots in the changing environment. PRM is selected to search for feasible paths compared rapidly according to the characteristics of the workpiece and the real-time requirements of the welding task. The main reason is that the random sampling technique based PRM has few parameters and a simple structure that can effectively solve the path planning problems in high dimensional space and complex constraints. Meanwhile, the probability graph obtained by random sampling can be used repeatedly once established, and the time of building probability graphs for the same workpiece with different positions is greatly saved. The performance still needs to be improved due to the randomness of
+
+2
+
+X. Zhou et al.
+Fig. 1. The entire workspace of the welding robot. sampling and the number of collision detection affecting the feasible path generation and its efficiency. Besides, the collision detection of the welding robot between any two transition points consumes numerous computational resources. Therefore, Lazy-PRM is introduced to carry out the collision detection after finding a feasible path to improve the search efficiency in solving the practical path planning problems. However, some path segments planned from the algorithm are quite close to obstacles when the end-effector is abstracted as a point. The repulsive field is thus adopted to create a safe distance between the robot body and obstacles. Furthermore, it is worth noting that the proposed algorithm allows fine-tuning of the welding gun angle, which increases the possibility of finding a viable path when solving the welding robot collision-free path planning problems.
+The structure of this paper is organized as follows. Section 2
+
+Robotics and Computer-Integrated Manufacturing 78 (2022) 102413
+summarizes the definition and the mathematical model of path planning problems. In Section 3, the proposed method for online collision-free path planning is described. Section 4 provides the simulation scenarios on the virtual environment using a 7-DOF welding robot, followed by the simulation results analysis in detail. And Section 5 gives the simulation results and actual welding scene of the welding tasks on stiffened plates. The final section provides some concluding remarks and discusses future work.
+2. Problem description
+The path planning problem studied in this paper focuses on finding the transition path of the 7-DOF welding robot from the initial position through each welding seam and finally back to the initial position. The welding paths of the robot are usually fixed and not considered. The purpose of this work is to quickly plan an optimal and collision-free transition path of the robot in the simulation software based on the actual scene, and then transmit the obtained path information from the host computer to the robot controller so that to drive the robot to finish the arc welding tasks. The whole workspace is shown in Fig. 1, where the working robot is a 7-DOF welding robot since it has an external shaft. The robot used in this paper is FANUC M20iD/25, and the initial robot position and the user coordinate O are predefined and shown in Fig. 1. The workpieces applied in the problem are mutually perpendicular stiffened plates. The infrared laser sensor fixed on the bracket is directly above the workbench, which is used to scan the position of the workpiece as the robot moves. The welding gun is equipped with a weld tracking sensor to improve the welding accuracy. But it also limits the welding angle and direction of the torch and increases the difficulty of path planning.
+The whole process of the approach is described in Fig. 2. All operations during welding path planning are accomplished through the host computer without manual adjustment. After the workpiece is laid out on the workbench, the infrared laser sensor scans the workbench as the robot moves, and returns data containing the relative offset and rotation
+
+Fig. 2. The flowchart of the collision-free path planning. 3
+
+X. Zhou et al.
+
+Table 1 DH parameters of the 7-DOF welding robot.
+
+Link i
+
+ai (m)
+
+αi (rad)
+
+di (m)
+
+1
+
+a1(0.075) -pi/2
+
+d1 (0.425)
+
+2
+
+a2 (0.840)
+
+pi
+
+0
+
+3
+
+a3(0.215) -pi/2
+
+0
+
+4
+
+0
+
+pi/2
+
+d4( − 0.890)
+
+5
+
+0
+
+-pi/2
+
+0
+
+6
+
+0
+
+pi
+
+d6( − 0.090)
+
+7
+
+e1
+
+0
+
+0
+
+θi (rad)
+θ1 θ2 − pi/2 θ3 + θ2 θ4 θ5 θ6 0
+
+Range
+− 40◦~170◦ − 40◦~145◦ − 180◦~275◦ − 190◦~190◦ − 140◦~140◦ − 270◦~270◦ 0 m ~ − 3m
+
+compared to the standard position. The standard position of each workpiece was predefined to unify and calibrate the coordinate system between robot and workpiece. The local path planner then adjusts the position of the workpiece in the simulated environment based on the information obtained by scanning and starts planning the transition path. The local path planner firstly builds the roadmap by taking the endpoint collision case into account according to the given environment information, then selects feasible paths with low fitness values to conduct collision detection in succession. The sample point and the corresponding transition path that caused the collision should be removed from the roadmap, and a new feasible path will be searched
+
+Robotics and Computer-Integrated Manufacturing 78 (2022) 102413
+afterward and repeat the collision detection. Once a feasible path passes collision detection, the local planner outputs the path information of the robot to the host computer, and the host computer runs the robot program to complete the arc welding task.
+To solve the problem successfully, some requirements need to notice:
+• The position and shape of workpieces should be known, and they are static during the welding process.
+• Positions of welding seams and the welding sequence are provided by users since the workpieces are relatively simple and welding seams are limited.
+• The desired initial and final positions of the robot are fixed and known. The robot posture at the welding terminals relative to the workpiece should be predefined as well.
+• The manipulator’s end-effector should move from an initial point to the ending point while avoiding collisions, following a TCP’s path with minimum path length cost.
+Let χ be the entire workspace, χobs is then denoted as the obstacle space, and χfree= χ\χobs as the free space. Both the initial point χinit and the goal point χgoal are the element of χfree. Let γ indicates a planning
+∑ query from χinit to χgoal, one possible collision-free path σ ∈ γ : [0, 1]→
+
+Fig. 3. The flow diagram of the proposed algorithm. 4
+
+X. Zhou et al.
+
+Robotics and Computer-Integrated Manufacturing 78 (2022) 102413
+
+Fig. 4. The digital model and the grid modeling of the robot (a)-(b) and workpiece (c)-(d).
+
+χfree represents a continuous trajectory mapping to the free space. If σ(0)
+
+= χinit and σ(1) = χgoal, the path is considered a feasible collision-free
+
+path. The mathematical expression for the collision-free path planning
+
+problem is then addressed as:
+
+(
+
+)
+
+∑1
+
+∑
+
+mindist
+
+σ(χi) , xi ∈ xfree, σ ∈ γ
+
+(1)
+
+0
+
+s.t.xLink(j− 1) + xLink(j) ∈ xfree, 2 ≤ j ≤ 6
+
+(2)
+
+xLink(7) + xLink(1) ∈ xfree
+
+(3)
+
+θj = θj − 2π, if θj > θj,max, 1 ≤ j ≤ 6
+
+(4)
+
+θj = θj + 2π, if θj < θj,min, 1 ≤ j ≤ 6
+
+(5)
+
+where dist(⋅) stands for the trajectory length of the selected path from the initial point to the goal point. In the Cartesian space path planning strategy, the robot trajectory is calculated as the straight-line distance between points; and the arc length of the path is computed when applying the path planning strategy in configuration space. χLink(j) represents the position of the jth joint for the welding robot, and the first two constraint formulas (2) and (3) stipulate that no collision occurs between the adjacent joints of the robot. θj means the jth joint angle of the robot, where constraints (4) and (5) indicate that the value of joint angle would never exceed the range [θj,min, θj,max] of the robot configurations.
+Necessary preparations are the description of the kinematic model of the welding robot and the corresponding inverse transformation solver. The welding robot has six rotation joints plus a prismatic joint, and the Denavit-Hartenberg (DH) parameters containing the range of motion for each joint are displayed in Table 1. And the (TCP) is defined with the sixpoint method in the actual welding point, set as [x,y,z,w,p,r] = [ − 109.2, 1.2, 361.3, − 176.7, − 47.4, − 6.5], where the first three values are coordinates along three-dimensional coordinated axes, and the last three values represent the rotate angles around three axes. The analytic geometry method of inverse kinematic is utilized to conclude eight sets of joint configurations, and the optimal configuration set is selected depending on joint limits and specific rules, where details are given in Section 3.4.
+
+3. Methodology
+
+This section focuses on the whole process of the proposed approach, which consists of three stages: the offline preparation before searching the transition paths, the online work environment adjustment and the query stage of feasible paths. The complete flow diagram of the proposed method is described in Fig. 3. Offline preparation aims to build the
+
+Fig. 5. Auxiliary strategy to adjust welding seams to accessible region.
+initial work environment with the welding robot and workpieces and then construct the roadmap in the established environment. Online adjustment mainly adjusts the position of the constructed workpieces and the corresponding roadmaps to fit the actual environment. And Query stage concentrates on finding the optimal transition paths that passed the collision detection and satisfying other constraints on actual production. The detailed information for each process is described in the following content.
+3.1. Offline preparation
+3. 1.1 Modelling Before searching the feasible paths for the arc welding robot, several
+things need to be finished, such as the virtual environment construction, the welding sequence, and robot postures at the terminals of each welding seam. In order to accurately build the virtual environment that is consistent with the actual scene in software, the model of the welding robot and workpieces can be established using the three-dimensional grid method according to the obtained STL files. The grid size is uniformly set as 10 mm for the robot with a welding gun and the workpiece. The space is divided into small cubes with specific grid sizes, and each cube is represented by the vertex that approaches positive infinity. Vertices containing the environmental obstacles such as the workpiece or robot will be recorded in the archive, and the vertex set is regarded as the obstacle space. The grid modeling of the welding robot and one
+
+5
+
+X. Zhou et al.
+
+example of workpiece modeling are shown in Fig. 4. The digital model of the robot is shown in Fig. 4(a), and the robot model with grid vertices is displayed in Fig. 4(b). The rasterized data of the robot is stored in seven segments for the convenience of the subsequent calculation and visualization of robot motion. Each section represents one robot link with a specific color, and the last part is the welding gun. Fig. 4(c) exhibits the STL file of the workpiece, while Fig. 4(d) provides the scatter diagram of the workpiece where the welding seams are labeled in blue lines.
+
+3.1.2. Environment construction The grid modeling method defines the girds that are not fully filled
+with modeling objects as obstacle space, then the space occupied by modeling objects is expanded. Welding seams on the corner surface of the workpiece will sink into the grids always located in the obstacle space, resulting in the impossibility of finding feasible paths. According to the geometric characteristics of the perpendicular stiffened plates, a motion planning rule based on practice is introduced, as shown in Fig. 5. The robot can preferentially move to the top of the workpiece, and the algorithm then adjusts the welding posture and plans feasible paths for the robot to avoid collisions occurring near the workbench. Thus, the actual welding seams are replaced by the approximate transition points that gradually increment the distance along the vertical direction of the welding seam and then along the tool axis-z. And the error of the path created by the transition point in this part could be automatically adjusted by the weld tracking device. In addition, the posture of the welding robot on the welding point is different in various welding sequences and directions due to the restriction factor that the welding tracking device must be directly in front of the welding gun movement direction, so the welding sequence and direction need to be determined in advance. For instance, the welding gun moves forward in the welding direction from WP2 to WP1, as Fig. 5 shows. If the welding direction changes to WP1-WP2, the welding gun will rotate 180◦ around itself and move backward. Also, the end of the welding gun is perpendicular to the welding seam, and the angle between the welding gun and two stiffened platers is set to 45◦ The practical workpieces are relatively simple, and the welding sequence with corresponding seam directions can be directly assigned. If the workpiece is complex with many welding seams, it can be achieved by applying the heuristic algorithms.
+
+3.1.3. Sampling & roadmap generation Traditional sampling methods are usually random, and difficult to
+cover the whole free space at a certain number of sampling points. Therefore, improving the sampling process could effectively enhance the performance of the sampling-based path planner. However, expanding the connectivity of the workspace and the runtime of the planner are two contradictory concepts. For example, it consumes computing resources when simply increasing the number of samples. Based on the concept of low-dispersion sampling [33], the algorithm introduces Lebesgue volume measurement to set the minimum radius of spheres between any two random samples wrapped by the sphere. Thus, the uniform distribution of the samples in small quantities is maintained by reserving samples where the distance to the nearest sample is larger than the minimum radius, and path queries can be accomplished with less runtime. The minimum radius of two sample points near obstacle space is formulated as follows:
+√̅̅̅̅̅̅̅̅ R = 3 Vol (6)
+λNπ
+
+∏⃒
+
+⃒
+
+3⃒
+
+⃒
+
+where Vol = n=1⃒maxm(χspace(m)) − minm(χspace(m))⃒ and χspace = χobs ∪
+
+χinit ∪ χgoal In Eq. (6), N denotes the number of samples, λ is a positive scaling
+factor, and Vol computes the volume of a smaller region covering the obstacle space and the space from the start point to the goal point. Since the volume of N balls with radius R is always smaller than that of the
+
+Robotics and Computer-Integrated Manufacturing 78 (2022) 102413
+
+Fig. 6. Different sampling methods with 200 nodes in a 2D environment.
+√3 ̅̅̅ cube space with side length NR, the remaining space is then filled with scaled obstacles. As shown in Fig. 6, the low-dispersion random samples can uniformly distribute in the workspace, which has more efficiency in capturing the connectivity of the workspace within a specific number of samples. Similar to the initial and the goal pose setting of the welding robot, sampling information also includes the randomly generated [w, p, r] pose. In the workspace far from obstacles, the uniform sampling method is adopted to fill the rest of the workspace with the specified step size. The roadmap is then connected using the samples generated from the low-dispersion random sampling and the uniform sampling method. A connection matrix is created to reserve the connectivity results between any two sample points. The connectivity result in the matrix is set to 0 when the connecting line goes through the obstacle area, and assigned to 1 if the connecting path is collision-free.
+
+3.2. Online adjustment
+
+The robot working environment and the workpiece position in the
+
+simulation environment must be consistent with the actual situation.
+
+The actual position of the workpiece is calibrated by an infrared laser
+
+sensor to obtain the rotation and offset relative to the standard position,
+
+and then the workpiece and sampling points in the simulation envi­
+
+ronment are transformed to complete online adjustment. In the ship
+
+formation welding process, workpieces are usually placed horizontally,
+
+and the variation of workpieces’ position often rotates around the z-axis and then shifts along the x- and y-axis. Thus, the position P′ of the
+
+workpiece after transformation can be expressed as:
+
+⎡
+
+⎤⎡ ⎤
+
+⎢ cos(θ) − sin(θ) 0 offsetx ⎥ px
+
+⎢
+
+⎥
+
+⎢ ⎢
+
+⎥ ⎥
+
+′
+
+⎢ ⎢
+
+sin(θ)
+
+cos(θ)
+
+0
+
+offsety
+
+⎥ ⎥
+
+⎢ py ⎥
+
+P = Rot(Z, θ) × P = ⎢
+
+⎥
+
+×
+
+⎢ ⎢
+
+⎥ ⎥
+
+(7)
+
+⎢ ⎢
+
+00
+
+1
+
+offsetz
+
+⎥ ⎥
+
+⎢ pz ⎥
+
+⎣
+
+⎦⎣ ⎦
+
+00
+
+01
+
+1
+
+where P is the predefined standard position of the workpiece, θ indicates the relative rotation angle of the workpiece, and [offsetx, offsety, offsetz]
+are the amount of translation on three axes. Ideally, offsetz should be 0, and the actual installation error could result in offsetz being a decimal close to 0.
+
+3.3. The shortest feasible path search using improved A*
+
+During the path search process, the A* algorithm generally selects nodes according to the heuristic cost function, which is expressed in Eq. (8). g(xinit, xi) represents the sum of the distance from the initial point to the ith sample point, h(xi, xgoal) is the estimated cost from the ith sample point to the goal point, and dist(⋅) is used to calculate the straight-line distance between points.
+
+(
+
+) ∑ i− 1
+
+(
+
+)
+
+Cost(i) = g(xinit, xi) + h xi, xgoal =
+
+dist(xi− 1, xi) + dist xi, xgoal
+
+(8)
+
+i=1
+
+6
+
+X. Zhou et al.
+
+Robotics and Computer-Integrated Manufacturing 78 (2022) 102413
+
+Fig. 7. The repulsive force of obstacles in the 2D grid environment.
+
+This method could effectively search the shortest paths for the terminal of manipulators or the robots that can be assumed as a point, but the collision detection often fails for the welding robot due to the constraints of the whole robot body. Since the welding robot and the welding gun cannot be abstracted into a straight line or a point during collision detection, it is necessary to measure the safe distance from the robot to obstacles. The repulsive force field is introduced in the proposed algorithm with the purpose of maintaining the safe distance between the welding robot (especially for the welding gun) and obstacles, also increasing the success rate of passing subsequent collision detection. The proposed method uses the repulsive field to wrap around the obstacles, where the repulsive force is evaluated by the sum of penalty distances between the welding robot and obstacles, as shown in Eq. (9).
+
+′
+
+′
+
+(
+
+)
+
+Cost (i) = g (xinit, xi) + h xi, xgoal
+
+∑ i− 1 (
+
+∑)
+
+(
+
+)
+
+=
+
+dist(xi− 1, xi) + μ si + dist xi, xgoal
+
+(9)
+
+i=1
+
+′
+where Cost (i) is the proposed cost function to evaluate the ith node, si indicates the repulsive force generated by the path between xi− 1 and xi, and μ is the penalty parameter to control the amount of repulsion applied. If there is a path through the repulsive field grid, the sum of the repulsive force values of the grid space which it passes is taken to punish the minimum fitness value of the path so that to increase the cost function value and control the algorithm prefers the path with a smaller fitness value to stay away from obstacles. For simplicity of computation, the repulsive force field is also divided into grids, and the s value is set to
+
+Fig. 8. The flowchart of collision detection. 7
+
+X. Zhou et al.
+different integers with various distances from obstacles. As displayed in Fig. 7, in the 2D grid workspace, the white grid without obstacles is defined as the free grid with a repulsive force value of 0, while the grid with obstacles should be the obstacle grid. Other colorful grids stand for the free space equipped with repulsive forces, and their levels decrease from the inside out. The repulsive forces that cover all the obstacles within a specific safe distance are then added together to compute the total repulsion. For example, the maximum repulsion level is set as 3, and two repulsion layers are added to the obstacles with the repulsion levels 2 and 1, respectively. In this case, the proposed cost function Cost′ (i)can be used to maintain both the shortest feasible path length obtained from the end-effector of the robot and the safe distance between the robot and obstacles. Furthermore, the strategy could reduce the number of collision detection and improve the calculation efficiency of the algorithm.
+3.4. Collision detections
+Collision detection aims to detect whether the robot collides with the workpiece, the workbench and the main body itself. During the welding process, welding seams are known and fixed, and the robot is considered collision-free during its journey along this path. The transition path of the robot that moves from the destination of one welding seam to the starting point of the other should be planned and detect collisions, while the detailed process is displayed in Fig. 8. After obtaining the feasible paths from the improved A*, each transition path is separated into Q interpolating points by the piecewise sampling method, and collision detection is performed on the robot pose at each interpolating point. According to the grid method, the robot poses represented by the set of grids vertices at these interpolating points. In the detection process, the vertices set of the robot and the obtained grid vertices set of the workpiece are compared to check whether intersection point(s) exists. If the intersection point(s) exists, it means an overlapping area is generated between the robot and obstacles, and the detected transition path is determined as collisional and should be eliminated. Under the circumstances, the robot posture adjustment strategy is triggered for a maximum of 20 times when the collision occurs between the welding gun and the workpiece to update the planned path and back to the collision detection stage; otherwise, the path transition point and the corresponding path connection are eliminated from the roadmap, and the path is replanned. If there is no overlapping part, the path is feasible, and the path information can be output to control the robot finishing the welding task through the host communication.
+The first issue in the collision detection process is to solve the robot posture at each transition point through the forward and inverse kinematics. The transformation matrix of the two adjacent joints for the robot with six joints can be expressed as:
+
+Robotics and Computer-Integrated Manufacturing 78 (2022) 102413
+
+i− i
+
+1T
+
+=
+
+Rot(X, αi−
+
+1)Trans(X, ai−
+
+1)Rot(Z, θi)Trans(Z, di)
+
+=
+
+⎡
+
+⎤
+
+cos(θi )
+
+− sin(θi)
+
+0
+
+ai− 1
+
+⎢⎢ sin(θi)cos(αi− 1) cos(θi)cos(αi− 1) − sin(αi− 1) − disin(αi− 1) ⎥⎥
+
+⎢
+
+⎥, i ≤ 6, i ∈ N+
+
+⎣ sin(θi)sin(αi− 1) cos(θi)sin(αi− 1) cos(αi− 1) dicos(αi− 1) ⎦
+
+0
+
+0
+
+0
+
+1
+
+(10)
+
+where α, θ, a and d are the DH parameters. Since the 7th joint of the
+
+robot is an external shaft on the y-axis, the transformation matrix from
+
+the 6th to 7th joint is addressed as:
+
+⎡
+
+⎤
+
+⎢1 0 0 0 ⎥
+
+⎢
+
+⎥
+
+6 ⎢ T = ⎢⎢ 0 1 0 e1 ⎥⎥⎥ (11)
+
+7 ⎢0 0 1 0 ⎥
+
+⎢
+
+⎥
+
+⎣
+
+⎦
+
+00 0 1
+
+where e1 means the distance that the robot moves on the external shaft.
+
+Therefore, the transformation matrix of the 7-DOF welding robot can be
+
+solved by the following equation. Where the matrix on the right side
+
+shows the robot pose matrix. px, py and pz are the Cartesian space po­
+
+sition of the robot end, and the left 3 × 3 submatrix stands for the robot
+
+pose at the current position.
+
+⎡
+
+⎤
+
+⎢ nx ox ⎢ ⎢ T = 0 1 2 3 4 5 6 ⎢ 1T2T3T4T5T6T7T = ⎢ ny oy ⎢ ⎢ nz oz ⎢ ⎣
+00
+
+ax px ⎥ ⎥ ⎥
+ay py ⎥ ⎥ ⎥
+az pz ⎥ ⎥ ⎦
+01
+
+(12)
+
+In general, the selection of the inverse kinematic solutions also influences the pose of the robot and collision detection. A reasonable method for the inverse kinematic solution selection is proposed in this paper, which can quickly pick the suitable solution to guide the robot to move in the desired way. The whole process is divided into two conditions, where the inverse kinematic solution is computed through the terminal points and transition points. For the 7-DOF welding robot, different joints occur in the specific displacement of the end-effector, and the same angle adjustment of the base joint is sweeping big area than others. In this case, the movement of the first three joints should be minimized as much as possible because they determine the most range of motion for the robot. Then, a solution from the left 2 candidate solution sets filtered by the first three joints are then selected by the last three joints. The selection criteria can be defined according to the actual
+
+Fig. 9. The illustration of the robot posture adjustment strategy. 8
+
+X. Zhou et al.
+
+Robotics and Computer-Integrated Manufacturing 78 (2022) 102413
+
+Fig. 10. The obtained trajectory for each algorithm on two scenarios.
+
+situation of the specific robot to prevent the robot from exceeding the
+
+limit. The numerical method with details is shown in Eq. (13), where
+
+fitnesssol represents the minimum fitness value of the robot on ith tran­
+
+sition point, solinv,i(l), l ≤ 8 denotes the obtained current at most 8 in­
+
+verse kinematic solutions at ith point, j is the joint number of the robot
+
+′
+where i,j ∈ N, and ωj is the weight vector for each joint angles which set
+
+to [0.3 0.3 0.3 0.1 0.1 0.1].
+
+(
+
+)
+
+(
+
+)
+
+∑3 ⃒
+
+⃒
+
+∑6 ⃒
+
+⃒
+
+min
+
+⃒solinv,i(l, j)⃒ & min
+
+⃒solinv,i(l, j)⃒ , if i = 1, N
+
+fitnesssol= {
+
+j=1
+
+j=4
+
+( ′(
+
+))
+
+min ωj solinv,i(l) − solinv,i− 1 , if 1 < i < N
+
+(13)
+
+3.5. Posture adjustment strategy
+Most paths are eliminated when collisions occur between the main body of the robot and the workpiece(s), which may cause the known information loss of paths and the work environment. For instance, the robot position can be obtained from welding points, transition points and other information in the robot path planning process, while its postures cannot be predicted or defined in advance except for two terminals of the entire path. In particular, the poses of the welding gun heavily affect the feasibility of the path when only the welding gun collides with the workpiece. Generally, the impropriate welding gun posture will affect the path to be judged as infeasible. But it is possible to make the path feasible if fine-tuning the pose toward the welding gun. On behalf of reducing the waste of computing resources, improving the success rate of collision detection and the efficiency of the path search, the posture adjustment strategy for the robot is employed only when collision detection is failed between the welding gun and workpiece. Besides, the adjustment process is only used during the transition path search and affects the welding posture and weld quality.
+Once the posture adjustment strategy is triggered, it is necessary to find the appropriate direction that the welding gun should move to
+
+adjust the position and posture of the robot, where the detailed process is described in Fig. 9. In order to find the direction, the center point of the welding gun pgun (denoted by the green node in Fig. 9 and the overlapping area Pgrid (marked as red circles for grids) created by collision should be obtained at first. The resultant force with a specific direction of the end-effector can be expressed as:
+
+∑ i=m (
+
+F=
+
+pgrid,i −
+
+i=1
+
+) pgun , where pgrid
+
+∈ Pgrid
+
+(14)
+
+The welding gun could move away from the collision area by adding the resultant force to the current robot pose. The components of the resultant force in three axes can be used to calculate the new direction and position of the robot with the fixed step length, as Eq. (15) shows.
+
+F
+
+pnew = p + ⋅(sl⋅i), i ≤ 20
+
+(15)
+
+|F|
+
+where sl means the fixed step length and is the same as the grid size in this paper, and i is the number of adjustments. pnew is the calculated pose after adjustment, and p represents the current pose of the robot when the collision occurs. The overlapping area is composed of the vertex set obtained from the intersecting grids between the robot and obstacles in the workspace. When the set of grid vertices with robot position intersects with the vertex set with obstacles, the overlapping area is generated, then the grid vertices contained in the intersection set are used to determine the collision area (or the overlapping area). The above steps described in Eq. (15) are repeated until pnew is obtained, which means no overlapped area is detected between the welding gun and workpiece, then jump out of this strategy to execute the unfinished collision detection task. If no available solution for pnew within the preset number of repetitions (20 in the experiment), the path is infeasible and should be removed.
+
+9
+
+X. Zhou et al.
+
+Table 2 Simulation results of different algorithms.
+
+Scenario Algorithm
+
+No. of Samples
+
+1
+
+RRT*
+
+–
+
+AB-RRT*
+
+–
+
+Lazy-PRM
+
+600
+
+Improved Lazy- 600
+
+PRM
+
+2
+
+RRT*
+
+–
+
+AB-RRT*
+
+–
+
+Lazy-PRM
+
+600
+
+Improved Lazy- 600 PRM
+
+Step size (mm)
+200 200 – – 200 200 – –
+
+Max. Repulsion level s
+0 0 0 13 0 0 0 13
+
+Robotics and Computer-Integrated Manufacturing 78 (2022) 102413
+
+Build roadmap time (s)
+–
+–
+1.147e+1 (6.73e1) 2.760e+0 (3.72e2) –
+–
+4.036e+0 (5.45e2) 3.895e+0 (1.23e+0)
+
+Path searching time (s)
+1.480e+3 (5.03e+5) 2.022e+3 (1.37e+6) 1.210e+2 (4.38e+2) 3.959e+1 (1.01e+2) 7.312e+2 (2.17e+5) 1.236e+3 (4.41e+5) 6.621e+1 (3.62e+2) 9.933e+1 (1.92e+3)
+
+Pathlength (mm)
+Ave.
+2.867e+3 (8.18e+4) 2.997e+3 (1.21e+5) 2.658e+3 (8.25e+3) 2.417e+3 (3.49e+3) 2.332e+3 (9.33e+4) 2.503e+3 (2.76e+5) 2.158e+3 (1.26e+4) 1.826e+3 (2.79e+3)
+
+Min. 2.340e+3 2.462e+3 2.523e+3 2.336e+3 1.33e+3 1.728e+3 1.902e+3 1.738e+3
+
+Total Cost
+1767.098 1160.729 398.236 284.051 492.204 743.298 143.019 142.938
+
+4. Formalisation and implementation
+
+4.1. Experiment setting
+
+The objective of the experiment is to plan the complete feasible
+
+welding transition path for the robot. In this part, the performance of
+
+path searching is mainly investigated that omits the work environment
+
+construction and the online obstacle adjustment. The experiment results
+
+are evaluated by the trajectory length and the time consumed during the
+
+path planning process. However, these two objectives are contradictory
+
+in the arc welding robot path planning problem. The total cost of both
+
+time consumption and path length is introduced in consequence to
+
+demonstrate the comprehensive performance of the algorithms more
+
+intuitively. Based on Eq. (1), the total cost can be addressed as:
+
+( ) dist 0 ( ∑1σ(χi)) Total cost = δ1 Troadmap + Tsearch + δ2⋅ 10
+
+(16)
+
+where Troadmap and Tsearch are the time for building the roadmap and searching for the feasible path, respectively. δ1 and δ2 are the weight vectors for each objective which are designed as δ1 = 0.5 and δ2 = 0.5 in this paper. To keep the consistent magnitude of the data, the value of path length is scaled by 10. The lower total cost is preferred to represent the better result of the algorithm.
+Matlab is utilized for programming and algorithm simulation in this paper. Each instance is executed 20 times, and the average values of path length and time are collected to demonstrate the effectiveness of the algorithms used in the experiment. In the simulated path planning case, lazy-PRM [32], AB-RRT*[9] and RRT* [34] are applied to compare with the proposed algorithm. The simulated environment is built using four obstacles, shown in Fig. 10. Due to the limitation of the simulated environment, the trajectory of the welding robot must be controllable, and the planning of the feasible path should be in Cartesian space instead of the configuration space. The primary parameter settings of lazy-PRM, AB-RRT* and RRT* are displayed in table 2, and other parameters are set as the original papers.
+
+Fig. 11. Movement of the 7-DOF welding robot in 3D workspace. 10
+
+X. Zhou et al.
+
+Table 3 performance comparison of proposed algorithm on different sample settings.
+
+No. Samples
+
+Max. Repulsion level
+
+μ
+
+Build roadmap time (s)
+
+1000
+
+15
+
+800
+
+15
+
+600
+
+15
+
+400
+
+15
+
+200
+
+15
+
+5
+
+1.411e+1 (2.03e+0)
+
+5
+
+8.202e+0 (4.43e-2)
+
+5
+
+2.863e+0 (6.02e-2)
+
+5
+
+1.455e+0 (9.28e-2)
+
+5
+
+4.023e-1 (2.25e-3)
+
+Robotics and Computer-Integrated Manufacturing 78 (2022) 102413
+
+Searching time (s)
+6.844e+1 (7.32e+2) 9.427e+1 (1.99e+2) 4.920e+1 (2.37e+2) 5.338e+1 (4.86e+2) 4.198e+1 (1.72e+2)
+
+Pathlength (mm)
+Ave.
+2.534e+3 (1.24e+3) 2.531e+3 (2.58e+3) 2.565e+3 (5.95e+3) 2.619e+3 (1.56e+4) 2.688e+3 (3.78e+4)
+
+Min.
+2.457e+3 2.418e+3 2.461e+3 2.459e+3 2.405e+3
+
+Total Cost
+313.305 355.592 308.558 316.711 311.211
+
+4.2. Simulation results
+In two scenarios where the starting and goal points are set differently with specific robot poses, the simulation results for each algorithm are listed in table 2, which presents the general parameter settings and the obtained average values with variance in the bracket for each algorithm. The best trajectories obtained from RRT*, AB-RRT*, lazy-PRM and improved lazy-PRM are displayed in Fig. 10, respectively. The obstacles are displayed as four lavender cubes, transition points are marked as magenta, the start and goal points are set to red and green, and the planned trajectories are drawn in orange.
+According to the table, it can be seen that the proposed improved lazy-PRM can achieve the best performance in scenario 1 and the best average pathlength and cost in scenario 2 at the number of samples with 600, maximum repulsion level 13 and penalty parameter μ = 1. The step size for RRT* and AB-RRT* are set to 200 mm since the defined workspace is quite large. And the search process is finished as long as no collision occurs between the searched sampling point and the goal point to improve efficiency. The best minimal path length of AB-RRT* in scenario 2 indicates a strong search capability, but the random search strategy results in low stability. Besides, AB-RRT* takes the most time to find feasible paths since the bidirectional path search policy and the robot posture adjustment strategy increase the number of collision detection, and the resulting average path length is longer than other algorithms. In contrast, the lazy-PRM based algorithms take relatively little time on a few numbers of collision detection to finish the searching. Especially for the improved algorithm, which maintains stable and high performance on finding collision-free paths within the acceptable time. As for the lazy-PRM algorithm, a longer time is taken than the proposed algorithm to build the roadmap. It is mainly because the proposed sampling method could generate more uniformly distributed sample points with higher probabilities for connecting the roadmap than the traditional random sampling method. The repulsive force field is applied to the proposed algorithm to select the best path with a safe distance between the welding robot and obstacles instead of the shortest path, and the posture adjustment strategy uses the collision information to adjust the obtained candidate path to be feasible, which further reduce the number of collision detection and the path search time. The total cost comparison of the three algorithms also proves that the proposed algorithm achieves the best overall performance.
+In Fig. 10, each plot shows the robot posture at the goal point, which means the joint configuration obtained from different algorithms are not the same although the goal position and the pose of the welding gun are given, and the paths obtained by algorithms also have differences.
+
+Although AB-RRT* achieves the shortest path length in scenario 2, the obtained trajectory is not smooth and may affect the robot’s motion. And the transition points saved by RRT* during the search seem similar to AB-RRT*, where the advantages of bidirectional growing trees are not obvious. The proposed algorithm almost founds the best paths in both scenarios, especially for the path obtained on scenario 2, which can be approximated to a smooth curve. Besides, it can be seen from the path information of the proposed algorithm in Fig. 10(a) that the second transition point is obtained after the robot posture adjustment strategy. The robot pose is updated after the posture adjustment strategy, and the adjusted path becomes collision-free. It is obvious that the obstacles can be well avoided during the robot motion, which indicates the effectiveness and efficiency of the proposed improved PRM method.
+Take an example of scenario 1, the detailed trajectory of each joint with the external axis (e1) of the arc welding robot on the selected six sampling points is shown in Fig. 11. To clearly understand the robot movement process, the first 6 subplots display the trajectories of the welding robot at different joints, and the last one exhibits the entire movement of the welding robot. The movement of the base joint displays the robot moves as the external axis moves. It can be seen that the motion of each joint is within a small acceptable range, which makes the path shorter and smoother.
+In this simulation, the effect of the proposed algorithm is affected by different parameter combinations, especially for the number of samples, the repulsion level and the penalty parameter μ of the cost function. In order to verify the best combination for the three main parameters, the control variable method is used to measure a set of suitable parameter settings, and the simulation results under scenario 1 are listed in tables 35.
+Table 3 gives the comparison results of the proposed algorithm on different numbers of sample points in scenario 1 while keeping the repulsion level to 15 and the penalty parameter to 5. According to the data in table 3, it can be obviously seen that the obtained path lengths become longer and the entire time consumption gradually shortened as the number of sampling points decreases. The reason for this result is that the time spent on building the roadmap increases rapidly when more sampling points are adopted to the algorithm, and more options in the roadmap to construct a feasible path with a shorter path length. More transition paths also lead to an increase in collision detection and search time on the path. In summary, the algorithm achieves the best overall performance with the lowest total cost when the number of sampling points is 600.
+In table 4, the experiment results display the comparison of the proposed algorithm with different maximum repulsion levels while
+
+Table 4 Performance comparison of proposed algorithm on different repulsion settings.
+
+No. Samples
+
+Max. Repulsion level
+
+μ
+
+Build roadmap time (s)
+
+Searching time (s)
+
+600
+
+15
+
+600
+
+14
+
+600
+
+13
+
+600
+
+12
+
+600
+
+11
+
+600
+
+10
+
+5
+
+2.863e+0 (6.019e-2)
+
+5
+
+2.783e+0 (7.93e-2)
+
+5
+
+2.666e+0 (1.64e-2)
+
+5
+
+2.800e+0 (4.67e-2)
+
+5
+
+2.681e+0 (2.37e-2)
+
+5
+
+8.875e+0 (6.85e-1)
+
+4.920e+1 (2.37e+2) 4.760e+1 (3.33e+2) 4.139e+1 (3.68e+1) 4.594e+1 (8.21e+1) 4.713e+1 (4.20e+2) 1.648e+2 (3.57e+3)
+
+Pathlength (mm)
+Ave.
+2.565e+3 (5.95e+3) 2.535e+3 (4.20e+3) 2.480e+3 (3.30e+3) 2.454e+3 (1.72e+3) 2.439e+03 (1.24e+3) 2.394e+3 (1.36e+3)
+
+Min.
+2.461e+3 2.417e+3 2.415e+3 2.381e+3 2.348e+3 2.330e+3
+
+Total Cost
+308.558 303.857 292.088 294.161 293.706 413.087
+
+11
+
+X. Zhou et al.
+
+Robotics and Computer-Integrated Manufacturing 78 (2022) 102413
+
+Table 5 Performance comparison of proposed algorithm on different penalty parameter μ settings.
+
+No. Samples
+
+Max. Repulsion level
+
+μ
+
+Build roadmap time (s)
+
+Searching time (s)
+
+600
+
+13
+
+600
+
+13
+
+600
+
+13
+
+600
+
+13
+
+600
+
+13
+
+600
+
+13
+
+10
+
+1.021e+1
+
+(1.07e+0)
+
+8
+
+8.938e+0
+
+(1.44e+0)
+
+6
+
+2.767e+0
+
+(2.01e-2)
+
+4
+
+2.722e+0
+
+(2.24e-2)
+
+2
+
+2.740e+0
+
+(3.18e-2)
+
+1
+
+2.760e+0
+
+(3.72e-2)
+
+1.569e+2 (2.24e+3) 1.468e+2 (2.05e+3) 4.447e+1 (1.45e+2) 4.232e+1 (5.85e+1) 4.390e+1 (2.40e+2) 3.959e+1 (1.01e+2)
+
+Pathlength (mm) Ave. 2.513e+3 (2.16e+3) 2.514e+3 (5.53e+3) 2.498e+3 (4.40e+3) 2.484e+3 (2.25e+3) 2.455e+03 (2.67e+3) 2.417e+3 (3.49e+3)
+
+Min. 2.415e+3 2.399e+3 2.415e+3 2.399e+3 2.369e+3 2.336e+3
+
+Total Cost
+418.377 407.133 297.073 293.395 292.092 284.051
+
+Fig. 12. Workpiece exhibition used in the experiment.
+
+keeping the number of samples and the penalty parameter constant. As the repulsion level decreases, the average path length is reduced while both runtimes grow. The repulsion level is used to measure the safe distance between the welding robot and obstacles, where the maximum safe distance can be calculated by multiplying the grid size and the repulsion level. The collision between the welding gun and obstacles is the most urgent issue to be avoided in the arc welding robot path planning problem. Therefore, the main purpose of the repulsion level is to measure the range of the safe distance from the welding gun center to obstacles. According to the actual size of the welding gun, we set the maximum repulsion level within the range [10, 15]. Because the welding gun collides with obstacles in any posture if the repulsion level is less than 10, which increases the time of path search, and it hardly collides with obstacles, and the obtained path will have a longer path length if the repulsion level exceeds 15. In this case, an appropriate repulsion level also could balance the contradiction between finding the shortest path and the time consumption of path search. As a result, it is found that the algorithm has the minimum total cost at a repulsion level of 13 through table 4.
+In table 5, the effectiveness of the penalty parameter μ is tested and demonstrated through the proposed evaluations. μ is positively correlated with time consumption and path length. The entire searching time and the path length become lower as μ reduces. It is due to the penalty distance in Eq. (9) being used to measure the safe distance between the welding robot and obstacles. The penalty distance becomes larger when applying a larger value of μ, which causes the searched path with a higher fitness value is less likely to be selected for collision detection. And vice versa. According to the data shown in table 5, it can be observed that the reduction in total cost value is slight as μ is less than 6, and μ = 1 achieves the best overall performance on the proposed algorithm. If μ = 0, which means the repulsive force field is invalid in the algorithm, and the feasible path is difficult to be found within the limited time due to failures of collision detection.
+
+5. Application scenario
+5.1. Actual simulation description
+In the actual welding shop, the work environment setting is shown in Fig. 1. The standard position of each workpiece should be calibrated before scanning to unify coordinate systems with the robot and environment coordinate system, and then scanning and updating the workpiece position to the simulated environment in real-time. To test the effectiveness of the proposed method on the actual welding tasks, three workpieces displayed in Fig. 12 are applied to the practical path planning problem, which requires the algorithm to search for feasible welding transition paths for the predefined robot within a limited time. According to the figure, it can be seen that both workpiece 1 and workpiece 3 have four welding seams, and workpiece 2 only needs two welding seams to operate. Two different scenarios are presented in this part, where the workpiece 1 and 3 are calculated at the ideal rotation angles while the rotation information of workpiece 2 is obtained based on the infrared laser scanning.
+To enhance the search efficiency for feasible paths and reduce the collision in the motion of the arc welding robot, the rule of gun lifting is applied in the actual welding scenarios. And the height of the workpiece lifting gun with specific distances is also different, where workpieces 1 and 3 lift 50 mm and workpiece 2 lifts 200 mm. Robot motion commands in the actual welding process usually contain MoveL and MoveJ. MoveL indicates the TCP of the robot moving in a straight line from one point to another corresponds to the path planning in Cartesian space, and MoveJ refers to the trajectory formed by the interpolation of joints in a path that plans paths in configuration space. The experiment is implemented in a single robot path planning system, where the results are obtained by averaging the results for 10 times run. The sampling method is developed by both the improved sampling method around the obstacle space and uniform sampling on the remaining workspace,
+
+12
+
+X. Zhou et al.
+
+Table 6 The simulation results of the welding robot path planning for each workpiece.
+
+Workpiece
+
+Rotation (x, y, z)
+
+Rotation matrix
+
+1 ⎡0⎤ ⎡ ⎤
+
+⎣0⎦
+
+⎢ 0.866 − 0.5 0 1000 ⎥
+
+⎢
+
+⎥
+
+30
+
+⎢ ⎢
+
+0.5
+
+0.866
+
+0
+
+−
+
+300
+
+⎥ ⎥
+
+⎢
+
+⎥
+
+⎢ ⎢
+
+00
+
+1
+
+0
+
+⎥ ⎥
+
+⎣
+
+⎦
+
+00
+
+01
+
+2 ⎡ − 0.012 ⎤ ⎡ ⎤
+
+⎣ − 0.121 ⎦
+
+⎢ 0.956 0.292 − 0.002 218.243 ⎥
+
+⎢
+
+⎥
+
+− 16.985
+
+⎢ ⎢
+
+−
+
+0.292
+
+0.956
+
+0.001
+
+331.092
+
+⎥ ⎥
+
+⎢
+
+⎥
+
+⎢ ⎢
+
+0.002
+
+0
+
+1 2.375
+
+⎥ ⎥
+
+⎣
+
+⎦
+
+00
+
+01
+
+3 ⎡0⎤ ⎡ ⎤
+
+⎣0⎦
+
+⎢ 0.940 0.342 0 1000 ⎥
+
+⎢
+
+⎥
+
+− 20
+
+⎢ ⎢
+
+−
+
+0.342
+
+0.940
+
+0
+
+−
+
+300
+
+⎥ ⎥
+
+⎢
+
+⎥
+
+⎢ ⎢
+
+00
+
+1
+
+79
+
+⎥ ⎥
+
+⎣
+
+⎦
+
+00
+
+01
+
+Robotics and Computer-Integrated Manufacturing 78 (2022) 102413
+
+Mean Time (s)
+10.463 (1.926)
+
+Path length (mm)
+Mean (Var)
+3.990e+4 (1.981e+7)
+
+Min 3.135e+4
+
+18.554 (85.338)
+
+7.294e+3 (1.459e+4)
+
+7.142e+3
+
+26.135 (271.278)
+
+2.621e+4 (4.217e+06)
+
+2.273e+4
+
+Fig. 13. The detailed trajectory for the arc welding robot on specific workpieces with/without the workpiece.
+
+where both the improved sampling method and the uniform sampling method require 500 sampling points. The repulsive force level is set as 2 since the grid approach has extended the obstacle space, and the penalty parameter of the cost function is μ = 5. The other parameter settings are the same as that of the simulated experiments.
+5.2. Experiment results
+The experiment results are obtained and displayed in table 6, which
+
+gives different rotation angles and offsets of each workpiece. Each workpiece takes less than one minute to find the feasible path, which is quite efficient for the online path planning system. The complete trajectories obtained from Matlab for each workpiece are displayed in Fig. 13, where the robot end-effector is located at the terminal of the last welding seam. The first-row subgraphs show the trajectory of the welding robot in the complete environment, and the subgraphs on the second row remove workpieces to make the trajectory clearer. When the welding robot moves along the welding seams or during the gun lifting
+
+13
+
+X. Zhou et al.
+
+Table 7 The welding transition path solutions of the workpiece 2.
+
+Wp
+
+x(mm)
+
+y(mm)
+
+WPtrans1 WPtrans2 WP1 WP2 WPtrans3 WPtrans4 WPtrans5 WP3 WP4 WPtrans6
+
+620.527 945.040 945.027 1518.876 1518.872 1303.301 1004.072 1004.057 1088.775 1088.767
+
+− 47.193 − 352.584 − 352.591 − 527.835 − 527.836 − 823.322 − 809.779 − 809.776 − 532.415 − 532.416
+
+z(mm)
+906.359 354.596 104.595 105.863 355.859 508.074 355.078 105.072 105.024 355.013
+
+Robotics and Computer-Integrated Manufacturing 78 (2022) 102413
+
+w∘
+2.021 − 45.012 − 45.012 − 45.011 − 45.012 72.255 − 45.012 − 45.011 − 45.012 − 45.012
+
+p∘
+39.812 − 0.121 − 0.121 − 0.121 − 0.121 48.151 − 0.121 − 0.120 − 0.121 − 0.120
+
+r∘
+13.891 − 16.975 − 16.975 − 16.965 − 16.964 16.153 72.915 72.915 72.815 72.815
+
+e1(mm)
+0 − 352.588 − 352.588 − 527.848 − 527.848 − 823.314 − 809.775 − 809.775 − 532.419 − 532.419
+
+Fig. 14. The trajectory of the welding robot on the actual workpiece shown in ROBOGUIDE.
+
+Fig. 15. The practical welding process on workpiece 2.
+process, the robot trajectory is obtained based on the interpolating points in Cartesian space, which follow the robot motion command MoveL. And other arc trajectories are operated by MoveJ, which is obtained from the interpolating points in the configuration space.
+As for the scenario with practically measured rotations by infrared laser scanning, the rotation angles and offset values are not ideal according to the actual installation and measurement errors. The best results on workpiece 2 obtained from the proposed algorithm are shown in table 7 with detailed point information. In table 7, the welding path WP represents two different types of transition points WPtrans and welding
+
+points WPi, and e1 shows the distance traveled by the external axis. Furthermore, the best result obtained from the simulation was verified on both the ROBOGUIDE software and the actual welding process, which are shown in Fig. 14 and Fig. 15, respectively. In Fig. 14, all the transition points in the path are marked as P[i] . The trajectory is exhibited with two different colors, where the green lines represent the trajectory is executed using the MoveL operation and the sky-blue curve shows the MoveJ operation. The green parameters and blue lines with percentage parameters define the robot’s speed during the specific path.
+To sum up, the scenarios were successfully solved by the proposed method within an acceptable amount of time, and the planned path is verified to be collision-free and smooth on both the robot software and the actual welding process. Compared with the path obtained from manual teaching, the proposed algorithm is more flexible to cope with the workpiece placed in various positions and evaluates the reachability of the welding robot to the workpiece at the current position. It is more efficient to find the shortest possible paths accurately according to the robot motion constraints and obstacle constraints.
+6. Conclusion and future work
+To plan a collision-free path for a high-DOF welding robot efficiently, the improved lazy-PRM method is proposed in this paper to solve the online collision-free path planning problem for the arc welding robot. The proposed approach consists of three main stages. In the offline preparation stage, the work environment is constructed by the grid method, which greatly reduces the computing consumption in a higher dimensional environment. And the improved sampling strategy expanded the space for connecting routes when building roadmaps,
+
+14
+
+X. Zhou et al.
+which improved the probability of finding feasible paths. The online adjustment stage aims to map the actual situation to the simulated environment, including the coordinate system unification between the welding robot, workbench and workpieces. And the purpose of the query stage is to search for the shortest collision-free paths over a shorter period of time, which requires fewer collision detection times and safer distances between the robot and obstacles. In this case, the repulsive force field is applied to the algorithm with the improved cost function that contains the information on safe distances and is combined with the lazy-PRM strategy to achieve the goals of online planning. From the theoretical perspective, the work proposes an automatic process of the online path planning problem for the arc welding robot. The proposed method proves its effective and superior performance on several tests from the simulated environment and the actual welding process. It also could replace manual teaching and give guidance for automatic welding tasks.
+Future work will concern more with improving the welding production efficiency of the actual welding process. On the one hand, the welding sequence optimization should be improved with algorithms rather than manual definition if the welding seams in a workpiece become abundant and complex. And it is worth studying the welding sequence planning when multiple workpieces are placed on the workbench simultaneously since the current approach mainly considers the welding of a single workpiece. On the other hand, the reachable space of a single robot is not enough to cover the entire workbench sometimes, which may need two or more robots to finish the welding process. In this case, the cooperative path planning problem for the welding robot also has potential for future research.
+CRediT authorship contribution statement
+Xin Zhou: Conceptualization, Methodology, Software, Formal analysis, Writing – original draft, Writing – review & editing. Xuewu Wang: Conceptualization, Funding acquisition, Supervision, Project administration, Writing – review & editing. Zuhong Xie: Methodology, Software, Resources, Investigation, Visualization. Fang Li: Resources, Investigation, Project administration, Supervision. Xingsheng Gu: Conceptualization, Funding acquisition, Supervision.
+Declaration of Competing Interest
+The authors declare that we do not have any commercial or associative interest that represents a conflict of interest in connection with the work submitted.
+Acknowledgement
+This work was supported by the National Natural Science Foundation of China (61973120, 62076095), and Fundamental Research Funds for the Central Universities, 222201917006.
+Supplementary materials
+Supplementary material associated with this article can be found, in the online version, at doi:10.1016/j.rcim.2022.102413.
+References
+[1] W. Gao, Q. Tang, J. Yao, Y. Yang, Automatic motion planning for complex welding problems by considering angular redundancy, Robotics Comput. Integr. Manuf. 62 (2020), 101862, https://doi.org/10.1016/j.rcim.2019.101862.
+
+Robotics and Computer-Integrated Manufacturing 78 (2022) 102413
+[2] J. Kim, E. Croft, Online near time-optimal trajectory planning for industrial robots, Robotics Comput. Integr. Manuf. 58 (2019) 158–171, https://doi.org/10.1016/J. RCIM. 2019.02.009.
+[3] Y. Liu, Y. Jiang, Robotic Path Planning Based on a Triangular Mesh Map, Int. J. Control Autom. Syst. 18 (2020) 2658–2666, https://doi.org/10.1007/s12555-0190396-z.
+[4] J. Gao, W. Ye, J. Guo, Z. Li, Deep reinforcement learning for indoor mobile robot path planning, Sensors 20 (2020) 5493, https://doi.org/10.3390/s20195493.
+[5] A. Hoyos, Ubaldo Ruiz, E. Cha´vez, Eric Sadit Tellez, Self-indexed motion planning, Inf. Syst. 87 (2020), 101399, https://doi.org/10.1016/J.IS.2019.04.011.
+[6] W. Khaksar, T.S. Hong, Mansoor Khaksar, O. Motlagh, A low dispersion probabilistic roadmaps (LD-PRM) algorithm for fast and efficient sampling-based motion planning, Int. J. Adv. Rob. Syst. 10 (2013), https://doi.org/10.5772/ 56973.
+[7] R. Mashayekhi, M. Idris, M. Anisi, I. Ahmedy, Ihsan Ali, Informed RRT*-connect: an asymptotically optimal single-query path planning method, IEEE Access 8 (2020) 19842–19852, https://doi.org/10.1109/ACCESS.2020.2969316.
+[8] Y. Li, W. Wu, Y. Gao, D. Wang, Z Fan, PQ-RRT*: an improved path planning algorithm for mobile robots, Expert Syst. Appl. 152 (2020), 113425, https://doi. org/10.1016/j.eswa.2020.113425.
+[9] X. Wang, J. Wei, X. Zhou, Z. Xia, X. Gu, Dual-objective collision-free path optimization of arc welding robot, IEEE Rob. Automat. Lett. 6 (2021) 6353–6360, https://doi.org/10.1109/LRA.2021.3092267.
+[10] L. Janson, E. Schmerling, Ashley A. Clark, M. Pavone, Fast marching tree: a fast marching sampling-based method for optimal motion planning in many dimensions, Int. J. Rob. Res. 34 (2015) 883–921, https://doi.org/10.1177/ 0278364915577958.
+[11] J. Xia, Z. Jiang, Z. Hao, Z. Rongjun, T. Haibo, Dual fast marching tree algorithm for human-like motion planning of anthropomorphic arms with task constraints, Ieee/ Asme Trans. Mechatronics 26 (2021) 2803–2813, https://doi.org/10.1109/ TMECH.2020.3047476.
+[12] J. Gammell, T. Barfoot, S. Srinivasa, Batch informed trees (BIT*): informed asymptotically optimal anytime search, Int. J. Rob. Res. 39 (2020) 543–567, https://doi.org/10.1177/0278364919890396.
+[13] J. Ma, Y. Liu, S. Zang, L. Wang, Robot path planning based on genetic algorithm fused with continuous bezier optimization, Comput. Intell. Neurosci. (2020), 9813040, https://doi.org/10.1155/2020/9813040.
+[14] Y. Li, Z. Huang, Y. Xie, Research status of mobile robot path planning based on genetic algorithm, J. Phys. Conf. Ser. 1544 (2020), 012021, https://doi.org/ 10.1088/1742-6596/1544/1/012021.
+[15] Q. Luo, H. Wang, Y. Zheng, J. He, Research on path planning of mobile robot based on improved ant colony algorithm, Neural Comput. Appl. 32 (2019) 1555–1566, https://doi.org/10.1007/s00521-019-04172-2.
+[16] B. Song, Z. Wang, L. Zou, An improved PSO algorithm for smooth path planning of mobile robots using continuous high-degree Bezier curve, Appl. Soft Comput. 100 (2021), 106960, https://doi.org/10.1016/j.asoc.2020.106960.
+[17] Y. Xie, R. Zhou, Y. Yang, Improved distorted configuration space path planning and its application to robot manipulators, Sensors 20 (2020) 6060, https://doi.org/ 10.3390/s20216060.
+[18] G. Chen, N. Luo, D. Liu, Z. Zhao, C. Liang, Path planning for manipulators based on an improved probabilistic roadmap method, Robotics Comput. Integr. Manuf. 72 (2021), 102196, https://doi.org/10.1016/J.RCIM.2021.102196.
+[19] W. Gao, Q. Tang, J. Yao, Y. Yang, Automatic motion planning for complex welding problems by considering angular redundancy, Robotics Comput. Integr. Manuf. 62 (2020), 101862, https://doi.org/10.1016/j.rcim.2019.101862, 101862-.
+[20] J. Xu, Z. Liu, C. Yang, L. Li, Y. Pei, A pseudo-distance algorithm for collision detection of manipulators using convex-plane-polygons-based representation, Robotics Comput. Integr. Manuf. 66 (2020), 101993, https://doi.org/10.1016/j. rcim.2020.101993.
+[21] B. Zi, J. Lin, S. Qian, Localization, obstacle avoidance planning and control of a cooperative cable parallel robot for multiple mobile cranes, Robotics Comput. Integr. Manuf. 34 (2015) 105–123, https://doi.org/10.1016/J.RCIM.2014.11.005.
+[22] G. Chen, D. Liu, Y. Wang, Q. Jia, X. Zhang, Path planning method with obstacle avoidance for manipulators in dynamic environment, Int. J. Adv. Rob. Syst. 15 (2018), https://doi.org/10.1177/1729881418820223.
+[23] Z. Xu, X. Zhou, H. Wu, X. Li, S. Li, Motion Planning of Manipulators for simultaneous obstacle avoidance and target tracking: an RNN approach with guaranteed performance, IEEE Trans. Ind. Electron. (2021) 1, https://doi.org/ 10.1109/TIE.2021.3073305. -1.
+[24] Jeevan Raajan, P. Srihari, Jayadev P. Satya, B. Bhikkaji, R. Pasumarthy. Real Time Path Planning of Robot using Deep Reinforcement Learning. IFAC-PapersOnLine. 53(2020): 15602–15607. 10.1016/J.IFACOL.2020.12.2494.
+[25] Tudor B. Ionescu, Adaptive simplex architecture for safe, real-time robot path planning, Sensors 21 (2021) 2589, https://doi.org/10.3390/s21082589.
+[26] M. Moussa, G. Beltrame, Real-time path planning with virtual magnetic fields, IEEE Robotics Automat. Lett. 6 (2021) 3279–3286, https://doi.org/10.1109/LRA. 2021.3063992.
+[27] X. Zhou, X. Wang, Xingsheng Gu. A decomposition-based multiobjective evolutionary algorithm with weight vector adaptation. Swarm and Evolutionary Computation. 61(2020):100825. 10.1016/j.swevo.2020.100825.
+
+15
+
+X. Zhou et al.
+[28] X. Wang, Z. Xia, X. Zhou, Y. Guo, X. Gu, H. Yan, Multiobjective path optimization for arc welding robot based on DMOEA/D-ET algorithm and proxy model, IEEE Trans. Instrum. Meas. 70 (2021) 1–13, https://doi.org/10.1109/ TIM.2021.3063190.
+[29] M. Zhao, H. Lu, S. Yang, Y. Guo, F. Guo, A fast robot path planning algorithm based on bidirectional associative learning, Comput. Indus. Eng. 155 (2021), 107173, https://doi.org/10.1016/J.CIE.2021.107173.
+[30] M. Faroni, M. Beschi, C. Guarino Lo Bianco, A. Visioli, Predictive joint trajectory scaling for manipulators with kinodynamic constraints, Control Eng. Pract. 95 (2020), 104264, https://doi.org/10.1016/j.conengprac.2019.104264.
+[31] B. Lu, H. Cao, Y. Hao, J. Lin, Y. Fang, Online antiswing trajectory planning for a practical rubber tire container gantry crane, IEEE Trans. Ind. Electron. (2021) 1, https://doi.org/10.1109/TIE.2021.3088356, 1-.
+
+Robotics and Computer-Integrated Manufacturing 78 (2022) 102413
+[32] R. Bohlin, L.E. Kavraki, Path planning using lazy PRM, in: Proceedings of the 2000 ICRA. Millennium Conference. IEEE International Conference on Robotics and Automation. Symposia Proceedings (Cat. No.00CH37065) 1, 2000, pp. 521–528, https://doi.org/10.1109/ROBOT.2000.844107.
+[33] Lucas Janson, Brian Ichter, M. Pavone, Deterministic sampling-based motion planning: optimality, complexity, and performance, Int. J. Rob. Res. 37 (2018) 46–61, https://doi.org/10.1177/0278364917714338.
+[34] S. LaValle, Rapidly-exploring random trees: progress and prospects, Algorithmic and Computational Robotics: New Directions (2000), https://doi.org/10.1201/ 9781439864135-43.
+
+16
+
+

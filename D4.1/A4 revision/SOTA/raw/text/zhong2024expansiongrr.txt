@@ -1,0 +1,404 @@
+Accepted for publication in IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), October 2024
+
+arXiv:2405.13770v2 [cs.RO] 3 Sep 2024
+
+Expansion-GRR: Efficient Generation of Smooth Global Redundancy Resolution Roadmaps
+Zhuoyun Zhong, Zhi Li, and Constantinos Chamzas
+
+Abstract— Global redundancy resolution (GRR) roadmap is a novel concept in robotics that facilitates the mapping from task space paths to configuration space paths in a legible, predictable, and repeatable way. Such roadmaps could find widespread utility in applications such as safe teleoperation, consistent path planning, and motion primitives generation. However, previous methods to compute GRR roadmaps often necessitate a lengthy computation time and produce non-smooth paths, limiting their practical efficacy. To address this challenge, we introduce a novel method EXPANSION-GRR that leverages efficient configuration space projections and enables a rapid generation of smooth roadmaps that satisfy the task constraints. Additionally, we propose a simple multi-seed strategy that further enhances the final quality. We conducted experiments in simulation with a 5-link planar manipulator and a Kinova arm. We were able to generate the GRR roadmaps up to 2 orders of magnitude faster while achieving higher smoothness. We also demonstrate the utility of the GRR roadmaps in teleoperation tasks where our method outperformed prior methods and reactive IK solvers in terms of success rate and solution quality.
+I. INTRODUCTION
+A robot is considered kinematically redundant for a specific task if it has more degrees of freedom (DOF) than those strictly required by the task [1]. As demonstrated in Fig. 1, the 7-DOF Kinova robotic arm is asked to reach a target object with a specific end-effector pose. Given its redundancy, the robot can accomplish this task through multiple or potentially infinite configurations. In general, the challenge of redundancy resolution is determining which among the many configurations to select as the most appropriate for the task at hand.
+In this work, we focus on the problem of global redundancy resolution (GRR) for end-effector paths [2]. This resolution enables a useful consistency property such that after any cyclic paths, it will always lead the robot back to the same configuration. For example, as shown in Fig. 2, upon executing a closed ellipse path, the global method will always lead the robot back to the original configuration while the non-global method may take the robot to another one. This feature ensures the robot’s motion is always repeatable and more predictable during execution.
+GRR roadmaps can potentially serve various purposes in robotics, including streamlining repeatable tasks and motion primitives generation. Moreover, a primary application lies in teleoperation interfaces for humans. A common strategy of teleoperation is to allow operators to issue motion commands directly to the end effector space, while the teleoperation
+All authors are affiliated with the Department of Robotics Engineering, Worcester Polytechnic Institute (WPI), Worcester, MA 01609, USA {zzhong3, zli11, cchamzas} @ wpi.edu.
+
+Fig. 1: The Kinova arm is tasked with reaching a 6-DOF pose to pick up an object. For this task, the 7-DOF arm is kinematically redundant and can reach the same object position with multiple configurations.
+(a) Non-global Resolution
+(b) Global Resolution Fig. 2: (a) After a cyclic path, non-global resolution can lead to different ending configurations from the same starting point. (b) Global resolution results in consistent paths, where the robot always returns to the original configuration.
+system translates these commands into actual joint motion. A GRR roadmap can aid such a system more effectively than reactive Inverse Kinematics (IK) solvers, as it can effectively recover from singularities and entrapment of local minima, while exhibiting repeatable and predictable motions.
+However, the computation of such a roadmap poses significant computational challenges. Previously proposed methods often required several hours to days to complete the process [2] and often yield GRR roadmaps with lower smoothness. To tackle this issue, we propose a novel method EXPANSIONGRR that uses an expansion strategy to rapidly connect adjacent nodes through configuration space projections. To ensure continuity, we consider multiple nearest neighbors during expansion. Also, we propose a multi-seed strategy to further enhance roadmap quality.
+Moreover, we introduce a straightforward yet effective approach to demonstrate the practical utility of this roadmap in teleoperation tasks. This method remains applicable even in scenarios where the GRR roadmap lacks full continuity or where users direct the robot to perform actions that might lead
+
+Accepted for publication in IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), October 2024
+
+to illegal maneuvers, such as encountering a self-collision. Through our experiments in simulation, we illustrate that the proposed method not only generates higher-quality roadmaps more efficiently but also outperforms advanced IK solvers in teleoperation tasks, involving robots with up to 7 DOF.
+Specifically, the contributions of this work include 1) the development of a new expansion algorithm for efficiently computing a smooth GRR roadmap, 2) the proposal of a multiseed strategy resulting in higher quality GRR roadmaps, and 3) the establishment of a teleoperation pipeline utilizing the GRR roadmap that surpasses prior methods. The implementation of the proposed algorithm1 is provided as open source.
+II. RELATED WORK
+Redundancy resolution has historically been a core concept in robotics [3]. Its applications span a wide spectrum, including avoidance of singularities [4] and obstacles [5] as well as facilitating teleoperation tasks [6]. Traditionally, redundancy is resolved at the velocity level [7] or the torque level [3] through the utilization of projection operators. However, our work focuses on redundancy resolution at the position level [2], [8] where we compute a direct mapping from task-space point to robot configurations.
+A commonly used strategy for addressing redundancy at the local position level is IK solvers. Examples include simple Jacobian-based IK solvers such as the Newton-Rapson method or more recent IK-solvers, such as Relaxed-IK [9] and Ranged IK [10], which incorporate more complicated constraints including self-collisions and singularity avoidance. These IK solvers exhibit high-speed performance, often processing at several iterations per second. However, they may get trapped in singularity or local minima during teleoperation and generate suboptimal solutions due to their lack of foresight and local problem-solving approaches.
+Another category of methods that resolve redundancy at the position level while often avoiding the local minima is singlequery planning methods [11]. Several planning methods that also incorporate task-space constraints [12] have been proposed, with a commonly used constrained sampling-based motion planning framework [13]. Nonetheless, the produced motions are often not repeatable as shown in Fig. 2a. To address this challenge, [14], [15] focus on producing cyclic repeatable paths that start and end at the same configuration. However, these methods are tailored towards producing a single repeatable path, while in this work, we aim to resolve all possible task-satisfying paths simultaneously.
+Roadmap-based methods, e.g., probabilistic roadmaps (PRM) [16], compute an approximation of the connectivity of the configuration space through random sampling. Given a start and goal configuration, the roadmap can be queried with graph search, and retrieve a collision-free path. Our work also computes a roadmap but is tailored towards producing paths that additionally satisfy task constraints and the paths are smooth both in task space and configuration space. The work that is most similar to ours is [2], which formulated the global
+1https://github.com/elpis-lab/Expansion-GRR
+
+redundancy resolution problem, and proposed an algorithm to compute a GRR roadmap. In this work, we propose a new algorithm that generates the GRR roadmaps more efficiently and produces smoother paths. We also demonstrate how it can be used for real-time motion planning as in teleoperation.
+Teleoperation is still a critical control mode of robotics, especially in safety-critical applications like surgery. There are many different teleoperating modes and interfaces depending on the application [17]. A common teleoperation interface is for humans to give commands in their natural 6-DOF taskspace, which then has to be retargeted, to a kinematically different (and often redundant) robot [18]. To compute the retargeting, a common strategy is to use reactive IK-solvers [9], [10] and convert cartesian commands directly to the robot’s configuration space. In this work, we showcase the utility of the computed GRR roadmap in teleoperation tasks, outperforming reactive-IK solvers, in terms of success rate and solution quality.
+III. NOTATIONS AND PROBLEM STATEMENT
+A. Definitions And Notations
+The general redundancy resolution problem aims to find a map M from the robot’s Task Space (T -space) to its Configuration Space (C-space). T -space represents the domain in which the robot performs its tasks, typically R3 or SE(3), while C-space contains all potential configurations available to the robot. We will denote the elements of T -space as p ∈ T and the elements of C-space as q ∈ C. Redundancy indicates that the dimension of C-space is higher than that of T -space, i.e., dim(C) > dim(T ).
+1) Local Redundancy Resolution: A map M is a local redundancy resolution if it is a transformation from p ∈ T to q ∈ C such that FK(q) = p, where FK is the forward kinematics function. For example, IK solvers are local resolutions at the point-wise level, and single-query planning methods are local resolutions at the path level.
+2) Global Redundancy Resolution: A map M is defined as global redundancy resolution if it satisfies the FK(q) = p constraint and additionally is an injective, continuous and smooth2 function F : T → C. The injectivity property ensures that each point in T -space is uniquely associated with a single configuration in C-space, maintaining the consistency of the result. Continuity and smoothness guarantee that a small change in T -space does not lead to discontinuous or large changes in C-space, resulting in continuous and smooth robotic motions.
+B. Approximate Global Redundancy Resolution
+Given that finding an analytical form for F is intractable, the proposed method focuses instead on computing an approximation [2]. An illustrative example is shown in Fig. 3 for the same 3-link planar manipulator of Fig. 2 that operates in R2.
+We first approximate T -space with a discrete roadmap graph Gp = (Vp, Ep). For the 3-link manipulator example, Gp
+2Technically, smoothness implies continuity, but since we measure them separately, we mention them both here.
+
+Accepted for publication in IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), October 2024
+
+y
+p3
+
+Joint3 q1
+
+p1 p2
+x
+.
+(a) T -space Roadmap Gp
+
+q3
+
+q2
+
+p3 p2 p1
+
+Joint1 (b) C-space Roadmap Gq
+
+Joint2
+
+Fig. 3: An illustration of the roadmaps Gp and Gq. (a) The points p1, p2,
+and p3 are neighboring samples in T -space, in this case, the end-effector position in R2. (b) The solid lines indicate SMM of T -space points. A roadmap Gq must select a single configuration qi from each manifold, and additionally, ensure that the configurations, q1, q2 and q3 of adjacent points,
+are ”close enough” to pertain continuity and smooth transition in C-space.
+
+y
+
+Joint3
+
+pj pm pi Pp
+(a) Path in T -space
+
+qi Lq
+Pq
+x . Joint1
+
+qm qbisect
+(b) Path in C-space
+
+qj pm
+Joint2
+
+Fig. 4: An illustration of the continuity constraint. (a) The robot’s end-
+effector follows a straight path Pp from pi to its adjacent point pj in T -space (green). (b) The robot’s corresponding configuration path Pq from qi to qj in C-space (green) can be computed by projecting the intermediate configurations to their corresponding SMM in a bisection manner. Ideally, Pq should stay ”close” to the straight line Lq delineated by qi and qj (black).
+
+is shown in Fig. 3a, with the T -space points p1, p2, p3 ∈ Vp as nodes and corresponding edges shown as dashed lines. In Fig. 3b, the solid lines indicate the set of configurations q that satisfy the constraints FK(q) = p induced by p1, p2, and p3, also known as the self-motion manifolds (SMM) [19]. To compute an approximation for F, we need to build the corresponding C-space roadmap Gq that satisfies the GRR properties:
+1) Injectivity: For each T -space vertex pi ∈ Vp, there is only a single corresponding C-space vertex qi ∈ Vq, i.e, choosing a single configuration q from each self-motion manifold (as shown in Fig. 3b).
+2) Continuity: For each T -space edge (pi, pj) ∈ Ep, the configurations of the matching C-space edge (qi, qj) ∈ Eq satisfy the continuity constraint, formally defined in Sec. IV-A and shown in Fig. 4.
+3) Smoothness: Minimize the length ratio of C-space edges (pi, pj) ∈ Ep to T -space edges (qi, qj) ∈ Eq.
+Concretely, the problem we are concerned with is: Given a graph Gp, compute a graph Gq that maximally satisfies 1), 2), and 3) while minimizing total computational time.
+IV. METHODOLOGY
+The main idea of the proposed method is to efficiently build the roadmap Gq by expanding from the selected initial configuration seeds. Again, for illustrative purposes, we will employ a 3-link planar manipulator operating in R2 task space (similar to that depicted in Fig. 2)
+A. Continuity Constraint
+To find a configuration q on the self-motion manifold that satisfies the constraint imposed by a point p, i.e., FK(q) = p, a common method employed is projection in C-space [8], [20]. Starting with a given initial guess qguess, an optimizer iteratively moves it closer to the desired self-motion manifold until a configuration q within tolerance is found. In this paper, as our projection operator, we use the Newton-Raphson IK, which is a Jacobian pseudo-inverse projection. Also, to ensure the returned configuration is valid a self-collision check is performed. We denote this function as Projection(p, qquess).
+Continuity ensures that a small variation in T -space does not lead to a discontinuous motion in C-space. To achieve this,
+
+we enforce a motion constraint similar to [21]. An illustration with the 3-link planar manipulator is provided in Fig. 4. Let us assume we want to move the end effector from point pi to its adjacent point pj in a straight line Pp in T -space. The motion constraint ensures that the corresponding configuration path Pq will not deviate significantly from the straight line Lq delineated by qi and qj in C-space.
+Fig. 4 illustrates visually how to perform this check. We project the bisected configuration qbisect to the self-motion manifold of the middle point pm and acquire the intermediate configuration qm. To pass the continuity check, the deviation between qm and qbisect, should be within a threshold. As shown in Alg. 1 this process is repeated recursively to ensure the continuity check passes up to an ϵ resolution.
+Algorithm 1: IsContinuous(pi, pj, qi, qj)
+/* Check threshold */
+1 if Dq(qi, qj) < ϵ then 2 return true;
+/* Bisect in T -space and C-space */
+3 pm ← BisectP(pi, pj); 4 qbisect ← BisectQ(qi, qj ); 5 qm ← Projection(pm, qbisect);
+/* Check deviation */
+6 if Max(Dq(qi, qm), Dq(qm, qj)) > c · Dq(qi, qj) then 7 return f alse;
+/* Run recursively */
+8 if IsContinuous(pi, pm, qi, qm) 9 and IsContinuous(pm, pj, qm, qj) then 10 return true;
+11 return f alse;
+In Alg. 1, BisectP finds the center of two T -space points, and BisectQ finds the center of two C-space configurations. The parameter c > 0.5, regulates the maximum deviation. The value ϵ is the minimal threshold to stop the visibility checking process. In this paper, we choose c and ϵ based on the dimension of the C-space, i.e., c = 0.5 (dim(C)), and ϵ = 0.05 (dim(C)). These values are chosen as reasonable default values that scale with the dimension of the C-space.
+
+Accepted for publication in IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), October 2024
+
+y
+p3 p1 p p2
+
+Joint3 q1
+qavg q3 q q 2
+p
+
+x
+.
+(a) T -space Roadmap Gp
+
+Joint1 (b) C-space Roadmap Gq
+
+Joint2
+
+Fig. 5: An illustration of projecting from multiple neighbors. (a) The points
+p1, p2, and p3 are neighboring points of p in T -space. (b) The solid lines indicate the self-motion manifold of p. A weighted average qavg is computed with neighbors’ corresponding configurations q1, q2, and q3 in C-space. It is then projected onto the self-motion manifold to find q.
+
+B. Projection From Multiple Neighbors
+
+Now we describe the proposed method for adding new configurations in an existing Gq roadmap, also illustrated with an example in Fig. 5.
+One strategy is to choose a configuration from a T space neighbor of p e.g., q3, and project it to get q, i.e, q = Projection(p, q3). However, since point p has multiple neighbors, projecting from a single one will create a bias towards this neighbor. For example, Projection(p, q3) could result in a configuration that is far from q1 and q2, resulting in discontinuities. Instead, we adopt a more general strategy of computing a weighted average configuration qavg in C-space from all neighboring configurations q1, q2, and q3 as shown in Fig. 5. By aggregating neighboring configurations, the resulting q derived from Projection(p, qavg) has a higher chance of being similar to all its neighbors. This similarity feature aids in improving overall smoothness and continuity.
+We now explain this process more formally, with the pseudo-code in Alg. 2. First, we denote a function that returns the k nearest neighbors neighbors of point p in the T -space graph Gp, as NearestNeighbors(p, k, Gp). We also define the T -space distance metric Dp adapted from [22] as:
+
+p8
+
+p8
+
+p4 q8 q4
+
+p2 q2
+
+p4 q8 q4
+
+p2 q2
+
+p6 q1 p1 p6 q q 6 1 p1
+
+q5
+
+q3
+
+p5 q7 p3
+
+p7
+
+(a) Starting with One Seed
+
+q5 p5
+
+q3 q7 p3
+p7
+
+(b) Starting with Multiple Seeds
+
+Fig. 6: (a) From an initial seed q1 (green), q2, q8 to q4 are sequentially generated (purple), and q3, q7 to q5 are also sequentially generated (blue). For q6, however, expanding from either side will lead to a configuration that is not continuous to the other. (b) Starting from seeds q1, q7, q8 and q6 (green), deriving from an initial cyclic path, we could achieve a fully connected T -space roadmap with all “elbow-down” configurations (purple).
+
+Algorithm 2: ProjectNeighbors(p, Gp, Gq)
+
+/* Collect qs and ds from neighbors */
+
+1 neighbors ← NearestNeighbors(pi, k, Gp);
+
+2 qs ← Empty configuration list;
+
+3 ds ← Empty distance list;
+
+4 foreach j ∈ neighbors do
+
+5 if qj is in Gq then
+
+6
+
+qs.append(qj );
+
+7
+
+ds.append(Dp(p, pj));
+
+/* Compute weights */
+8 ws ← Weight list with the same size as qs; 9 foreach j ∈ neighbors do 10 wi ← (Max(ds)/di)2
+11 Normalize(ws);
+/* Compute and project from qavg */
+12 qavg ← WeightedAverage(qs, ws); 13 return Projection(p, qavg);
+
+Dp(pi, pj ) = wt · DR3 (ti, tj ) + wo · DSO(3)(oi, oj ), where
+
+DR3 (ti, tj ) = ∥ti − tj ∥
+
+(1)
+
+DSO(3)(oi, oj ) = 1 − |oi · oj |
+
+and t, o denote the translation and orientation (represented by a quaternion) component of a T -space point. ∥ti − tj∥ is the standard Euclidean norm and |oi · oj| is the absolute value of the inner product, while wt and wo are chosen weights to scale the distances. In this paper, we set wt = 1 and wo = 0.3. If T = R3, we set wo = 0.
+After locating the neighbors of a point p, we collect a list of configurations qs from them. Their corresponding weights ws are determined based on their T -space distances ds and
+scale towards the closer neighbors. Lastly, we compute the weighted average configuration qavg and project it to find q.
+C. Seeding Strategy
+
+The techniques discussed in the previous sections can be used to expand the roadmap Gq by incrementally adding new nodes. However, the choice of the initial configuration(s) that the roadmap is seeded with, also has a significant impact
+
+on the final result. A simple seeding strategy would be to initialize Gq with a random configuration and expand from there. Yet, this simple seeding method is prone to create discontinuities in C-space. Fig. 6a illustrates an example with the simple 3-link manipulator. Starting from an initial seed q1 such that FK(q1) = p1, one set of generated configurations are “elbow-down” configurations (blue), while the other set is “elbow up” (purple). This results in a discontinuity at the p6 task point, since no configuration (either purple or blue) will satisfy the continuity constraint of both sides.
+Ideally, the seeds should be situated within C-space to minimize the probability of encountering discontinuities. To this aim, we propose an alternative multi-seeding strategy, as depicted in Fig. 6b. Given that the final roadmap must encompass all potential cyclic paths, we propose to initialize the roadmap with configurations from a continuous cyclic path, shown as the green configurations in Fig. 6b. While there exist algorithmic approaches to generating cyclic paths [14], [15], we opted to manually create one per robot, since only a single cyclic path is required for our purposes.
+
+Accepted for publication in IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), October 2024
+
+D. Global Expansion
+In this section, we describe how we can use the tools mentioned in the previous sections to build the C-space roadmap Gq = (Vq, Eq). We start by discretizing T space and generating the T -space roadmap Gp = (Vp, Ep). Although several choices exist, in this paper we use grid discretization. Given the selected initial configurations qsinit and roadmap Gp, Alg. 3 describes, how we incrementally expand the roadmap in C-space by projection from nearest neighbors in a Breadth First Search (BFS) manner.
+First, we initialize the C-space roadmap Gq, a queue Q, and the visited set V with qsinit (line 1-line 3). Similar to BFS, it iteratively dequeues an index i from Q and explores its k nearest neighbors in the T -space (line 4-line 11). For each point pi that does not have a corresponding configuration, it uses Alg. 2 to project the weighted average configuration and find the solution qi for the point pi (line 12). Finally, it runs IsContinuous(Alg. 1) checks with all neighbors to verify continuity, and the results will be used to update Gq (line 13-line 14).
+
+Algorithm 3: GlobalExpansion(Gp, qsinit)
+
+/* Initialize */
+
+1 Initialize C − space roadmap Gq with qsinit;
+
+2 Q ← A queue with each i ∈ qsinit;
+
+3 V ← A set with each i ∈ qsinit;
+
+4 while Q̸ = ∅ do
+
+/* Expand in BFS order */
+
+5 i ← Q.dequeue();
+
+6 foreach j ∈ NearestNeighbors(pi, k, Gp) do
+
+7
+
+if j ∈/ V then
+
+8
+
+V.add(j);
+
+9
+
+Q.enqueue(j);
+
+10 if qi is in Gq then
+
+11
+
+continue;
+
+/* Project from neighbors */
+12 qi ← ProjectNeighbors(pi, Gp, Gq);
+/* Continuity check and update */
+13 Run IsContinuous check with each neighbor; 14 Add qi and valid edges into Gq;
+
+E. Utilizing The Roadmap
+Now, we introduce some potential use cases for the computed GRR roadmap.
+1) IK Solver: To use the GRR map as an IK solver, we need to generalize it to the continuous space for all p ∈ T . To this aim, the process described in Alg. 2 can still be employed to find the corresponding configuration q for any given point p. However, the functionality of NearestNeighbor will be different when discontinuous edges are present in the local neighboring subgraph of Gq. The function should only consider neighbors in the largest connected component of the subgraph, ignoring any disconnected neighbors. Another way to view this process is to use the GRR roadmap to get a good qguess, and then use an off-the-shelf IK-solver to project it to the given task-point constraint.
+
+2) T -space Path Planning: To find a path from a starting configuration to a goal configuration, we can directly plan a path in the configuration roadmap Gq. However, if it is desired to have the end-effector follow the edges of the T space roadmap Gp closely, we can instead search and plan a path Pp in roadmap Gp. We then interpolate the points along Pp and for each interpolated waypoint p, we can run ProjectNeighbors to find its corresponding configuration q and build the C-space path Pq. This ensures the end effector will closely follow the edges of Gp. Also, since the interpolation happens along the edges, the configuration path Pq will always be feasible and continuous because the edges have passed the IsContinuous check.
+3) Teleoperation: Given a real-time Cartesian command from a human operator, we can produce the corresponding configuration as described in Sec. IV-E.1. However, since the human input will not necessarily follow the edges of the roadmap, the produced configuration q is not guaranteed to be feasible. It can get into self-collision or a discontinuous region if one exists. In this case, we can leverage the roadmaps and run planning as in Sec. IV-E.2 to detour from these regions.
+We design the teleoperation pipeline as follows. Given the current configuration qc and a new human input pt as the target, we compute the next configuration qt by running ProjectNeighbors. We verify the feasibility of going from qc to qt by testing it with IsContinuous. We execute it if feasible. Otherwise, instead of going towards the human input pt, we change the target from pt to pt’s valid nearest neighbor pn in Gp. Such a change ensures the robot still follows human commands closely without getting into an infeasible zone. Once the human input pt becomes feasible again, we leverage planning as described in Sec. IV-E.2 to plan a path from qc to the new valid target qt and continue tracking human input.
+V. EXPERIMENTS
+We evaluate the performance of our method in two aspects. First, we assess the quality of the GRR roadmap relative to the criteria set in Sec. III. Second, we emulated teleoperation tasks and compared the results obtained from the GRR roadmaps and different IK-solvers. All the experiments were run on a machine with Intel i5-10400 and 16 GB memory.
+A. Roadmap Quality Metrics
+To measure the quality of the resolution roadmap Gq, two metrics are used:
+1) Roadmap Connectivity: A fully connected C-space roadmap Gq may not exist or may be difficult to find, resulting in a discontinuous graph. We quantify this concept of connectivity with the metric:
+C(Gq) = NEq (2) NEp
+where NEq is the size of the C-space edge set Eq, and NEp is the size of the T -space edge set Ep. Thus, a fully connected roadmap U (Gq) = 1 refers to a C-space roadmap that has as many edges as the T -space roadmap.
+
+Accepted for publication in IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), October 2024
+
+Robot
+5-link Manipulator Position
+5-link Manipulator Position & Fixed Rotation
+Kinova Position
+Kinova Position & Fixed Rotation
+
+Dim(C) 5 5 7 7
+
+Dim(T ) 2 3 3 6
+
+TABLE I: Roadmap Quality
+
+Vertices 1,013 1,013 3,299 3,299
+
+Method
+RANDOM-GRR EXPANSION-GRR
+RANDOM-GRR EXPANSION-GRR
+RANDOM-GRR EXPANSION-GRR
+RANDOM-GRR EXPANSION-GRR
+
+Connectivity (%)
+100.00 100.00
+100.00 100.00
+100.00 100.00
+100.00 100.00
+
+Smoothness
+16.853 5.675
+24.528 8.992
+9.223 2.563
+11.205 4.299
+
+Building Time (min)
+2.023 0.095
+1.862 0.150
+22.971 0.201
+72.013 0.196
+
+2) Roadmap Smoothness: Another metric that evaluates the roadmap quality is the smoothness, approximated by the averaged ratio of C-space edge distance to T -space edge distance:
+S(Gq) = 1 Dq(qi, qj) (3) NEq (i,j)∈Eq Dp(pi, pj )
+where NEq is the size of the C-space edge set Eq. Dq and Dp are functions to compute the distance in C-space and T -space.
+B. Roadmap Quality Experiment
+We compare the roadmap connectivity, smoothness, and building time with the GRR method proposed in [2]. Instead of using multi-seeding and projections, [2] builds the GRR map by first randomly sampling numerous C-space configurations at each T -space point. It then connects all the adjacent pairs that pass the continuity test. Eventually, a constraint satisfaction problem (CSP) solver is used to select a single configuration for each point. We refer to this method as RANDOM-GRR. In all experiments, we used 100 random samples per T -space point.
+We tested in simulation two robots, a 5-link planar manipulator (5-DOF), and a Kinova Gen3 arm (7-DOF) with a Robotiq-85 gripper (shown in Fig. 1. The 5-link planar manipulator joints are continuous (have no limits) and selfintersections are allowed. The tested T -space for the planar manipulator are T = R2 and T = SE(2), and the latter incorporates a fixed rotation where the end-effector is always facing right. The Kinova robot was tested with T = R3 and T = SE(3), with the latter incorporating a fixed rotation where the end-effector is consistently facing downwards.
+The results are given in Table I. Both RANDOM-GRR and EXPANSION-GRR can fully resolve the global redundancy. However, EXPANSION-GRR outperforms RANDOM-GRR by building a smoother roadmap up to 2 orders of magnitude faster. We attribute the improved smoothness to the proposed projections which minimize the distances between neighboring configurations. Also, by utilizing multi-seeding and projection, we can avoid the time-consuming steps caused by extensive sampling in random-GRR.
+C. Teleoperation Experiment
+To evaluate the performance of our method in teleoperation, we designed four geometric path tracing tasks, which provide commands to robots in T -space:
+
+• Random Line: A line defined by two random points. • Self-crossing Line: A line as in Random Line, but it
+passes through the robot’s base. • Random Circle: A planar circle defined by a random
+center point, up vector, and radius. • Partially Reachable Circle: A planar circle as in Random
+Circle, but part of it goes beyond the reachable space.
+For each task, 100 paths are randomly generated. Intermediate waypoints are sent sequentially to the solvers at 50 Hz over 4 seconds, i.e. 200 waypoints per path to follow, simulating a human input action.
+To use EXPANSION-GRR and RANDOM-GRR for teleoperation we use the teleoperation pipeline we proposed in Sec. IV-E.3, and compare against Newton-Raphson IK and Relaxed IK [9]. The weights of the Relaxed IK terms were chosen to minimize deviation from input as suggested in [9]. We measure the following three metrics:
+1) Deviation From Input: The deviation from the produced path to the input path in T -space is measured by finding the pairs of matched waypoints with dynamic time warping and then computing the average distance between these pairs.
+2) Path Smoothness: We define path smoothness similar to roadmap smoothness, as the average distance ratio of the produced C-space path to that of the produced T -space path.
+3) Success Rate: The success is determined by whether the produced T -space path follows the input path to the goal. We marked it as a failure if the produced path gets stuck due to local minima or self-collision.
+For a fair comparison, we calculate deviation and smoothness only for the problems that all methods succeed.
+We ran the tasks with the Kinova arm in T = R3 with fixed rotation and the aggregated results are summarized in Table II. The IK solvers often got stuck in local minima at line-related tasks and encountered singularities in circlerelated tasks. RANDOM-GRR had the lowest success rate, as it tended to produce discontinuous paths from the non-smooth map. The proposed method EXPANSION-GRR was able to achieve 100% success rate in all types of tasks. Regarding deviation from input, EXPANSION-GRR performed as well as Newton-IK in tasks Random-Line and Random-Circle, but in the more challenging tasks Self-Crossing Line and Partially Reachable Circle, our method exhibited higher deviation due to the need for more planning. For smoothness, the IK-solvers achieved the best results for each T -space path. This result is expected as our method prioritizes global consistency and
+
+Accepted for publication in IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), October 2024
+
+continuity over smoothness. Nevertheless, EXPANSION-GRR still produces smoother paths compared to RANDOM-GRR.
+
+Type
+Random Line
+Selfcrossing
+Line
+Random Circle
+Partially Reach-
+able Circle
+
+TABLE II: Teleoperation Experiment
+
+Methods
+Newton IK Relaxed IK RANDOM-GRR EXPANSION-GRR Newton IK Relaxed IK RANDOM-GRR EXPANSION-GRR Newton IK Relaxed IK RANDOM-GRR EXPANSION-GRR Newton IK Relaxed IK RANDOM-GRR EXPANSION-GRR
+
+Deviation From Input
+0.011 0.023 1.984 0.011 0.479 0.184 2.547 0.461 0.022 0.023 0.458 0.022 0.085 0.102 0.652 0.166
+
+Path Smoothness
+4.395 4.569 6.432 5.071 7.882 4.236 5.760 5.481 4.284 3.986 6.974 4.664 6.138 3.997 6.428 5.200
+
+Success Rate %
+90 78 49 100 30 54 34 100 98 98 77 100 99 95 78 100
+
+VI. DISCUSSION
+In this paper, we presented a new method to generate smooth GRR roadmaps in an efficient manner. We also demonstrated these properties compared to the prior art and illustrated how they can be used for teleoperation tasks.
+One of the limitations of our work is that it uses all of the available redundancy of the robot to satisfy the T -space constraints, making it challenging to meet other secondary objectives. In the future we would like to address this problem by building more flexible roadmaps similar to [8], [23]. The selection of initial seeds is another interesting problem to investigate. One potential avenue is to generate cyclic paths using [14], [15]. Although our method achieved full connectivity in the tested examples, this might not always be possible e.g., when obstacles are present. Nonetheless, we expect the roadmap to still be usable as in the example with the infeasible query of the self-crossing lines.
+Finally, we would like to investigate applications of GRR roadmaps beyond teleoperation such as motion planning, dimensional reduction, and generating motion primitives.
+
+REFERENCES
+[1] S. Chiaverini, “Redundant Robots,” in Encyclopedia of Systems and Control, J. Baillieul and T. Samad, Eds. London: Springer, 2015, pp. 1141–1150. [Online]. Available: https://doi.org/10.1007/ 978-1-4471-5058-9 173
+[2] K. Hauser and S. Emmons, “Global Redundancy Resolution via Continuous Pseudoinversion of the Forward Kinematic Map,” IEEE Transactions on Automation Science and Engineering, vol. 15, no. 3, pp. 932–944, July 2018. [Online]. Available: https://ieeexplore.ieee.org/document/8325410/
+[3] O. Khatib, “A unified approach for motion and force control of robot manipulators: The operational space formulation,” IEEE Journal on Robotics and Automation, vol. 3, no. 1, pp. 43–53, Feb. 1987. [Online]. Available: https://ieeexplore.ieee.org/document/1087068
+[4] S. Chiaverini, “Singularity-robust task-priority redundancy resolution for real-time kinematic control of robot manipulators,” IEEE Transactions on Robotics and Automation, vol. 13, no. 3, pp. 398–410, June 1997. [Online]. Available: https://ieeexplore.ieee.org/document/ 585902
+
+[5] A. A. Maciejewski and C. A. Klein, “Obstacle Avoidance for Kinematically Redundant Manipulators in Dynamically Varying Environments,” The International Journal of Robotics Research, vol. 4, no. 3, pp. 109–117, Sept. 1985. [Online]. Available: https://doi.org/10.1177/027836498500400308
+[6] C. Brooks, W. Rees, and D. Szafir, “Assistance in Teleoperation of Redundant Robots through Predictive Joint Maneuvering,” ACM Transactions on Human-Robot Interaction, Nov. 2023. [Online]. Available: https://dl.acm.org/doi/10.1145/3630265
+[7] C. A. Klein and C.-H. Huang, “Review of pseudoinverse control for use with kinematically redundant manipulators,” IEEE Transactions on Systems, Man, and Cybernetics, no. 2, pp. 245–250, Mar. 1983. [Online]. Available: http://ieeexplore.ieee.org/document/6313123/
+[8] A. Albu-Scha¨ffer and A. Sachtler, “Redundancy Resolution at Position Level,” IEEE Transactions on Robotics, vol. 39, no. 6, pp. 4240–4261, Dec. 2023. [Online]. Available: https://ieeexplore.ieee.org/document/ 10246229/
+[9] D. Rakita, B. Mutlu, and M. Gleicher, “RelaxedIK: Real-time Synthesis of Accurate and Feasible Robot Arm Motion,” in Robotics: Science and Systems, June 2018. [Online]. Available: http://www.roboticsproceedings.org/rss14/p43.pdf
+[10] Y. Wang, P. Praveena, D. Rakita, and M. Gleicher, “RangedIK: An Optimization-based Robot Motion Generation Method for RangedGoal Tasks,” in 2023 IEEE International Conference on Robotics and Automation (ICRA), May 2023, pp. 9700–9706. [Online]. Available: https://ieeexplore.ieee.org/document/10161311/?arnumber=10161311
+[11] A. Orthey, C. Chamzas, and L. E. Kavraki, “Sampling-based motion planning: A comparative review,” Annual Review of Control, Robotics, and Autonomous Systems, vol. 7, no. 1, p. null, July 2024. [Online]. Available: https://doi.org/10.1146/annurev-control-061623-094742
+[12] D. Berenson, S. Srinivasa, and J. Kuffner, “Task Space Regions: A framework for pose-constrained manipulation planning,” The International Journal of Robotics Research, vol. 30, no. 12, pp. 1435–1460, Oct. 2011. [Online]. Available: http://journals.sagepub. com/doi/10.1177/0278364910396389
+[13] Z. Kingston, M. Moll, and L. E. Kavraki, “Sampling-Based Methods for Motion Planning with Constraints,” Annual Review of Control, Robotics, and Autonomous Systems, vol. 1, no. 1, pp. 159–185, May 2018. [Online]. Available: https://www.annualreviews.org/doi/10.1146/ annurev-control-060117-105226
+[14] G. Oriolo and C. Mongillo, “Motion Planning for Mobile Manipulators along Given End-effector Paths,” in International Conference on Robotics and Automation (ICRA). Barcelona, Spain: IEEE, 2005, pp. 2154–2160. [Online]. Available: http: //ieeexplore.ieee.org/document/1570432/
+[15] G. Oriolo, M. Cefalo, and M. Vendittelli, “Repeatable Motion Planning for Redundant Robots Over Cyclic Tasks,” IEEE Transactions on Robotics, vol. 33, no. 5, pp. 1170–1183, Oct. 2017. [Online]. Available: http://ieeexplore.ieee.org/document/7982689/
+[16] L. Kavraki, P. Svestka, J.-C. Latombe, and M. Overmars, “Probabilistic roadmaps for path planning in high-dimensional configuration spaces,” IEEE Transactions on Robotics and Automation, vol. 12, no. 4, pp. 566–580, Aug. 1996. [Online]. Available: https: //ieeexplore.ieee.org/document/508439
+[17] G. Niemeyer, C. Preusche, S. Stramigioli, and D. Lee, “Telerobotics,” in Springer Handbook of Robotics, ser. Springer Handbooks, B. Siciliano and O. Khatib, Eds. Cham: Springer International Publishing, 2016, pp. 1085–1108. [Online]. Available: https: //doi.org/10.1007/978-3-319-32552-1 43
+[18] N. Boguslavskii, Z. Zhong, L. M. Genua, and Z. Li, “A Shared Autonomous Nursing Robot Assistant with Dynamic Workspace for Versatile Mobile Manipulation,” in IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), Oct. 2023, pp. 7040–7045. [Online]. Available: https://ieeexplore.ieee.org/abstract/ document/10342401
+[19] J. Burdick, “On the inverse kinematics of redundant manipulators: characterization of the self-motion manifolds,” in 1989 International Conference on Robotics and Automation Proceedings, vol. 1, May 1989, pp. 264–270. [Online]. Available: https://ieeexplore.ieee.org/ document/99999
+[20] Z. Kingston, M. Moll, and L. E. Kavraki, “Exploring implicit spaces for constrained sampling-based planning,” The International Journal of Robotics Research, vol. 38, no. 10-11, pp. 1151–1178, Sept. 2019. [Online]. Available: http://journals.sagepub.com/doi/10.1177/ 0278364919868530
+
+Accepted for publication in IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), October 2024
+[21] R. H. Taylor, “Planning and Execution of Straight Line Manipulator Trajectories,” IBM Journal of Research and Development, vol. 23, no. 4, pp. 424–436, July 1979. [Online]. Available: https: //ieeexplore.ieee.org/document/5390800
+[22] J. Kuffner, “Effective sampling and distance metrics for 3D rigid body path planning,” in IEEE International Conference on Robotics and Automation, vol. 4, Apr. 2004, pp. 3993–3998. [Online]. Available: https://ieeexplore.ieee.org/document/1308895
+[23] H. Yao, R. Laha, L. F. C. Figueredo, and S. Haddadin, “Enhanced dexterity maps (edm): A new map for manipulator capability analysis,” IEEE Robotics and Automation Letters, vol. 9, no. 2, pp. 1628–1635, 2024. [Online]. Available: https: //ieeexplore.ieee.org/abstract/document/10368298
+
+

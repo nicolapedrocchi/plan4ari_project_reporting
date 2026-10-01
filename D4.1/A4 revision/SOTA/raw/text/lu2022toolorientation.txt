@@ -1,0 +1,982 @@
+Journal of Manufacturing Processes 80 (2022) 789–804 Contents lists available at ScienceDirect
+Journal of Manufacturing Processes
+journal homepage: www.elsevier.com/locate/manpro
+
+High-order joint-smooth trajectory planning method considering tool-orientation constraints and singularity avoidance for robot surface machining
+Lei Lu a, Lei Zhang a, Cheng Fan a,*, Hao Wang b,*
+a Jiangsu Provincial Key Laboratory of Advanced Robotics &Collaborative Innovation Center of Suzhou Nano Science and Technology, Soochow University, Suzhou 215021, China b Department of Mechanical Engineering, Faculty of Engineering, National University of Singapore, 9 Engineering Drive 1, Singapore 117575, Singapore
+
+ARTICLE INFO
+Keywords: Robotic machining Joint-smooth tool path planning Tool orientation requirements Singularity avoidance Surface machining
+
+ABSTRACT
+Compared with the traditional machine tools, robots are low-cost and flexible for the machining process. However, owing to the complex constraints in the operation space and the redundant degrees of freedom (DoFs), it is challenging to obtain a joint-smooth optimal trajectory for the robotic machining. This article develops a high-order smooth joint trajectory planning method for robot surface machining considering with the tool posture constraints (the collision avoidance and cutting angles limits) and the robot state limits (the singularity avoidance). In the proposed method, the whole trajectory of the tool posture is integrated by the optimized differential vector in steps. In every integrating step, the differential vector is optimized from the redundant DoFs with the combined and balanced optimization objective considering the joint-smooth requirements, tool orientation limits and robot state constraints. At the same time, the upper limit of the second-order differential is given to limit the change rate of the optimized differential vector and to smooth the generated trajectory further. As the drastic change of the feasible region and tool-tip path curve, the boundary of the feasible region should be smoothed in advance to compensate for the hysteresis of the numerical integration method. In the end, two cases of robot surface machining are provided to verify the method. In the experimental process, an UR-5 robot with Robot Operating System (ROS) controller is used and the complex curve is machined by the robot.
+
+1. Introduction
+Owing to the low cost and flexibility, the robots show an increasing share in machining the components with complex structures and freeform surfaces [1–4]. However, the nonlinear kinematics relationship for the robot and the complex structure of the workpiece make it difficult to find the optimal machining process [5–7].
+Compared with the conventional motion planning of the 6R robot, the joint trajectory planning for robot surface machining is much more challenging [8–10]. Firstly, it is a fundamental and tricky problem for 6R robot motion planning when the dimension of the operation space is reduced by constraints [11–13]. For the surface machining process, the main constraints in the operation space are the tool tip needs to follow the tool path curve strictly [14,15]. Secondly, the constrained space is further limited by cutting process requirements. The cutting angle requirements require the tool axis vector in a specific cone and on one side
+
+of the feed direction in the operation space [16,17], and the potential mechanical collision between the tool holder, workpiece and robots also provides limits for the tool orientation space [18,19]. In the end, for most 6R serial robots, the singularity avoidance is important for the joint trajectory planning, as there is a drastic change or jump of the joint motion even for a smaller motion for the end effector of the robot in the operation space [20–22].
+To tackle these motion planning problems for the robotic machining, the sampling-based method is an efficient way to find the trajectory in the joint space. Moreover, the Open Motion Planning Library (OMPL) provides a collection of state-of-the-art sampling-based motion planners. The planner explores the high-dimensional constrained configuration space with collision limits [23] and links the sampled valid robot states to obtain the available motion. However, in the majority of cases, the motion process found by the normal sampling-based algorithms is not optimal [24]. Sertac, Karaman [25] introduced PRM* (Probabilistic
+
+* Corresponding authors. E-mail addresses: chfan@suda.edu.cn (C. Fan), mpewhao@nus.edu.sg (H. Wang).
+https://doi.org/10.1016/j.jmapro.2022.06.041 Received 16 March 2022; Received in revised form 15 June 2022; Accepted 16 June 2022 Available online 26 June 2022 1526-6125/© 2022 The Society of Manufacturing Engineers. Published by Elsevier Ltd. All rights reserved.
+
+L. Lu et al.
+Fig. 1. The flowchart for the procedure of the proposed method. Roadmaps) and RRT* (Rapidly-exploring Random Tree) methods, which were verified asymptotically optimal. Berenson and Jaillet [26] combined the RRT's rapid exploration properties with random global optimization methods to find the optimal solution. Kalakrishnan et al. [27] provided a probabilistic optimization method. The approach generated a noisy path to explore the space to produce an updated trajectory with lower cost, and the cost function combined the obstacle avoidance and smoothness requirements. Using the sampling-based motion planner in robot surface machining, Diaz Posada et al. [28] optimized the stiffness along with the whole tool-tip path using the Transition-RRT planner from the redundant DoFs. Lu et al. [29] generated the tool path for robotic ball-end and flank milling by sampling-based motion planning algorithms to get the shortest joint trajectory. In the method, all the three redundant DoFs were considered. However, the smoothness requirements were still hard to be considered in the method.
+To generate the trajectory of the robot machining process for the complex workpiece, many pieces of research have been reported to avoid collision and achieve a geometry-smooth machining process. Peng
+
+Journal of Manufacturing Processes 80 (2022) 789–804
+
+et al. [30] used sequential linearization programming to improve the initial solution provided by the conventional graph-based method to obtain the smoothness trajectory from the redundant DoFs. Lu et al. [31] applied B-spline for the joint configuration interpolation. They presented an optimization method to solve the inverse kinematics problem of the 6R robot to follow a given tool path considering smoothness and collision-free requirements. However, only one redundant freedom, i.e., the rotation along its own axis for the cutting tool, was considered in these methods. But at a certain tool path trajectory point, the three degrees of freedom of the tool orientation for the ball-end surface machining process are free and the tool axis can swing in a defined area. The three degrees of freedom of the rotation movement of the ball-end cutting tool could refer to the redundant degrees of freedom compared with the translation movement. Liao et al. [32] optimized the redundant DoFs to obtain the higher stiffness robot posture by dividing the surface into multiple sub-regions. Lu et al. [33] also optimized the differential vector and integrated the whole posture trajectory by the optimized differential vector. But the change rate of the optimized differential vector is not limited and the singularity and collision avoidances are not to be considered in the method. Although singularity avoidance has been studied for the tool path planning in the five-axis surface machining [34,35], very few articles discussed singularity avoidance problems in the robotic-surface machining process.
+In this article, a second-order limited joint trajectory generation method is developed for the surface machining by the robot with the tool posture and robot state constraints. (“High-order” in the paper mainly refers to the second-order differential vector is limited in the numerical integrating process.) In the method, the tool posture trajectory is integrated by using the differential vector, and the differential vector is optimized from the redundant DoFs in every integrating step with the combined optimization objective. In the differential vector optimizing process, the minimum of the vector is preferred, and the vector should also be optimized to have the trend to let the robot move away from the singularity point of the robot and to make the cutting tool axis move away from the tool orientation's boundary. At the same time, the change rate of the differential vector is also limited, i.e., the derivatives of the differential vector are limited to further smooth the trajectory. In the end, two tool-tip paths are provided to verify the joint trajectory planning method by using the UR-5 robot model and one of cases is machined on an aluminum part by the UR robot.
+
+2. The overall procedure of the proposed method
+
+For most of the machining process, the tool-tip path C(u) should be
+
+planned according to the machining surface and generated in advance.
+
+Therefore, the three freedom of the tool-tip movement is constrained to
+
+follow the tool-tip path curve, i.e., dC(u) = [x′(u), y′(u), z′(u)]du. How­
+
+ever, for most of the circumstances, two of the rotational freedom of the
+
+tool are constrained in a certain region, and there is no limit for the last
+
+rotation freedom along its own axis. Then, the differential move of the
+
+rotation for the tool δ(u) = [δx(u), δy(u), δz(u)] is free and redundant.
+
+The tool pose's differential move δ(u) can be set as the optimization
+
+variables, and the tool pose along the tool-tip path can be integrated by
+
+the optimized differential move δ(u).
+
+The overall algorithm procedure of the method is shown in Fig. 1.
+
+Firstly, at the start point u0 of the tool-tip path curve, the tool pose (the
+
+tool orientation angle) is given directly with the optimal status (The
+
+rolling and pitch angles of the cutting tool are set at the center of their
+
+feasible region from the cutting angles limits and collision constraints.
+
+And the yaw angle, i.e., the rotation freedom along its cutting axis, is
+
+chosen at the state with the lowest condition number of the robot by
+
+discretizing the yaw angle region). After the differential move [δx, δy,
+
+δz] in the point u0 is optimized, the next tool posture T1 in point u1 can
+
+be obtained by.
+
+()
+
+T1 = R Dopt T0
+
+(1)
+
+790
+
+L. Lu et al.
+
+Journal of Manufacturing Processes 80 (2022) 789–804
+
+Fig. 2. The coordinate system for the robotic machining system.
+
+⎡ nx
+
+ox ax x ⎤
+
+⎢ ny oy ay y ⎥
+
+where T1 =⎣
+
+⎦ is the tool posture homogeneous
+
+nz oz az z
+
+0 0 01 coordinates matrix, Dopt = [x′(u)Δu, y′(u)Δu, z′(u)Δu, δx, δy, δz]T are the optimized variables (where x′(u), y′(u), z′(u) are the tool path curve's
+
+tangent vector, Δu = u1 − u0, [δx, δy, δz] are the differential move of the
+
+⎡1
+
+′
+− δz δy x (u)Δu ⎤
+
+′
+
+⎢ δz rotation for the tool.), R(Dopt)= ⎣
+
+1 − δx y (u)Δu ⎥
+
+′
+
+⎦ is
+
+− δy δx 1 z (u)Δu
+
+0
+
+0
+
+0
+
+1
+
+the homogeneous coordinates transform matrix for the differential move
+
+Dopt. After the tool posture T1 is obtained, the joint position of the machining robot J1 = IK(T1) can be calculated by the inverse kinematic. Through continuous loop iterative integration, the whole tool path tra­
+
+jectory is obtained until the end of the tool-tip curve.
+
+3. Optimizing the differential move D with different objectives
+
+According to the method, how to optimize the differential move D is crucial because the whole posture trajectory is integrated by D. As the tool-tip's differential movement dC(u) = [x′(u), y′(u), z′(u)]Δu is constrained to follow the tool-tip path curve and the differential move of the rotation for the tool δ(u)= [δx, δy, δz] is free, there are three redundant DoFs for the D to be optimized.
+
+3.1. The minimal differential vector in the joint space
+
+To obtain the smoothness-oriented trajectory in the joint space, the minimal differential move Dq = [dq1, dq2, dq3, dq4, dq5, dq6]T in the joint space is set as the optimization objective to be sought. According to the definition of Jacobian matrix J, the relation for the differential move D of the tool posture in the operation space and the differential move Dq in the joint space is
+
+D = JDq
+
+(2)
+
+Therefore, the first optimal objective is designed as:
+
+⃦⃦ ⃦
+
+⃦
+
+min ⃦Dq⃦ = ⃦J(q)− 1D ⃦
+
+(3)
+
+[δx,δy,δz]
+
+2
+
+2
+
+where q = [q1, q2, q3, q4, q5, q6]T is the robot state, D are the optimization variables.
+
+3.2. Singularity avoidance requirements
+
+When the robot moves to the accessible boundary or the joints axis are collinear, the robot is in the singularity state. Its Jacobi matrix becomes a singularity matrix. At that point or near the singularity point, a small change in the end effector, the joints will change largely. In the machining process, the singularity state should be avoided. In mathematics, the condition number is often used to evaluate the singularity of the matrix. The condition number of the Jacobi matrix is defined as κ(q) = ⃦⃦J(q) ∞ − 1 ‖J(q) ‖∞ ⃦⃦ (4)
+
+According to the definition of the condition number, the value range of the condition number is
+
+1 ≤ κ(J) ≤ ∞
+
+(5)
+
+When the κ(J) is slightly larger than one, the Jacobi matrix J is wellconditioned, which means the robot state is far away from the singularity point. If the κ(J) is very large, the Jacobi matrix is said to be illconditioned and the robot is almost singular. When the robot state is at the singularity point, the condition number is equal to infinity. Therefore, the minimum of the condition number κ(J) of the robot's Jacobi matrix is one of the optimization objectives in the method to realize the singularity avoidance.
+According to the proposed method, the differential move D is the optimized variables. Then, the differential move D should be optimized to let the robot move away from the singularity point, i.e., let the robot move to the state with the low condition number κ(J). From the current robot state qi, the next robot state can be approximated by the differential move D by Eq. (2), i.e.,
+
+̃qi+1 = qi + Dq = qi + Ji− 1D
+
+(6)
+
+791
+
+L. Lu et al.
+
+Fig. 3. The cutting angles definition in {LCS}.
+
+The estimated Jacobi matrix J(̃qi+1) and condition number κ(̃Ji+1) of the next robot state can be obtained by the ̃qi+1. Then, the optimization objective can be set as:
+
+min κ(̃Ji+1)
+
+(7)
+
+[δx,δy,δz]
+
+Journal of Manufacturing Processes 80 (2022) 789–804
+are Δα = αi+1 − αi = acos( (dot((Proj(ztool i+)1)) , xi+1) ) − acos(dot(Proj(ztool i) , xi) ) Δγ = γi+1 − γi = acos dot ztool i+1,zi+1 − acos(dot(ztool i, zi) )
+(10)
+According to Ti+1 = R(D)Ti, ztool_i+1¼R(D)ztool_i, and the change Δα and Δγ for the cutting angles can be calculated as: Δα = acos(dot(Proj(R(D)ztool i ) , xi+1) ) − acos(dot(Proj(ztool i) , xi) )
+
+Δγ = acos(dot(R(D)ztool i , zi+1) ) − acos(dot(ztool i, zi) )
+
+(11)
+
+As the collision and cutting angles requirements, the differential changes Δα and Δγ should let the tool axis move away from the boundaries (α, α,
+_
+γ, and γ) by optimizing the D. Then, the optimization objective for tool
+_
+orientation can be designed as:
+
+min Δαop = |αi − αh|Δα αi ∕= αh
+
+[δx,δy,δz]
+
+αi − αh
+
+min Δγop = |γi − γh|Δγ γi ∕= γh
+
+[δx,δy,δz]
+
+γi − γh
+
+(12)
+
+α+α
+_
+where αi and γi are the current tool orientation angles, αh = 2 and γh =
+
+γ+γ
+
+_
+2
+
+are
+
+the
+
+centres
+
+of
+
+the
+
+feasible
+
+region.
+
+Eq.
+
+(12)
+
+ensure
+
+that
+
+no
+
+matter
+
+the cutting angles are larger or smaller than the centres αh and γh, the
+
+optimization objectives Δαop and Δγop will drive the αi+1 and γi+1 move
+
+to the αh and γh. When αi = αh, γi = γh, the αi and γi are in the most optimal
+
+position for the tool orientation requirements. Therefore, the optimi­
+
+zation objective can be.
+
+min Δαop = ‖Δα‖ αi = αh
+[δx,δy,δz]
+
+min Δγop = ‖Δγ‖ γi = γh
+[δx,δy,δz]
+
+(13)
+
+3.3. The optimization objective for the tool orientation
+
+3.4. Combining the different requirements
+
+Considering the feasible region in the operation space, the third optimal objective is to make the differential move D to drive the cutting tool axis away from the constraints edge. As shown in Fig. 2, when the cutting tool moves to the tool-tip point ui, the tool pose should be adjusted to avoid collisions. At the same time, the cutting angles in the local machining coordinate system ({LCS}) also provide limits for the tool orientation. Therefore, at the certain tool path trajectory point ui, the collision constraints and cutting angles limits can be transformed to constraints for the tool pose in {LCS}.
+As shown in Fig. 2, the tool axis angles (α is the angle between the projection of the tool axis ztool with the x-axis of {LCS}; γ is the angle between the tool axis ztool with the z-axis of {LCS}.) should be limited for the collision and cutting angle requirements, i.e., {
+α(u) ≤ α(q) ≤ α(u) (8) γ(u) ≤ γ(q) ≤ γ(u)
+According to the differential move D definition, the tool posture Ti+1 is generated from Ti by the R(D) as shown in Fig. 3, i.e., Ti+1 = R(D)Ti. According to the cutting angles definition, the cutting angles α and γ at the tool path point ui are
+αi = acos(dot(Proj(ztool i) , xi) ) γi = acos(dot(ztool i, zi) ) (9)
+where Proj(ztool_i) is the projection vector in the xy surface of {LCS} for the tool axis vector ztool_i, dot(a, b) denotes dot product; xi, yi, zi are the tool axis vector of {LCS}.
+The differential change of the α and γ from tool path point ui to ui+1
+
+Considering the above requirements, the objectives should be com­
+
+bined and balanced. The new combined optimal objective is designed as
+
+⃦⃦ Objective (δx, δy, δz) = λ1 ⃦Dq⃦unit + λ2 κ(J)unit + λ3Δαunit + λ4Δγunit
+
+(14)
+
+where ‖Dq‖unit, κ(J)unit, Δαunit and Δγunitare the normalized optimization
+
+objectives
+
+⃦⃦ ⃦Dq⃦ = ( unit
+
+‖Dq‖2− min(‖Dq‖2 ) max(‖Dq‖ )− min(‖Dq‖ ),
+
+κ(J)unit =
+
+2
+
+2
+
+max(κ(J) )− min(κ(J) ) κ(J)− min(κ(J) ) ,Δαunit =
+
+Δαop− min(Δαop) max(Δαop)− min(Δαop),Δγunit =
+
+Δγop− min(Δγop) max(Δγop)− min(Δγop))
+
+which all change from 0 to 1 with the optimization variables [δx, δy, δz].
+
+λ1, λ2, λ3 and λ4 are the balance factors. Then, the minimal of the
+
+objective Objective (δx, δy, δz) can be obtained by an optimization al­
+
+gorithm, such as the non-linear constrained optimization methods pro­
+
+vided by Matlab [36].
+
+The balance factors λ1, λ2, λ3 and λ4 should be designed to balance the
+
+influence of the different requirements. Relatively, λ1 have no related
+
+with the robot or cutting tool state, λ1 can be set as constant. For most of
+
+circumstances, λ1 can be set one. When the requirement for the minimal
+
+joint differential vector increases, larger λ1 can be set.
+
+However, the requirement of singularity avoidance is varying con­
+
+cerning with the condition number κ(Ji). When the condition number
+
+κ(Ji) is not far greater than one, the robot state is well-conditioned,
+
+where the singularity avoidance is less demanding. When the condi­
+
+tion number κ(Ji) becomes very larger, the robot state is approaching the
+
+singularity point. The optimization objective should be achieved to
+
+prevent the robot from entering the singularity area in priority.
+
+In this paper, a threshold value κthreshold for the condition number is
+
+792
+
+L. Lu et al. Fig. 4. The influence of the abrupt change for the planned tool orientation.
+
+Journal of Manufacturing Processes 80 (2022) 789–804
+
+provided. When the condition number κ(Ji) is smaller than the κthreshold,
+
+the importance of κ(Ji)unit in the combined objective Objective (δx, δy, δz)
+
+should be vague. When the condition number κ(Ji) is larger than the
+
+κthreshold, the importance of κ(Ji)unit in the combined object Objective (δx,
+
+δy, δz) is expected to be higher with the increased κ(Ji). Then, the factor
+
+λ2 is designed as follow:
+
+( κ(Ji) )a λ2 = κthreshold
+
+(15)
+
+where a ≥ 1 is the exponent constant for the factor λ2. From Eq. (15), when κ(Ji) is smaller than κthreshold, λ2 is less than one. When κ(Ji) is larger than κthreshold, λ2 will be larger than one and increases with κ(Ji). To obtain satisfactory discrimination, a larger exponent constant a can
+be selected. In this paper, κthreshold is chosen as 100 and the exponent constant a is 4. When κ(Ji) is smaller than 100, λ2 is always smaller than 1 and the share of the κ(Ji)unit in the combined objective would always be
+
+Fig. 5. Robot machining system.
+
+Fig. 7. The tool orientation angles constraints in {LCS}.
+
+Fig. 6. The rectangular tool-tip path curve. 793
+
+L. Lu et al.
+
+Journal of Manufacturing Processes 80 (2022) 789–804
+
+Fig. 8. The pre-smoothed tool orientation angles constraints.
+
+( αi − αh)b1 λ3 = a1 α − α
+
+(
+
+)b2
+
+λ4 = a2γi − γh
+
+γ− γ
+
+(16)
+
+Fig. 9. The final tool orientation angles constraints.
+weak. When κ(Ji) is much larger than 100, the factor λ2 will increase heavily with 4 times and the share of the κ(Ji)unit in the combined objective also increases heavily.
+Similarly, the requirements of the tool orientation are also varying. When the tool axis is far away from the tool orientation boundary, the influence of tool orientation angles' requirements should be less pronounced. On the contrary, when the tool axis is near the boundary, the expectation of letting the tool axis move away from the feasible region's boundary is crucial. The factors are designed as follow:
+
+where αi and γi are the current tool orientation angles. a1 and a2 are the factors that should be larger than 2. When the tool orientation re­
+
+quirements are stricter, larger values of the factors a1 and a2 are ex­
+
+pected. b1 and b2 are exponent constants that are larger than one. In this
+
+paper, the a1 and a2 are chosen as 3 and b1 and b2 are chosen as 8. Then,
+
+according to Eq. (16), if the distance from αi and γi to the boundary are
+
+α− α
+
+γ− γ
+
+smaller than
+
+6 _ and
+
+_
+6
+
+respectively,
+
+the
+
+factors
+
+λ3
+
+and
+
+λ4
+
+would
+
+be
+
+larger than one. When the αi and γi are closer to the boundary, λ3 and λ4
+
+would increase by 8 times, the share of the tool orientation in the
+
+combined objective would increase heavily. If the distance from αi and γi
+
+α− α
+
+γ− γ
+
+to the αh and γh are smaller than 3 _ and 3 _, λ3 and λ4 are always smaller
+
+than 1 and the share of the tool orientation in the combined objective
+
+would always be weak.
+
+When the tool orientation requirements are stricter, the larger factors b1 and b2 are also expected. According to Eq. (16), when αi and γi move to the boundary (α, α, γ, and γ), larger values for λ3 and λ4 will be obtained,
+__
+
+and the shares for λ3Δαunit and λ4Δγunit of Objective (δx, δy, δz) will become larger.
+
+3.5. Further limiting the change rate of the optimized differential vector D
+In the proposed method, the differential moves of the tool orientation [δx, δy, δz] are the optimization variables. Therefore, the upper and lower limits for the differential move [δx, δy, δz] should be set because the differential move is a small quantity, i.e.
+/ δx/ds ≤ δx ds ≤ δx/ds
+
+794
+
+L. Lu et al.
+
+Journal of Manufacturing Processes 80 (2022) 789–804
+
+Fig. 10. The planned joints trajectory by different methods.
+
+/ δy/ds ≤ δy ds ≤ δy/ds
+
+/
+
+δz/ds ≤ δz ds ≤ δz/ds
+
+(17)
+
+where ds is the arc length differential, δx/ds, δy/ds, δz/ds, δx/ds, δy/ds
+
+_
+
+_
+
+_
+
+and δz/ds are the given lower and upper limits for the optimization variables. The optimized variables can be changed from the upper limit to the lower limit arbitrarily. Therefore, the planned tool pose along the tool-tip path curve will be C1 continuous. To obtain the higher-order smoothed tool posture process, the change rate of the optimized variables in the two adjacent integration steps are also limited according to the proposed method, i.e.,
+
+795
+
+L. Lu et al.
+
+Journal of Manufacturing Processes 80 (2022) 789–804
+
+Fig. 11. The condition number along the tool path.
+
+Fig. 12. The tool orientation angle α planned by different methods.
+
+Δδx/ds ≤ (δxi+1 − δxi)opt ≤ Δδx/ds ds
+
+Δδy/ds ≤ (δyi+1 − δyi)opt ≤ Δδy/ds ds
+
+Δδz/ds ≤ (δzi+1 − δzi)opt ≤ Δδz/ds ds
+
+(18)
+
+where Δδx/ds, Δδy/ds, Δδz/ds, Δδx/ds, Δδy/ds and Δδz/ds are the given
+
+_
+
+_
+
+_
+
+lower and upper limits for the change rate of the optimized variables. When the change rate of the optimized variables in the two adjacent steps violates the limits, the next optimized variables [δxi+1, δyi+1, δzi+1] should be re-calculated according to the lower and upper limits of the change rate to ensure the higher-order derivatives of the optimized variables are limited. Taking variable δxi+1 for example, the concrete algorithm is provided as follow:
+
+796
+
+L. Lu et al.
+
+Journal of Manufacturing Processes 80 (2022) 789–804
+
+Fig. 13. The tool orientation angle γ planned by different methods.
+
+Fig. 14. The tool posture planned by the proposed method.
+
+4. Pre-smooth the tool axis angles boundaries
+
+From the proposed method, the whole trajectory is integrated by the
+
+optimized Dopt and the change rate of the Dopt is also limited. Therefore,
+
+the high order derivatives of the tool orientation will be limited and the
+
+variation of the tool axis planned by the proposed method cannot change
+
+abruptly. But the boundaries of the tool orientation (α, α, γ, and γ)
+
+_
+
+_
+
+change arbitrarily, considering the abrupt appearance of the obstacle (as shown in Fig. 7 and 16 (a)).
+As shown in Fig. 4, if there is no look-ahead function, the proposed method couldn't deal with the abrupt change of the edges. And, the tool axis angle trajectory planned by the method would violate the constraints with the sudden change of the tool orientation constraints (α or
+_
+
+γ). From the optimization objective for the tool orientation, moving to
+_
+
+the centre of the feasible area (αh and γh) is part of the optimization
+
+objective. As shown in Fig. 4, the tool orientation could be adjusted in
+
+advance by pre-adjusting the feasible region's boundary (α, α, γ, and γ).
+
+_
+
+_
+
+Therefore, the drastic change of the feasible region's boundary (α, α, γ,
+
+_
+
+_
+
+and γ) could be pre-smoothed to compensate for the hysteresis of the numerical integration method.
+In this paper, the forward difference quotient Δ_boui = bousi−i− bsoui− 1 i− 1 of the feasible region boundary is smoothed, where boui is the boundary edge in the tool path point ui, si is the total arc length for the tool path point ui from start point u0. Taking the upper boundary as the example, the concrete algorithm of the pre-smoothing method is presented as follow:
+
+797
+
+L. Lu et al.
+
+Journal of Manufacturing Processes 80 (2022) 789–804
+
+The evaluation threshold Δb for the drastic change of the boundary is determined according to the lower or upper limits of the differential
+
+move (δx/ds, δy/ds, δz/ds, δx/ds, δy/ds and δz/ds) as presented in Eq.
+
+_
+
+_
+
+_
+
+(17), i.e.,
+
+Δb = 2δθ/ds
+
+(19)
+
+where θ is x, y and z. Through the above algorithm, all the boundaries α,
+_
+α, γ, and γ of the feasible region are smoothed, i.e., no difference quo­
+_
+tient of the boundary along the tool path curve is larger than the given threshold Δb. Therefore, the tool axis could be pre-adjusted by Eq. (14) as moving to the centre of the feasible area (αh and γh) is part of the optimization objective.
+
+5. Boundary pre-adjustment for the rapid change of the {LCS}
+
+Fig. 15. The butterfly tool-tip path curve on an inclined surface.
+
+Except for the drastic change of the tool orientation boundary, the limited differential move D also cannot address the rapid change of the tool path curve because the cutting angles are defined in {LCS}. According to the cutting angles (i.e., αi and γi) definition, they are the angles between the axis vector of {LCS} (i.e., xi, yi) and the tool axis (i.e., ztool_i) as shown in Fig. 3. Then, the tool orientation should also be preadjusted to prepare for the drastic variation of the cutting angles due to the rapid change of the axis vector of {LCS}. A similar measure to the drastic change of the α, α, γ, and γ is used to tackle this problem, the tool
+__
+
+axis could also be adjusted in advance through pre-adjusting the tool
+
+orientation boundary (α, α, γ, and γ) to prepare for the rapid change of
+
+_
+
+_
+
+the axis vector of {LCS}.
+
+According to the cutting angle definition, the angle differential
+
+quotient dθi
+ds
+
+dθi
+( ds
+
+is the difference quotient for the axis vector of {LCS}
+
+along
+
+the
+
+tool
+
+path
+
+curve.
+
+dθi ds
+
+=
+
+Δθ si− si−
+
+1,
+
+where
+
+Δθ
+
+is
+
+the
+
+angle
+
+for
+
+the
+
+axis
+
+798
+
+L. Lu et al.
+
+Journal of Manufacturing Processes 80 (2022) 789–804
+
+vectors of {LCS} at the adjacent points.) for the axis vector of {LCS}
+
+could be set as the evaluation indicator. And the upper-limit |δ/ds| of the
+
+optimized differential move [δx/ds, δy/ds, δz/ds] are accordingly set as
+
+the
+
+threshold
+
+value
+
+for
+
+the
+
+evaluation
+
+indicator
+
+dθ .
+ds
+
+When
+
+dθi ds
+
+is
+
+larger
+
+than the given threshold value |δ/ds|, the boundary should be pre-
+
+adjusted to let the tool axis prepare in advance for the rapid change of
+
+the axis vector of {LCS}. The concrete algorithm is provided as follow:
+
+6. Calculation cases and practical machining
+To describe and prove the trajectory planning method, the joints' trajectory of two curves (one is a square curve and another is a complicate butterfly curve on an inclined surface) are planned by the method. The complicated butterfly curve on an inclined surface is machined in the practical machining process on an aluminum part. As shown in Fig. 5, the UR-5 robot in our laboratory is used as the robot for calculation cases and practical machining. Although the absolute positioning accuracy and stiffness are the two weak points for UR robot used in the machining process. However, the absolute positioning accuracy is improved by an on-line measurement probe. With the development of 3D printing technology and precision casting, the materials to be removed become less and less which reduces the requirements for robots as processing equipment.
+
+6.1. Case A
+
+In order to verify the proposed method, a large square path with
+
+three right-angle inflection points is provided in Fig. 6 (To ensure a
+
+clearer positional relationship between the tool-tip path and four blocks,
+
+the front, side and top views of the square tool path and the blocks are
+
+also provided.) and the length of one side of the square is 200 mm (The
+
+maximum arm span of the UR-5 is about 800 mm.). The rectangular
+
+curve is larger enough in the area of the workspace of the robot. At the
+
+same time, four blocks along the tool path are provided to verify the
+
+collision avoiding function. As there are three right-angle inflection
+
+points for the tool path, the axis vector of {LCS} will change abruptly
+
+which can verify the ability of the proposed method to tackle the abrupt
+
+change of the curvature of the tool path curve.
+
+To keep the tool in the correct pose during the cutting process, the
+
+◦
+
+◦◦
+
+cutting angles' boundary in {LCS}are firstly given, 90 ≤ α ≤ 270 , 5 ≤ γ
+
+◦
+
+≤ 45 . Combining the cutting angles' constraints and collision re­
+
+quirements, the tool orientation boundaries along the square tool path
+
+are plotted in Fig. 7. From the figure, to avoid the tool axis collision with
+
+the blocks, the tool orientation feasible region become narrow with the
+
+obstacles. And due to the sudden pop up of the obstacle blocks, there are
+
+abrupt changes of the tool orientation boundaries.
+
+According to the method, the optimized tool orientation differential
+
+vector will not have the ability to tackle these sudden changes without
+
+advanced processing. The constraints should be pre-smoothed to handle
+
+the abrupt changes of the tool axis angles' boundary considering the
+
+hysteresis of the integration process of the method. By Algorithm 2, the
+
+pre-smoothed constraints are shown in Fig. 8. (In order to further
+
+smooth the boundary, the simple moving average (SMA) method is used
+
+after the constraints are smoothed by Algorithm 2. The SMA method has
+
+a well-round and smooth function. The boundaries after smoothing by
+
+the SMA method are slightly different from the original boundaries and
+
+the distance is very small which won't have much influence.) Compared
+
+with Fig. 7, the change rate of the constraints is smoothed in the forward
+
+direction of the integration process.
+
+In this case, there are three right-angle inflection points. The direc­
+
+tion of {LCS} would change abruptly at these points. Therefore, the tool
+
+orientation should be pre-adjusted. According to the method, moving to
+
+the centre of the feasible area is part of the optimization objective.
+
+Therefore, the boundary could be adjusted in advance to pre-adjust the
+
+tool axis' moving direction to handle the abrupt change of {LCS}. The
+
+final tool orientation angles constraints after pre-smoothing and pre-
+
+adjusting are given in Fig. 9.
+
+After the final boundaries are obtained, the differential vector D can
+
+be optimized with the combined objective Objective (δx, δy, δz). Then,
+
+the whole tool path is integrated by the optimized D in steps. At the same
+
+time, the other three comparison methods changed from the proposed
+
+method are used to plan the joint trajectory and to reflect the superiority
+
+of the proposed method. The first comparison method is about the same
+
+as the proposed method. However, the constraints have not been pre-
+
+799
+
+L. Lu et al.
+
+Journal of Manufacturing Processes 80 (2022) 789–804
+
+Fig. 16. The planned tool posture with the obstacle in {WCS}.
+
+smoothed, and the influence of the abrupt change of {LCS} has also not been considered in this method, i.e., the cutting angle constraints as shown in Fig. 7 are used. This method is named as NSC (NSC is short of the “un-smoothed constraints”) method. In the second comparison method, the change rate of the differential vector is not limited, i.e., Algorithm 1 in this method is left out. This method is named as FDL (FDL is short for the “Only the First order Differential vector is Limited”) method. In the last comparative method, the singularity avoidance requirement is deleted in the combined optimization objective in Eq. (14). This method is named as NSO (NSO is short for the “No-singularityavoidance optimization”) method. Firstly, the joint trajectories planned by these methods are all shown in Fig. 10.
+As shown in the figures, there are obviously larger jumps in the joint trajectory planned by the NSO method, although the differential move of the end of the robot is limited. That means, at those points, the robot is closed to the singularity point. The condition number of the Jacobian matrix along the tool path is also provided in Fig. 11. From the figure,
+
+the condition number of the robot become larger at those points for the NSO method. Compared with the NSO method, the condition numbers along the tool path curve for the other three methods are much smaller.
+Except for the singularity avoidance requirements, the tool orientation angles α and γ in {LCS} should be limited in certain angles. The angles (α and γ) for these methods are also shown in Figs. 12 and 13. From the figures, the angles (α and γ) planned by NSC violate the constraints, especially at the right-angle inflection points. It is mainly due to the abrupt change of {LCS}. And the tool orientation constraints have not been pre-smooth to let the tool orientation make some preparation for the abrupt change in the NSC method. However, the tool orientation angles planned by the other three methods satisfy the requirements. From the enlarged partial fig. D of the tool orientation angles α in Fig. 12, the tool orientation angles α planned by the FDL, NSO and the proposed methods are all pre-adjusted for the abrupt change of {LCS} by the boundary. But the angle planned by the NSC method is not adjusted in advance as the boundary has not been pre-adjusted. From the
+
+Fig. 17. The tool orientation angles constraints. 800
+
+L. Lu et al.
+
+Journal of Manufacturing Processes 80 (2022) 789–804
+
+Fig. 18. The joints trajectory for the tool-tip curve.
+
+Table 1 The travelled distance for these methods.
+
+The proposed method
+
+The SCA method
+
+Travelled distance (rad)
+
+11.0908
+
+36.8850
+
+The FDL method
+10.8167
+
+The NSC method
+9.5706
+
+enlarged partial fig. A of the tool orientation angle α in Fig. 12 and the enlarged partial fig. A of the tool orientation angles γ in Fig. 13, the tool orientation α and γ planned by the NSC method also could not handle the suddenly change of tool axis' constraints due to the sudden appearance of the obstacle.
+
+The tool posture trajectory planned by the method proposed in this article is provided in Fig. 14. From the figure, the tool-tip follows the square curve strictly and the planned tool orientation along the curve also satisfies the requirements of avoiding the collision with the obstacle blocks. At the same time, the planned tool posture trajectory without considering the blocks is also provided in Fig. 14. As shown in figures, the tool orientation without considering the constraints would collide with the blocks.
+6.2. Case B
+In this section, a 3D butterfly curve on an inclined surface as shown in Fig. 15 is machined by the robot. For the ball-end milling process, the
+
+801
+
+L. Lu et al.
+
+Journal of Manufacturing Processes 80 (2022) 789–804
+
+Fig. 19. The scheduled feedrate profiles.
+
+Fig. 20. The robot machining results.
+
+tool orientation is only limited by the collision and cutting angle re­
+
+quirements in {LCS}. To keep the tool in the correct pose during the
+
+◦
+
+cutting process, the cutting angles boundary are firstly given, 90 ≤ α ≤
+
+◦◦
+
+◦
+
+270 , 5 ≤ γ ≤ 15 .
+
+Firstly, the constraints for the tool orientation in {LCS} are estab­
+
+lished according to the cutting angles and the collision requirements. As
+
+shown in Fig. 16, a suppositional obstacle is provided. Combining the
+
+cutting angles requirements in {LCS}, the tool orientation angles con­
+
+straints are plotted in Fig. 17 (a).
+
+It can be seen in Fig. 17(a) that the tool orientation constraints
+
+change abruptly due to the requirements of collision avoidance. Ac­
+
+cording to the developed method, the constraints should be pre-
+
+smoothed and pre-adjusted to handle the rapid change of the con­
+
+straints' boundary and {LCS}. The pre-smoothed and pre-adjusted
+
+boundaries are shown in Fig. 17 (b) and the planned tool posture trajectory is also plotted in Fig. 16. It is noted that when the tool axis moves to the block of the obstacle, the tool axis will be driven to the other side of the block.
+To verify the proposed method, another trajectory planning method is provided as a comparison. In the comparison method, the posture angles α and γ are always set as the middle of the boundary, and only the rotation angle θ around the tool axis is set as the optimized variable like most of the references [29,31]. In the comparison method, the graph method is provided to optimize the trajectory considering the condition number of the robot state and continuity requirements. Subsequently, the rotation angle θ trajectory is smoothed by the SMA method and fitted by the B-spline to improve the smoothness. This comparison method is named as SCA (Same Cutting Angle) method. And, NSC and FDL
+
+802
+
+L. Lu et al.
+
+Journal of Manufacturing Processes 80 (2022) 789–804
+
+methods same from Case A are also used as comparisons. The planned joint trajectories for these methods are all shown in Fig. 18.
+The travelled distance of the joints for these methods are provided in Table 1. From Table 1, the path distance for the SCA method is much longer than the other methods. From Fig. 18, the joints trajectory planned by the SCA method is also more complex, although for the same tool-tip path curve. The reason is the other methods optimize the three DoFs of the cutting tool posture to obtain the minimal differential vector in the joint space. But for the SCA method, only the rotation angle along its own axis is optimized. The optimization space for the SCA method is much smaller than the other three methods.
+To further test the practice of the method provided in this article, the joints trajectory planned by the method is used to carve the butterfly curve on an incline aluminum surface by the UR robot. The feedrate profiles of the machining process is scheduled by the algorithm developed by the authors [37]. The planned feedrate profile is shown in Fig. 19. From the figures, the machining time of the joint trajectory planned by the proposed method is much shorter than the SCA method, although for the same tool-tip curve. Especially for the FDL method, although the joint path for the FDL method is less than the proposed as presented in Table 1, the machining time for FDL is longer because the high-order derivatives of the tool orientation curve obtained by FDL are not limited.
+After the feedrate profile is scheduled, the planned trajectories could be used to carve the butterfly curve on the incline aluminum surface. The machined results are present in Fig. 20. As shown in the figures, the butterfly curve could be machined by the UR robot, although the inclined butterfly curve is much more complicated. At the same time, the machining process video is also provided in the Supplementary material. From the video, the machining process is stable and the method provided in this article can be used in the actual robot surface machining process.
+7. Conclusion
+Considering the collision requirements and the redundant DoFs, a high-order smooth joint trajectory planning method is provided for the robotic surface machining. In this method, the smoothness requirements, i.e., the minimal of the differential vector in the joint space and the trend of letting the tool axis move away from the feasible region's boundary and singularity points are set as the optimization objectives. To get the high-order smooth joint trajectory, the change rate of the optimized differential vector is limited in the numerical integrating process. Due to the hysteresis in the numerical integration process, the pre-smooth and pre-adjustment algorithms for the tool orientation boundaries are provided. In the end, the joint trajectories for two cases are planned by this method. In contrast with the other methods, the method can deal with the abrupt change of the tool orientation constraints and {LCS}, and improve the smoothness of the machining process. The feedrate scheduling results illustrate the effectiveness of the high-order smoothness and the collision avoidance is testified by tool path curve with blocks. The singularity avoidance is also verified and illustrated by Case A. In the end, the inclined butterfly curve is machined in practice on an aluminum part by the UR robot.
+Supplementary data to this article can be found online at https://doi. org/10.1016/j.jmapro.2022.06.041.
+Declaration of competing interest
+The authors declare that they have no known competing financial interests or personal relationships that could have appeared to influence the work reported in this paper.
+Acknowledgements
+This research was supported in part by the Singapore Ministry of
+
+Education [grant numbers: MOE-T2EP50120-0010], in part by the Na­
+tional Natural Science Foundation of China [grant numbers: 51705120],
+in part by the Natural Science Foundation of the Jiangsu Higher Edu­
+cation Institutions of China [grant numbers: 19KJA220001], and in part
+by the Natural Science Foundation of the Jiangsu Province [grant
+numbers: BK20201412].
+References
+[1] Verl A, Valente A, Melkote S, Brecher C, Ozturk E, Tunc LT. Robots in machining. CIRP Ann 2019;68(2). https://doi.org/10.1016/j.cirp.2019.05.009. 799-22.
+[2] Ji W, Wang L. Industrial robotic machining: a review. IntJAdvManufTechnol 2019; 103(1–4):1239–55. https://doi.org/10.1007/s00170-019-03403-z.
+[3] Becker P, Eichmann C, Ro¨nnau A, Dillmann R. Automation of post-processing in additive manufacturing with industrial robots. In: 2020 IEEE 16th International Conference on Automation Science and Engineering (CASE). IEEE; 2020. p. 1578–83. https://doi.org/10.1109/CASE48305.2020.9216955.
+[4] Xiao M, Ding Y, Yang G. A model-based trajectory planning method for robotic polishing of complex surfaces. IEEE Trans Autom Sci Eng 2021:1–14. https://doi. org/10.1109/TASE.2021.3095061.
+[5] Fang HC, Ong SK, Nee AY. Robot path planning optimization for welding complex joints. IntJAdvManufTechnol 2017;90:3829–39. https://doi.org/10.1007/s00170016-9684-z.
+[6] Dai C, Lefebvre S, Yu KM, Geraedts JM, Wang CC. Planning jerk-optimized trajectory with discrete-time constraints for redundant robots. IEEE TransAutomSciEng 2020;17(4):1711–24. https://doi.org/10.1109/ TASE.2020.2974771.
+[7] Rakita D, Mutlu B, Gleicher M. STAMPEDE: a discrete-optimization method for solving pathwise-inverse kinematics. In: IEEE International Conference on Robotics and Automation; 2019. p. 3507–13. https://doi.org/10.1109/ICRA.2019.8793617.
+[8] Xu P, Yao X, Liu S, Wang H, Liu K, Kumar AS, Lu WF, Bi G. Stiffness modeling of an industrial robot with a gravity compensator considering link weights. MechMachTheory 2021;161:104331. https://doi.org/10.1016/j. mechmachtheory.2021.104331.
+[9] Sarraji WK. Inverse kinematics-based trajectory generation for robot-assisted 3Dsurface machining28(9); 2010.
+[10] Zhao J, Zhan J, Jin R, Tao M. An oblique ultrasonic polishing method by robot for free-form surfaces. Int J Mach Tool Manuf 2000;40(6):795–808. https://doi.org/ 10.1016/S0890-6955(99)00112-1.
+[11] LaValle SM, Kuffner Jr JJ. Randomized kinodynamic planning. IntJRobotRes 1999; 15(5):378–400. https://doi.org/10.1177/02783640122067453.
+[12] Caron S, Pham QC, Nakamura Y. Completeness of randomized kinodynamic planners with state-based steering. RobotAutonSyst 2015;89:5818–23. https://doi. org/10.1016/j.robot.2016.12.002.
+[13] Bordalba R, Ros L, Porta JM. Randomized kinodynamic planning for constrained systems. In: 2018 IEEE International Conference on Robotics and Automation (ICRA). IEEE; 2018. p. 7079–86. https://doi.org/10.1109/ICRA.2018.8460753.
+[14] Liang F, Kang C, Fang F. A smooth tool path planning method on NURBS surface based on the shortest boundary geodesic map. JManufProcess 2020;1(58):646–58. https://doi.org/10.1016/j.jmapro.2020.08.047.
+[15] L´eger J, Angeles J. Off-line programming of six-axis robots for optimum fivedimensional tasks. MechMachTheory 2016;100:155–69. https://doi.org/10.1016/ j.mechmachtheory.2016.01.015.
+[16] Habibi M, Kilic ZM, Altintas Y. Minimizing flute engagement to adjust tool orientation for reducing surface errors in five-axis ball end milling operations. J Manuf Sci Eng 2020;143(2):1–35. https://doi.org/10.1115/1.4048267.
+[17] Liang F, Kang C, Fang F. A review on tool orientation planning in multi-axis machining. IntJProdRes 2020:1–31. https://doi.org/10.1080/ 00207543.2020.1786187.
+[18] Wang Y, Xu J, Sun Y. Tool orientation adjustment for improving the kinematics performance of 5-axis ball-end machining via CPM method. RobotComputIntegrManuf 2021;68:102070. https://doi.org/10.1016/j. rcim.2020.102070.
+[19] Sun S, Sun Y, Lee YS. A gouge-free tool axis reorientation method for kinematics compliant avoidance of singularity in 5-axis machining. ASME JManufSciEng 2019;141(5):051010. https://doi.org/10.1115/1.4043266.
+[20] Xu W, Zhang J, Liang B, Li B. Singularity analysis and avoidance for robot manipulators with nonspherical wrists. <sb:contribution><sb:title>IEEE Trans Ind</sb:title> </sb:contribution><sb:host><sb:issue><sb:series><sb: title>Electron</sb:title></sb:series></sb:issue></sb:host> 2015;63(1). https://doi.org/10.1109/TIE.2015.2464176.
+[21] Huang Y, Yong YS, Chiba R, Arai T, Ueyama T, Ota J. Kinematic control with singularity avoidance for teaching-playback robot manipulator system. IEEE TransAutomSciEng 2016;13(2):729–42. https://doi.org/10.1109/ TASE.2015.2392095.
+[22] Milenkovic P. Continuous path control for optimal wrist singularity avoidance in a serial robot. MechMachTheory 2019;140:809–24. https://doi.org/10.1016/j. mechmachtheory.2019.05.004.
+[23] Kingston Z, Moll M, Kavraki LE. Exploring implicit spaces for constrained sampling-based planning. IntJRobotRes 2019;38(10–11):1151–78. https://doi. org/10.1177/0278364919868530.
+[24] Canny J. The complexity of robot motion planning. Cambridge: MIT Press; 1987.
+
+803
+
+L. Lu et al.
+[25] Karaman S, Frazzoli E. Sampling-based algorithms for optimal motion planning. IntJRobotRes 2011;30(7):846–94. https://doi.org/10.1177/0278364911406761.
+[26] Jaillet L, Cort´es J, Sim´eon T. Sampling-based path planning on configuration-space cost maps. IEEE TransRobot 2010;26(4):635–46. https://doi.org/10.1109/ TRO.2010.2049527.
+[27] Kalakrishnan M, Chitta S, Theodorou E, Pastor P, Schaal S. STOMP: stochastic trajectory optimization for motion planning. IEEE IntConfRobotAutom 2011: 4569–74. https://doi.org/10.1109/ICRA.2011.5980280.
+[28] Diaz Posada JR, Schneider U, Sridhar A, Verl A. Automatic motion generation for robotic milling optimizing stiffness with sample-based planning. Machines 2017;5 (1). https://doi.org/10.3390/machines5010003.
+[29] Lu L, Zhang J, Tian X, Han J, Wang H. Tool path optimization for robotic surface machining by using sampling-based motion planning algorithms. J Manuf Sci Eng 2021;143(1):011002. https://doi.org/10.1115/1.4047734.
+[30] Peng J, Ding Y, Zhang G, Ding H. Smoothness-oriented path optimization for robotic milling processes. SciChina TechnolSci 2020;63:1751–63. https://doi.org/ 10.1007/s11431-019-1529-x.
+[31] Lu YA, Tang K, Wang CY. Collision-free and smooth joint motion planning for sixaxis industrial robots by redundancy optimization. RobotComputIntegrManuf 2021;68:102091. https://doi.org/10.1016/j.rcim.2020.102091.
+
+Journal of Manufacturing Processes 80 (2022) 789–804
+[32] Liao ZY, Li JR, Xie HL, Wang QH, Zhou XF. Region-based toolpath generation for robotic milling of freeform surfaces with stiffness optimization. RobotComputIntegrManuf 2020;64:101953. https://doi.org/10.1016/j. rcim.2020.101953.
+[33] Lu L, Han J, Dong F, Ding Z, Fan C, Chen S, Liu H, Wang H. Joint-smooth toolpath planning by optimized differential vector for robot surface machining considering the tool orientation constraints. IEEE/ASME TransMechatron 2021. https://doi. org/10.1109/TMECH.2021.3104477.
+[34] Liu Q, Huang T. Inverse kinematics of a 5-axis hybrid robot with non-singular tool path generation. RobotComputIntegrManuf 2019;56:140–8. https://doi.org/ 10.1016/j.rcim.2018.06.003.
+[35] Wan M, Liu Y, Xing WJ, Zhang WH. Singularity avoidance for five-axis machine tools through introducing geometrical constraints. Int J Mach Tool Manuf 2018; 127:1–13. https://doi.org/10.1016/j.ijmachtools.2017.12.006.
+[36] “Optimization toolbox,” mathworks, Portola Valley, CA, USA [Online]. Available, https://uk.mathworks.com/help/optim/ug/fmincon.html/. [Accessed 15 March 2022].
+[37] Lu L, Zhang J, Fuh JY, Han J, Wang H. Time-optimal tool motion planning with tool-tip kinematic constraints for robotic machining of sculptured surfaces. RobotComputIntegrManuf 2020;65:101969. https://doi.org/10.1016/j. rcim.2020.101969.
+
+804
+
+

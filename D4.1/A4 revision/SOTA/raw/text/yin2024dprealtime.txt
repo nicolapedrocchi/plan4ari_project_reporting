@@ -1,0 +1,650 @@
+arXiv:2411.17052v2 [cs.RO] 18 Mar 2025
+
+Dynamic Programming-Based Offline Redundancy Resolution of Redundant Manipulators Along Prescribed Paths with Real-Time Adjustment
+Zhihang Yina,1, Fa Wub,1, Ziqian Wangc, Jianmin Yangd, Jiyong Tane,∗ and Dexing Konga,∗
+aSchool of Mathematical Sciences, Zhejiang University, Xihu, Hangzhou, 310058, Zhejiang, China bZhejiang Demetics Medical Technology Co., Ltd., Xihu, Hangzhou, 310012, Zhejiang, China cDepartment of Human Development, Teachers College, Columbia University, New York, 10027, NY, United States dZhejiang College of Sports, Hangzhou, 311231, Zhejiang, China eShenzhen Institute for Advanced Study, University of Electronic Science and Technology of China, Shenzhen, 610056, Guangdong, China
+
+ARTICLE INFO
+Keywords: Robot programming manipulator motion planning optimal control optimization methods
+
+ABSTRACT
+Traditional offline redundancy resolution of trajectories for redundant manipulators involves computing inverse kinematic solutions for Cartesian space paths, constraining the manipulator to a fixed path without real-time adjustments. Online control algorithms can achieve real-time adjustment of paths, but it cannot consider subsequent path points, leading to the possibility of the manipulator being forced to stop mid-motion due to joint constraints. To address this, this paper introduces a dynamic programming-based offline redundancy resolution for redundant manipulators along prescribed paths with real-time adjustment. The proposed method allows the manipulator to move along a prescribed path while implementing real-time adjustment along the normal to the path. Using Dynamic Programming, the proposed approach computes a global maximum for the variation of adjustment parameters. As long as the variation of adjustment parameters between adjacent sampling path points does not exceed this limit, the algorithm provides the next path point’s joint angles based on the current joint angles, enabling the end-effector to achieve the adjusted Cartesian pose. The main innovation of this paper lies in augmenting traditional offline optimal planning with real-time adjustment capabilities, achieving a fusion of offline planning and online control.
+
+1. Introduction
+In many applications of robotics, such as ultrasound scanning robots (Li, Xu and Meng, 2021), massage robots (Ma, Yao, Ni and Zhu, 2005), polishing robots (Zeng, Zhu, Gao, Ji, Ansari and Lu, 2023; Xenya and Cortesão, 2023), and others, it is necessary for the robot to move precisely along a pre-planned path in a three-dimensional workspace. When performing these tasks, non-redundant manipulators are easily limited by singular points and joint ranges, making it difficult for them to reach certain specific poses along the given path, so redundant manipulators are preferred (Chiaverini, Oriolo and Maciejewski, 2016).
+In this paper, we consider the application scenario of robotic ultrasound scanning using a 7-degree-of-freedom (7DOF) redundant manipulator. Equipped with an ultrasound probe at its end effector, the manipulator acquires ultrasound images in close proximity to the patient’s skin. Consequently, the manipulator needs to move along a Cartesian space path specified according to the patient’s body surface, aiming to complete the scan as seamlessly as possible to enhance the quality and efficiency of the diagnose.
+∗Corresponding author scutjy2015@163.com (J. Tan); dxkong@zju.edu.cn (D. Kong)
+ORCID(s): 0000-0001-6356-1743 (J. Tan); 0000-0001-9339-8086 (D. Kong)
+1The two authors contribute equally to this work.
+
+Ultrasound scanning necessitates the control of the contact force between the probe and the patient: excessive contact force may cause discomfort to the patient, while insufficient contact force can result in unclear images. Therefore, it is essential for the manipulator to actively adjust the contact force in real-time during the scanning process. Since the probe is connected to the end-effector of the manipulator by a spring, by adjusting the manipulator path along the direction of the probe, the contact force can be controlled by altering the length of the spring.
+Due to the redundancy of the manipulator we use, a given end-effector pose can correspond to an infinite number of possible joint configurations, known as its inverse kinematic solutions. Although these joint configurations can all position the end-effector at the same pose, the range of joint configurations achievable during subsequent motion will differ due to constraints on joint angles, velocities, and other factors, leading to variations in the range of poses that can be later reached. Therefore, selecting the optimal solution from the infinite possible inverse kinematic solutions is crucial for the completeness of subsequent motion. This pertains to the redundancy resolution problem in redundant manipulators. The redundancy resolution algorithms for manipulators can be broadly categorized into two types: online control and offline planning.
+In online control algorithms, the inverse kinematic solution of the target pose are computed based on the current state of the manipulator without regard to future states. This method only considers the local path point, disregarding
+
+Z. Yin et al.:
+
+Page 1 of 14
+
+the restrictions of the current joint positions on subsequent motion, and thus cannot guarantee complete motion along a given path. The Cartesian pose controller integrated within the manipulator that we utilize belongs to this category. We will demonstrate its disadvantage through experiments in Section 4.1. On the other hand, online control algorithms inherently consider only the current state of the manipulator and the target pose, allowing for easy path adjustments. Widely used impedance control (Hogan, 1984; Song, Yu and Zhang, 2017; He, Dong and Sun, 2016; Ficuciello, Villani and Siciliano, 2015) falls into this category of algorithms.
+To prevent the manipulator from halting its motion due to joint limitations during operation, a viable approach is to employ an offline planning algorithm. Such algorithms consider all the path points along the manipulator’s path simultaneously before its motion, thoroughly addressing the restrictions imposed by the joint angles on subsequent motion. By considering all path points, the obtained inverse kinematic solutions can satisfy various joint constraints, such as those related to angle and velocity. However, due to the nonlinearity of the inverse kinematic mapping of the manipulator, changing the pose of a single path point and calculating its corresponding joint angles does not allow for a simple linear calculation of the subsequent points’ corresponding joint angles. Instead, the inverse kinematic solutions of all subsequent Cartesian poses need to be recomputed using the time-consuming algorithm, making realtime path adjustments challenging.
+We aspire for the manipulator to traverse a path without interruptions while also being capable of real-time path adjustments during its motion. Therefore, we aim to enhance the offline planning algorithm to integrate real-time adjustment functionalities. Driven by this concept, we propose a dynamic programming-based offline optimal planning algorithm of redundant manipulators along prescribed paths with real-time adjustment. With this algorithm, the manipulator can complete its motion along the path while allowing realtime adjustments to the path.
+1.1. Related Work The key to our study lies in solving the redundancy res-
+olution of a redundant manipulator. Redundancy resolution can mainly be done in the velocity or position level(Fahimi, 2008;). Algorithms in acceleration or higher-order level are also possible (Reiter, Müller and Gattringer, 2018). Algorithms designed on the joint velocity or higher level involve online computing the pseudoinverse of the Jacobian matrix associated with the forward kinematics of the controlled manipulator(Zhang, Li and Zhou, 2019). Such algorithm is online, as the manipulator moves, it calculates the joint angles for the next time step based on the current joint parameters and the expected Cartesian pose for the next time step. In (Zhong, Zhang, Zhai, Li, Xu, Pan and Zhou, 2023), a real-time optimization problem is established by considering the joint constraints of the manipulator as constraints, with the error between the current trajectory of the manipulator
+
+and the expected trajectory as the optimization objective. RNN is used for real-time optimization.
+However, as mentioned before, such velocity-based algorithm overlooks the influence of the current manipulator joint angles on the subsequent motion of the robot. As the manipulator moves, the joint angles of some joints may reach limits, causing the manipulator to jam and preventing further motion. Many algorithms have been proposed for joint-limit and singularity avoidance in online motion. The algorithm proposed in (Xu and Sun, 2018) keeps the manipulator closer to the mid-joint position of the joint limits to eliminate the danger of joint limits. However, due to the uncertainty of subsequent paths, this still does not guarantee that the joint angles of the manipulator will not reach their limits. Similarly, Huo and Baron (2008) maintains the manipulator as close as possible to the mid-joint position and as far as possible to the singularities at the same time to avoid joint limits and kinematic singularity. The algorithm proposed in (Moe, Antonelli, Teel, Pettersen and Schrimpf, 2016) devides tasks into different priority sets and allows a general number of scalar set-based tasks to be handled with a given priority within a number of equality tasks. This method can fulfill the system’s equality tasks while ensuring that the setbased tasks are always satisfied. With their algorithm, highpriority set-based tasks remain in their valid set at all times, whereas lower-priority set-based tasks cannot be guaranteed to be satisfied due to the influence of the higher-priority equality tasks. Lillo, Pierri, Caccavale and Antonelli (2020) tested the set-based task-priority kinematic control scheme for a dual-arm mobile manipulator, ensuring the integrity of the system and the effectiveness of the mission to be accomplished. However, due to the nature of online motion generation, these methods cannot ensure that the manipulator moves along the prescribed path while simultaneously avoiding joint limits.
+Algorithms designed on the joint position level generally introduce appropriate parameters to obtain the inverse kinematic solutions at various points along the path. Subsequently, by designing a global energy function, an optimization problem is formulated to determine the parameter values at each point, thereby achieving the global optimal solution for redundancy resolution along the path. Due to the simultaneous consideration of all path points and the computation of all inverse kinematic solutions, this type of algorithm belongs to offline planning and needs to be completed before the manipulator’s motion. (Ferrentino, Salvioli and Chiacchio, 2021) uses the joint space decomposition and selects redundant variables from the joint position vector as the redundancy parameters, obtaining a closed-form of inverse kinematic solution. Other parameterization methods, such as those proposed in (Shimizu, Kakuya, Yoon, Kitagaki and Kosuge, 2008), can also be selected based on the specific structure of the manipulator.
+Through parameterization, determining the inverse kinematic solution for the manipulator’s path transforms into finding the parameter values for each path point. This converts the problem into an optimization problem, where the
+
+Z. Yin et al.:
+
+Page 2 of 14
+
+objective of the optimization is determined by the practical requirements of the task. The algorithms proposed in (Ferrentino et al., 2021; Schappler, 2023; Ferrentino, Savino, Franchi and Chiacchio, 2023) use dynamic programming for optimal planning of redundant robots along prescribed paths. Based on the specific requirements of different practical tasks, an arbitrary energy function can be established as the objective of the optimization problem. Constraints can also be converted into constraints for the optimization problem through mathematical modeling. Since these algorithms calculate the joint angles corresponding to each moment of the manipulator’s motion in advance, they can ensure the completeness of the manipulator’s path. However, this also prevents the manipulator from making real-time adjustments to the path.
+Dynamic programming is a mathematical method for solving a class of optimization problems. It breaks down complex problems into a series of interconnected and overlapping subproblems, and combines the solutions of these subproblems recursively to obtain the optimal solution to the original problem(Simpson, 1961; Zietz, 2007). Using the dynamic programming algorithm, we can determine the globally optimal solution for redundancy resolution corresponding to the prescribed path, ensuring that the joint angle motion at every moment complies with the manipulator’s constraints, obtaining feasible trajectory results for the manipulator.
+To ensure the integrity of the manipulator’s motion, this paper opts to use the dynamic programming-based offline planning algorithm as the foundation, combined with a realtime control algorithm to address the problem proposed in this study.
+1.2. Paper Contribution and Organization This paper’s contribution lies in its pioneering inte-
+gration of real-time path adjustment functionality into traditional offline planning algorithms. Conventional offline planning algorithms precompute the complete path of the manipulator before operation, ensuring the feasibility of the manipulator’s motion but restricting it to follow the predetermined path. The proposed algorithm not only retains the advantages of offline planning by guaranteeing the feasibility of the manipulator’s motion, but also enables realtime adjustment of the subsequent path based on feedback from sensors and other sources during operation, thereby achieving online control. The proposed algorithm represents a significant breakthrough in offline planning algorithms for manipulators. This paper presents three main innovations:
+∙ Augmenting traditional offline optimal planning with real-time adjustment capabilities achieves a fusion of offline planning and online control, enabling the manipulator to adapt instantly to changes in the working environment and execute pre-defined tasks more effectively.
+∙ For the same pose, different inverse kinematic solutions are chosen based on the current joint angles, ensuring that the motion of each joint complies with the constraints.
+
+∙ The design of the dynamic programming algorithm enables the simultaneous determination of the inverse kinematic solution for the path and the maximum variation in path adjustment parameters.
+This paper is organized as follows. First, the mathematical model of the problem is described in section II. Then, the dynamic programming-based offline optimal planning algorithm of redundant manipulators along prescribed paths with real-time adjustment is proposed in section III. Finally, we tested the algorithm using test paths and randomly generated adjustment parameters, thereby demonstrating the reliability of the algorithm in section IV.
+
+2. Preliminaries and problem formulation
+
+In our work, we will take the Franka 7-DOF manipu-
+
+lator(Haddadin, Parusel, Johannsmeier, Golz, Gabl, Walch,
+
+Sabaghian, Jaehne, Hausperger and Haddadin, 2022) for
+
+study and experimentation. The host system communicates
+
+with the manipulator at a frequency of 1000Hz. The host
+
+system is capable of real-time access to various motion
+
+parameters of the manipulator, enabling it to send control
+
+commands for the motion of the manipulator. Therefore,
+
+we choose to discretize the pre-planned path in Cartesian
+
+space, ensuring that the sampling interval between adjacent
+
+path points is a multiple of the communication period of the
+
+manipulator.
+
+For a given path, we refer to the points that specify
+
+the corresponding Cartesian poses as sampling points, and
+
+the points at which the manipulator needs to communicate
+
+with the host and receive control signals as communica-
+
+tion points. A sampling point necessarily corresponds to
+
+a communication point, while a communication point may
+
+not be a sampling point. The host system, based on real-
+
+time information obtained from sensor readings, adjusts the
+
+positions of subsequent path points along the normal to the
+
+path at sampling points.
+
+Given a discrete path {𝐓EE𝑛} with 𝑛 + 1 sampling points
+
+in Cartesian space, 𝑖 represents the index of sampling points
+
+ranging from 0 to 𝑛 and 𝐓EE𝑖 denotes the end effector pose of the 𝑖-th sampling point. 𝐓EE𝑖 is a homogeneous transforma-
+
+tion matrix, which can be represented by a three-dimensional
+
+rotation matrix and a three-dimensional translation vector:
+
+[
+
+]
+
+𝐓EE𝑖 = 𝐑EE𝑖 𝐩EE𝑖 𝟎 1 (1)
+
+1×3
+
+where 𝐑EE𝑖 is the rotation matrix of the end effector of the 𝑖th sampling point, and 𝐩EE𝑖 is the translation vector. Let 𝐙𝑖 denote the z-axis of the rotation matrix representing the end-
+effector orientation of the manipulator at the 𝑖-th path point.
+This vector signifies the direction of the manipulator’s end-
+effector. For instance, when the manipulator is employed for ultrasound scanning, 𝐙𝑖 corresponds to the direction of the ultrasound probe. During the operation of the manipulator,
+the host will calculate the bounded adjustment parameter
+𝑦𝑖 in real time and adjust the end effector pose of the 𝑖th
+
+Z. Yin et al.:
+
+Page 3 of 14
+
+sampling point to 𝐓̂ EE𝑖(𝑦𝑖) according to 𝐙𝑖:
+
+[
+
+]
+
+𝐓̂ EE𝑖(𝑦𝑖) = 𝐑EE𝑖 𝐩EE𝑖 + 𝑦𝑖𝐙𝑖 𝟎 1 (2)
+
+1×3
+
+We will only consider the limitations on joint angle and
+velocity at first. Constraints on acceleration and jerk can be
+achieved through velocity limitations and further algorith-
+mic adjustments. The angular velocity of the manipulator’s joints is limited by 𝐪̇ max, and the joint angles have both lower and upper bounds, denoted as 𝐪min and 𝐪max respectively.
+Due to limitations in the angular velocity of the manipu-
+lator’s joints, the manipulator may fail to reach the adjusted
+position when the adjustment parameters undergo significant
+changes. Therefore, we have to set a consistent upper bound
+𝛿 on the change in the adjustment parameter 𝑦𝑖. As long as the difference between the adjustment parameter 𝑦𝑖+1 of the next waypoint and 𝑦𝑖 of the current waypoint does not exceed this global maximum variation, the algorithm can compute a feasible inverse kinematic solution of 𝐓̂ EE𝑖+1(𝑦𝑖+1) in realtime. The upper bound should be as large as possible to
+enable the manipulator to adjust the path to the maximum
+extent.
+In offline planning, the assurance that the manipulator’s
+trajectory complies with the joint constraints is established
+by predetermining the joint angles of each path point be-
+fore the motion, ensuring that these angles satisfy the con-
+straints. Building upon this concept, we want to calculate
+the joint angles corresponding to all path points in advance.
+Discretization is standard approach to offline redundancy
+resolution problems. Therefore, we divide the range of 𝑦𝑖 into 2𝑜 equal parts and discretize the coefficients to 2𝑜 + 1
+discrete values {𝑏−𝑜, 𝑏−𝑜+1, … , 𝑏𝑜} to maintain a finite set of potential path scenarios. Given that the values of 𝑦𝑖 have already been uniformly discretized, for convenience, we can
+directly use the change in the indices of 𝑦𝑖 values in the sequence {𝑏−𝑜, 𝑏−𝑜+1, … , 𝑏𝑜} to measure the variation in 𝑦𝑖. Denote 𝑐𝑖 as the indice of 𝑦𝑖 in the potential value sequence, which means 𝑦𝑖 = 𝑏𝑐𝑖 , and the restriction 𝛿 on the variation of 𝑦𝑖 implies a restriction on the variation of 𝑐𝑖, denoted as 𝑑. In other words, depending on the different values of 𝑦𝑖, 𝑦𝑖+1 can have at most 2𝑑 + 1 different values.
+Taking into account the constraints imposed by the joint
+angles of the previous sampling point on the current sam-
+pling point, for different adjusted paths, despite the ma-
+nipulator having the same Cartesian pose at the current
+sampling point, the pose and joint angles of the previous
+sampling point may differ, leading to different constraints
+on the joint angles at the current sampling point. Thus,
+even with identical Cartesian poses, the corresponding joint
+angles differ. We will compute the inverse kinematic solution
+for the target pose based on the joint angles of the previous
+sampling point, in other words, obtaining the inverse kinematic mapping 𝐪𝑖 = 𝑓 −1(𝐓̂ EE𝑖(𝑦𝑖), 𝐪𝑖−1). The previous joint angles 𝐪𝑖−1 will serve as the redundancy parameter.
+Deriving the inverse kinematic solutions based on the
+current joint angles of the manipulator resembles online
+planning. The distinction lies in the fact that we do not
+
+Z. Yin et al.:
+
+compute the inverse kinematic solutions in real-time, but rather perform all calculations before the manipulator’s motion commences, ensuring uninterrupted motion of the manipulator under all feasible adjusted paths.
+The problem we aim to address is as follows: to find the theoretical global maximum value for 𝑑, along with an inverse kinematic mapping 𝑓 −1, such that: for any {𝑐𝑛} that satisfies:
+𝑐0 = 0 (3) |𝑐𝑖 − 𝑐𝑖−1| ⩽ 𝑑, ∀𝑖 ∈ {1, 2, ..., 𝑛}
+𝐪𝑖 = 𝑓 −1(𝐓̂ EE𝑖(𝑏𝑐𝑖 ), 𝐪𝑖−1) is an inverse kinematic solution of 𝐓̂ EE𝑖(𝑏𝑐𝑖 ), and 𝐪𝑖 satisfies the following equation:
+𝑞min,𝑐 ⩽ 𝑞𝑖,𝑐 ⩽ 𝑞max,𝑐, 𝑖 = 0, 1, ..., 𝑛; 𝑐 = 1, 2, ..., 7 (4) |𝑞̇𝑖,𝑐| ⩽ 𝑞̇max,𝑐, 𝑖 = 1, 2, ..., 𝑛; 𝑐 = 1, 2, ..., 7
+where 𝑞min,𝑐, 𝑞max,𝑐, 𝑞𝑖,𝑐, 𝑞̇𝑖,𝑐, 𝑞̇max,𝑐, represent the 𝑐-th components of vectors 𝐪min, 𝐪max, 𝐪𝑖, 𝐪̇ 𝑖, 𝐪̇ max respectively. The angular volocities of joints can be easily calculated by definition:
+𝐪̇ 𝑖 = 𝐪𝑖 − 𝐪𝑖−1 , 𝑖 = 1, 2, ..., 𝑛 (5) 𝑡0
+The process of the proposed algorithm is roughly illustrated as in Figure 1. The algorithm is roughly divided into two parts: the offline planning before the manipulator’s motion and the real-time interaction with the manipulator during its motion, including the real-time adjustment of the path and motion compensation between adjacent sampling points.
+3. Algorithms
+In this section, we will use dynamic programming to obtain the maximum 𝑑 and the inverse kinematic mapping 𝑓 −1. Subsequently, we will employ motion compensation algorithm to ensure that the joint trajectory satisfies constraints on acceleration and jerk, enabling it to operate on the actual hardware.
+3.1. Inverse Kinematics Before seeking the redundancy resolution for the entire
+path, it is worthwhile to first consider the inverse kinematic solution corresponding to a single Cartesian pose 𝐓EE. Due to the redundancy of the 7-DOF manipulator, there exist infinitely many inverse kinematic solutions.
+Take the Franka Emika manipulator we use for experimental purposes in this study as an example. It is a nimble lightweight robot with 7 degrees of freedom and highly sensitive sensors. Figure 2 shows the Denavit-Hartenberg parameters of the Franka Emika manipulator, and Table 1 shows the limits of the joints of the manipulator2.
+2https://frankaemika.github.io/docs/
+Page 4 of 14
+
+Table 1 Limits of Joints
+
+Name Joint 1 Joint 2 Joint 3 Joint 4 Joint 5 Joint 6 Joint 7 Unit
+𝐪max 2.8973 1.7628 2.8973 -0.0698 2.8973 3.7525 2.8973 rad
+𝐪min -2.8973 -1.7628 -2.8973 -3.0718 -2.8973 -0.0175 -2.8973 rad 𝐪̇ max 2.1750 2.1750 2.1750 2.1750 2.6100 2.6100 2.6100 rads 𝐪̈ max 15 7.5 10 12.5 15 20 20 s2 rad 𝐪⃛max 7500 3750 5000 6250 7500 10000 10000 ras3d
+
+Figure 1: The process of the proposed algorithm. The algorithm is roughly divided into two parts: the offline planning before the manipulator’s motion and the real-time interaction with the manipulator during its motion, including the real-time adjustment of the path and motion compensation between adjacent sampling points.
+By employing the parameterization technique(Ferrentino and Chiacchio, 2018) and geometrical analysis(Tittel, 2021), we can derive closed-form inverse kinematics solutions for the manipulator. Following (Lee and Bejczy, 1991), a certain joint angle can be fixed as a parameter. The algorithm proposed in (He and Liu, 2021) calculates the inverse kinematic solutions of the Franka robot by taking 𝑞7, the joint angle of the 7th joint of the manipulator, as a parameter. Once 𝑞7 is specified, the manipulator can be considered as a 6-degreeof-freedom one. When a solution exists, there are three possible scenarios that lead to multiple solutions, resulting in up to 8 sets of solutions. These multiple solutions can be mutually converted when they exist. By considering the constraints on each joint angle, an analysis is conducted to exclude the multiple solutions while preserving the existence of the solutions through the imposition of restrictions on the joint angles. From this, we can obtain a bijective inverse kinematic mapping 𝑓𝑞−17 within the workspace of the 6-DOF
+Z. Yin et al.:
+
+Figure 2: Denavit-Hartenberg frames and table of parameters
+for the Franka Emika robot. In this figure, joint angles
+𝑞1,...,7 = 0. The reference frames follow the modified DenavitHartenberg convention, 𝑑1 = 0.333m, 𝑑3 = 0.316m, 𝑑5 = 0.384m, 𝑑𝑓 = 0.107m, 𝑎4 = 0.0825m, 𝑎5 = −0.0825m, 𝑎7 = 0.088m.
+
+manipulator:
+
+[𝑞1, 𝑞2, ..., 𝑞6]𝑇 = 𝑓𝑞−1(𝐓EE)
+
+(6)
+
+7
+
+Thus, we have obtained the parameterized inverse kinematic solution for the 7-DOF manipulator:
+
+𝐪 = 𝑓̃−1(𝐓EE, 𝑞7) [ = 𝑓 −1 𝑞7 (𝐓EE)] (7) 𝑞7
+
+During the computation of the inverse kinematic solutions, we also incorporate avoidance strategies for singularity. In robotics, the relationship between joint velocities and Cartesian velocities at the end-effector of a manipulator is commonly expressed using the Jacobian matrix as follows:
+
+𝐯 = 𝐽 (𝐪)𝐪̇
+
+(8)
+
+where 𝐯 represents the Cartesian velocity vector and 𝐽 denotes the Jacobian matrix. When the Jacobian matrix becomes singular, the manipulator loses one or more degrees of freedom, resulting in restricted motion in a particular direction in Cartesian space regardless of the chosen joint velocities. This limitation is known as singularity in the robot’s motion(Chiaverini et al., 2016).
+
+Page 5 of 14
+
+After obtaining a set of joint angles, we can compute the corresponding Jacobian matrix and examine whether the matrix is singular, thereby excluding singular configurations of the manipulator.
+In this paper, we will adopt another discretization approach: dividing the range of 𝑞7 into 𝑚 − 1 equal parts, thereby restricting the values of 𝑞7 to 𝑚 discrete values {𝑎1, 𝑎2, … , 𝑎𝑚}.
+For other redundant manipulators with potentially greater degrees of freedom, the method for solving the inverse kinematics remains the same, albeit requiring the introduction of additional parameters.
+3.2. Dynamic Programming-Based Algorithm We have proposed algorithm 1 to find the global max-
+imum value of 𝑑 and the inverse kinematic mapping 𝑓 −1 defined in section 2.
+It should be noted that given the end-effector pose 𝐓EE, not every 𝑞7 value can yield a corresponding inverse kinematic solution due to various restrictions on the manipulator joint angles and mechanical structure. The following test path serves as an example:
+
+Figure 3: The existence of solutions corresponding to each
+𝐓EE(𝑡) and 𝑞7 is depicted in a figure, where the blue regions indicate the existence of the inverse kinematic solutions.
+
+⎡cos(𝜃(𝑡)) sin(𝜃(𝑡)) 0 0.6 + 0.1 cos(𝜃(𝑡))⎤
+
+⎢sin(𝜃(𝑡)) − cos(𝜃(𝑡)) 0
+
+0.1 sin(𝜃(𝑡)) ⎥
+
+𝐓EE(𝑡) = ⎢ 0
+
+0
+
+−1
+
+0.1
+
+⎥
+
+⎢
+
+⎥
+
+⎣0
+
+0
+
+0
+
+1
+
+⎦
+
+(9)
+
+where 𝜃(𝑡) = 𝑡2𝜋 𝑡 − 𝜋, 0 ⩽ 𝑡 ⩽ 𝑡max and the duration 𝑡max is
+max
+10 seconds. Sample this path at consistent time intervals to obtain 𝑛 + 1 path points, and we can obtain the discretized path {𝐓EE𝑛}.
+The existence of solutions corresponding to each 𝐓EE(𝑡) and 𝑞7 is depicted in a figure, where the blue regions indicate the existence of the inverse kinematic solutions, as shown in Figure 3.
+For the inverse kinematic solution of a fixed path, it is tantamount to finding a continuous curve within the blue region in Figure 3 that connects 𝑡 = 0 and 𝑡 = 10, while ensuring that adjacent points on the curve satisfy the manipulator’s constraints on joint velocities. Other joint angles, such as the point in the lower left blue section in Figure 3, although representing an inverse kinematic solution for the path point, are not contiguous with the subsequent blue sections, thus causing a discontinuity in motion. This underscores the necessity of anticipating subsequent path points in advance.
+The problem under investigation in this study introduces a adjustment parameter 𝑦𝑖 for the 𝑖th sampling point pose 𝐓EE𝑖 in equation (2). Similarly, the adjusted pose 𝐓̃ EE(𝑦) of a Cartesian pose 𝐓EE corresponding to the adjustment parameter 𝑦 is defined as follows:
+
+[
+
+]
+
+̃
+
+𝐑EE 𝐩EE + 𝑦𝐙
+
+𝐓EE(𝑦) =
+
+(10)
+
+𝟎1×3
+
+1
+
+Z. Yin et al.:
+
+Figure 4: The existence of solutions corresponding to each 𝐓EE(𝑡), 𝑦 and 𝑞7 is depicted in a figure, where the colored regions indicate the existence of the inverse kinematic solutions.
+where 𝐑EE is the rotation matrix of the end effector, 𝐩EE is the translation vector, and 𝐙 denote the z-axis of the rotation matrix 𝐑EE. We can depict the existence of the inverse kinematic solution for each 𝐓EE(𝑡) of the test path corresponding to 𝑞7 and 𝑦 in a three-dimensional coordinate system. The colored region in the graph indicates the existence of the corresponding solutions, as illustrated in Figure 4.
+Similar to the fixed path problem, we need to solve the inverse kinematics within the colored region of the three-dimensional coordinate system in Figure 4. Denote 𝑓̃−1(𝐓̂ EE𝑖(𝑏𝑘), 𝑎𝑗), which is the inverse kinematic solution of the 𝑖th path point with the 𝑗th potential value 𝑎𝑗 of the 7th joint angle 𝑞7 and the 𝑘th potential value 𝑏𝑘 of the adjustment parameter 𝑦, as 𝐪̄ 𝑖,𝑗,𝑘. The inverse kinematic solution 𝑓̃−1 is defined in equation (7). The colored point with Cartesian coordinates ( 𝑡max 𝑛 𝑖, 𝑗, 𝑘) in Figure 4 represents 𝐪̄ 𝑖,𝑗,𝑘. We aim to find the global maximum variation 𝑑 between 𝑐𝑖 and 𝑐𝑖 +1
+Page 6 of 14
+
+for all 𝑖. To obtain this global maximum, we will employ
+a dynamic programming algorithm and construct a local
+energy function for each set of potential joint angles. For the joint angles 𝐪̄ 𝑖,𝑗,𝑘 = 𝑓 −1(𝐓̂ EE𝑖(𝑏𝑘), 𝑎𝑗 ) of the
+manipulator, we can consider this path point as a new start-
+ing point and move along the original path to the endpoint
+with adjustment, thus forming a sub-path. On this sub-path,
+we can define an energy function 𝐿(𝑖, 𝑗, 𝑘) analogous to 𝑑:
+𝐿(𝑖, 𝑗, 𝑘) is the maximum 𝑑𝑖, such that for any {𝑦𝑛} that satisfies:
+
+𝑐𝑖 = 𝑘, 𝐪𝑖 = 𝐪̄ 𝑖,𝑗,𝑘 (11) |𝑐𝑥 − 𝑐𝑥−1| ⩽ 𝑑𝑖, ∀𝑥 ∈ {𝑖 + 1, 𝑖 + 2, ..., 𝑛} 𝐪𝑥 = 𝑓 −1(𝐓̂ EE𝑖(𝑏𝑐𝑥 ), 𝐪𝑥−1) is an inverse kinematic solution of 𝐓̂ EE𝑥(𝑏𝑐𝑥 ), and 𝐪𝑥 satisfies the following equation:
+
+𝑞min,𝑐 ⩽ 𝑞𝑥,𝑐 ⩽ 𝑞max,𝑐, 𝑥 = 𝑖, 𝑖 + 1, ..., 𝑛; 𝑐 = 1, 2, ..., 7 (12) |𝑞̇𝑥,𝑐| ⩽ 𝑞̇max,𝑐, 𝑥 = 𝑖 + 1, 𝑖 + 2, ..., 𝑛; 𝑐 = 1, 2, ..., 7
+In the sub-path starting from the joint angles 𝐪̄ 𝑖,𝑗,𝑘, as long as the difference between the indice 𝑐𝑥+1 of the next waypoint’s adjustment parameter and 𝑐𝑥 of the current does not exceed 𝑑𝑖, the algorithm can compute a feasible inverse kinematic solution of 𝐓̂ EE𝑥+1(𝑦𝑥+1) in real-time. It’s obvious that :
+
+𝑚
+
+max 𝑑 = max 𝐿(0, 𝑗, 0)
+
+(13)
+
+𝑗=1
+
+The sub-path starting from the joint angles 𝐪̄ 𝑖,𝑗,𝑘 can be further decomposed into the starting point and the sub-
+path starting from the next sampling point. We will uti-
+lize this decomposition to iteratively compute all values of
+𝐿(𝑖, 𝑗, 𝑘). The potential pose of the next sampling point is 𝐓̂ EE𝑖+1(𝑏𝑘+𝑒), where |𝑒| ⩽ 𝐿(𝑖, 𝑗, 𝑘), and |𝑘 + 𝑒| ⩽ 𝑜. For all 𝐪̄ 𝑖,𝑗,𝑘, we will recursively calculate 𝐿(𝑖, 𝑗, 𝑘) and define all inverse mappings 𝑓 −1(𝐓̂ EE𝑖+1(𝑏𝑘+𝑒), 𝐪̄ 𝑖,𝑗,𝑘).
+For any chosen set of 𝑖, 𝑗, and 𝑘, and for any non-negative
+integer 𝑠, if 𝐿(𝑖, 𝑗, 𝑘) ⩾ 𝑠, according to the definition, for any {𝑐𝑛} satisfying |𝑐𝑥 −𝑐𝑥−1| ⩽ 𝑠 for all 𝑥 = 𝑖+1, 𝑖+2, ..., 𝑛 and 𝑐𝑖 = 𝑘, we have 𝐪𝑖 = 𝐪̄ 𝑖,𝑗,𝑘, 𝐪𝑥 = 𝑓 −1(𝐓̂ EE𝑥(𝑏𝑐𝑥 ), 𝐪𝑥−1) as an inverse kinematic solution of 𝐓̂ EE𝑥(𝑏𝑐𝑥 ), and 𝐪𝑥 satisfies the constraints. Take 𝑐𝑖+1 = 𝑘 + 𝑒 which satisfies |𝑒| ⩽ 𝑠 and |𝑘 + 𝑒| ⩽ 𝑜. |𝑐𝑖+1 − 𝑐𝑖| ⩽ 𝑠, thus there exists a 𝑗𝑒 such that 𝐪̄ 𝑖+1,𝑗𝑒,𝑘+𝑒 = 𝑓 −1(𝐓̂ EE𝑖+1(𝑏𝑘+𝑒), 𝐪𝑖). 𝐪̄ 𝑖+1,𝑗𝑒,𝑘+𝑒 is a pathpoint of the sub-path starting from 𝐪̄ 𝑖,𝑗,𝑘, thus for any {𝑐𝑛} satisfying |𝑐𝑥−𝑐𝑥−1| ⩽ 𝑠 for all 𝑥 = 𝑖+2, 𝑖+3, ..., 𝑛 and 𝑐𝑖+1 = 𝑘+𝑒, we can take 𝑐𝑖 = 𝑘 and use the 𝐪𝑥 calculated from the subpath starting from 𝐪̄ 𝑖,𝑗,𝑘 as the inverse kinematic solution of 𝐓̂ EE𝑥(𝑏𝑐𝑥 ) in the sub-path starting from 𝐪̄ 𝑖+1,𝑗𝑒,𝑘+𝑒. It inherently satisfies the constraints. From definition, we have
+𝐿(𝑖 + 1, 𝑗𝑒, 𝑘 + 𝑒) ⩾ 𝑠. Thus, if 𝐿(𝑖, 𝑗, 𝑘) ⩾ 𝑠, for any 𝑒 satisfying |𝑒| ⩽ 𝑠 and |𝑘 + 𝑒| ⩽ 𝑜, there exists a 𝑗𝑒 such that 𝐿(𝑖 + 1, 𝑗𝑒, 𝑘 + 𝑒) ⩾ 𝑠.
+Conversely, if for any 𝑒 satisfying |𝑒| ⩽ 𝑠 and |𝑘+𝑒| ⩽ 𝑜,
+there exists a 𝑗𝑒 such that 𝐿(𝑖+1, 𝑗𝑒, 𝑘+𝑒) ⩾ 𝑠 and 𝐪̄ 𝑖+1,𝑗𝑒,𝑘+𝑒
+
+Z. Yin et al.:
+
+satisfies the constraints with 𝐪̄ 𝑖,𝑗,𝑘, then 𝐿(𝑖, 𝑗, 𝑘) ⩾ 𝑠. For any {𝑐𝑛} satisfying |𝑐𝑥 −𝑐𝑥−1| ⩽ 𝑠 for all 𝑥 = 𝑖+1, 𝑖+2, ..., 𝑛 and 𝑐𝑖 = 𝑘, there’s a certain 𝑒 such that 𝑐𝑖+1 = 𝑘 + 𝑒. We can then use the 𝐪𝑥 calculated from the sub-path starting from 𝐪̄ 𝑖+1,𝑗𝑒,𝑘+𝑒 as the inverse kinematic solution of 𝐓̂ EE𝑥(𝑦𝑥) in the sub-path starting from 𝐪̄ 𝑖,𝑗,𝑘. It inherently satisfies the constraints. From definition, we have 𝐿(𝑖, 𝑗, 𝑘) ⩾ 𝑠.
+Thus, we have obtained the recursive property of 𝐿(𝑖, 𝑗, 𝑘):
+𝐿(𝑖, 𝑗, 𝑘) is the maximum 𝑑𝑖, such that for any 𝑒 satisfying |𝑒| ⩽ 𝑑𝑖 and |𝑘 + 𝑒| ⩽ 𝑜, there exists a feasible 𝐪̄ 𝑖+1,𝑗𝑒,𝑘+𝑒 satisfying joint angle and velocity constraints, and 𝐿(𝑖 +
+1, 𝑗𝑒, 𝑘 + 𝑒) ⩾ 𝑑𝑖. For a fixed set of 𝑖, 𝑗 and 𝑘, we also need to define
+𝑓 −1(𝐓̂ EE𝑖+1(𝑏𝑘+𝑒), 𝐪̄ 𝑖,𝑗,𝑘) for any 𝑒 satisfying |𝑒| ⩽ 𝐿(𝑖, 𝑗, 𝑘) and |𝑘 + 𝑒| ⩽ 𝑜. We denote the inverse kinematic solution 𝐪̄ 𝑖+1,𝑗′,𝑘+𝑒 of 𝐓̂ EE𝑖+1(𝑏𝑘+𝑒) that complies with the constraints and has the maximum 𝐿(𝑖 + 1, 𝑗′, 𝑘 + 𝑒) as 𝐪̄ 𝑖+1,𝑗𝑒,𝑘+𝑒. We define:
+
+𝑓 −1(𝐓̂ EE𝑖+1(𝑏𝑘+𝑒), 𝐪̄ 𝑖,𝑗,𝑘) = 𝐪̄ 𝑖+1,𝑗𝑒,𝑘+𝑒
+
+(14)
+
+According to the recursive property, we will start from 𝑖 = 𝑛 − 1 and recursively calculate all the values of 𝐿(𝑖, 𝑗, 𝑘) with 𝑖 moving backward. Algorithm 1 shows the solution:
+
+Algorithm 1 The solution for the maximum value of 𝑑
+
+1: Set 𝑖 = 𝑛 − 1
+
+2: Set 𝑑𝑖 = 0
+
+3: For 1 ⩽ 𝑗 ⩽ 𝑚, −𝑜 ⩽ 𝑘 ⩽ 𝑜
+
+4: Repeat:
+
+5: If feasible solutions 𝐪̄ 𝑖+1,𝑗±𝑑𝑖 ,𝑘±𝑑𝑖 both exist
+
+6:
+
+𝑑𝑖 = 𝑑𝑖 + 1
+
+7: Else, 𝐿(𝑖, 𝑗, 𝑘) = 𝑑𝑖 − 1, terminate the loop
+
+8: For (𝑛 − 1 > 𝑖 ⩾ 0)
+
+9: For 1 ⩽ 𝑗 ⩽ 𝑚, −𝑜 ⩽ 𝑘 ⩽ 𝑜
+
+10: Repeat
+
+11: If feasible solutions 𝐪̄ 𝑖+1,𝑗±𝑑𝑖 ,𝑘±𝑑𝑖 both exist 12: And 𝐿(𝑖 + 1, 𝑗𝑡, 𝑘 + 𝑡) ⩾ 𝑑𝑖 , ∀|𝑡| ⩽ 𝑑𝑖
+
+13:
+
+𝑑𝑖 = 𝑑𝑖 + 1
+
+14: Else, 𝐿(𝑖, 𝑗, 𝑘) = 𝑑𝑖 − 1, terminate the loop
+
+15: Find 𝑗0, such that: 16: 𝐿(0, 𝑗0, 0) = max𝑚𝑗=1 𝐿(0, 𝑗, 0) 17: Denote 𝐪̄ 0,𝑗0,0 as the starting point of the path 18: 𝑑𝑚𝑎𝑥 = 𝐿(0, 𝑗0, 0)
+
+For 𝐪̄ 𝑛−1,𝑗,𝑘, we simply need to ensure that the joint angles at the next sampling point satisfies the constraints. We start with 𝑑𝑛−1 at 0 and and increase it by 1 each time, checking if the compliant solutions 𝐪̄ 𝑖+1,𝑗−𝑑𝑛−1 ,𝑘−𝑑𝑛−1 and 𝐪̄ 𝑖+1,𝑗𝑑𝑛−1 ,𝑘+𝑑𝑛−1 both exist, until one does not. Then the previous 𝑑𝑛−1 yields the 𝐿(𝑛 − 1, 𝑗, 𝑘). Line 1 to Line 7 in Algorithm 1 correspond to this step.
+Assuming that for all 𝑗′ and 𝑘′, we have computed 𝐿(𝑖 + 1, 𝑗′, 𝑘′), we will use the computed 𝐿(𝑖 + 1, 𝑗′, 𝑘′) to recursively calculate 𝐿(𝑖, 𝑗, 𝑘). For any 𝐪̄ 𝑖,𝑗,𝑘, set 𝑑𝑖 = 0. Traversing 𝑗′ and check if 𝐪̄ 𝑖+1,𝑗′,𝑘 satisfies constraints on joint angles and velocities. If there are no joint angles that
+Page 7 of 14
+
+satisfy the constraints, it indicates that the manipulator is stuck at the current joint angles and cannot proceed to the next step. Otherwise, there exists a 𝑗0 such that 𝐪̄ 𝑖+1,𝑗0,𝑘 satisfies the constraints and has the maximum 𝐿(𝑖 + 1, 𝑗0, 𝑘). If 𝐿(𝑖 + 1, 𝑗0, 𝑘) = 0, we have 𝐿(𝑖, 𝑗, 𝑘) = 0 and stop the increment on 𝑑𝑖.
+Then we move on to 𝑑𝑖 = 1. We traverse 𝐪̄ 𝑖+1,𝑗′,𝑘−1 and 𝐪̄ 𝑖+1,𝑗′,𝑘+1, and check if constraints on joint angles and velocities are satisfied. If there exist 𝑗−1, 𝑗1 such that 𝐪̄ 𝑖+1,𝑗−1,𝑘−1 and 𝐪̄ 𝑖+1,𝑗1,𝑘+1 satisfy the constraints respectively, and 𝐿(𝑖, 𝑗±1, 𝑘 ± 1) ⩾ 1, by the recursive property, we have 𝐿(𝑖, 𝑗, 𝑘) ⩾ 1. Otherwise, 𝐿(𝑖, 𝑗, 𝑘) = 0.
+Subsequently, we increase on 𝑑𝑖 by 1 at each step, traverse 𝐪̄ 𝑖+1,𝑗′,𝑘−𝑑𝑖 and 𝐪̄ 𝑖+1,𝑗′,𝑘+𝑑𝑖 . If constraints cannot be satisfied, or any 𝐿(𝑖+1, 𝑗𝑡, 𝑘+𝑡) for 𝑡 ∈ {−𝑑𝑖, −𝑑𝑖 +1, ..., 𝑑𝑖} is less than 𝑑𝑖, we have 𝐿(𝑖, 𝑗, 𝑘) = 𝑑𝑖 − 1, and stop the increment on 𝑑𝑖. Line 8 to Line 14 in Algorithm 1 correspond to this step.
+Through the aforementioned recursion, we can compute all the values of 𝐿(𝑖, 𝑗, 𝑘). Subsequently, from 𝐿(0, 𝑗, 0), we select the maximum value 𝐿(0, 𝑗0, 0), which represents the maximum 𝑑. The corresponding 𝐪̄ 0,𝑗0,0 is then used as the inverse kinematic solution for the starting point of the path. Line 15 to Line 18 in Algorithm 1 correspond to this step.
+During the motion of the manipulator, the 𝑐𝑖 corresponding to the 𝑖th sampling point is read in real-time. Suppose 𝐪̄ 𝑖−1,𝑗,𝑐𝑖−1 is the joint angles at the (𝑖 − 1)-th sampling point, then 𝐪̄ 𝑖,𝑗′,𝑐𝑖 = 𝑓 −1(𝐓̂ EE𝑖(𝑏𝑐𝑖 ), 𝐪̄ 𝑖,𝑗,𝑘) is used as the 𝑖-th sampling point’s joint angle. This value is then sent to the manipulator, enabling it to move along the adjusted path.
+Based on the recursive structure and the number of iterations of the algorithm, we can derive its computational complexity. The complexity is related to the number of path points 𝑛, the number of possible values for the seventh joint angle 𝑚, and the number of adjustment parameter values 𝑜. The computational complexity of the algorithm is 𝑂(𝑚2𝑛𝑜2).
+3.3. Motion Compensation In our study, we have only considered constraints on
+joint angle and velocity. However, in practical manipulator operations, there are also limitations on joint acceleration and jerk. Therefore, when testing the algorithm on the actual manipulators, adjustments to the algorithmic results are necessary to conform to these additional constraints.
+We have chosen to employ a motion compensation algorithm. Due to the time intervals between sampling points along the path being greater than the communication cycle of the manipulator, the host system needs to communicate with the manipulator and issue control commands between adjacent sampling points. The target joint angles at intermediate points need to be obtained through interpolation or similar methods. To ensure smooth motion, we aim for the manipulator’s joints to move at a constant speed between adjacent sampled points. Algorithm 2 is our motion compensation algorithm.
+During communication between the host system and the manipulator, real-time readings of the current joint angles
+
+Algorithm 2 Motion Compensation
+
+1: Read the elapsed time 𝑡 of the motion
+
+2: If 𝑡 is the 𝑖-th sampling point
+
+3: Calculate 𝑐𝑖+1
+
+4:
+
+𝐪𝑖+1 = 𝑓 −1(𝐓̂ EE𝑖+1(𝑏𝑐𝑖+1 ), 𝐪𝑖)
+
+5: Calculate the remaining time 𝑡r before 𝐓̂ EE𝑖+1(𝑏𝑐𝑖+1 )
+
+6: 𝐪̈ max’ = min(𝐪̈ max, 𝐪⃛max ⋅ 𝑛0 ⋅ 𝑡0)
+
+𝐪̈ 2
+max
+7: 𝐪̇ max’ = min(𝐪̇ max, 𝐪̈ max ⋅ 𝑛0 ⋅ 𝑡0 − 2⋅𝐪⃛ )
+
+max
+
+8: Read 𝐪now, 𝐪̇ now, and 𝐪̈ now
+
+9: 𝐪̇ = 𝐪𝑖+1−𝐪now
+
+d
+
+𝑡r
+
+10: 𝐪̈ d = 𝐪̇ d−𝐪̇ now 𝑡0
+
+11: 𝐪⃛d = 𝐪̈d−𝐪̈now
+
+𝑡0
+
+12: *For 1 ⩽ 𝑐 ⩽ 7
+
+13:
+
+If 𝑞⃛d𝑐 > 𝑞⃛max𝑐
+
+14:
+
+𝑞⃛d𝑐 = 𝑞⃛max𝑐, 𝑞̈d𝑐 = 𝑞̈now𝑐 + 𝑞⃛d𝑐 ⋅ 𝑡0,
+
+15:
+
+𝑞̇d𝑐 = 𝑞̇now𝑐 + 𝑞̈d𝑐 ⋅ 𝑡0, return to *
+
+16:
+
+If 𝑞̈d𝑐 > 𝑞̈max’𝑐
+
+17: 𝑞̈d𝑐 = 𝑞̈max’𝑐 , 𝑞⃛d𝑐 = 𝑡 𝑞̈now𝑐−𝑞̈d𝑐 ,
+
+0
+
+18:
+
+𝑞̇d𝑐 = 𝑞̇now𝑐 + 𝑞̈d𝑐 ⋅ 𝑡0, return to *
+
+19:
+
+If 𝑞̇d𝑐 > 𝑞̇max’𝑐
+
+20: 𝑞̇d𝑐 = 𝑞̇max’𝑐 , 𝑞̈d𝑐 = 𝑡 𝑞̇now𝑐−𝑞̇d𝑐 ,
+
+0
+
+21: 𝑞⃛d𝑐 = 𝑞̈now𝑐−𝑞̈d𝑐 𝑡 , return to * 0
+
+22: 𝐪d = 𝐪now + 𝐪̇ ⋅ 𝑡0
+
+23: Return 𝐪d as the expected joint angle for the next com-
+
+munication point.
+
+𝐪now, velocities 𝐪̇ now, and accelerations 𝐪̈ now of joints are obtained. Adjustment coefficients read at the last sampling point and the algorithmically derived path are used to calculate the expected joint angles 𝐪𝑖+1 at the next sampling point. Subsequently, the remaining time before the next sampling point, denoted as 𝑡r, is used to compute the expected velocity 𝐪̇ d, acceleration 𝐪̈ d and jerk 𝐪⃛d for the next communication cycle:
+𝐪̇ d = 𝐪𝑖+1 − 𝐪now 𝑡r
+𝐪̈ d = 𝐪 (15) ̇ d − 𝐪̇ now 𝑡0
+𝐪⃛d = 𝐪̈ d − 𝐪̈ now 𝑡0
+where 𝑡0 is the communication period of the manipulator. Lines 9 to 11 in Algorithm 2 correspond to this step.
+After that, we sequentially examine whether the jerk, acceleration, and velocity exceed their respective limits. If any of these values surpass the limits, they need to be adjusted to their corresponding maximum values, and the other two motion parameters need to be recalculated until all motion parameters comply with the constraints. With the calculated velocity, we can obtain the desired joint angles for
+
+Z. Yin et al.:
+
+Page 8 of 14
+
+Figure 5: The interpolated expected path points cannot guarantee that acceleration and jerk constraints are satisfied, hence we can only modify the actual path under these constraints. This process inevitably leads to discrepancies between the actual and theoretical paths, and our algorithm minimizes this error to the greatest extent under joint constraints, ensuring that the manipulator smoothly reaches the expected joint angles at the next sampling point.
+the next communication point. Lines 12 to 23 correspond to this step.
+Considering the constraint on jerk, the manipulator may not be able to change the acceleration direction in a short time. After accelerating, if the manipulator needs to decelerate in a certain joint, there will still be a period of acceleration. This acceleration period might cause the joint angle to exceed its velocity limits. Therefore, a "cautionary value" needs to be set for the joint velocities. When the velocity surpasses this limit, the manipulator must reduce its acceleration and begin deceleration.
+We can simulate the extreme scenarios for each joint, considering the need for the manipulator to immediately cease acceleration and begin deceleration when operating at maximum acceleration. At this point, the jerk reaches its upper limit and is opposite in direction to the current velocity. Assuming the velocity at the current communication point is 0, we can calculate the velocities and accelerations for the subsequent communication points. The velocity when the acceleration is 0 represents the velocity we need to reserve for the deceleration process. Subtracting this reserved velocity from the maximum velocity yields the cautionary value for velocity.
+Similarly, due to the constraint on manipulator acceleration, when the manipulator velocity needs to change direction, there will still be a short deceleration along the current direction. This deceleration may cause the joint angles to exceed their limits. Consequently, when using the algorithm to solve the inverse kinematics, the joint angle limits need to be reduced to accommodate space for deceleration.
+Figure 5 succinctly illustrates our motion compensation algorithm. The interpolated expected path points cannot guarantee that acceleration and jerk constraints are satisfied, hence we can only modify the actual path under these
+Z. Yin et al.:
+
+constraints. This process inevitably leads to discrepancies between the actual and theoretical paths, and our algorithm minimizes this error to the greatest extent under joint constraints, ensuring that the manipulator smoothly reaches the expected joint angles at the next sampling point.
+In addition, we also need to consider how to smoothly bring the manipulator to a stop as the motion approaches its end. This requires the manipulator’s joint velocity, acceleration, and jerk to be zero as the motion stops. In order to smoothly bring the manipulator’s velocity and acceleration to zero, additional constraints need to be satisfied:
+
+𝐪̈ ⩽ 𝐪⃛max ⋅ 𝑛0 ⋅ 𝑡0
+𝐪̈ 2max (16) 𝐪̇ ⩽ 𝐪̈ max ⋅ 𝑛0 ⋅ 𝑡0 −
+2 ⋅ 𝐪⃛max
+where 𝑛0 is the number of remaining communication cycles. Line 6 and line 7 in Algorithm 2 correspond to this step.
+Thus, we have constructed the motion compensation algorithm for manipulator control. At each communication cycle, the final manipulator control algorithm is as described in Algorithm 2.
+After applying the motion compensation algorithm, during the actual operation of the manipulator, when there is a significant discrepancy between the desired joint velocity derived from the algorithm and the current velocity of the manipulator, the manipulator is unable to adjust to the desired joint velocity, causing the actual path to deviate from the expected path. Therefore, it is necessary to impose stricter constraints on the joint angular velocity of the desired path to ensure that the manipulator can return to the expected path after deviating. When using dynamic programming to compute redundancy resolution, we modify the velocity upper limit of the joint angles to 𝐪̇ max2.
+Subsequently, we will calculate the maximum error introduced by the motion compensation algorithm, as well as the maximum time required for the manipulator to return to the expected path after deviating. We consider the most extreme scenario, where the manipulator and the desired path move in opposite directions at their maximum velocities. Through straightforward calculations, we can determine the maximum joint angle error 𝐞𝐫𝐫max and the maximum time 𝐭max required for each joint to return to the desired joint angles:
+
+(𝐪̇ max + 𝐪̇ max2)2 𝐞𝐫𝐫max =
+
+2𝐪̈ max (17)
+
+𝐭max =
+
+2𝐪̇ 2max
+
+𝐪̈ max(𝐪̇ max − 𝐪̇ max2)
+
+When 𝐪̇ max2 is fixed, 𝐭max reaches its minimum value when 𝐪̇ max = 2𝐪̇ max2. As 𝐪̇ max2 decreases, 𝐞𝐫𝐫max and 𝐭max both decreases, while the maximum difference between adjacent adjustment parameters also decreases, which will
+diminish the algorithm’s ability to adjust the path in real
+time. However, considering the algorithm’s ability to adjust
+the path in real time, it can compensate for errors by dynam-
+ically modifying the path in practical applications.
+
+Page 9 of 14
+
+Figure 6: The end-effector paths obtained from both simulated and laboratory tests of the manipulator. Whether in simulation or in real-world testing, the manipulator completed the entire motion along the path, and the executed trajectory closely matched the expected path.
+
+4. Results
+To verify the feasibility of the proposed algorithm, we selected the Franka Emika manipulator for the research and testing of our algorithm.
+4.1. Comparison with the Franka Cartesian pose generator
+The robot controller has a Cartesian pose generator that can calculate the inverse kinematic solution of the Cartesian pose based on the current state of the manipulator and control its movements accordingly at a fixed frequency. The Cartesian pose generator is an online algorithm, which may lead to interruptions in subsequent motions. We will use the Cartesian path 𝐓EE(𝑡) in equation (9) as the test path.
+First, we conducted tests on the proposed algorithm. For the original path, we simulated the joint angles of the manipulator at each communication point using software, obtaining the theoretical results of the algorithm. Additionally, we performed real-world testing using the Franka manipulator, resulting in laboratory results. Whether in simulation or in real-world testing, the manipulator completed the entire motion along the path, and the executed trajectory closely matched the expected path, as is shown in Figure 6.
+Subsequently, we computed the angles, velocities, accelerations, and jerks of each joint in the simulated tests, as depicted in Figure 7. All the data has been normalized, with 1 representing its maximum value and -1 representing its minimum value. From the figures, it is evident that all motion parameters adhere to their respective constraints.
+The testing of the Franka Cartesian pose generator, however, did not proceed as smoothly. To maintain control over variables, we initiated the manipulator from the same initial joint angles as the proposed algorithm. Due to joint velocities and accelerations exceeding limits, the manipulator was forced to halt shortly after commencing its motion. Consequently, we had to modify the path velocity to allow for a gradual acceleration of the manipulator. While the
+Z. Yin et al.:
+
+Figure 7: The angles, velocities, accelerations, and jerks of each joint in the simulated tests. All the data has been normalized, with 1 representing its maximum value and -1 representing its minimum value. From the figures, it is evident that all motion parameters adhere to their respective constraints.
+manipulator successfully initiated motion, it was compelled to stop due to joint angles surpassing their limits, just after the halfway point of the motion. The end-effector trajectory of the manipulator is illustrated in Figure 8.
+Upon inspecting the motion parameters of each joint angle, we discovered that the angle of joint 7 reached its minimum value, resulting in an inability to continue the motion. The angle, velocity, acceleration, and jerk of joint 7 are illustrated in Figure 9, with each datum undergoing the same normalization process as depicted in Figure 7.
+Subsequently, we compared the results obtained from the proposed algorithm with those from the Cartesian pose generator in Figure 10. It is visually apparent that while both methods initiated from the same initial joint angles, as the motion progressed, there were variations in the selection of joint angles. Under the proposed algorithm, the manipulator returns to its original pose, whereas under the Franka algorithm, the manipulator stops midway.
+By comparison, we observe that the online control algorithm cannot guarantee manipulator completes the entire trajectory. The test path we used is a circle, meaning the manipulator has the same pose at the start and end points. However, by examining Figure 3, we find that the 7th joint
+Page 10 of 14
+
+During the manipulator’s motion, the probe was directly contacted by hand. By adjusting the path in real-time based on the sensor readings and keeping the readings within a fixed range, the manipulator was able to move while simultaneously following the hand’s vertical adjustments. The test path with 101 sampling points is defined as follows:
+
+Figure 8: The end-effector trajectory of the manipulator using Franka Cartesian pose generator. The manipulator compelled to stop due to joint angles surpassing their limits.
+Figure 9: The angle, velocity, acceleration, and jerk of joint 7, with each datum undergoing the same normalization process as depicted in Figure 7. The angle of joint 7 reached its minimum value, resulting in an inability to continue the motion.
+angle 𝑞7 of the manipulator must decrease from its maximum to its minimum value in order to ensure movement along the path. While the start and end points have the same pose, different joint angles are required considering the entire trajectory, which the online control algorithm is unable to achieve. This comparative experiment highlights the advantages of the offline planning algorithm. 4.2. Practical task test
+Next, we tested the real-time adjustment capability of the proposed algorithm with a practical task. This is the key highlight of the proposed algorithm, a capability that other offline planning algorithms are unable to achieve. A model probe is mounted in a sliding groove at the end of the manipulator and is connected to the manipulator via a spring, allowing it to make small movements along the direction of the manipulator’s end-effector. Subsequently, a distance sensor was attached to the end-effector to measure the distance between the probe and the end-effector. Z. Yin et al.:
+
+⎡cos( 2𝜋𝑖 ) ⎢ 100
+
+sin( 2𝜋𝑖 )
+100
+
+0 0.6 + 0.1 cos( 2𝜋𝑖 )⎤ 100 ⎥
+
+⎢sin( 2𝜋𝑖 100 ) − cos( 2𝜋𝑖 100 ) 0
+
+0.1 sin( 2𝜋𝑖 100 ) ⎥
+
+𝐓EEi = ⎢ 0
+
+0
+
+−1
+
+0.2
+
+⎥
+
+⎢
+
+⎥
+
+⎣0
+
+0
+
+0
+
+1
+
+⎦
+
+(18)
+
+The time interval between two adjacent sampling points is 0.1s. The maximum adjustment parameter 𝑏𝑜 is 0.05m. Figure 11 illustrates the testing of the manipulator’s path adjustment in response to hand movements. Before the hand makes contact with the manipulator, the manipulator actively adjusts its trajectory downward along the direction of the end-effector, effectively performing a target-seeking action. Once the hand contacts the model probe, the manipulator can actively adjust its motion trajectory in real-time to follow the vertical movements of the hand.
+Then we plotted the trajectory of the manipulator’s endeffector in Figure 12. The original trajectory of the manipulator, the desired adjusted trajectory computed in real-time by the proposed algorithm, and the actual trajectory of the manipulator after motion compensation were all included in the plot. It can be observed that the manipulator effectively follows the adjusted trajectory, and its path exhibits realtime adjustments compared to the original trajectory. These results demonstrate the feasibility and reliability of the proposed algorithm.
+Subsequently, we computed the error in the results. To intuitively demonstrate the error, we only considered the positional error along the path. During the operation of the manipulator, while controlling the manipulator to move along the path in real time, we also calculated the desired path after motion compensation. In Figure 13, we plot the error of the calculated results and the actual experimental results compared to the desired path obtained by the algorithm. Larger errors occur at the starting and ending points of the path due to the acceleration from zero velocity and deceleration to zero velocity. The errors for both results are maintained within the order of 10−3 meters. The error in the actual experimental results is higher than that in the calculated results due to the manipulator’s control.
+From the experimental results, it can be observed that the proposed algorithm effectively enables real-time adjustment of the manipulator’s path. The algorithm itself incurs negligible computational errors, and the errors generated by the motion compensation interpolation algorithm corresponding to the proposed algorithm are also within the fine-tuning range of devices such as springs. Therefore, the proposed algorithm can effectively accomplish its intended function.
+
+Page 11 of 14
+
+Figure 10: The top row illustrates the results obtained from the proposed algorithm, while the bottom row shows the results of the Franka algorithm. While both methods initiated from the same initial joint angles, as the motion progressed, there were variations in the selection of joint angles. Under the proposed algorithm, the manipulator returns to its original pose, whereas under the Franka algorithm, the manipulator stops midway.
+
+Figure 11: The testing of the manipulator’s path adjustment in response to hand movements. Before the hand makes contact with the manipulator, the manipulator actively adjusts its trajectory downward along the direction of the end-effector, effectively performing a target-seeking action. Once the hand contacts the model probe, the manipulator can actively adjust its motion trajectory in real-time to follow the vertical movements of the hand
+
+5. Conclusion
+This paper innovatively proposes a dynamic programmingbased offline redundancy resolution of redundant manipulators along prescribed paths with real-time adjustment. The proposed algorithm not only retains the advantages of offline
+
+planning by guaranteeing the feasibility of the manipulator’s motion but also enables real-time adjustment of the subsequent path based on feedback from sensors and other sources during operation, thereby achieving online control. The proposed algorithm represents a significant breakthrough in offline planning algorithms for manipulators.
+
+Z. Yin et al.:
+
+Page 12 of 14
+
+Acknowledgments
+This work was supported by The National Natural Science Foundation(Nos.12090020, 12090025) and the Zhejiang Provincial Science and Technology Program(2022C03113).
+
+Figure 12: The original trajectory of the manipulator, the desired adjusted trajectory computed in real-time by the proposed algorithm, and the actual trajectory of the manipulator after motion compensation were all included in the plot. It can be observed that the manipulator effectively follows the adjusted trajectory, and its path exhibits real-time adjustments compared to the original trajectory.
+Figure 13: The error of the calculated results and the actual experimental results compared to the desired path obtained by the algorithm. Larger errors occur at the starting and ending points of the path due to the acceleration from zero velocity and deceleration to zero velocity. The errors for both results are maintained within the order of 10−3 meters. The error in the actual experimental results is higher than that in the calculated results due to the manipulator’s control.
+However, due to the uncertainty of the path generated by the algorithm, it is not possible to apply smoothing techniques such as interpolation to the path before the manipulator’s operation. Instead, motion compensation is employed to minimize the discrepancy between the actual and desired paths as much as possible. When the manipulator’s joints undergo frequent acceleration, deceleration, or direction changes, errors and vibrations may occur. This also results in the algorithm performing not as well for complex paths. Therefore, in future research, we aim to improve the smoothness of the path to enhance the algorithm’s performance.
+
+References
+Chiaverini, S., Oriolo, G., Maciejewski, A.A., 2016. Redundant robots. Springer Handbook of Robotics , 221–242.
+Fahimi, F., 2008;. Autonomous Robots: Modeling, Path Planning, and Control. 1. aufl.;1; ed., Springer Science + Business Media, New York, NY.
+Ferrentino, E., Chiacchio, P., 2018. Redundancy Parametrization in Globally-Optimal Inverse Kinematics. Springer International Publishing, Cham. Advances in Robot Kinematics 2018, pp. 47–55.
+Ferrentino, E., Salvioli, F., Chiacchio, P., 2021. Globally optimal redundancy resolution with dynamic programming for robot planning: A ros implementation. Robotics 10.
+Ferrentino, E., Savino, H.J., Franchi, A., Chiacchio, P., 2023. A dynamic programming framework for optimal planning of redundant robots along prescribed paths with kineto-dynamic constraints. IEEE transactions on automation science and engineering , 1–14.
+Ficuciello, F., Villani, L., Siciliano, B., 2015. Variable impedance control of redundant manipulators for intuitive human-robot physical interaction. IEEE transactions on robotics 31, 850–863.
+Haddadin, S., Parusel, S., Johannsmeier, L., Golz, S., Gabl, S., Walch, F., Sabaghian, M., Jaehne, C., Hausperger, L., Haddadin, S., 2022. The franka emika robot: A reference platform for robotics research and education. IEEE robotics and automation magazine 29, 2–20.
+He, W., Dong, Y., Sun, C., 2016. Adaptive neural impedance control of a robotic manipulator with input saturation. IEEE transactions on systems, man, and cybernetics. Systems 46, 334–344.
+He, Y., Liu, S., 2021. Analytical inverse kinematics for franka emika panda – a geometrical solver for 7-dof manipulators with unconventional design. 2021 9th International Conference on Control, Mechatronics and Automation (ICCMA) , 194–199.
+Hogan, N., 1984. Impedance control: An approach to manipulation. 1984 American Control Conference , 304–313.
+Huo, L., Baron, L., 2008. The joint-limits and singularity avoidance in robotic welding. Industrial Robot: An International Journal 35.
+Lee, S., Bejczy, A.K., 1991. Redundant arm kinematic control based on parameterization. Proceedings. 1991 IEEE International Conference on Robotics and Automation , 458–465 vol.1.
+Li, K., Xu, Y., Meng, M.Q.., 2021. An overview of systems and techniques for autonomous robotic ultrasound acquisitions. IEEE transactions on medical robotics and bionics 3, 510–524.
+Lillo, P.D., Pierri, F., Caccavale, F., Antonelli, G., 2020. Experiments on whole-body control of a dual-arm mobile robot with the set-based taskpriority inverse kinematics algorithm. 2020 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , 9096–9101.
+Ma, L.Z., Yao, G.Y., Ni, Q.L., Zhu, Z., 2005. Study of the traditional chinese medicine(tcm) massage robot based on the hybrid mechanism to obtain rolling treatment. Jixie sheji yu yanjiu 21, 43–46.
+Moe, S., Antonelli, G., Teel, A.R., Pettersen, K.Y., Schrimpf, J., 2016. Setbased tasks within the singularity-robust multiple task-priority inverse kinematics framework: General formulation, stability analysis, and experimental results. Frontiers in Robotics and AI 3.
+Reiter, A., Müller, A., Gattringer, H., 2018. On higher order inverse kinematics methods in time-optimal trajectory planning for kinematically redundant manipulators. IEEE Transactions on Industrial Informatics 14, 1681–1690.
+Schappler, M., 2023. Pose optimization of task-redundant robots in second-order rest-to-rest motion with cascaded dynamic programming and nullspace projection, in: Gusikhin, O., Madani, K., Nijmeijer, H. (Eds.), Informatics in Control, Automation and Robotics, Springer International Publishing, Cham. pp. 106–131.
+
+Z. Yin et al.:
+
+Page 13 of 14
+
+Shimizu, M., Kakuya, H., Yoon, W.., Kitagaki, K., Kosuge, K., 2008. Analytical inverse kinematic computation for 7-dof redundant manipulators with joint limits and its application to redundancy resolution. IEEE transactions on robotics 24, 1131–1142.
+Simpson, M.G., 1961. An introduction to dynamic programming. Applied Statistics 10, 32–38.
+Song, P., Yu, Y., Zhang, X., 2017. Impedance control of robots: An overview. 2017 2nd International Conference on Cybernetics, Robotics and Control (CRC) , 51–55.
+Tittel, S., 2021. Analytical solution for the inverse kinematics problem of the franka emika panda seven-dof light-weight robot arm. 2021 20th International Conference on Advanced Robotics (ICAR) , 1042–1047.
+Xenya, M.C., Cortesão, R.P.D., 2023. A compliant robot-assisted mold polishing application using the franka emika robot. IECON 2023- 49th Annual Conference of the IEEE Industrial Electronics Society , 1–7.
+Xu, Q., Sun, X., 2018. Adaptive operation-space control of redundant manipulators with joint limits avoidance. 2018 Tenth International Conference on Advanced Computational Intelligence (ICACI) , 358– 363.
+Zeng, X., Zhu, G., Gao, Z., Ji, R., Ansari, J., Lu, C., 2023. Surface polishing by industrial robots: a review. International journal of advanced manufacturing technology 125, 3981–4012.
+Zhang, Y., Li, S., Zhou, X., 2019. Recurrent-neural-network-based velocitylevel redundancy resolution for manipulators subject to a joint acceleration limit. IEEE transactions on industrial electronics (1982) 66, 3573– 3582.
+Zhong, L., Zhang, X., Zhai, X., Li, Y., Xu, Z., Pan, J., Zhou, X., 2023. Realtime solution of multi-constrained quadratic programming problem for redundant manipulator based on recurrent neural network. 2023 IEEE International Conference on Robotics and Biomimetics (ROBIO) , 1–6.
+Zietz, J., 2007. Dynamic programming: An introduction by example. The Journal of economic education 38, 165–186.
+
+Z. Yin et al.:
+
+Page 14 of 14
+
+

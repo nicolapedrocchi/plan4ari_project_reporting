@@ -1,0 +1,49 @@
+% =====================================================================
+%  Plan4ARI -- D4.1 (A4 revision) -- Supporting note
+%  State of the art on Model Predictive Path Integral (MPPI) control
+%  for industrial manipulators and Autonomous Mobile Robots (AMRs)
+%
+%  Build:  latexmk -pdf main.tex      (or: pdflatex, bibtex, pdflatex x2)
+%  Sources: ../wiki/sources/<bibkey>.md   PDFs: ../raw/papers/<bibkey>.pdf
+% =====================================================================
+\documentclass[10pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[a4paper,margin=2.1cm]{geometry}
+\usepackage{amsmath,amssymb,bm}
+\usepackage{booktabs,tabularx,multirow}
+\usepackage{graphicx}
+\usepackage[dvipsnames]{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,fit,backgrounds}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{enumitem}
+\usepackage{cite}
+\usepackage{microtype}
+\usepackage[colorlinks=true,linkcolor=MidnightBlue,citecolor=MidnightBlue,urlcolor=MidnightBlue]{hyperref}
+
+\setlist{itemsep=1pt,topsep=3pt,leftmargin=*}
+\input{sota_macros}
+
+\title{\textbf{Model Predictive Path Integral Control for Industrial Manipulators and Autonomous Mobile Robots: a State-of-the-Art Analysis}\\[4pt]
+\large Plan4ARI -- Activity 4, Task 4.1 -- Supporting note for D4.1 (A4 revision)}
+\author{CNR-STIIMA, Industrial Robotics Lab}
+\date{October 2026 -- Draft v0.1}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent
+Model Predictive Path Integral (MPPI) control is a sampling-based, derivative-free formulation of receding-horizon optimal control that maps naturally onto massively parallel hardware. In the last decade it has evolved from an aggressive-driving controller into a family of methods used for whole-body manipulation, contact-rich tasks, reactive task-and-motion planning and crowd-aware navigation, and it is now the reference predictive controller of the ROS\,2 navigation stack. This note reviews the theoretical foundations of MPPI, positions it with respect to gradient-based Model Predictive Control (MPC) and other horizon-based planners, and analyses the most promising contributions for industrial arms and AMRs, with a detailed discussion of the Multi-Modal MPPI of Zhang \emph{et al.}~\cite{zhang2024m3p2i}. We close with a gap analysis that motivates the MPPI-based motion-planning framework proposed for Plan4ARI.
+\end{abstract}
+
+\input{sota_body}
+
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+
+\end{document}

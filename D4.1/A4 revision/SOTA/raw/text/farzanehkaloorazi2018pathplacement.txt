@@ -1,0 +1,657 @@
+Mechanism and Machine Theory 130 (2018) 346–362
+Contents lists available at ScienceDirect
+Mechanism and Machine Theory
+journal homepage: www.elsevier.com/locate/mechmachtheory
+Research paper
+Simultaneous path placement and trajectory planning optimization for a redundant coordinated robotic workcell
+MohammadHadi FarzanehKaloorazi a,∗, Ilian A. Bonev a, Lionel Birglen b
+a École de technologie supérieure, 1100 rue Notre-Dame ouest, Montreal, QC, H2x 2E7, Canada b École Polytechnique de Montréal, 2900 Boulevard Edouard-Montpetit, Montreal, QC, H3T 1J4, Canada
+
+article info
+Article history: Received 13 May 2018 Revised 29 July 2018 Accepted 22 August 2018 Available online 11 September 2018
+Keywords: Path placement Redundancy resolution Robot-robot coordination PSO Kinematics Serial manipulator
+
+a b s t r a c t
+An optimization method using Particle Swarm Optimization (PSO) is introduced in order to simultaneously optimize the trajectory planning and placement of a given path in a redundant coordinated robotic workcell. The workcell consists of a 6 Degree Of Freedom (DOF) serial manipulator, a 6 DOF parallel manipulator and a rotary table mounted on the parallel manipulator. Since the workcell has 13 DOF, one has to solve the kinematic redundancy of the workcell. The solution will be obtained considering the singularities of the serial manipulator and the workspace boundaries of all manipulators. The algorithm to obtain the optimum path placement is explained through a simple example and the result for a helix path around the workpiece is represented.
+© 2018 Elsevier Ltd. All rights reserved.
+
+1. Introduction
+Due to composites’ light weight, high stiffness, and high strength, they have found applications in many areas, including aerospace, automobiles, wind turbines, and civil infrastructures. The increasing use of composites gives rise to the need to improve their method of manufacturing. Composite structures are typically manufactured using labour-intensive methods such as hand lay-up. However, this technique has many disadvantages, such as poor repeatability, a signiﬁcant amount of wasted materials, and long process times. The advent of automated tape placement and Automated Fiber Placement (AFP) machines has signiﬁcantly improved the manufacturing of composites in terms of speed of material deposition, repeatability, good compaction, reduction of waste, and seamless transfer from design to manufacturing.
+1.1. Automated ﬁber placement
+AFP machines have been used to make the fuselage of Boeing 787s and components of many aircraft structures [1,2]. Current AFP machines are generally built for manufacturing airframe components that are shaped like shallow plates or shells. Normally, they have a 6 Degree Of Freedom (DOF) Serial Manipulator (SM) in order to place the ﬁber on the workpiece and a rotary table to spin the workpiece. For certain applications where the shapes are more complex, such as tubes with double curvature, some modiﬁcations must be made to extend the machines’ capabilities. One possible way to increase manufacturing ﬂexibility is to add another 6 DOF manipulator to the workcell. Due to the heavy weight of the piece and
+∗ Corresponding author. E-mail address: mohammadhadi.farzanehkaloorazi.1@ens.etsmtl.ca (M. FarzanehKaloorazi).
+https://doi.org/10.1016/j.mechmachtheory.2018.08.022 0094-114X/© 2018 Elsevier Ltd. All rights reserved.
+
+M. FarzanehKaloorazi et al. / Mechanism and Machine Theory 130 (2018) 346–362
+
+347
+
+other advantages of parallel mechanisms [3–7], we have chosen to use a hexapod Parallel Manipulator (PM) in this work. The hexapod is a classic design for position and motion control, and is often used in ﬂight simulation [8,9]. Mounting the rotary table (1 DOF) on the 6 DOF hexapod permits maximum freedom in operation. The 6 DOF SM thus enables a 13 DOF coordinated robotic workcell to do the ﬁber placement task.
+The quality of the end product – the composite – is largely dependent on how the original ﬁber path is generated [10,11]. Before we can build a framework for collaboration between a 6-DOF hexapod and a SM, we must ﬁrst analyze the robots’ kinematics. It is essential to solve the Inverse Kinematic Problem (IKP) and Forward Kinematic Problem (FKP) of both robots in order to control them. The main concern of this paper is to obtain the optimized motions for the aforementioned 13 DOF workcell.
+
+1.2. Redundancy resolution
+
+In this work, we use the term “robot coordination” to mean a collaboration between two or more robots that leads to a high degree of redundancy in the workcell. In [12], an analytical methodology for computing the inverse kinematic problem for 7 DOF redundant manipulators is proposed. The Jacobian matrix of redundant manipulators has a non-empty null space. Manipulability is enhanced by taking advantage of the null space in [13]. Eﬃcient use of the null space enables other types of subtask resolution to be done, such as torque optimization [14], obstacle avoidance [15,16], and singularity avoidance [17,18] .
+Jacobian-based redundancy resolution is applicable to dynamically tracking the trajectory of the robot. In [19], the author minimizes the joint torques by choosing the joint acceleration null-space vector. In [20], the authors derive the inverse dynamics for an actuated redundant 3-DOF PM by optimizing the driving force using the least squares approach. Various artiﬁcial intelligent methods are proposed by Zhang and Lei [21] to solve the IKP of an actuation-redundant 3-DOF PM, such as Multilayer Perceptron Neural Networks (MLPNN), Radial Basis Functions (RBFNN), and Support Vector Machines (SVM). In [22], the authors present a novel approach to on-line collision-free path planning of a two-arm manipulator system. They implemented a system that generates a collision-free path for one manipulator while the other is moving.
+
+1.3. Workpiece placement
+
+Workpiece placement is always subject to redundancy, even in the presence of just one manipulator. The degree of redundancy in the workpiece placement is independent of the robot DOF and can be higher than the robot DOF. In [23], the goal is to determine the optimum placement of the workpiece to be machined, considering the elastostatic model of the robot and the cutting forces applied on the tool. In [24], a redundancy resolution for polishing operations is suggested. The kinematics capability is chosen to be the speed ratio of the effector, since they wanted to obtain voluntarily non-isotropic behavior. In [25], multi-objective path placement optimization for PMs is done in order to minimize actuator torques, energy consumption, and shaking forces. It is argued in [26] that it is more eﬃcient to perform the milling operation in regions of the robot’s workspace where manipulability is highest. Therefore the best initial pose of the robot is obtained to maximize manipulability. In [27], the authors numerically solved the problem of path placement for redundant manipulators. This included the problem of where to place the components (tables, other robots, or machining stations) relative to each other, as well as how to resolve the redundancies of the workcell. None of the aforementioned studies considers the path placement for a coordinated redundant robotic workcell that has a second manipulator detached from the main manipulator. They all place the path on a ﬁxed platform rather than a moving platform. Furthermore, they neglect to perform the trajectory optimization simultaneously for both the main manipulator and the redundant manipulator.
+In more recent literature [28–30], the authors propose an approach to optimize the path planning of a robot and positioner in a redundant workcell for a ﬁber placement task. Time-optimal proﬁles for the joint variables are obtained by discretizing the problem, wherein all possible motions of the robot and positioner are represented as directed multi-layer graphs. This technique is based on the discrete dynamic programming principle, which allows ﬁnding the global optimum by sequentially solving all possible sets of the problems of lower dimensions. However, since the workspace of the positioner is discretized, for each motion of the positioner, the time-optimal solution is obtained by reducing to analysis of the preceding node at each step. Furthermore, the method does not take the placement of the positioner and the path on the positioner into account. The goal of [28–30] is one part of the objective of this paper. This part will be referred to as the 1D optimization, i.e. optimization of the rotary table’s motion.
+The same objective of ﬁber placement redundancy resolution is investigated in [31,32]. They obtain the optimal trajectory for rotary table by the means of Gradient Projection Method (GPM). GPM is a powerful tool when it comes to 1 DOF redundancy resolution, but for higher DOF workcells, it can only result into local optimums.
+In this paper, we intend to optimize the path placement of a redundant coordinated robotic workcell, Fig. 1. Assuming that the path is given using the method represented in [31,32], it is possible to place it anywhere within the workspace boundaries. In this paper, a path is a set of time-independent frames in the Cartesian space given in the form of a text ﬁle (each line in the ﬁle has 16 entries representing 16 elements in the 4 by 4 homogeneous transformation matrix) and a trajectory is the motion in space (either Cartesian or joint space) relevant to each frame in the path. The optimization problem is to ﬁnd the best place to put the path in order to satisfy the optimization criteria. As shown in Fig. 1, the coordinated workcell consists of an SM, a hexapod PM, and a rotary table mounted on the hexapod. The workpiece to be
+
+348
+
+M. FarzanehKaloorazi et al. / Mechanism and Machine Theory 130 (2018) 346–362
+
+Fig. 1. The redundant coordinated robotic workcell. The workpiece to be wrapped is placed on the rotary table. which is mounted on the hexapod. The SM has a ﬁber placement tool attached to its EE.
+wrapped is placed on the rotary table, and the ﬁber placer head is a tool attached to the end-effector (EE) of the SM. In ﬁber placement applications, the tool must always be perpendicular to the surface of the workpiece. The given path is in a 6D space.
+It is worth mentioning that since the hexapod is already integrated into the system, we will be using it as a tilt and torsion table (see Section 2.2.1). Adding 1, 2 or 3 supplementary axes is indeed classic but our work generalizes this to a six-axis machine and could be adapted to these simpler cases. It is true that this operation can be done with fewer DOF, but it requires setting up a new workcell which is less practically justiﬁed. Since setting up a robotic workcell is a costly deed, one needs to design a multipurpose workcell. This workcell is set up in such a way that it is used for multiple purposes, one of such being the focus of this paper, i.e., ﬁber placement. In this paper, collision avoidance among the different parts of the workcell is not taken into account. However, authors of this paper has worked on this topic and another article with similar scope (camera placement for an inspection workcell), with consideration of collisions, is to be published soon.
+1.4. Particle swarm optimization
+The optimization method proposed in this paper uses a stochastic technique called Particle Swarm Optimization (PSO) as the optimization base for the placement of the components. A simpler classic method is then used for trajectory planning. PSO simulates the social movement behavior of a group (typically animals), such as a ﬂock of birds or school of ﬁsh [34,35]. Like other metaheuristic methods, PSO does not need any higher-order information, such as the gradient of the problem being optimized. Therefore, it does not require the problem to be differentiable. However, metaheuristic methods do not guarantee the solution to be global optimal. Moreover, they usually involve a greater number of function calls than classic methods.
+We chose PSO over other optimization methods because for the problem at hand, it is impossible to ﬁnd an explicit answer to the ﬁrst derivative of the cost function. Therefore, it is only possible to use a numerical optimization method. Out of all the numerical methods - including classical methods such as Newton-Raphson and more advanced methods based on the second derivative of the cost function - we chose an evolutionary algorithm because it provides us with the reliability and convergence time we need [36–38]. There are various evolutionary algorithms, some of them are well-known and have been used for a variety of problems such as Genetic Algorithm (GA) [39]. In comparison to GA, PSO is easy to code and obtains the optimum solution fast enough. The details will be discussed in the upcoming sections.
+The method consists of a 1D optimization of the rotation angle of the rotary table within a 6D optimization of the pose of the hexapod’s EE. The motion optimization of the rotary table is combined with the hexapod EE pose. Therefore, they must be solved within each other for each iteration of the PSO-based algorithm. The path is ﬁxed to the moving frame of the rotary table, the base frame of the rotary table is ﬁxed to the EE of the hexapod, and the base frame of the hexapod is ﬁxed with respect to the global base frame of the SM. The hexapod moves the rotary table and places it in the optimized pose regarding the singular poses of the SM. Once done, the rotary table moves the workpiece in order to place each point of the path in the best place.
+
+M. FarzanehKaloorazi et al. / Mechanism and Machine Theory 130 (2018) 346–362
+
+349
+
+Fig. 2. Three mechanisms collaborating in the project.
+
+Table 1 DHM parameters of the SM in cm.
+
+i θi
+
+αi
+
+a i
+
+d i
+
+1 θ1
+
+0
+
+0
+
+0
+
+2 − π2 − π2 150 0
+
+3 θ3
+
+0
+
+790 0
+
+4 θ4 5 θ5 6 θ6
+
+− π2 250 835
+
+0 π2 0
+
+0
+
+− π2 100
+
+The remainder of this paper is organized as follows. First, the kinematic equations of the hexapod and SM are brieﬂy addressed. The general idea of PSO is represented. Then, the methodology to optimize the path placement problem of the workcell is explained through a simple planar example. Finally, the proposed method is applied to a 6D case study and the obtained results are presented.
+
+2. Kinematics of the hexapod and serial manipulator
+
+In the 13 DOF workcell under study, three mechanisms are involved: (a) a 6 DOF SM; (b) a hexapod; and (c) a rotary table (as shown in Fig. 2). The SM is a Fanuc mate 120i industrial robot. All revolute joint actuators and its last three joints intersect at the wrist center, as shown in Fig. 2a. The Hexapod is a 6-RSS PM, where R stands for actuated revolute joint and S stands for spherical passive joint (see Fig. 2b).
+In this section, we explain the Forward Kinematic Problem (FKP) and Inverse Kinematic Problem (IKP) of the robots. The FKP is to obtain the pose (position and orientation) of the EE (in Cartesian space), having the values of the actuators (in the joint space). The EE’s pose is the displacement along the x, y and z axis and rotation about the x, y and z axis. The IKP is to ﬁnd the values of all actuators corresponding to a given EE pose. Both the IKP and FKP are represented in the base frame of each robot. In what follows, the IKP and FKP for the SM and hexapod are presented.
+
+2.1. Kinematics of the SM
+
+The kinematic model of the SM is derived based on the Denavit–Hartenberg Modiﬁed (DHM) notation [40]. Table 1 presents the DHM information for the Fanuc robot. The transformation matrix from frame i to i − 1 can be shown as follows:
+
+Aii−1 = Rot(x, αi )Trans(ai, 0, 0)Rot(z, θi )Trans(di, 0, 0),
+
+(1)
+
+⎡
+
+c(θi )
+
+−s(θi )
+
+0
+
+⎤
+a i
+
+i−1 ⎢s(θi)c(αi) c(θi)c(αi) −s(αi) −dis(αi)⎥
+
+Ai = ⎣
+
+⎦ .
+
+(2)
+
+s(θi)s(αi) c(θi)s(θi) c(αi) dic(αi)
+
+0
+
+0
+
+0
+
+1
+
+The FKP of any SM can be obtained via chain multiplication of the transformation matrix of the robot’s joints, as follows:
+
+A06 = A01A21A32A34A45A56. (3)
+The FKP of SMs is easy to solve; the main challenge is to solve the IKP for SMs. The majority of 6 DOF industrial robots have a wrist arrangement for the last three joints that leads to an analytical solution of the IKP. Various methods have been
+
+350
+
+M. FarzanehKaloorazi et al. / Mechanism and Machine Theory 130 (2018) 346–362
+
+Fig. 3. The kinematic model of the hexapod. Revolute actuators are located in B1...6.
+
+introduced to solve the IKP of the wrist-partitioned SMs, such as geometrical methods [41], and mathematical ones [42]. This paper uses the formulation suggested in Craig’s book; for more details on the IKP, the reader is referred to [43].
+To obtain the Jacobian matrix of the SMs using Eq. (3), one has:
+
+x = A06(1, 4) y = A06(2, 4) z = A06(3, 4)
+
+β
+
+=
+
+atan2
+
+(
+
+A
+
+0 6
+
+(
+
+1
+
+,
+
+3
+
+)
+
+,
+
+1 − sin(A06(1, 3))2)
+
+α
+
+=
+
+atan2
+
+(
+
+−A
+
+0 6
+
+(
+
+2
+
+,
+
+3
+
+)
+
+/
+
+c
+
+o
+
+s
+
+(
+
+β
+
+)
+
+,
+
+A
+
+0 6
+
+(
+
+3
+
+,
+
+3
+
+)
+
+/
+
+c
+
+o
+
+s
+
+(
+
+β
+
+)
+
+)
+
+γ
+
+=
+
+atan2
+
+(
+
+−A
+
+0 6
+
+(
+
+1
+
+,
+
+2
+
+)
+
+/
+
+c
+
+o
+
+s
+
+(
+
+β
+
+)
+
+,
+
+A
+
+0 6
+
+(
+
+1
+
+,
+
+1
+
+)
+
+/
+
+c
+
+o
+
+s
+
+(
+
+β
+
+)
+
+)
+
+.
+
+(4)
+
+This can be written in vector form:
+
+x˙ = Jθ˙,
+
+(5)
+
+where J is the Jacobian matrix – in which the elements are the partial derivatives of the kinematics equations, x˙ is the
+vector of EE velocities, and θ˙ is the vector of joint velocities. The relationship between the EE velocity and the (known) joint
+velocities is thus fully described by the Jacobian. The EE velocity is a linear function of the joint velocities. Any conﬁguration in the workspace of the robot for which det(J) vanishes is called a singularity. In singularity conﬁgurations, the robot may lose some DOF or reach some uncontrollable DOF. For more information on how to obtain the Jacobian matrix, please refer to [44,45]. For singularities in SMs, see [46,47].
+
+2.2. Kinematics of the hexapod
+
+In contrast to SMs, it is easy to solve the IKP for PMs and diﬃcult (in some cases impossible) to ﬁnd an analytical solution
+
+for the FKP. The IKP of the hexapod under study is obtained analytically. The FKP is solved using a numerical method.
+
+The following relation holds for each link (see Fig. 3 and please refer to [33] for more details):
+
+−→ −→ −→ −→ −−→
+
+OO = OBi + BiTi + TiAi + AiO ,
+
+(6)
+
+−→
+
+−→
+
+where the angle of the vector BiTi is the joint angle. The initial position of an actuator is set by the user. In Eq. (6), OBi is
+
+−−→
+
+ﬁxed, AiO is deﬁned by the EE pose, and the length of the distal links TiAi and proximal link BiTi are known. Therefore, by
+
+solving a quadratic equation, the IKP of the hexapod is solved. This quadratic equation corresponds to the intersection of
+
+the joint circle with the center of Bi, and the sphere with the center of Ai. There can be up to 26 = 64 solutions to the hexapod IKP. The hexapod FKP is solved numerically; see [33].
+
+2.2.1. Workspace of the hexapod The hexapod provides a 6 DoF workspace. Since the rotary table provides one orientational DoF and is mounted on the
+hexapod, one orientational DoF in the workspace of the hexapod is redundant. One can consider the orientation about the z-axis of hexapod’s EE as the redundant DoF. Furthermore, the displacement of the EE is very limited, and compared to the workspace of the SM, it is very small: about 1%. Therefore, the translation along the x, y and z axes is negligible. Hence, the hexapod is essentially only useful for tilting about the horizontal axis.
+
+M. FarzanehKaloorazi et al. / Mechanism and Machine Theory 130 (2018) 346–362
+
+351
+
+Fig. 4. The T&T angles deﬁned by successive rotations: (a) tilt; (b) torsion [48].
+
+Fig. 5. Projected orientation workspace [x, y, z] = [0, 0, 0.12].
+
+One orientational workspace representation, which is very applicable here, is called Tilt and Torsion (T&T) workspace [48,49]. T&T has proven useful for the workspace representation of symmetrical parallel mechanisms. The next step is to use a simple numerical procedure to obtain the so-called constant-torsion workspace.
+The T&T representation only uses two angles in such a way that the axis of one angle is variable and deﬁned by the
+other angle. As shown in Fig. 4a, ﬁrst the body frame is tilted about the horizontal axis a, at an angle θ . Then, as illustrated in Fig. 4b, the body frame is rotated about the updated z axis, called the z axis, at an angle σ . The ﬁrst step is the so-called
+tilt, and the second step is torsion. The rotation matrix R deﬁnes the orientation described by T&T angles (see [50]), as follows
+
+R = Rz(φ)Ry(θ )Rz(σ − φ)
+
+(7)
+
+c(φ)c(θ )c(σ − θ ) − s(φ)s(σ − φ) −c(φ)c(θ )s(σ − φ) − s(φ)c(σ − φ) c(φ)s(θ )
+
+R = s(φ)c(θ )c(σ − φ) + c(φ)s(σ − φ) −s(φ)c(θ )s(σ − φ) + c(φ)c(σ − φ) s(φ)s(θ ) .
+
+(8)
+
+−s(θ )c(σ − φ)
+
+s(θ )c(σ − φ)
+
+c(θ )
+
+The T&T workspace of the hexapod for a range of σ is represented in Fig. 5. In this ﬁgure, the T&T workspace is obtained
+by means of discretization, at a speciﬁc pose of the EE, i.e. [x, y, z] = [0, 0, 0.12] cm, which is roughly the center of the workspace. In Fig. 6, the maximum projected orientation workspace of the mechanism is depicted for a range of other
+variables, i.e. x = [−0.4, 0.4], y = [−0.4, 0.4], z = [0.09, 0.15], σ = [−0.2, 0.2]. As can be observed in Fig. 6, the maximum tilt
+provided by the hexapod is about 12 degrees. It is essential to obtain the workspace of the hexapod in order to limit the search space of the transition phase in the
+algorithm. While optimizing the placement of the main branch of the workpiece, the optimization is constrained by the joint limits, i.e. workspace, of the SM. Therefore, once the optimized place has been obtained for the main branch of the workpiece, the hexapod has to be placed according to the obtained place. This can be anywhere in the workspace of the SM and is not related to the workspace of the hexapod. But once the placement of the hexapod is ﬁxed for the main branch, the optimum placement for the second branch has to be within the workspace of the hexapod. This is because the transition phase is the movement of the EE of the hexapod in order to place the second branch in an optimum place. Therefore,
+
+352
+
+M. FarzanehKaloorazi et al. / Mechanism and Machine Theory 130 (2018) 346–362
+
+Fig. 6. Maximal projected orientation workspace x = [−0.4, 0.4], y = [−0.4, 0.4], z = [0.09, 0.15], σ = [−11.5, 11.5].
+Fig. 7. PSO (a) to ﬁnd the deepest part of the lake and (b) a simpliﬁed representation of the involved parameters. Choosing the search direction of two particles in the swarm, i.e. particle i and j. gbest, stands for the global best in the current iteration. Pbest is the best memory of the particle itself. The resulting velocity is a combination of personal and global best memories, as well as the previous velocity of the particle and an element of randomness to shuﬄe the particle around.
+the search space for the transition phase is restricted to the obtained T&T workspace. Essentially, due to the very limited translational workspace of the hexapod, it is only being used as a tilt and torsion table. 3. Particle swarm optimization (PSO)
+PSO is a metaheuristic population-based algorithm. Unlike evolutionary algorithms, such as GA, PSO does not use selection [34]. PSO is based on social intelligence. As can be observed in Fig. 7a, the main concept of PSO is to ﬁnd the deepest part of the lake. Each member shares their observations with others, and for the next move, each individual decides on its direction based on the entire swarm’s information. Furthermore, in this study, some features are added to the basic PSO in order to improve the algorithm’s functionality. The PSO algorithm is brieﬂy explained in what follows; for more information on the origin of PSO, see [34].
+
+M. FarzanehKaloorazi et al. / Mechanism and Machine Theory 130 (2018) 346–362
+
+353
+
+As a basic interpretation of PSO, a population of swarms includes the candidate solutions, i.e. particles, [51]. The particles move around in the initiated search-space based on the simple PSO formulae. Each particle is driven by its personal best memory and the entire ﬂock’s best memory. In each iteration, improved positions are discovered, which will be used to guide the movements of the particles in the next iteration. A series of iterations will hopefully lead to the global optimum. However, as with all numeric optimizations, there is no guarantee of ﬁnding the best solution. The chances of ﬁnding the global optimum increase with more iterations, more particles, and greater ﬁne-tuning of the PSO parameters.
+A general overview of the velocity vector is presented in Fig. 7b. In this ﬁgure, the velocity of a particle for each iteration is being calculated by a combination of the previous velocity and the personal and global best known positions. The PSO velocity update equation is as follows:
+
+vi,d ← ωvi,d + φprp(pi,d − xi,d ) + φgrg(gi,d − xi,d ),
+
+(9)
+
+where ω, φp, and φg are tuning parameters, which must be chosen carefully in order to achieve reliable results. Velocity
+vi, d is the current velocity of the ith particle for the dth dimension; xi, d is the current position of a particle; pi, d is the best personal memory of the ith particle; and gi, d is the best global memory of the whole swarm.
+During the procedure, it is probable that for a particular member of the path, while applying the velocity vector, that
+member locates outside of the optimization constraints in other words, outside the robot’s workspace. In this case, the
+reﬂection effect will be applied to the particle. The next section explains this feature in greater detail.
+
+4. Methodology
+
+The optimization objective of the proposed method is to ﬁnd the best placement of a given path in the SM workspace. The optimization variables are the elements of the placement in the Cartesian space, i.e. the position and orientation of the path. In general, path T4 × 4 × n is the input of the optimization algorithm, which is a set of homogeneous 4 × 4 matrices representing n points in the path.
+The objective is to be as far as possible from singular poses of the SM. There are several indexes we can use to measure the performance of a robot, such as condition number, manipulability, dexterity, etc. [52]. However, none of these can be considered the best metric, due to scale and unit differences. In this paper, the distance-to-the-singularity index is simply deﬁned by the absolute value of the determinant of the Jacobian matrix of the SM. The bigger this value, the further from the singularity is the robot. Therefore, the obtained optimized placement is a solution with the biggest determinant value. The joints limits of the SM are considered as the constraints of the optimization. For the hexapod, the joints limits are only considered in the transition phase, which will be discussed in upcoming sections.
+The optimization problem can be structured as follows:
+
+m
+max f = − |det(Jp)|
+p=1
+
+s.t. qimin < qi < qimax ,
+
+(10)
+
+where Jp is the Jacobian matrix of SM for point p, f is absolute summation of determinant of Jp, for all the points in the path (p = 1 . . . m). The optimization constraint is the joint limits of the SM, which must be within a certain range. Optimization parameters are 12 placement parameters plus 1 DOF for rotary table actuation (13 in total). Once the placement of path on the rotary table and rotary table on the hexapod is known and joint value of rotary table is set for each point of the path, Jp is a unique value for each point and performance index consists of summation of all Jp.
+The problem of obtaining the best path placement mainly arises from the nature of the coordinated robotic workcells. The optimization is performed in a mixed space of Cartesian space (12 placement parameters) and joint space (1 rotary table actuation). Using PSO, each particle represents a speciﬁc place for the path and rotary table, and represents rotary table joint value. Just like in the example in Fig. 7a, the particles search throughout the workspace by testing the path in different places and sharing results in order to calculate individual velocities for the next iteration. For the ﬁrst iteration, a population of the particles is randomly generated within the hexapod workspace.
+In general, there are six design parameters in a 6D search space, i.e. the pose of the reference frame of the path to the moving frame of the hexapod. The number of objective functions equals the number of points in the path. For example, in a three-point path, three independent values will be obtained for the cost function of a particle. This can be regarded as a multi-objective optimization problem. Various methods can be used to transform a multi-objective problem to a singleobjective one; this study uses a simple summation, which means all the points in the path have the same effect on the cost function. The single cost value of a particle is obtained by the summation of the costs of all points divided by number of points. For future works, we recommend using a weighted sum function, in which it is possible to have different levels of importance for different points in the path. For example, if the points around the junction of the workpiece are more important than the points around the main branch, one can add more weight to the former points, and therefore obtain those results that are more in favorable to junction points.
+At the ﬁrst iteration, a hypercube space (depending on the number of optimization parameters) is assigned as the search space. It is possible for the particles to violate the initial search space during subsequent iterations. Therefore, another feature, called the reﬂection effect, can be added to the basic PSO. In the reﬂection effect, when a particle goes outside
+
+354
+
+M. FarzanehKaloorazi et al. / Mechanism and Machine Theory 130 (2018) 346–362
+
+Fig. 8. Items involved in the placement problem: (a) the robot; (b) the path.
+Fig. 9. Different aspects of the path placement and the ﬁnal result.
+of the initial search space boundaries, a reﬂection function brings it back inside the search space. The formulation of this add-on is simple. By adding only the negative value of the velocity vector, the particle is brought back inside. However, sometimes it is better to not have this add-on in the algorithm, because in its presence, the ﬁnal answer is forced to be found only inside the initial search space. Without this add-on, because of a randomness coeﬃcient in the velocity equation, a particle can search beyond the initial search space boundaries. In this paper, the reﬂection effect is not applied for the initial search space, but it is applied for the constraint, i.e. the mechanism workspace.
+For all evolutionary algorithms, tuning of the code’s parameters is an important task. A basic way to do so is simple trial-and-error. In some particular cases, partitioners may use a lighter optimization algorithm to tune the parameters of the main algorithm. This can be helpful in large-scale projects where an optimization routine will be repeated over and over. In this project, we used the simple trial-and-error method. In evolutionary algorithms, it is probable that running the algorithm multiple times will lead to different results. The degree of difference depends on population size and the number of iterations: the greater the population and number of iterations, the more similar the results. 4.1. Simpliﬁed illustration
+In order to better understand the algorithm, a simple example of the process is presented as follows. In this example,
+a simple path of three points in a planar space (x, y, φ) is taken into account (as shown in Fig. 8b). In this case, there are three design variables (x, y and φ of the reference frame of the path, i.e. the ﬁrst point), and three objective functions
+(three points). An example of a planar serial robot’s workspace is presented in Fig. 8a. The summation of the three objective functions is the ﬁnal objective function to be optimized. The goal of the algorithm is to maximize the net distance of the path from the singular poses of the planar robot. This is computed using the determinant of the Jacobian matrix of the robot at each point of the trajectory. An example of a poorly located particle is shown in Fig. 9a. In this case, we bring the particle back into the workspace and apply a small random movement on it. Fig. 9b presents an example of a PSO problem’s initial
+
+M. FarzanehKaloorazi et al. / Mechanism and Machine Theory 130 (2018) 346–362
+
+355
+
+Algorithm 1 The pseudo-code of the optimization algorithm, based on PSO, to obtain placement of a given path in the 13
+
+DOF workcell under study.
+
+1: Input: path as trajectory on the part; Geometrical parameters of the robots; Rrot(θ ) as the rotation matrix about the
+rotary table’s axis.
+
+2: Parameters: n number of particles; p number of points in the path.
+
+3: for i from 1 to n do
+
+4: rndTrans = rnd(Trans, PMw);
+5: Particle{i} = rndTrans ∗ path{:}
+
+6: for j from 1 to m do
+
+7:
+
+[dist{ j}, θbest{ j}] = fmaxsearch(singularity_dist(Rrot(θ ) ∗ Particle{i}{ j}))
+
+8: end for
+
+9: ParticlePersonalBest{i} = sum(dist{:})
+
+10: end for
+
+11: ParticleGlobalBest = max(ParticlePersonalBest{:})
+
+12: while desired precision do
+
+13: for i from 1 to n do
+
+14:
+
+Particle{i} = Eq.~??
+
+15:
+
+for j from 1 to p do
+
+16:
+
+[dist{ j}, θbest{ j}] = fmaxsearch(singularity_dist(Rrot(θ ) ∗ Particle{i}{ j}))
+
+17:
+
+end for
+
+18:
+
+if ParticlePersonalBest{i} < sum(dist{:}) then
+
+19:
+
+ParticlePersonalBest{i} = sum(dist{:})
+
+20:
+
+end if
+
+21: end for
+
+22: if ParticleGlobalBest < max(ParticlePersonalBest{:}) then
+
+23:
+
+ParticleGlobalBest = max(ParticlePersonalBest{:})
+
+24: end if
+
+25: end while
+26: Output: ParticleGlobalBest as the Hexapod’s poses, θbest{:} as the rotary table’s path.
+
+Fig. 10. Convergence of the algorithm. The general stopping criteria is a limit of 20 iterations.
+population, which is randomly distributed in the workspace of the robot. A pseudo-code of the algorithm is presented in Algorithm 1 The ﬁnal result of the simple path placement example is represented in Fig. 9c. As it can be observed it is more inclined toward the middle of the workspace to be far from the borders and a bit toward the borders of the workspace, because the index of type two singularity is lower closer to the borders. Therefore the descent of the determinant is faster towards the inner borders of workspace.
+In this optimization, the number of particles in the population, nPop, is 30, and the maximum number of iterations, MaxIt, is 20. “Maximum number of iterations” means that the process may end before this number of iterations. That is because there is another criterion applied here: If changes in the cost are less than , then terminate the process. When the latter criterion is inactive, the number of function call is roughly NFC = 20 × 30 = 600. This process is done in 0.7067 s by a 3.5 GHz processor. The result of the optimization, not considering the stopping criteria of , is presented in Fig. 10a. When we add stopping criteria of in such a way that if for the last 4 iterations, the changes in the cost are less than = 0.002, then terminate the process, the result is as shown in Fig. 10b and the number of function calls is NFC = 10 × 30 = 300, which produces a 0.3536 s process.
+
+356
+
+M. FarzanehKaloorazi et al. / Mechanism and Machine Theory 130 (2018) 346–362
+
+5. Redundancy optimization
+
+The previous section introduced a method of ﬁnding the best placement for the path inside the workspace of the SM. In this section, we apply the method to the 13 DOF workcell to take advantage of the redundancy and use it to ﬁnd the best kinematic solution for the robots at hand. The purpose of the optimization is to be as far as possible from the singular poses of the SM. Here we only consider the singularity of the SM based on the determinant of the Jacobian matrix. The singularity of the hexapod is not taken into consideration, because the hexapod workspace is very small and there is no singularity within it.
+Recalling the general goal of the project – ﬁber placement – we consider a “Y”-shaped workpiece to be wrapped. The rotary table is mounted on the hexapod, and the central axis of the main branch of the “Y”-shaped workpiece is (ideally) coincident with the rotation axis of the rotary table. (Later we will see that the algorithm works even if the rotation and central axes are not coincided.)
+The strategy to follow in this algorithm is to manipulate only the SM and the rotary table during the ﬁber placement of each branch, and keep the hexapod still. In other words, if we have three branches in a part – which is the case for the “Y”-shaped workpiece – the hexapod moves once before we wrap the ﬁrst branch to place the entire branch in an optimized place; then the rotary table and the SM do their jobs to wrap the branch. For the second branch, the hexapod moves to place the second branch in the optimized pose. (Note that this pose is not necessarily a good pose for the ﬁrst branch, but as it has already been wrapped, this is not a problem). Likewise, for the third branch the hexapod moves in order to place the third branch in the optimized pose. While each branch is being wrapped, a system of 7 DOF is active (including the SM and rotary table). There is a transition phase between each branch during which the rotary table and the SM are ﬁxed and the hexapod moves the entire workpiece to place it in the optimized pose in the workspace of the SM. Note that during the transition phase, the SM is attached and ﬁxed to the workpiece. Since the workpiece is being moved by the hexapod, the SM has to move to maintain its EE on the transition point of the part; however, the movement of the SM is not a part of the optimization, and it is merely guided by the hexapod. This is very important, since the fragile ﬁbres are easily broken under shear stress.
+The procedure of this algorithm includes a 6 DOF optimization to obtain the optimized pose of the hexapod (i.e., the placement of the rotary table). Each possible hexapod pose is a particle in the population. For each particle, a 1D optimization is done to obtain the rotation of the rotary table. The 1D optimization is simply performed using a method based on Newton-Raphson (NR). The initial search point of the NR is chosen to be the obtained angle for the last point of the path. Since the points in the path are usually very close to each other, the 1D optimization converges within a few iterations (although this still depends on the desired precision). The 1D optimization is applied to all the points in the path.
+
+5.1. The pseudo-code of the algorithm
+
+Algorithm 1 represents the pseudo-code of the proposed algorithm. The input of the algorithm is path as the path around the workpiece. The path is given as a set of frames perpendicular to the surface of the workpiece. In particular, an array of transformation matrices (path4 × 4 × p). Geometrical parameters of the robots are presented in the DH table for the SM and link lengths of the hexapod. These parameters will be used to compute the IKP of the mechanisms as well as the
+Jacobian matrix and singularity index. Rrot(θ ) represents a rotation matrix of θ degrees around the rotary table’s rotation
+axis. The path has m points and the population of the swarm is n. Lines 3 to 10 show the ﬁrst iteration in which a random population is generated and for which the 1D optimization has been done. In line 4, a 4 × 4 transformation matrix, i.e. Trans, is randomly generated within the workspace of the hexapod, i.e. PMw. In line 5, the random transformation matrix is multiplied to the whole path, resulting in the ith Particle. Note that “{:}” refers to all the members of a set. In lines 6 to 8, the cost function is calculated for each point of the particle. In line 7, the 1D optimization is done by a simple Newton’s
+method, i.e. fmaxsearch. singularity_dist is a function computing the determinant of the Jacobian matrix of the SM; it returns the distance to the singularity. In the 1D optimization, θ as the rotation angle of the rotary table is the variable
+to be optimized. The objective is to maximize the distance from the singular poses of the SM. Particle{i}{j} refers to the jth point in the ith particle of the population. The output of line 7 is the max distance-to-singularity of the jth point, i.e. dist{j},
+and also the best θ . Line 9 shows that at the ﬁrst iteration, the best result for a particle, i.e. ParticlePersonalBest, is the only
+result that is the summation of all the distances, i.e. dist{:}. In the next iterations, the ParticlePersonalBest may change if a better result is obtained.
+In line 11, the particle with the maximum ParticlePersonalBest is the global best, i.e. ParticleGlobalBest. Lines 12 to 25 are iterative part of the algorithm, and it continues until the desired accuracy of the result is achieved. It is basically the same routine as lines 3 to 10. The difference is that in line 14, instead of random generation, this time based on the PSO logic represented in Eq. (9), the position of the particle is determined. Another difference is in lines 18 and 22, in which the obtained results for the current iteration are compared to the previous best results. If the new result is better, it replaces the old result; if not, the old result is still the personal and global best.
+It is probable that for one point in the path, the determinant of the Jacobian is positive and for the next one is negative (as opposed to zero for both of them). In this case, the algorithm obtains a safe distance to singularity for both points, but in fact the SM has to cross a singularity, i.e. change the working mode in order to move on to the next point. Therefore, one must check if the sign of the determinant has changed. If it has, the particle is completely useless, and ∞ is returned as the
+
+M. FarzanehKaloorazi et al. / Mechanism and Machine Theory 130 (2018) 346–362
+
+357
+
+Fig. 11. The initial path around the workpiece. Each point is represented as a frame consisting of the origin and RGB as xyz axes. The path has 2795 points starting from the bottom. Points 1 to 1399 are a simple helix around the main branch, and point 1400 is where the junction appears [31].
+
+Fig. 12. The initial population of the path’s reference frame is generated randomly within the hexapod workspace.
+cost function. Furthermore, in the application of the ﬁber placement, a sudden direction change for the rotary table is not allowed, because it may cause the ﬁber to break. Such a condition has been considered in the code in such a way that the speed and direction of the rotary table is limited.
+This algorithm is extensible to any redundant robotic workcell, and it is possible to modify the optimization criteria and add more of them. As always, computational time depends on the desired accuracy and complexity of the system. In this example, for each 1D optimization the IKP of the SM is solved and the determinant of the Jacobian is computed. Based on the symmetry of the path, some sections have been simpliﬁed in order to decrease the number of points. In this study, there were 10 iterations for 20 particles, performed with a 2.3 GHz processor and 8 GB of ram, and it took about 21 min to converge on the results.
+5.2. Results
+An example of a helix-type path around the “Y”-shaped workpiece is presented in Fig. 11. In accordance with the concept of PSO, the ﬁrst population is generated randomly. An example of the random generation within the workspace of the hexapod is represented in Fig. 12. The frames shown in the ﬁgure are the reference frame of the path and basically each frame represents a particle. At the end of the ﬁrst iteration, we have a population of the random poses of the hexapod and for each random pose, the rotation angle of the rotary table is optimized. The hexapod pose is the same as the placement
+
+358
+
+M. FarzanehKaloorazi et al. / Mechanism and Machine Theory 130 (2018) 346–362
+
+Fig. 13. Some possible angles of one point of the trajectory are optimized by a 1D optimization. The result is an optimized angle of the rotary table for this point.
+Fig. 14. The footprint of ﬁber placement tool tip, at the end of the ﬁber placement process. The yellow curve is the ﬁnal trajectory for the SM to follow. It is a linear trajectory for the main branch and an expanding helix for the second branch. (For interpretation of the references to colour in this ﬁgure legend, the reader is referred to the web version of this article.)
+of the rotary table with respect to the SM, with a ﬁxed offset from the hexapod’s EE, In the next iteration, the velocity of the particles change with respect to Eq. (9). In this iteration, the hexapod pose has somewhat improved, and again a 1D optimization runs for each point of the path. Finally, after a number of iterations, the pose of the hexapod is optimized and the best rotation angle for the rotary table is obtained for each point of the path.
+The concept of the 1D rotary table optimization is illustrated in Fig. 13. This ﬁgure only shows one point of the path, for which the rotary table is able to move the point in a circular manner. For each point of the path, the best rotation of the rotary table, with respect to the objective function, is chosen. Eventually, for each particle, a set of rotation angles associated to the points of the path is obtained. The summation of the objective functions, (i.e., the determinant of the Jacobian matrix of the SM) at all the points of the path represents the total cost of the particle.
+The tool tip footprint of ﬁnal trajectory for the SM to follow is presented in Fig. 14. It is a semi-linear trajectory from point 1 to 1399 in the path. Since the axis of the main branch coincides with the rotation axis of the rotary table, and the path is a helix, the trajectory is a line for the main branch. For the rest of the path from point 1400 to the end, it is an expanding helix. The transition point is deﬁned by the practitioner. In this study, point 1400 is chosen to be the transition point. In the transition point, the rotary table holds its angle and the tip of the SM’s tool is ﬁxed to the transition point.
+
+M. FarzanehKaloorazi et al. / Mechanism and Machine Theory 130 (2018) 346–362
+
+359
+
+Fig. 15. The trajectory for the rotary table to follow. It is linear for point numbers 1 to 1399 it is linear, and therefore it is neglected for the sake of a better representation.
+
+Fig. 16. The trajectory for the SM to follow. It is linear for point numbers 1 to 1399, and therefore it is neglected for the sake of a better representation.
+Meanwhile, the hexapod adjusts itself to a new pose, which is the optimum for the second branch. Then after the transition is done, the hexapod will stay ﬁxed and the SM and rotary table start working and continue to do their ﬁber placement. Also, the trajectory for the rotary table to follow during the ﬁber placement is constantly decreasing in angle, see Fig. 15. For point number 1 to 1399, it is linear decrease in angle, and therefore it is neglected for the sake of a better representation. Note that it is essential for the rotary table to be capable of inﬁnite rotation. The joint trajectory for the SM to follow is presented in Fig. 16. From point 1 to around 1500, it has almost zero movements, since it is associated with the main branch. The transition phase happens at point 1617. After this point it has a periodic movement. One can observe that for the linear part, joint 5 (J5) operates near 90 degrees, for which it is the furthest distance to the singularity (given the fact that J5 = 0, 180 is a singular pose for the SM). Afterwards the average movement of J5 is around 90 degrees. J5 stays within the range J5 = [78, 128], which is a safe margin for the SM to operate.
+The ﬁnal pose of the hexapod and the placement of the rotary table on the hexapod is presented in Fig. 17. As can be observed, the ﬁnal placement does not resemble a conventional workcell. In this case, either the hexapod on the ﬂoor, or the rotary table on the hexapod has to be placed in such a way that satisﬁes the obtained result. An easy way to do so is to
+
+360
+
+M. FarzanehKaloorazi et al. / Mechanism and Machine Theory 130 (2018) 346–362
+
+Fig. 17. The ﬁnal placement of the rotary table on the hexapod. It is not conventional to place the rotary table with an orientation to the surface of the EE. A spacer is needed in this situation in order to place and ﬁx the rotary table on the hexapod.
+use a spacer in order to provide the ﬁxed transformation from the base of the rotary table to the hexapod EE. The hexapod is ﬁxed to the ﬂoor at a distance of x = 1549 mm from the world frame (SM Base). The optimized placement of the rotary table is actually to be deﬁned in the world frame (restricted inside the workspace of the hexapod), and its placement on the hexapod can actually be variable. The start pose of the hexapod depends on the size and shape of the spacer. However, in order to take advantage of the full hexapod workspace, the rotary table is ﬁxed on the moving frame of the hexapod in such a way that the hexapod’s starting point is aligned with the center of the T&T workspace. Therefore, the ﬁxed frame of the
+rotary table is represented in the moving frame of the hexapod as follows: {x = 56, y = 56, z = 144, θ = 23, φ = 75, ψ =
+16, in Euler zyx convention.
+6. Conclusion
+In this paper, an optimization method based on Particle Swarm Optimization (PSO) was introduced. A redundant coordinated robotic workcell of 13 degrees of freedom (DOF) – including a 6 DOF SM, a 6 DOF hexapod parallel mechanism, and a 1 DOF rotary table – was mounted on the hexapod. The workcell’s task was to wrap a ﬁber around a “Y”-shaped workpiece to create a composite material. The optimization had two objectives: ﬁrst, for a given path on the “Y”-shaped part, to obtain a solution regarding redundancy in the DOF; and second, regarding the singular poses of the SM, for the obtained solutions be far from singularities. The optimization method is basically a 1D optimization within a 6D optimization. The procedure was explained through an illustrative example, and the result for a sample path was presented. In future works, a collision-free trajectory and obstacle avoidance will be considered.
+Acknowledgment
+We gratefully acknowledge the ﬁnancial support of the Fonds de Recherche du Québec Nature et Technologies (project 182702). The authors wish to thank Xiaoming Zhang and Clement Hely for their help with the actual coordinated system.
+Supplementary material
+Supplementary material associated with this article can be found, in the online version, at doi:10.1016/j.mechmachtheory. 2018.08.022 .
+
+M. FarzanehKaloorazi et al. / Mechanism and Machine Theory 130 (2018) 346–362
+
+361
+
+References
+[1] McCarville, D. A. (2009). Evolution of and projections for automated composite material placement equipment in the aerospace industry (Doctoral dissertation, Walden University).
+[2] P.-W. Chen, K.-J. Chen, A crashworthiness simulation for a light aircraft constructed of composite materials, Trans. Can. Soc. Mech. Eng. 39 (4) (2015) 829–843 .
+[3] J.P. Merlet, Parallel Robots, Springer, 2006. [4] R.-M.A. Nzue, J.-F. Brethé, E. Vasselin, D. Lefebvre, Comparison of serial and parallel robot repeatability based on different performance criteria, Mech.
+Mach. Theory 61 (2013) 136–155. [5] F. Gao, W. Li, X. Zhao, Z. Jin, H. Zhao, New kinematic structures for 2-, 3-, 4-, and 5-DOF parallel manipulator designs, Mech. Mach. Theory 37 (11)
+(2002) 1395–1411. [6] Y.-J. Chiu, M.-H. Perng, Self-calibration of a general hexapod manipulator with enhanced precision in 5-DOF motions, Mech. Mach. Theory 39 (1)
+(2004) 1–23. [7] B. Dasgupta, T. Mruthyunjaya, The stewart platform manipulator: a review, Mech. Mach. Theory 35 (1) (2000) 15–40. [8] M.L. Husty, An algorithm for solving the direct kinematics of general Stewart–Gough platforms, Mech. Mach. Theory 31 (4) (1996) 365–379. [9] Y.-Q. Yu, Optimum shaking force and shaking moment balancing of the RSS’R spatial linkage, Mech. Mach. Theory 22 (1) (1987) 39–45. [10] B. Shirinzadeh, G. Cassidy, D. Oetomo, G. Alici, M.H. Ang Jr, Trajectory generation for open-contoured structures in robotic ﬁbre placement, Robot.
+Comput. Integr. Manuf. 23 (4) (2007) 380–394. [11] A.W. Blom, B.F. Tatting, J.M. Hol, Z. Gürdal, Fiber path deﬁnitions for elastically tailored conical shells, Compos. Part B Eng. 40 (1) (2009) 77–84. [12] M. Shimizu, H. Kakuya, W.-K. Yoon, K. Kitagaki, K. Kosuge, Analytical inverse kinematic computation for 7-DOF redundant manipulators with joint
+limits and its application to redundancy resolution, IEEE Trans. Robot. 24 (5) (2008) 1131–1142. [13] T. Yoshikawa, Manipulability and redundancy control of robotic mechanisms, in: Proceedings of the IEEE International Conference on Robotics and
+Automation, Vol. 2, IEEE, 1985, pp. 1004–1009. [14] S. Nokleby, R. Fisher, R. Podhorodeski, F. Firmani, Force capabilities of redundantly-actuated parallel manipulators, Mech. Mach. Theory 40 (5) (2005)
+578–599 . [15] A.C. Nearchou, Solving the inverse kinematics problem of redundant robots operating in complex environments via a modiﬁed genetic algorithm,
+Mech. Mach. Theory 33 (3) (1998) 273–292. [16] M. FarzanehKaloorazi, M.T. Masouleh, S. Caro, Collision-free workspace of 3-RPR planar parallel mechanism via interval analysis, in: Advances in Robot
+Kinematics, Springer, 2014, pp. 327–334. [17] D.N. Nenchev, Y. Tsumaki, M. Takahashi, Singularity-consistent kinematic redundancy resolution for the SRS manipulator, in: Proceedings of the
+IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), Vol. 4, IEEE, 2004, pp. 3607–3612. [18] M.-H.F. Kaloorazi, M.T. Masouleh, S. Caro, Determination of the maximal singularity-free workspace of 3-DOF parallel mechanisms with a constructive
+geometric approach, Mech. Mach. Theory 84 (2015) 25–36. [19] J.M. Hollerbach, K.C. Suh, Redundancy resolution of manipulators through torque optimization, IEEE J. Robot. Autom. 3 (4) (1987) 308–316. [20] J. Wu, J. Wang, L. Wang, T. Li, Dynamics and control of a planar 3-DOF parallel manipulator with actuation redundancy, Mech. Mach. Theory 44 (4)
+(2009) 835–849. [21] D. Zhang, J. Lei, Kinematic analysis of a novel 3-DOF actuation redundant parallel manipulator using artiﬁcial intelligence approach, Robot. Comput.
+Integr. Manuf. 27 (1) (2011) 157–163. [22] X. Cheng, On-line collision-free path planning for service and assembly tasks by a two-arm robot, in: Proceedings of the IEEE International Conference
+on Robotics and Automation, Vol. 2, IEEE, 1995, pp. 1523–1528. [23] S. Caro, C. Dumas, S. Garnier, B. Furet, Workpiece placement optimization for machining operations with a KUKA KR270-2 robot, in: Proceedings of
+the IEEE International Conference on Robotics and Automation (ICRA), IEEE, 2013, pp. 2921–2926. [24] V. Robin, L. Sabourin, G. Gogu, Optimization of a robotized cell with redundant architecture, Robot. Comput. Integr. Manuf. 27 (1) (2011) 13–21. [25] R. Ur-Rehman, S. Caro, D. Chablat, P. Wenger, Multi-objective path placement optimization of parallel kinematics machines based on energy consump-
+tion, shaking forces and maximum actuator torques: application to the orthoglide, Mech. Mach. Theory 45 (8) (2010) 1125–1141. [26] G.-C. Vosniakos, E. Matsas, Improving feasibility of robotic milling through robot placement optimisation, Robot. Comput. Integr. Manuf. 26 (5) (2010)
+517–525 . [27] J.S. Hemmerle, F.B. Prinz, Optimal path placement for kinematically redundant manipulators, in: Proceedings of the IEEE International Conference on
+Robotics and Automation, IEEE, 1991, pp. 1234–1244. [28] J. Gao, A. Pashkevich, S. Caro, Optimization of the robot and positioner motion in a redundant ﬁber placement workcell, Mech. Mach. Theory 114
+(2017) 170–189. [29] J. Gao, A. Pashkevich, S. Caro, Optimal trajectories generation in robotic ﬁber placement systems, in: Proceedings of the Materials Science and Engi-
+neering Conference Series, 212, 2017, p. 012009. [30] J. Gao, A. Pashkevich, S. Caro, Manipulator motion planning in redundant robotic system for ﬁber placement process, in: New Trends in Mechanism
+and Machine Science, Springer, 2017, pp. 243–252. [31] C. Hély, L. Birglen, W.-F. Xie, Feasibility study of robotic ﬁbre placement on intersecting multi-axial revolution surfaces, Robot. Comput. Integr. Manuf.
+48 (2017) 73–79. [32] C. Hely, Planiﬁcation de trajectoires pour placement automatisé de ﬁbres sur surfaces de géométries complexes, École Polytechnique de Montréal,
+2016 Ph.D. thesis. [33] X. Zhang, W.-F. Xie, S.V. Hoa, Modeling and workspace analysis of collaborative advanced ﬁber placement machine, in: Proceedings of the ASME
+International Mechanical Engineering Congress and Exposition, 2014. [34] J. Kennedy, Particle swarm optimization, in: Encyclopedia of Machine Learning, Springer, 2011, pp. 760–766. [35] J. Kenndy, R. Eberhart, Particle swarm optimization, in: Proceedings of the IEEE International Conference on Neural Networks, Vol. 4, 1995,
+pp. 1942–1948. [36] M. Najjari, R. Guilbault, Formula derived from particle swarm optimization (PSO) for optimum design of cylindrical roller proﬁle under EHL regime,
+Mech. Mach. Theory 90 (2015) 162–174. [37] V. Savsani, R. Rao, D. Vakharia, Optimal weight design of a gear train using particle swarm optimization and simulated annealing algorithms, Mech.
+Mach. Theory 45 (3) (2010) 531–541. [38] S. Kucuk, Energy minimization for 3-RRR fully planar parallel manipulator using particle swarm optimization, Mech. Mach. Theory 62 (2013) 129–149. [39] M. Khorshidi, M. Soheilypour, M. Peyro, A. Atai, M.S. Panahi, Optimal design of four-bar mechanisms using a hybrid multi-objective ga with adaptive
+local search, Mech. Mach. Theory 46 (10) (2011) 1453–1465. [40] J. Denavit, Richard S. Hartenberg and the symbolic notation (a personal reﬂection), Mech. Mach. Theory 35 (6) (2000) 757–760. [41] M.L. Husty, M. Pfurner, H.-P. Schröcker, A new and eﬃcient algorithm for the inverse kinematics of a general serial 6r manipulator, Mech. Mach.
+Theory 42 (1) (2007) 66–81. [42] S. Qiao, Q. Liao, S. Wei, H.-J. Su, Inverse kinematic analysis of the general 6r serial manipulators based on double quaternions, Mech. Mach. Theory 45
+(2) (2010) 193–199. [43] J.J. Craig, Introduction to Robotics, Addison, Reading, MA, 1986. [44] A. Nubiola, Calibration of a serial robot using a laser tracker, École de technologie supérieure, 2011 Ph.D. thesis. [45] D. Kohli, M.-s. Hsu, The jacobian analysis of workspaces of mechanical manipulators, Mech. Mach. Theory 22 (3) (1987) 265–275.
+
+362
+
+M. FarzanehKaloorazi et al. / Mechanism and Machine Theory 130 (2018) 346–362
+
+[46] J. Angeles, J. Angeles, Fundamentals of Robotic Mechanical Systems, Vol. 2, Springer, 2002. [47] D. Zlatanov, R. Fenton, B. Benhabib, Identiﬁcation and classiﬁcation of the singular conﬁgurations of mechanisms, Mech. Mach. Theory 33 (6) (1998)
+743–760 . [48] I.A. Bonev, C.M. Gosselin, Analytical determination of the workspace of symmetrical spherical parallel mechanisms, IEEE Trans. Robot. 22 (5) (2006)
+1011–1017 . [49] Q. Jiang, C.M. Gosselin, Determination of the maximal singularity-free orientation workspace for the Gough–Stewart platform, Mech. Mach. Theory 44
+(6) (2009) 1281–1293. [50] I. Bonev, D. Zlatanov, C. Gosselin, Advantages of the modiﬁed Euler angles in the design and control of PKMS, in: Proceedings of the Parallel Kinematic
+Machines International Conference, Citeseer, 2002, pp. 171–188. [51] Y. Zhang, S. Wang, G. Ji, A comprehensive survey on particle swarm optimization algorithm and its applications, Math. Probl. Eng. 2015 (2015). [52] J.-P. Merlet, Jacobian, manipulability, condition number, and accuracy of parallel robots, J. Mech. Des. 128 (1) (2006) 199–206.
+
+

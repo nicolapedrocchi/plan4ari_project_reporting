@@ -1,0 +1,3755 @@
+Journal of Machine Learning Research 11 (2010) 3137-3181
+
+Submitted 1/10; Revised 7/10; Published 11/10
+
+A Generalized Path Integral Control Approach to Reinforcement Learning
+
+Evangelos A.Theodorou Jonas Buchli Stefan Schaal∗ Department of Computer Science University of Southern California Los Angeles, CA 90089-2905, USA
+
+ETHEODOR@USC.EDU JONAS@BUCHLI.ORG SSCHAAL@USC.EDU
+
+Editor: Daniel Lee
+
+Abstract
+With the goal to generate more scalable algorithms with higher efﬁciency and fewer open parameters, reinforcement learning (RL) has recently moved towards combining classical techniques from optimal control and dynamic programming with modern learning techniques from statistical estimation theory. In this vein, this paper suggests to use the framework of stochastic optimal control with path integrals to derive a novel approach to RL with parameterized policies. While solidly grounded in value function estimation and optimal control based on the stochastic Hamilton-JacobiBellman (HJB) equations, policy improvements can be transformed into an approximation problem of a path integral which has no open algorithmic parameters other than the exploration noise. The resulting algorithm can be conceived of as model-based, semi-model-based, or even model free, depending on how the learning problem is structured. The update equations have no danger of numerical instabilities as neither matrix inversions nor gradient learning rates are required. Our new algorithm demonstrates interesting similarities with previous RL research in the framework of probability matching and provides intuition why the slightly heuristically motivated probability matching approach can actually perform well. Empirical evaluations demonstrate signiﬁcant performance improvements over gradient-based policy learning and scalability to high-dimensional control problems. Finally, a learning experiment on a simulated 12 degree-of-freedom robot dog illustrates the functionality of our algorithm in a complex robot learning scenario. We believe that Policy Improvement with Path Integrals (PI2) offers currently one of the most efﬁcient, numerically robust, and easy to implement algorithms for RL based on trajectory roll-outs. Keywords: stochastic optimal control, reinforcement learning, parameterized policies
+1. Introduction
+While reinforcement learning (RL) is among the most general frameworks of learning control to create truly autonomous learning systems, its scalability to high-dimensional continuous state-action systems, for example, humanoid robots, remains problematic. Classical value-function based methods with function approximation offer one possible approach, but function approximation under the non-stationary iterative learning process of the value-function remains difﬁcult when one exceeds about 5-10 dimensions. Alternatively, direct policy learning from trajectory roll-outs has recently made signiﬁcant progress (Peters, 2007), but can still become numerically brittle and full of open
+∗. Also at ATR Computational Neuroscience Laboratories, Kyoto 619-0288, Japan.
+c 2010 Evangelos Theodorou, Jonas Buchli and Stefan Schaal.
+
+THEODOROU, BUCHLI AND SCHAAL
+tuning parameters in complex learning problems. In new developments, RL researchers have started to combine the well-developed methods from statistical learning and empirical inference with classical RL approaches in order to minimize tuning parameters and numerical problems, such that ultimately more efﬁcient algorithms can be developed that scale to signiﬁcantly more complex learning system (Dayan and Hinton, 1997; Koeber and Peters, 2008; Peters and Schaal, 2008c; Toussaint and Storkey, 2006; Ghavamzadeh and Yaakov, 2007; Deisenroth et al., 2009; Vlassis et al., 2009; Jetchev and Toussaint, 2009).
+In the spirit of these latter ideas, this paper addresses a new method of probabilistic reinforcement learning derived from the framework of stochastic optimal control and path integrals, based on the original work of Kappen (2007) and Broek et al. (2008). As will be detailed in the sections below, this approach makes an appealing theoretical connection between value function approximation using the stochastic HJB equations and direct policy learning by approximating a path integral, that is, by solving a statistical inference problem from sample roll-outs. The resulting algorithm, called Policy Improvement with Path Integrals (PI2), takes on a surprisingly simple form, has no open algorithmic tuning parameters besides the exploration noise, and it has numerically robust performance in high dimensional learning problems. It also makes an interesting connection to previous work on RL based on probability matching (Dayan and Hinton, 1997; Peters and Schaal, 2008c; Koeber and Peters, 2008) and motivates why probability matching algorithms can be successful.
+This paper is structured into several major sections:
+• Section 2 addresses the theoretical development of stochastic optimal control with path integrals. This is a fairly theoretical section. For a quick reading, we would recommend Section 2.1 for our basic notation, and Table 1 for the ﬁnal results. Exposing the reader to a sketch of the details of the derivations opens the possibility to derive path integral optimal control solutions for other dynamical systems than the one we address in Section 2.1. The main steps of the theoretical development include:
+– Problem formulation of stochastic optimal control with the stochastic Hamilton-JacobiBellman (HJB) equation
+– The transformation of the HJB into a linear PDE – The generalized path integral formulation for control systems with controlled and un-
+controlled differential equations – General derivation of optimal controls for the path integral formalism – Path integral optimal control applied to special cases of control systems
+• Section 3 relates path integral optimal control to reinforcement learning. Several main issues are addressed:
+– Reinforcement learning with parameterized policies – Dynamic Movement Primitives (DMP) as a special case of parameterized policies,
+which matches the problem formulation of path integral optimal control. – Derivation of Policy Improvement with Path Integrals (PI2), which is an application of
+path integral optimal control to DMPs.
+• Section 4 discusses related work.
+3138
+
+A GENERALIZED PATH INTEGRAL CONTROL APPROACH TO REINFORCEMENT LEARNING
+
+• Section 5 illustrates several applications of PI2 to control problems in robotics. • Section 6 addresses several important issues and characteristics of RL with PI2.
+
+2. Stochastic Optimal Control with Path Integrals
+The goal in stochastic optimal control framework is to control a stochastic dynamical system while minimizing a performance criterion. Therefore, stochastic optimal control can be thought as a constrained optimization problem in which the constrains corresponds to stochastic dynamical systems. The analysis and derivations of stochastic optimal control and path integrals in the next sections rely on the Bellman Principle of optimality (Bellman and Kalaba, 1964) and the HJB equation.
+
+2.1 Stochastic Optimal Control Deﬁnition and Notation
+
+For our technical developments, we will use largely a control theoretic notation from trajectory-
+
+based optimal control, however, with an attempt to have as much overlap as possible with the
+
+standard RL notation (Sutton and Barto, 1998). Let us deﬁne a ﬁnite horizon cost function for a
+
+trajectory τi (which can also be a piece of a trajectory) starting at time ti in state xti and ending at
+
+time1 tN
+
+tN
+
+R(τi) = φtN + rt dt,
+
+(1)
+
+ti
+
+with φtN = φ(xtN ) denoting a terminal reward at time tN and rt denoting the immediate cost at time
+
+t. In stochastic optimal control (Stengel, 1994), the goal is to ﬁnd the controls ut that minimize the
+
+value function:
+
+V (xti) = Vti = min Eτi [R(τi)] ,
+
+(2)
+
+uti :tN
+
+where the expectation Eτi[.] is taken over all trajectories starting at xti. We consider the rather general class of control systems:
+
+x˙t = f(xt ,t) + G(xt) (ut + εt ) = ft + Gt (ut + εt ) ,
+
+(3)
+
+with xt ∈ ℜn×1 denoting the state of the system, Gt = G(xt) ∈ ℜn×p the control matrix, ft = f(xt) ∈ ℜn×1 the passive dynamics, ut ∈ ℜp×1 the control vector and εt ∈ ℜp×1 Gaussian noise with variance Σε. As immediate cost we consider
+rt = r(xt , ut ,t) = qt + 1 utT Rut , (4) 2
+
+where qt = q(xt,t) is an arbitrary state-dependent cost function, and R is the positive semi-deﬁnite weight matrix of the quadratic control cost. The stochastic HJB equation (Stengel, 1994; Fleming and Soner, 2006) associated with this stochastic optimal control problem is expressed as follows:
+
+−∂tVt = min rt + (∇xVt )T Ft + 1trace (∇xxVt )Gt ΣεGtT , (5)
+
+u
+
+2
+
+1. If we need to emphasize a particular time, we denote it by ti, which also simpliﬁes a transition to discrete time notation later. We use t without subscript when no emphasis is needed when this “time slice” occurs, t0 for the start of a trajectory, and tN for the end of a trajectory.
+
+3139
+
+THEODOROU, BUCHLI AND SCHAAL
+
+where Ft is deﬁned as Ft = f(xt,t) + G(xt)ut. To ﬁnd the minimum, the cost function (4) is inserted into (5) and the gradient of the expression inside the parenthesis is taken with respect to controls u and set to zero. The corresponding optimal control is given by the equation:
+u(xt ) = ut = −R−1GtT (∇xtVt ).
+Substitution of the optimal control above, into the stochastic HJB (5), results in the following nonlinear and second order Partial Differential Equation (PDE):
+
+−∂tVt = qt + (∇xVt )T ft − 1 (∇xVt )T Gt R−1GtT (∇xVt ) + 1trace (∇xxVt )Gt ΣεGtT .
+
+2
+
+2
+
+The ∇x and ∇xx symbols refer to the Jacobian and Hessian, respectively, of the value function with respect to the state x, while ∂t is the partial derivative with respect to time. For notational compactness, we will mostly use subscripted symbols to denote time and state dependencies, as
+introduced in the equations above.
+
+2.2 Transformation of HJB into a Linear PDE
+In order to ﬁnd a solution to the PDE above, we use a exponential transformation of the value function:
+Vt = −λ log Ψt.
+Given this logarithmic transformation, the partial derivatives of the value function with respect to time and state are expressed as follows:
+
+∂tVt = −λ 1 ∂t Ψt , Ψt
+
+∇xVt = −λ 1 ∇xΨt , Ψt
+
+∇xxVt = λ 2 1 ∇xΨt ∇xΨtT − λ 1 ∇xxΨt .
+
+Ψt
+
+Ψt
+
+Inserting the logarithmic transformation and the derivatives of the value function we obtain:
+
+λ
+
+λ
+
+T λ2
+
+T
+
+−1 T
+
+1
+
+∂t Ψt = qt − (∇xΨt ) ft − 2 (∇xΨt ) Gt R Gt (∇xΨt ) + trace (Γ) ,
+
+(6)
+
+Ψt
+
+Ψt
+
+2Ψt
+
+2
+
+where the term Γ is expressed as:
+
+Γ = λ 2 1 ∇xΨt ∇xΨtT − λ 1 ∇xxΨt Gt ΣεGtT .
+
+Ψt
+
+Ψt
+
+The trace of Γ is therefore:
+
+trace (Γ) = λ Ψ2 1 trace ∇xΨtT Gt ΣεGt ∇xΨt − λ 1Ψ trace ∇xxΨt Gt Σ t εGtT . (7)
+
+3140
+
+A GENERALIZED PATH INTEGRAL CONTROL APPROACH TO REINFORCEMENT LEARNING
+
+Comparing the underlined terms in (6) and (7), one can recognize that these terms will cancel under the assumption of λR−1 = Σε, which implies the simpliﬁcation:
+
+λGt R−1GtT = Gt ΣεGtT = Σ(xt ) = Σt .
+
+(8)
+
+The intuition behind this assumption (cf. also Kappen, 2007; Broek et al., 2008) is that, since the weight control matrix R is inverse proportional to the variance of the noise, a high variance control input implies cheap control cost, while small variance control inputs have high control cost. From a control theoretic stand point such a relationship makes sense due to the fact that under a large disturbance (= high variance) signiﬁcant control authority is required to bring the system back to a desirable state. This control authority can be achieved with corresponding low control cost in R.
+With this simpliﬁcation, (6) reduces to the following form
+
+−∂t Ψt = − 1λ qt Ψt + ftT (∇xΨt ) + 12trace (∇xxΨt )Gt ΣεGtT , (9)
+
+with boundary condition: ΨtN = exp
+
+−
+
+1 λ
+
+φtN
+
+. The partial differential equation (PDE) in (9) corre-
+
+sponds to the so called Chapman Kolmogorov PDE, which is of second order and linear. Analytical
+
+solutions of (9) cannot be found in general for general nonlinear systems and cost functions. How-
+
+ever, there is a connection between solutions of PDEs and their representation as stochastic differ-
+
+ential equation (SDEs), that is mathematically expressed by the Feynman-Kac formula (Øksendal,
+
+2003; Yong, 1997). The Feynman-Kac formula (see appendix B) can be used to ﬁnd distributions
+
+of random processes which solve certain SDEs as well as to propose numerical methods for solving
+
+certain PDEs. Applying the Feynman-Kac theorem, the solution of (9) is:
+
+− ttN 1 qt dt
+
+1
+
+1 tN
+
+Ψti = Eτi ΨtN e i λ
+
+= Eτi exp − φtN −
+
+qt dt .
+
+λ
+
+λ ti
+
+(10)
+
+Thus, we have transformed our stochastic optimal control problem into the approximation problem of a path integral. With a view towards a discrete time approximation, which will be needed for numerical implementations, the solution (10) can be formulated as:
+
+1
+
+N−1
+
+Ψti = lim p (τi|xi) exp − φtN + ∑ qtj dt dτi,
+
+(11)
+
+dt→0
+
+λ
+
+j=i
+
+where τi = (xti, ....., xtN ) is a sample path (or trajectory piece) starting at state xti and the term p (τi|xi) is the probability of sample path τi conditioned on the start state xti. Since Equation (11) provides the exponential cost to go Ψti in state xti, the integration above is taken with respect to sample paths τi = (xti, xti+1, ....., xtN ). The differential term dτi is deﬁned as dτi = (dxti, ....., dxtN ). Evaluation of the stochastic integral in (11) requires the speciﬁcation of p (τi|xi), which is the topic
+of our analysis in the next section.
+
+2.3 Generalized Path Integral Formulation
+To develop our algorithms, we will need to consider a more general development of the path integral approach to stochastic optimal control than presented in Kappen (2007) and Broek et al. (2008). In particular, we have to address that in many stochastic dynamical systems, the control transition matrix Gt is state dependent and its structure depends on the partition of the state in directly and
+
+3141
+
+THEODOROU, BUCHLI AND SCHAAL
+
+non-directly actuated parts. Since only some of the states are directly controlled, the state vector is partitioned into x = [x(m)T x(c)T ]T with x(m) ∈ ℜk×1 the non-directly actuated part and x(c) ∈ ℜl×1the directly actuated part. Subsequently, the passive dynamics term and the control transition matrix can be partitioned as ft = [ft(m)T ft(c)T ]T with fm ∈ ℜk×1, fc ∈ ℜl×1 and Gt = [0k×p Gt(c)T ]T with Gt(c) ∈ ℜl×p. The discretized state space representation of such systems is given as:
+√ xti+1 = xti + fti dt + Gti uti dt + dtεti ,
+
+or, in partitioned vector form:
+
+xti+1 (m)
+
+xti(m) fti(m)
+
+0k×p
+
+(c) =
+
+(c) + (c) dt +
+
+(c)
+
+xti+1
+
+xti
+
+fti
+
+Gti
+
+√ uti dt + dtεti .
+
+(12)
+
+Essentially the stochastic dynamics are partitioned into controlled equations in which the state xti+1 (c) is directly actuated and the uncontrolled equations in which the state xti+1 (m) is not directly actuated. Since stochasticity is only added in the directly actuated terms (c) of (12), we can develop
+p (τi|xi) as follows.
+
+p (τi|xti ) = p (τi+1|xti )
+= p (xtN , ....., xti+1|xti )
+N−1
+= Π j=i p xt j+1 |xt j ,
+
+where we exploited the fact that the start state xti of a trajectory is given and does not contribute to its probability. For systems where the control has lower dimensionality than the state (12), the transition probabilities p xtj+1|xtj are factorized as follows:
+
+p xt j+1 |xt j
+
+= p xt j+1 (m) |xt j · p xt j+1 (c) |xt j = p xt j+1 (m) |xt j(m), xt j(c) · p xt j+1 (c) |xt j(m), xt j(c) ∝ p xt j+1 (c) |xt j ,
+
+(13)
+
+where we have used the fact that p xti+1 (m)|xti(m), xti(c) is the Dirac delta function, since xtj+1 (m) can be
+
+computed deterministically from xtj(m), xtj(c). For all practical purposes,2 the transition probability of the stochastic dynamics is reduced to the transition probability of the directly actuated part of the
+
+state:
+
+N−1
+
+N−1
+
+(c)
+
+p (τi|xti ) = Π j=i p xt j+1 |xt j ∝ Π j=i p xt j+1 |xt j .
+
+(14)
+
+Since we assume that the noise ε is zero mean Gaussian distributed with variance Σε, where Σε ∈ ℜl×l, the transition probability of the directly actuated part of the state is deﬁned as:3
+
+p xt j+1 (c) |xt j =
+
+1/2 1 exp − 1 xt j+1 (c) − xt j(c) − ft j(c)dt −1 2 ,
+
+(2π)l · |Σtj |
+
+2
+
+Σt j
+
+2. The delta functions will all integrate to 1 in the path integral.
+
+3. For notational simplicity, we write weighted square norms (or Mahalanobis distances) as vT Mv =
+
+v
+
+2.
+M
+
+(15)
+
+3142
+
+A GENERALIZED PATH INTEGRAL CONTROL APPROACH TO REINFORCEMENT LEARNING
+
+where the covariance Σtj ∈ ℜl×l is expressed as Σtj = Gtj(c)ΣεGtj(c)T dt. Combining (15) and (14) results in the probability of a path expressed as:
+
+p (τi|xti ) ∝
+
+1
+
+1 N−1 (c)
+
+(c) (c) 2
+
+1/2 exp − ∑ xtj+1 − xtj − ftj dt −1 .
+
+N−1
+Π j=i
+
+(2π)l
+
+Σt j |
+
+2 j=1
+
+Σt j
+
+Finally, we incorporate the assumption (8) about the relation between the control cost and the variance of the noise, which needs to be adjusted to the controlled space as Σtj = Gtj(c)ΣεGtj(c)T dt = λGtj(c)R−1Gtj(c)T dt = λHtj dt with Htj = Gtj(c)R−1Gtj(c)T . Thus, we obtain:
+
+
+
+p (τi|xti ) ∝
+
+1
+
+1 N−1
+
+1/2 exp − ∑
+
+N−1
+Π j=i
+
+(2π)l|Σtj |
+
+2λ j=i
+
+xt j+1 (c) − xt j (c) (c) − ft j
+dt
+
+2
+dt.
+−1
+Ht j
+
+With this formulation of the probability of a trajectory, we can rewrite the the path integral (11) as:
+
+Ψti = lim
+dt→0
+= lim
+dt→0
+
+
+
+exp
+
+−
+
+1 λ
+
+φtN
+
++
+
+N−1
+∑ j=i
+
+qt j
+
+dt
+
++
+
+1 2
+
+N−1
+∑ j=i
+
+xt j+1 (c) −xt j(c) (c)
+dt − ft j
+
+1 D(τi) exp
+
+− 1 S(τi λ
+
+ΠN−1 (2π)l/2|Σt |1/2
+
+j=i
+
+j
+
+dτi(c),
+
+
+2
+
+dt
+
+H−1
+
+tj
+
+(c)
+
+dτi
+
+(16)
+
+where, we deﬁned
+
+N−1 1 N−1
+S(τi) = φtN + ∑ qtj dt + ∑
+
+j=i
+
+2 j=i
+
+xt j+1 (c) − xt j (c) (c) − ft j
+dt
+
+2
+dt,
+−1
+Ht j
+
+and
+
+D(τi)
+
+=
+
+N−1
+Π j=i
+
+(2π)l/2|Σtj |1/2
+
+.
+
+Note that the integration is over dτi(c) = dxti(c), ....., dxtN (c) , as the non-directly actuated states can be integrated out due to the fact that the state transition of the non-directly actuated states is deterministic, and just added Dirac delta functions in the integral (cf. Equation (13)). Equation (16) is written in a more compact form as:
+
+Ψti = lim
+dt→0
+
+exp − 1λ S(τi) − log D(τi) dτi(c)
+
+= lim exp − 1 Z(τi) dτi(c), (17)
+
+dt→0
+
+λ
+
+where Z(τi) = S(τi) + λ log D(τi). It can be shown that this term is factorized in path dependent and path independent terms of the form:
+
+3143
+
+THEODOROU, BUCHLI AND SCHAAL
+
+˜
+
+λ(N − i)l
+
+Z(τi) = S(τi) +
+
+log (2πdtλ) ,
+
+2
+
+where
+
+S˜(τi)
+
+=
+
+S(τi) +
+
+λ 2
+
+N−1
+∑ j=i
+
+log
+
+|
+
+Ht
+
+j
+
+|
+
+.
+
+This formula is a required step for the derivation of
+
+optimal controls in the next section. The constant term 2 λ(N−i)l log (2πdtλ) can be the source of
+
+numerical instabilities especially in cases where ﬁne discretization dt of stochastic dynamics is
+
+required. However, in the next section, and in a great detail in Appendix A, lemma 1, we show how
+
+this term drops out of the equations.
+
+2.4 Optimal Controls
+
+For
+
+every
+
+moment
+
+of
+
+time,
+
+the
+
+optimal
+
+controls
+
+are
+
+given
+
+as
+
+uti
+
+=
+
+−
+
+R−
+
+1
+
+GT
+ti
+
+(
+
+∇xt
+
+i
+
+Vti
+
+)
+
+.
+
+Due to the
+
+exponential transformation of the value function, the equation of the optimal controls can be written
+
+as uti = λR−1Gti ∇xti Ψti . Ψti
+
+After substituting Ψti with (17) and canceling the state independent terms of the cost we have:
+
+
+
+
+
+−
+
+1 λ
+
+S˜(
+
+τi
+
+)
+
+(c)
+
+ −1 T ∇xti(c) e
+
+dτi 
+
+uti = lim λR Gti
+
+1˜
+
+(c)  ,
+
+dt→0
+
+e− λ S(τi)dτi
+
+Further analysis of the equation above leads to a simpliﬁed version for the optimal controls as
+
+uti = P (τi) uL (τi) dτi(c) , (18)
+
+with the probability P (τi) and local controls uL (τi) deﬁned as
+
+P (τi) =
+
+− 1 S˜(τi)
+eλ
+− 1 S˜(τi) e λ dτi
+
+(19)
+
+−1 (c)T
+
+˜
+
+uL (τi) = −R Gti lim ∇x(c) S(τi) .
+
+dt→0
+
+ti
+
+The path cost S˜(τi) is a generalized version of the path cost in Kappen (2005a) and Kappen (2007), which only considered systems with state independent control transition4 Gti. To ﬁnd the local controls uL (τi) we have to calculate the limdt→0 ∇x(c)S˜(τi). Appendix A and more precisely lemma
+ti
+2 shows in detail the derivation of the ﬁnal result:
+
+˜
+
+−1 (c)
+
+lim ∇x(c) S(τi) = −Hti Gti εti − bti ,
+
+dt→0
+
+ti
+
+where the new term bti is expressed as bti = λHtiΦti and Φti ∈ ℜl×1 is a vector with the jth element
+
+deﬁned as:
+
+1
+
+−1
+
+(Φti ) j = trace Hti ∂[x(c)] Hti .
+
+2
+
+ti j
+
+4.
+
+More
+
+precisely
+
+if
+
+Gti(c)
+
+=
+
+G(c)
+
+then
+
+the
+
+term
+
+λ 2
+
+N−1
+∑ j=i
+
+log
+
+|
+
+Ht
+
+j
+
+|
+
+disappears
+
+since
+
+it
+
+is
+
+state
+
+independent
+
+and
+
+it
+
+appears
+
+in
+
+both nominator and denominator in (19). In this case, the path cost is reduced to S˜(τi) = S(τi).
+
+3144
+
+A GENERALIZED PATH INTEGRAL CONTROL APPROACH TO REINFORCEMENT LEARNING
+
+The local control can now be expressed as:
+
+−1 (c)T −1 (c)
+uL(τi) = R Gti Hti Gti εti − bti ,
+
+By substituting Hti = Gti(c)R−1Gti(c)T in the equation above, we get our main result for the local controls of the sampled path for the generalized path integral formulation:
+
+uL(τi) = R−1Gti(c)T Gti(c)R−1Gti(c)T Gti −1 (c)εti − bti .
+
+(20)
+
+The equations in boxes (18), (19) and (20) form the solution for the generalized path integral stochastic optimal control problem. Given that this result is of general value and constitutes the foundation to derive our reinforcement learning algorithm in the next section, but also since many other special cases can be derived from it, we summarized all relevant equations in Table 1.
+The Given components of Table 1 include a model of the system dynamics, the cost function, knowledge of the system’s noise process, and a mechanism to generate trajectories τi. It is important to realize that this is a model-based approach, as the computations of the optimal controls requires knowledge of εi. εi can be obtained in two ways. First, the trajectories τi can be generated purely in simulation, where the noise is generated from a random number generator. Second, trajectories could be generated by a real system, and the noise εi would be computed from the difference between the actual and the predicted system behavior, that is, Gti(c)εi = x˙ti − xˆ˙ti = x˙ti − (fti + Gtiuti). Computing the prediction xˆ˙ti also requires a model of the system dynamics.
+Previous results in Kappen (2005a), Kappen (2007), Kappen (2005b) and Broek et al. (2008) are special cases of our generalized formulation. In the next section we show how our generalized formulation is specialized to different classes of stochastic dynamical systems and we provide the corresponding formula of local controls for each class.
+
+2.5 Special Cases
+The purpose of this section is twofold. First, it demonstrates how to apply the path integral approach to specialized forms of dynamical systems, and how the local controls in (20) simplify for these cases. Second, this section prepares the special case which we will need for our reinforcement learning algorithm in Section 3.
+
+2.5.1 SYSTEMS WITH ONE DIMENSIONAL DIRECTLY ACTUATED STATE
+The generalized formulation of stochastic optimal control with path integrals in Table 1 can be applied to a variety of stochastic dynamical systems with different types of control transition matrices. One case of particular interest is where the dimensionality of the directly actuated part of the state is 1D, while the dimensionality of the control vector is 1D or higher dimensional. As will be seen below, this situation arises when the controls are generated by a linearly parameterized function approximator. The control transition matrix thus becomes a row vector Gti(c) = gti(c)T ∈ ℜ1×p. According to (20), the local controls for such systems are expressed as follows:
+
+R−1gti( (c)T c)
+
+uL(τi) = (c)T
+
+(c) gti εti − bti .
+
+gti R−1gti
+
+3145
+
+THEODOROU, BUCHLI AND SCHAAL
+
+• Given:
+
+– The system dynamics x˙t = ft + Gt (ut + εt) (cf. 3)
+
+–
+
+The immediate cost rt
+
+=
+
+qt
+
++
+
+1 2
+
+uT
+t
+
+Rut
+
+(cf. 4)
+
+– A terminal cost term φtN (cf. 1)
+
+– The variance Σε of the mean-zero noise εt
+
+– Trajectory starting at ti and ending at tN: τi = (xti, ....., xtN )
+
+– A partitioning of the system dynamics into (c) controlled and (m) uncontrolled equations, where n = c + m is the dimensionality of the state xt (cf. Section 2.3)
+
+• Optimal Controls:
+
+– Optimal controls at every time step ti: uti = P (τi) u (τi) dτi(c)
+
+– Probability of a trajectory: P (τi) =
+
+− 1 S˜(τi)
+eλ
+− 1 S˜(τi) e λ dτi
+
+–
+
+Generalized
+
+trajectory
+
+cost:
+
+S˜(τi)
+
+=
+
+S(τi)
+
++
+
+λ 2
+
+N−1
+∑ j=i
+
+log |Htj |
+
+where
+
+∗
+
+S(τi)
+
+=
+
+φtN
+
++
+
+N−1
+∑ j=i
+
+qt j
+
+dt
+
++
+
+1 2
+
+N−1
+∑ j=i
+
+xt j+1 (c) −xt j(c) (c)
+dt − ft j
+
+2
+dt
+−1
+Ht j
+
+∗ Ht j = Gt j(c)R−1Gt j(c)T
+
+– Local Controls: uL(τi) = R−1Gti(c)T Gti(c)R−1Gti(c)T Gti −1 (c)εti − bti
+
+∗ bti = λHti Φti ∗ [Φti ] j = 21trace
+
+−1
+Hti
+
+∂[xti(c)] j Hti
+
+where
+
+Table 1: Summary of optimal control derived from the path integral formalizm.
+
+Since the directly actuated part of the state is 1D, the vector xti(c) collapses into the scalar xti(c) which appears in the partial differentiation above. In the case that gti(c) does not depend on xti(c), the differentiation with respect to xti(c) results to zero and the the local controls simplify to:
+
+R−1gti(c)gti(c)T
+
+uL(τi) = (c)T
+
+(c) εti .
+
+gti R−1gti
+
+2.5.2 SYSTEMS WITH PARTIALLY ACTUATED STATE
+The generalized formula of the local controls (20) was derived for the case where the control transition matrix is state dependent and its dimensionality is Gt(c) ∈ ℜl×p with l < n and p the dimensionality of the control. There are many special cases of stochastic dynamical systems in optimal control
+
+3146
+
+A GENERALIZED PATH INTEGRAL CONTROL APPROACH TO REINFORCEMENT LEARNING
+
+and robotic applications that belong into this general class. More precisely, for systems having a state dependent control transition matrix that is square (Gti(c) ∈ ℜl×l with l = p) the local controls based on (20) are reformulated as:
+
+uL(τi) = εti − Gti(c)−1bti . (21)
+
+Interestingly, a rather general class of mechanical systems such as rigid-body and multi-body dynamics falls into this category. When these mechanical systems are expressed in state space formulation, the control transition matrix is equal to rigid body inertia matrix Gti(c) = M(θti) (Sciavicco and Siciliano, 2000). Future work will address this special topic of path integral control for multi-body dynamics.
+Another special case of systems with partially actuated state is when the control transition matrix is state independent and has dimensionality Gt(c) = G(c) ∈ ℜl×p. The local controls, according to (20), become:
+uL(τi) = R−1G(c)T G(c)R−1G(c)T G −1 (c)εti . (22)
+If Gti(c) is square and state independent, Gti(c) = G(c) ∈ ℜl×l, we will have:
+
+uL(τi) = εti .
+
+(23)
+
+This special case was explored in Kappen (2005a), Kappen (2007), Kappen (2005b) and Broek et al. (2008). Our generalized formulation allows a broader application of path integral control in areas like robotics and other control systems, where the control transition matrix is typically partitioned into directly and non-directly actuated states, and typically also state dependent.
+
+2.5.3 SYSTEMS WITH FULLY ACTUATED STATE SPACE
+
+In this class of stochastic systems, the control transition matrix is not partitioned and, therefore, the
+control u directly affects all the states. The local controls for such systems are provided by simply substituting Gti(c) ∈ ℜn×p in (20) with Gti ∈ ℜn×n. Since Gti is a square matrix we obtain:
+
+uL(τi)
+
+=
+
+εti
+
+−
+
+−1
+Gti bti
+
+,
+
+with bti = λHti Φti and
+
+1
+
+−1
+
+(Φti ) j = trace Hti ∂(xti ) j Hti ,
+
+2
+
+where the differentiation is not taken with respect to (xti(c)) j but with respect to the full state (xti) j. For this fully actuated state space, there are subclasses of dynamical systems with square and/or
+
+state independent control transition matrix. The local controls for these cases are found by just substituting Gti(c) with Gti in (21), (22) and (23).
+
+3. Reinforcement Learning with Parameterized Policies
+Equipped with the theoretical framework of stochastic optimal control with path integrals, we can now turn to its application to reinforcement learning with parameterized policies. Since the beginning of actor-critic algorithms (Barto et al., 1983), one goal of reinforcement learning has been
+
+3147
+
+THEODOROU, BUCHLI AND SCHAAL
+
+to learn compact policy representations, for example, with neural networks as in the early days of machine learning (Miller et al., 1990), or with general parameterizations (Peters, 2007; Deisenroth et al., 2009). Parameterized policies have much fewer parameters than the classical time-indexed approach of optimal control, where every time step has it own set of parameters, that is, the optimal controls at this time step. Usually, function approximation techniques are used to represent the optimal controls and the open parameters of the function approximator become the policy parameters. Function approximators use a state representation as input and not an explicit time dependent representation. This representation allows generalization across states and promises to achieve better generalization of the control policy to a larger state space, such that policies become re-usable and do not have to be recomputed in every new situation.
+The path integral approach from the previous sections also follows the classical time-based optimal control strategy, as can be seen from the time dependent solution for optimal controls in (33). However, a minor re-interpretation of the approach and some small mathematical adjustments allow us to carry it over to parameterized policies and reinforcement learning, which results in a new algorithm called Policy Improvement with Path Integrals (PI2).
+
+3.1 Parameterized Policies
+We are focusing on direct policy learning, where the parameters of the policy are adjusted by a learning rule directly, and not indirectly as in value function approaches of classical reinforcement learning (Sutton and Barto, 1998)—see Peters (2007) for a discussion of pros and cons of direct vs. indirect policy learning. Direct policy learning usually assumes a general cost function (Sutton et al., 2000; Peters, 2007) in the form of
+
+J(x0) = p(τ0)R(τ0)dτ0,
+
+(24)
+
+which is optimized over states-action trajectories5 τ0 = (xt0, at0, ..., xtN ). Under the ﬁrst order Markov property, the probability of a trajectory is
+
+p(τi)
+
+=
+
+p(
+
+xti
+
+)
+
+Π
+
+N−1 j=i
+
+p(
+
+xt
+
+j
+
++
+
+1
+
+|
+
+xt
+
+j
+
+,
+
+at
+
+j
+
+)
+
+p(
+
+at
+
+j
+
+|
+
+xt
+
+j
+
+)
+
+.
+
+Both the state transition and the policy are assumed to be stochastic. The particular formulation of the stochastic policy is a design parameter, motivated by the application domain, analytical convenience, and the need to inject exploration during learning. For continuous state action domains, Gaussian distributions are most commonly chosen (Gullapalli, 1990; Williams, 1992; Peters, 2007). An interesting generalized stochastic policy was suggested in Rueckstiess et al. (2008) and applied in Koeber and Peters (2008), where the stochastic policy p(ati|xti) is linearly parameterized as:
+
+ati = gtiT (θ + εti ),
+
+(25)
+
+with gti denoting a vector of basis functions and θ the parameter vector. This policy has state de-
+
+pendent noise, which can contribute to faster learning as the signal-to-noise ratio becomes adaptive
+
+since it is a function of gti. It should be noted that a standard additive-noise policy can be expressed
+
+in this formulation, too, by choosing one basis function (gti) j = 0. For Gaussian noise ε the proba-
+
+bility of an action is p(ati|xti) = N
+
+θT gti , Σti
+
+with
+
+Σti
+
+=
+
+gT
+ti
+
+Σεgti .
+
+Comparing
+
+the
+
+policy
+
+formulation
+
+5. We use at to denote actions here in order to avoid using the symbol u in a conﬂicting way in the equations below, and to emphasize that an action does not necessarily coincide with the control command to a physical system.
+
+3148
+
+A GENERALIZED PATH INTEGRAL CONTROL APPROACH TO REINFORCEMENT LEARNING
+
+in (25) with the control term in (3), one recognizes that the control policy formulation (25) should ﬁt into the framework of path integral optimal control.
+
+3.2 Generalized Parameterized Policies
+
+Before going into more detail of our proposed reinforcement learning algorithm, it is worthwhile contemplating what the action at actually represents. In many applications of stochastic optimal control there are three main problems to be considered: i) trajectory planning, ii) feedforward control, and iii) feedback control. The results of optimization could thus be an optimal kinematic trajectory, the corresponding feedforward commands to track the desired trajectory accurately in face of the system’s nonlinearities, and/or time varying linear feedback gains (gain scheduling) for a negative feedback controller that compensates for perturbations from accurate trajectory tracking.
+There are very few optimal control algorithms which compute all three issues simultaneously, such as Differential Dynamic Programming(DDP) (Jacobson and Mayne, 1970), or its simpler version the Iterative Linear Quadratic Regulator(iLQR) (Todorov, 2005). However, these are model based methods which require rather accurate knowledge of the dynamics and make restrictive assumptions concerning differentiability of the system dynamics and the cost function.
+Path integral optimal control allows more ﬂexibility than these related methods. The concept of an “action” can be viewed in a broader sense. Essentially, we consider any “input” to the control system as an action, not unlike the inputs to a transfer function in classical linear control theory. The input can be a motor command, but it can also be anything else, for instance, a desired state, that is subsequently converted to a motor command by some tracking controller, or a control gain (Buchli et al., 2010) . As an example, consider a robotic system with rigid body dynamics (RBD) equations (Sciavicco and Siciliano, 2000) using a parameterized policy:
+
+q¨ = M(q)−1 (−C(q, q˙ ) − v(q)) + M(q)−1u,
+
+(26)
+
+u = G(q)(θ + εti),
+
+(27)
+
+where M is the RBD inertia matrix, C are Coriolis and centripetal forces, and v denotes gravity forces. The state of the robot is described by the joint angles q and joint velocities q˙ . The policy (27) is linearly parameterized by θ, with basis function matrix G—one would assume that the dimensionality of θ is signiﬁcantly larger than that of q to assure sufﬁcient expressive power of this parameterized policy. Inserting (27) into (26) results in a differential equation that is compatible with the system equations (3) for path integral optimal control:
+
+q¨ = f(q, q˙ ) + G˜ (q)(θ + εti)
+
+(28)
+
+where
+
+f(q, q˙ ) = M(q)−1 (−C(q, q˙ ) − v(q)) ,
+
+G˜ (q) = M(q)−1G(q).
+
+This example is a typical example where the policy directly represents motor commands. Alternatively, we could create another form of control structure for the RBD system:
+
+q¨ = M(q)−1 (−C(q, q˙ ) − v(q)) + M(q)−1u,
+
+u = KP(qd − q) + KD(q˙ d − q˙ ),
+
+q¨ d = G(qd, q˙ d)(θ + εti).
+
+(29)
+
+3149
+
+THEODOROU, BUCHLI AND SCHAAL
+
+Here, a Proportional-Derivative (PD) controller with positive deﬁnite gain matrices KP and KD converts a desired trajectory qd, q˙ d into a motor command u. In contrast to the previous example, the parameterized policy generates the desired trajectory in (29), and the differential equation for the desired trajectory is compatible with the path integral formalism.
+What we would like to emphasize is that the control system’s structure is left to the creativity of its designer, and that path integral optimal control can be applied on various levels. Importantly, as developed in Section 2.3, only the controlled differential equations of the entire control system contribute to the path integral formalism, that is, (28) in the ﬁrst example, or (29) in the second example. And only these controlled differential equations need to be known for applying path integral optimal control—none of the variables of the uncontrolled equations is ever used.
+At this point, we make a very important transition from model-based to model-free learning. In the example of (28), the dynamics model of the control system needs to be known to apply path integral optimal control, as this is a controlled differential equation. In contrast, in (29), the system dynamics are in an uncontrolled differential equation, and are thus irrelevant for applying path integral optimal control. In this case, only knowledge of the desired trajectory dynamics is needed, which is usually created by the system designer. Thus, we obtained a model-free learning system.
+
+3.3 Dynamic Movement Primitives as Generalized Policies
+As we are interested in model-free learning, we follow the control structure of the 2nd example of the previous section, that is, we optimize control policies which represent desired trajectories. We use Dynamic Movement Primitives (DMPs) (Ijspeert et al., 2003) as a special case of parameterized policies, which are expressed by the differential equations:
+
+1τ z˙t = ft + gtT (θ + εt ), (30) 1 y˙t = zt , τ 1 x˙t = −αxt , τ
+ft = αz(βz(g − yt ) − zt ).
+
+Essentially, these policies code a learnable point attractor for a movement from yt0 to the goal g, where θ determines the shape of the attractor. yt, y˙t denote the position and velocity of the
+trajectory, while zt, xt are internal states. αz, βz, τ are time constants. The basis functions gt ∈ ℜp×1are deﬁned by a piecewise linear function approximator with Gaussian weighting kernels, as
+suggested in Schaal and Atkeson (1998):
+
+[gt ] j = pw j xt (g − y0), ∑k=1 wk
+
+w j = exp −0.5h j(xt − c j)2 ,
+
+(31)
+
+with bandwith h j and center c j of the Gaussian kernels—for more details see Ijspeert et al. (2003). The DMP representation is advantageous as it guarantees attractor properties towards the goal while remaining linear in the parameters θ of the function approximator. By varying the parameter θ the shape of the trajectory changes while the goal state g and initial state yt0 remain ﬁxed. These properties facilitate learning (Peters and Schaal, 2008a).
+
+3150
+
+A GENERALIZED PATH INTEGRAL CONTROL APPROACH TO REINFORCEMENT LEARNING
+
+3.4 Policy Improvements with Path Integrals: The (PI2) Algorithm
+As can be easily recognized, the DMP equations are of the form of our control system (3), with only one controlled equation and a one dimensional actuated state. This case has been treated in Section 2.5.1. The motor commands are replaced with the parameters θ—the issue of time dependent vs. constant parameters will be addressed below. More precisely, the DMP equations can be written as:
+
+  x˙t
+
+−αxt
+
+  01×p 
+
+ z˙t  = 
+
+yt
+
+ +  01×p  (θt + εt ) .
+
+y˙t
+
+αz(βz(g − yt ) − zt )
+
+gt(c)T
+
+The state of the DMP is partitioned into the controlled part xt(c) = yt and uncontrolled part xt(m) = (xt zt)T . The control transition matrix depends on the state, however, it depends only on one of the state variables of the uncontrolled part of the state, that is, xt. The path cost for the stochastic dynamics of the DMPs is given by:
+
+N ˜ −1 1 N−1 xt j+1 (c) − xt j (c) (c) λ 2 N−1
+
+S(τi) = φtN + ∑ qtj dt + ∑
+
+j=i
+
+2 j=i
+
+− ft j
+
+dt + ∑ log |Htj |
+
+dt H−1 2 j=i
+
+tj
+
+N−1 1 N−1 (c)T 2
+
+∝ φtN + ∑ qtj + ∑ gtj (θtj + εtj ) −1
+
+j=i
+
+2 j=i
+
+Ht j
+
+N−1
+
+1 N−1 1
+
+T (c) −1 (c)T
+
+= φtN + ∑ qtj + ∑ (θtj + εtj ) gtj Htj gtj (θtj + εtj )
+
+j=i
+
+2 j=i 2
+
+N−1
+
+1 N−1 1
+
+T gt j(c)gt j(c)T
+
+= φtN + ∑ qtj + ∑ (θtj + εtj ) (c)T
+
+(c) (θt j + εt j )
+
+j=i
+
+2 j=i 2
+
+gt R−1 gt
+
+= φtN + ∑ qtj + ∑ (θtj + εtj ) N−1 1 N−1 1 T MtTj RMtj (θtj + εtj ).
+
+j=i
+
+2 j=i 2
+
+(32)
+
+R−1gt j gtTj
+
+(c)T −1 (c)
+
+with Mtj = gT R−1g . Ht becomes a scalar given by Ht = gt R gt . Interestingly, the term
+
+tj
+
+tj
+
+λ 2
+
+N−1
+∑ j=i
+
+log
+
+|
+
+Ht
+
+j
+
+|
+
+for
+
+the
+
+case
+
+of
+
+DMPs
+
+depends
+
+only
+
+on
+
+xt ,
+
+which
+
+is
+
+a
+
+deterministic
+
+variable
+
+and
+
+therefore can be ignored since it is the same for all sampled paths. We also absorbed, without
+
+loss of generality, the time step dt in cost terms. Consequently, the fundamental result of the path
+
+integral stochastic optimal problem for the case of DMPs is expressed as:
+
+uti = P (τi) uL (τi) dτi(c) , (33)
+
+where the probability P (τi) and local controls u (τi) are deﬁned as
+
+P (τi) =
+
+e− λ1 S˜(τi) e− λ1 S˜(τi)dτi ,
+
+R−1gti(c)gti(c)T
+
+uL(τi) = (c)T
+
+(c) εti ,
+
+gti R−1gti
+
+3151
+
+THEODOROU, BUCHLI AND SCHAAL
+
+and the path cost given as
+
+S˜(τi) = φtN + ∑ qtj + ∑ εt N−1 1 N−1 Tj MtTj RMtj εtj .
+
+j=i
+
+2 j=i
+
+Note that θ = 0 in these equations, that is, the parameters are initialized to zero. These equations correspond to the case where the stochastic optimal control problem is solved with one evaluation of the optimal controls (33) using dense sampling of the whole state space under the “passive dynamics” (i.e., θ = 0), which requires a signiﬁcant amount of exploration noise. Such an approach was pursued in the original work by Kappen (2007) and Broek et al. (2008), where a potentially large number of sample trajectories was needed to achieve good results. Extending this sampling approach to high dimensional spaces, however, is daunting, as with very high probability, we would sample primarily rather useless trajectories. Thus, biasing sampling towards good initial conditions seems to be mandatory for high dimensional applications.
+Thus, we consider only local sampling and an iterative update procedure. Given a current guess of θ, we generate sample roll-outs using stochastic parameters θ + εt at every time step. To see how the generalized path integral formulation is modiﬁed for the case of iterative updating, we start with the equations of the update of the parameter vector θ, which can be written as:
+
+θti(new) =
+
+R−1gti gti T (θ + εti )
+
+P (τi)
+
+T −1
+
+dτi
+
+gti R gti
+
+R−1gti gti T εti
+
+R−1gti gti T θ
+
+= P (τi) T −1 dτi + T −1
+
+gti R gti
+
+gti R gti
+
+= δθti +
+
+R−1gti gti T θ
+
+−1
+
+T
+
+trace (R gti gti )
+
+= δθti + Mti θ.
+
+(34)
+
+R−1gti gt T i εti The correction parameter vector δθti is deﬁned as δθti = P (τi) g T R−1g dτi. It is important to
+
+t
+
+t
+
+i
+
+i
+
+note that θti(new) is now time dependent, that is, for every time step ti, a different optimal parameter
+
+vector is computed. In order to return to one single time independent parameter vector θ(new), the
+
+vectors θti(new) need to be averaged over time ti.
+
+We start with a ﬁrst tentative suggestion of averaging over time, and then explain why it is
+
+inappropriate, and what the correct way of time averaging has to look like. The tentative and most
+
+intuitive time average is:
+
+(new) 1 N−1 (new) 1 N−1
+
+1 N−1
+
+θ = ∑ θti = ∑ δθti + ∑ Mtiθ.
+
+N i=0
+
+N i=0
+
+N i=0
+
+Thus, we would update θ based on two terms. The ﬁrst term is the average of δθti, which is reasonable as it reﬂects the knowledge we gained from the exploration noise. However, there would be a
+second update term due to the average over projected mean parameters θ from every time step—it should be noted that Mti is a projection matrix onto the range space of gti under the metric R−1, such that a multiplication with Mti can only shrink the norm of θ. From the viewpoint of having optimal parameters for every time step, this update component is reasonable as it trivially eliminates the part
+of the parameter vector that lies in the null space of gti and which contributes to the command cost
+
+3152
+
+A GENERALIZED PATH INTEGRAL CONTROL APPROACH TO REINFORCEMENT LEARNING
+
+of a trajectory in a useless way. From the view point of a parameter vector that is constant and time
+
+independent and that is updated iteratively, this second update is undesirable, as the multiplication
+
+of the parameter vector θ with Mti in (34) and the averaging operation over the time horizon reduces the L2 norm of the parameters at every iteration, potentially in an uncontrolled way.6 What we
+
+rather want is to achieve convergence when the average of δθti becomes zero, and we do not want
+
+to continue updating due to the second term.
+
+The problem is avoided by eliminating the projection matrix in the second term of averaging,
+
+such that it become:
+
+θ(new) = 1 ∑ δθti + ∑ θ = ∑ δθti + θ. N−1 1 N−1 1 N−1
+
+N i=0
+
+N i=0
+
+N i=0
+
+The meaning of this reduced update is simply that we keep a component in θ that is irrelevant and contributes to our trajectory cost in a useless way. However, this irrelevant component will not prevent us from reaching the optimal effective solution, that is, the solution that lies in the range space of gti. Given this modiﬁed update, it is, however, also necessary to derive a compatible cost function. As mentioned before, in the unmodiﬁed scenario, the last term of (32) is:
+
+1 ∑ (θ + εtj ) N−1 T MtTj RMtj (θ + εtj )
+2 j=i
+
+To avoid a projection of θ, we modify this cost term to be:
+1 ∑ (θ + Mtj εtj ) N−1 T R(θ + Mtj εtj ).
+2 j=i
+
+With this modiﬁed cost term, the path integral formalism results in the desired θti(new) without the Mti projection of θ.
+The main equations of the iterative version of the generalized path integral formulation, called Policy Improvement with Path Integrals (PI2), can be summarized as:
+
+P (τi) =
+
+e− λ1 S(τi) e− λ1 S(τi)dτi ,
+
+(35)
+
+S(τi) = φtN + ∑ qtj dt + ∑ (θ + Mtj εtj ) N−1 1 N−1 T R(θ + Mtj εtj )dt, (36)
+
+j=i
+
+2 j=i
+
+δθti = P (τi) Mti εti dτi,
+
+(37)
+
+N−1
+∑i=0 (N
+
+− i)
+
+w j,ti
+
+[δθti ] j
+
+[δθ] j =
+
+N−1
+
+,
+
+(38)
+
+∑i=0 w j,ti (N − i)
+
+θ(new) = θ(old) + δθ.
+
+Essentially, (35) computes a discrete probability at time ti of each trajectory roll-out with the help of the cost (36). For every time step of the trajectory, a parameter update is computed in (37) based
+6. To be precise, θ would be projected and continue shrinking until it lies in the intersection of all null spaces of the gti basis function—this null space can easily be of measure zero.
+
+3153
+
+THEODOROU, BUCHLI AND SCHAAL
+
+on a probability weighted average over trajectories. The parameter updates at every time step are
+
+ﬁnally averaged in (38). Note that we chose a weighted average by giving every parameter update a
+
+weight7 according to the time steps left in the trajectory and the activation of the kernel in (31). This
+
+average can be interpreted as using a function approximator with only a constant (offset) parameter
+
+vector to approximate the time dependent parameters. Giving early points in the trajectory a higher
+
+weight is useful since their parameters affect a large time horizon and thus higher trajectory costs.
+
+Other function approximation (or averaging) schemes could be used to arrive at a ﬁnal parameter
+
+update—we preferred this simple approach as it gave very good learning results. The ﬁnal parameter update is θ(new) = θ(old) + δθ.
+
+The parameter λ regulates the sensitivity of the exponentiated cost and can automatically be
+
+optimized for every time step i to maximally discriminate between the experienced trajectories.
+
+More precisely, a constant term can be subtracted from (36) as long as all S(τi) remain positive—this constant term8 cancels in (35). Thus, for a given number of roll-outs, we compute the exponential
+
+term in (35) as
+
+exp − 1 S(τi) = exp −h S(τi) − min S(τi) ,
+
+λ
+
+max S(τi) − min S(τi)
+
+with h set to a constant, which we chose to be h = 10 in all our evaluations. The max and min
+operators are over all sample roll-outs. This procedure eliminates λ and leaves the variance of the exploration noise ε as the only open algorithmic parameter for PI2. It should be noted that the equations for PI2 have no numerical pitfalls: no matrix inversions and no learning rates,9 rendering PI2 to be very easy to use in practice.
+The pseudocode for the ﬁnal PI2 algorithm for a one dimensional control system with function approximation is given in Table 2. A tutorial Matlab example of applying PI2 can be found at
+http://www-clmc.usc.edu/software .
+
+4. Related Work
+In the next sections we discuss related work in the areas of stochastic optimal control and reinforcement learning and analyze the connections and differences with the PI2 algorithm and the generalized path integral control formulation.
+
+4.1 Stochastic Optimal Control and Path Integrals
+The path integral formalism for optimal control was introduced in Kappen (2005a,b). In this work, the role of noise in symmetry breaking phenomena was investigated in the context of stochastic optimal control. In Kappen et al. (2007), Wiegerinck et al. (2006), and Broek et al. (2008), the path integral formalism is extended for the stochastic optimal control of multi-agent systems.
+Recent work on stochastic optimal control by Todorov (2008), Todorov (2007) and Todorov (2009b) shows that for a class of discrete stochastic optimal control problems, the Bellman equa-
+
+7. The use of the kernel weights in the basis functions (31) for the purpose of time averaging has shown better perfor-
+
+mance with respect to other weighting approaches, across all of our experiments. Therefore this is the weighting that
+
+we suggest. Users may develop other weighting schemes as more suitable to their needs.
+
+h min S(τi)
+
+8. In fact, the term inside the exponent results by adding maxS(τi)−minS(τi) , which cancels in (35), to the term
+
+− hS(τi)
+
+which is equal to − 1 S(τi).
+
+max S(τi)−min S(τi)
+
+λ
+
+9. R is a user design parameter and usually chosen to be diagonal and invertible.
+
+3154
+
+A GENERALIZED PATH INTEGRAL CONTROL APPROACH TO REINFORCEMENT LEARNING
+
+• Given:
+
+–
+
+An immediate cost function rt
+
+=
+
+qt
+
++
+
+θT
+t
+
+Rθt
+
+(cf.
+
+1)
+
+– A terminal cost term φtN (cf. 1)
+
+–
+
+A stochastic parameterized policy at
+
+=
+
+gT
+t
+
+(θ
+
++
+
+εt
+
+)
+
+(cf.
+
+25)
+
+– The basis function gti from the system dynamics (cf. 3 and Section 2.5.1)
+
+– The variance Σε of the mean-zero noise εt
+
+– The initial parameter vector θ
+
+• Repeat until convergence of the trajectory cost R:
+
+– Create K roll-outs of the system from the same start state x0 using stochstic parameters θ + εt at every time step
+
+– For k = 1...K, compute:
+
+e− λ1 S(τi,k) ∗ P (τi,k) = K − 1 S(τ )
+∑k=1[e λ i,k ]
+
+∗
+
+S(τi,k)
+
+=
+
+φtN ,k
+
++
+
+N−1
+∑ j=i
+
+qt j,k
+
++
+
+1 2
+
+N−1
+∑ j=i+1(θ
+
++
+
+Mt j,kεt j,k)T
+
+R(θ
+
++
+
+Mt j,kεt j,k)
+
+R−1gt j ,k gtTj ,k
+t j ∗ ,k Mt j,k = gT R−1gt j,k
+
+– For i = 1...(N − 1), compute:
+
+∗ δθti = ∑kK=1 [P (τi,k) Mti,k εti,k]
+
+– Compute [δθ] j = ∑Ni=−01(N−i) w j,t N−1 i [δθti ] j
+∑i=0 w j,ti (N−i)
+
+– Update θ ← θ + δθ
+
+–
+
+Create
+
+one
+
+noiseless
+
+roll-out
+
+to
+
+check
+
+the
+
+trajectory
+
+cost
+
+R
+
+=
+
+φtN
+
++
+
+N−1
+∑i=0 rti .
+
+In case
+
+the noise cannot be turned off, that is, a stochastic system, multiple roll-outs need be
+
+averaged.
+
+Table 2: Pseudocode of the PI2 algorithm for a 1D Parameterized Policy (Note that the discrete time step dt was absorbed as a constant multiplier in the cost terms).
+
+tion can be written as the KL divergence between the probability distribution of the controlled and uncontrolled dynamics. Furthermore it is shown that the class of discrete KL divergence control problem is equivalent to the continuous stochastic optimal control formalism with quadratic cost control function and under the presence of Gaussian noise. In Kappen et al. (2009), the KL divergence control formalism is considered and it is transformed to a probabilistic inference problem. In all this aforementioned work, both in the path integral formalism as well as in KL divergence control, the class of stochastic dynamical systems under consideration is rather restrictive since the
+3155
+
+THEODOROU, BUCHLI AND SCHAAL
+control transition matrix is state independent. Moreover, the connection to direct policy learning in RL and model-free learning was not made in any of the previous projects.
+Our PI2 algorithm differs with respect to the aforementioned work in the following points. • In Todorov (2009b) the stochastic optimal control problem is investigated for discrete action
+- state spaces and therefore it is treated as Markov Decision Process (MDP). To apply our PI2 algorithm, we do not discretize the state space and we do not treat the problem as an MDP. Instead we work in continuous state - action spaces which are suitable for performing RL in high dimensional robotic systems. To the best of our knowledge, our results present RL in one of the most high dimensional continuous state action spaces.
+• In our derivations, the probabilistic interpretation of control comes directly from the FeynmanKac Lemma. Thus we do not have to impose any artiﬁcial “pseudo-probability“ treatment of the cost as in Todorov (2009b). In addition, for the continuous state - action spaces we do not have to learn the value function as it is suggested in Todorov (2009b) via Z-learning. Instead we directly ﬁnd the controls based on our generalization of optimal controls.
+• In the previous work, the problem of how to sample trajectories is not addressed. Sampling is performed at once with the hope to cover the all state space. We follow a rather different approach that allows to attack robotic learning problems of the complexity and dimensionality of the little dog robot.
+• The work in Todorov (2009a) considers stochastic dynamics with state dependent control matrix. However, the way of how the stochastic optimal control problem is solved is by imposing strong assumptions on the structure of the cost function and, therefore, restrictions of the proposed solution to special cases of optimal control problems. The use of this speciﬁc cost function allows transforming the stochastic optimal control problem to a deterministic optimal control problem. Under this transformation, the stochastic optimal control problem can be solved by using deterministic algorithms.
+• With respect to the work in Broek et al. (2008), Wiegerinck et al. (2006) and Kappen et al. (2009) our PI2 algorithm has been derived for a rather general class of systems with control transition matrix that is state dependent. In this general class, Rigid body and multi-body dynamics as well as the DMPs are included. Furthermore we have shown how our results generalize previous work.
+4.2 Reinforcement Learning of Parameterized Policies
+There are two main classes of related algorithms: Policy Gradient algorithms and probabilistic algorithms.
+Policy Gradient algorithms (Peters and Schaal, 2006a,b) compute the gradient of the cost function (24) at every iteration and the policy parameters are updated according to θ(new) = θ(old) + α∇θJ. Some well-established algorithms, which we will also use for comparisons, are as follows (see also Peters and Schaal, 2006a,b).
+4.2.1 REINFORCE
+Williams (1992) introduced the episodic REINFORCE algorithm, which is derived from taking the derivative of (24) with respect to the policy parameters. This algorithm has rather slow convergence
+3156
+
+A GENERALIZED PATH INTEGRAL CONTROL APPROACH TO REINFORCEMENT LEARNING
+
+due to a very noisy estimate of the policy gradient. It is also very sensitive to a reward baseline parameter bk (see below). Recent work derived the optimal baseline for REINFORCE (cf. Peters and Schaal, 2008a), which improved the performance signiﬁcantly. The episodic REINFORCE update equations are:
+
+N−1
+∇θk J = Eτ0 (R(τ0) − bk) ∑ ∇θk ln p(ati |xti ) ,
+i=0
+
+N−1
+
+2
+
+Eτ0 ∑i=0 ∇θk ln p(ati |xti ) R(τ0)
+
+bk =
+
+N−1 2 , Eτ0 ∑i=0 ∇θk ln p(ati |xti )
+
+where
+
+k
+
+denotes
+
+the
+
+k-th
+
+coefﬁcient
+
+of
+
+the
+
+parameter
+
+vector
+
+and
+
+R(τ0)
+
+=
+
+1 N
+
+N−1
+∑i=0
+
+rti .
+
+4.2.2 GPOMDP AND THE POLICY GRADIENT THEOREM ALGORITHM
+In their GPOMDP algorithm, Baxter and Bartlett (2001) introduced several improvements over REINFORCE that made the gradient estimates more efﬁcient. GPOMDP can also be derived from the policy gradient theorem (Sutton et al., 2000; Peters and Schaal, 2008a), and an optimal reward baseline can be added (cf. Peters and Schaal, 2008a). In our context, the GPOMDP learning algorithm can be written as:
+
+N−1
+
+j (k)
+
+∇θk J = Eτ0 ∑ (rt j − btj ) ∑ (∇θk ln p(ati |xti )) ,
+
+j=0
+
+i=0
+
+(k) Eτ0 (∇θk ln p(ati |xti ))2 rti
+
+bti =
+
+2.
+
+Eτ0 (∇θk ln p(ati |xti ))
+
+4.2.3 THE EPISODIC NATURAL ACTOR CRITIC
+One of the most efﬁcient policy gradient algorithm was introduced in Peters and Schaal (2008b), called the Episodic Natural Actor Critic. In essence, the method uses the Fisher Information Matrix to project the REINFORCE gradient onto a more effective update direction, which is motivated by the theory of natural gradients by Amari (1999). The eNAC algorithm takes the form of:
+
+ξti,k =
+
+∇θk ln p(ati |xti ) , 1
+
+∇θJ J0
+
+N−1 −1
+
+N−1
+
+= Eτ0 ∑ ξti,kξtiT,k Eτ0 R(τ0) ∑ ξti,k ,
+
+i=0
+
+i=0
+
+where J0 is a constant offset term.
+
+4.2.4 POWER
+The PoWER algorithm (Koeber and Peters, 2008) is a probabilistic policy improvement method, not a gradient algorithm. It is derived from an Expectation-Maximization framework using probability
+
+3157
+
+THEODOROU, BUCHLI AND SCHAAL
+
+matching (Dayan and Hinton, 1997; Peters and Schaal, 2008c). Using the notation of this paper, the parameter update of PoWER becomes:
+
+N−1
+
+T −1
+
+gti gti
+
+tN
+
+gti
+
+gT
+ti
+
+εt
+
+δθ = Eτ0 ∑ Rti T
+
+Eτ0 ∑ Rti T
+
+,
+
+i=0 gti gti
+
+ti=to gti gti
+
+N−1
+
+−1
+
+2
+
+gti gtTi
+
+where Rti = ∑ j=i rtj . If we set R = c I in the update (37) of PI , and set gT g = I in the matrix
+
+ti ti
+
+inversion term of (39), the two algorithms look essentially identical. But it should be noted that
+
+the rewards rti in PoWER need to behave like an improper probability, that is, be strictly positive
+
+and integrate to a constant number—this property can make the design of suitable cost functions more complicated. PI2, in contrast, uses exponentiated sum of reward terms, where the immedi-
+
+ate reward can be arbitrary, and only the cost on the motor commands needs be quadratic. Our
+
+empirical evaluations revealed that, for cost functions that share the same optimum in the PoWER pseudo-probability formulation and the PI2 notation, both algorithms perform essentially identical,
+
+indicating that the matrix inversion term in PoWER may be unimportant for many systems. It should
+
+be noted that in Vlassis et al. (2009), PoWER was extended to the discounted inﬁnite horizon case,
+
+where PoWER is the special case of a non-discounted ﬁnite horizon problem.
+
+5. Evaluations
+We evaluated PI2 in several synthetic examples in comparison with REINFORCE, GPOMDP, eNAC, and, when possible, PoWER. Except for PoWER, all algorithms are suitable for optimizing immediate reward functions of the kind rt = qt + utRut. As mentioned above, PoWER requires that the immediate reward behaves like an improper probability. This property is incompatible with rt = qt + utRut and requires some special nonlinear transformations, which usually change the nature of the optimization problem, such that PoWER optimizes a different cost function. Thus, only one of the examples below has a compatible a cost function for all algorithms, including PoWER. In all examples below, exploration noise and, when applicable, learning rates, were tuned for every individual algorithms to achieve the best possible numerically stable performance. Exploration noise was only added to the maximally activated basis function in a motor primitive,10 and the noise was kept constant for the entire time that this basis function had the highest activation—empirically, this tick helped improves the learning speed of all algorithms.
+5.1 Learning Optimal Performance of a 1 DOF Reaching Task
+The ﬁrst evaluation considers learning optimal parameters for a 1 DOF DMP (cf. Equation 30). The immediate cost and terminal cost are, respectively:
+rt = 0.5 ft2 + 5000 θT θ, φtN = 10000(y˙t2N + 10(g − ytN )2)
+with yt0 = 0 and g = 1—we use radians as units motivated by our interest in robotics application, but we could also avoid units entirely. The interpretation of this cost is that we would like to reach the goal g with high accuracy while minimizing the acceleration of the movement and while keeping the parameter vector short. Each algorithm was run for 15 trials to compute a parameter update, and
+10. That is, the noise vector in (25) has only one non-zero component.
+
+3158
+
+A GENERALIZED PATH INTEGRAL CONTROL APPROACH TO REINFORCEMENT LEARNING
+a total of 1000 updates were performed. Note that 15 trials per update were chosen as the DMP had 10 basis functions, and the eNAC requires at least 11 trials to perform a numerically stable update due to its matrix inversion. The motor primitives were initialized to approximate a 5-th order polynomial as point-to-point movement (cf. Figure 1a,b), called a minimum-jerk trajectory in the motor control literature; the movement duration was 0.5 seconds, which is similar to normal human reaching movements. Gaussian noise of N(0, 0.1) was added to the initial parameters of the movement primitives in order to have different initial conditions for every run of the algorithms. The results are given in Figure 1. Figure 1a,b show the initial (before learning) trajectory generated by the DMP together with the learning results of the four different algorithms after learning— essentially, all algorithms achieve the same result such that all trajectories lie on top of each other. In Figure 1c, however, it can be seen that PI2 outperforms the gradient algorithms by an order of magnitude. Figure 1d illustrates learning curves for the same task as in Figure 1c, just that parameter updates are computed already after two roll-outs—the eNAC was excluded from this evaluation as it would be too heuristic to stabilize its ill-conditioned matrix inversion that results from such few roll-outs. PI2 continues to converge much faster than the other algorithms even in this special scenario. However, there are some noticeable ﬂuctuation after convergence. This noise around the convergence baseline is caused by using only two noisy roll-outs to continue updating the parameters, which causes continuous parameter ﬂuctuations around the optimal parameters. Annealing the exploration noise, or just adding the optimal trajectory from the previous parameter update as one of the roll-outs for the next parameter update can alleviate this issue—we do not illustrate such little “tricks” in this paper as they really only affect ﬁne tuning of the algorithm.
+5.2 Learning Optimal Performance of a 1 DOF Via-Point Task
+The second evaluation was identical to the ﬁrst evaluation, just that the cost function now forced the movement to pass through an intermediate via-point at t = 300ms. This evaluation is an abstract approximation of hitting a target, for example, as in playing tennis, and requires a signiﬁcant change in how the movement is performed relative to the initial trajectory (Figure 2a). The cost function was
+r300ms = 100000000(G − yt300ms )2, φtN = 0 with G = 0.25. Only this single reward was given. For this cost function, the PoWER algorithm can be applied, too, with cost function r˜300ms = exp(−1/λ r300ms) and r˜ti = 0 otherwise. This transformed cost function has the same optimum as r300ms. The resulting learning curves are given in Figure 2 and resemble the previous evaluation: PI2 outperforms the gradient algorithms by roughly an order of magnitude, while all the gradient algorithms have almost identical learning curves. As was expected from the similarity of the update equations, PoWER and PI2 have in this special case the same performance and are hardly distinguishable in Figure 2. Figure 2a demonstrates that all algorithms pass through the desired target G, but that there are remaining differences between the algorithms in how they approach the target G—these difference have a small numerical effect in the ﬁnal cost (where PI2 and PoWER have the lowest cost), but these difference are hardly task relevant.
+5.3 Learning Optimal Performance of a Multi-DOF Via-Point Task
+A third evaluation examined the scalability of our algorithms to a high-dimensional and highly redundant learning problem. Again, the learning task was to pass through an intermediate target G,
+3159
+
+THEODOROU, BUCHLI AND SCHAAL
+
+1 10 100 1000 10000 15000
+1 10 100 1000 2000
+
+Position [rad] Velocity [rad/s]
+
+1 0.8 0.6 0.4 0.2
+0
+a) -0.2
+0 3000000 2500000 2000000 1500000 1000000
+500000
+c) 0
+
+Initial PI^2 REINFORCE PG NAC
+
+0.1
+
+0.2
+
+0.3
+
+0.4
+
+0.5
+
+Time [s]
+
+Number of Roll-Outs
+
+6 5 4 3 2 1 0
+b) -1
+0 3000000
+2500000
+2000000
+1500000
+1000000
+500000
+d) 0
+
+0.1
+
+0.2
+
+0.3
+
+0.4
+
+0.5
+
+Time [s]
+
+Number of Roll-Outs
+
+Cost Cost
+
+Figure 1:
+
+Comparison of reinforcement learning of an optimized movement with motor primitives. a) Position trajectories of the initial trajectory (before learning) and the results of all algorithms after learning—the different algorithms are essentially indistighuishable. b) The same as a), just using the velocity trajectories. c) Average learning curves for the different algorithms with 1 std error bars from averaging 10 runs for each of the algorithms. d) Learning curves for the different algorithms when only two roll-outs are used per update (note that the eNAC cannot work in this case and is omitted).
+
+just that a d = 2, 10, or 50 dimensional motor primitive was employed. We assume that the multiDOF systems model planar robot arms, where d links of equal length l = 1/d are connected in an open chain with revolute joints. Essentially, these robots look like a multi-segment snake in a plane, where the tail of the snake is ﬁxed at the origin of the 2D coordinate system, and the head of the snake can be moved in the 2D plane by changing the joint angles between all the links. Figure 3b,d,f illustrate the movement over time of these robots: the initial position of the robots is when all joint angles are zero and the robot arm completely coincides with the x-axis of the coordinate frame. The goal states of the motor primitives command each DOF to move to a joint angle, such that the entire robot conﬁguration afterwards looks like a semi-circle where the most distal link of the robot
+3160
+
+A GENERALIZED PATH INTEGRAL CONTROL APPROACH TO REINFORCEMENT LEARNING
+
+Position [rad]
+
+1.2 1
+0.8 0.6 0.4 0.2
+0 -0.2 -0.4 -0.6
+a) -0.8
+0
+
+25000000
+
+20000000
+
+15000000 G
+Initial
+
+Cost
+
+PI^2 REINF.
+
+10000000
+
+PG NAC
+
+5000000
+
+PoWER
+
+0.1
+
+0.2
+
+0.3
+
+0.4
+
+0.5
+
+Time [s]
+
+b) 0
+
+Number of Roll-Outs
+
+1 10 100 1000 10000 15000
+
+Figure 2: Comparison of reinforcement learning of an optimized movement with motor primitives for passing through an intermediate target G. a) Position trajectories of the initial trajectory (before learning) and the results of all algorithms after learning. b) Average learning curves for the different algorithms with 1 std error bars from averaging 10 runs for each of the algorithms.
+
+(the end-effector) touches the y-axis. The higher priority task, however, is to move the end-effector
+through a via-point G = (0.5, 0.5). To formalize this task as a reinforcement learning problem, we
+denote the joint angles of the robots as ξi, with i = 1, 2, ..., d, such that the ﬁrst line of (30) reads now as ξ¨i,t = fi,t + gTi,t(θi + εi,t)—this small change of notation is to avoid a clash of variables with the (x, y) task space of the robot. The end-effector position is computed as:
+
+1d
+
+i
+
+xt = ∑ cos( ∑ ξ j,t),
+
+d i=1
+
+j=1
+
+1d
+
+i
+
+yt = ∑ sin( ∑ ξ j,t).
+
+d i=1 j=1
+
+The immediate reward function for this problem is deﬁned as
+
+d
+∑i=1
+
+(d
+
++
+
+1
+
+−
+
+i)
+
+0.1
+
+f2
+i,t
+
++
+
+0.5
+
+θT
+i
+
+θi
+
+rt =
+
+d
+
+,
+
+(39)
+
+∑i=1(d + 1 − i)
+
+∆r300ms = 100000000 (0.5 − xt300ms )2 + (0.5 − yt300ms )2 ,
+
+φtN = 0,
+
+where ∆r300ms is added to rt at time t = 300ms, that is, we would like to pass through the viapoint at this time. The individual DOFs of the motor primitive were initialized as in the 1 DOF examples above. The cost term in (39) penalizes each DOF for using high accelerations and large parameter vectors, which is a critical component to achieve a good resolution of redundancy in the arm. Equation (39) also has a weighting term d + 1 − i that penalizes DOFs proximal to the orgin more than those that are distal to the origin—intuitively, applied to human arm movements, this would mean that wrist movements are cheaper than shoulder movements, which is motivated by the
+
+3161
+
+THEODOROU, BUCHLI AND SCHAAL
+
+fact that the wrist has much lower mass and inertia and is thus energetically more efﬁcient to move.
+
+The results of this experiment are summarized in Figure 3. The learning curves in the left column demonstrate again that PI2 has an order of magnitude faster learning performance than the other algorithms, irrespective of the dimensionality. PI2 also converges to the lowest cost in all
+examples:
+
+Algorithm PI2 REINFORCE PG NAC
+
+2-DOFs 98000 ± 5000 125000 ± 2000 128000 ± 2000 113000 ± 10000
+
+10-DOFs 15700 ± 1300 22000 ± 700 28000 ± 23000 48000 ± 8000
+
+50-DOFs 2800 ± 150 19500 ± 24000 27000 ± 40000 22000 ± 2000
+
+Figure 3 also illustrates the path taken by the end-effector before and after learning. All algo-
+rithms manage to pass through the via-point G appropriately, although the path particularly before reaching the via-point can be quite different across the algorithms. Given that PI2 reached the low-
+est cost with low variance in all examples, it appears to have found the best solution. We also added a “stroboscopic” sketch of the robot arm for the PI2 solution, which proceeds from the very right to
+the left as a function of time. It should be emphasized that there were absolutely no parameter tuning needed to achieve the PI2 results, while all gradient algorithms required readjusting of learning
+rates for every example to achieve best performance.
+
+5.4 Application to Robot Learning
+Figure 4 illustrates our application to a robot learning problem. The robot dog is to jump across as gap. The jump should make forward progress as much as possible, as it is a maneuver in a legged locomotion competition which scores the speed of the robot—note that we only used a physical simulator of the robot for this experiment, as the actual robot was not available. The robot has three DOFs per leg, and thus a total of d = 12 DOFs. Each DOF was represented as a DMP with 50 basis functions. An initial seed behavior (Figure 5-top) was taught by learning from demonstration, which allowed the robot barely to reach the other side of the gap without falling into the gap—the demonstration was generated from a manual adjustment of spline nodes in a spline-based trajectory plan for each leg.
+PI2 learning used primarily the forward progress as a reward, and slightly penalized the squared acceleration of each DOF, and the length of the parameter vector. Additionally, a penalty was incurred if the yaw or the roll exceeded a threshold value—these penalties encouraged the robot to
+3162
+
+A GENERALIZED PATH INTEGRAL CONTROL APPROACH TO REINFORCEMENT LEARNING
+
+Cost y [m]
+
+Cost y [m]
+
+1 10 100 1000 10000 15000
+
+1 10 100 1000 10000 15000
+
+1 10 100 1000 10000 15000
+
+10000000 9000000 8000000 7000000 6000000 5000000 4000000 3000000 2000000 1000000
+a) 0
+10000000 9000000 8000000 7000000 6000000 5000000 4000000 3000000 2000000 1000000
+c) 0
+10000000 9000000 8000000 7000000 6000000 5000000 4000000 3000000 2000000 1000000
+e) 0
+
+Number of Roll-Outs
+Number of Roll-Outs
+Initial PI2 REINFORCE PG NAC
+Number of Roll-Outs
+
+0.6
+0.1
+2 DOF b) -0.4
+0
+0.6
+0.1
+10 DOF d)-0.4 0
+0.6
+0.1
+50 DOF f) -0.4
+0
+
+G
+
+0.5
+
+1
+
+x [m]
+
+G
+
+0.5
+
+1
+
+x [m]
+
+G
+
+0.5
+
+1
+
+x [m]
+
+Cost y [m]
+
+Figure 3:
+
+Comparison of learning multi-DOF movements (2,10, and 50 DOFs) with planar robot arms passing through a via-point G. a,c,e) illustrate the learning curves for different RL algorithms, while b,d,f) illustrate the end-effector movement after learning for all algorithms. Additionally, b,d,f) also show the initial end-effector movement, before learning to pass through G, and a “stroboscopic” visualization of the arm movement for the ﬁnal result of PI2 (the movements proceed in time starting at the very right and ending by (almost) touching the y axis).
+
+3163
+
+THEODOROU, BUCHLI AND SCHAAL
+
+600
+
+500
+
+400
+
+Cost
+
+300
+
+200
+
+100
+
+(a) Real & Simulated Robot Dog
+
+0
+
+1
+
+10
+
+100
+
+Number of Roll-Outs
+
+(b) Learning curve for Dog Jump with PI2 ±1std
+
+Figure 4:
+
+Reinforcement learning of optimizing to jump over a gap with a robot dog. The improvement in cost corresponds to about 15 cm improvement in jump distance, which changed the robot’s behavior from an initial barely successful jump to jump that completely traversed the gap with entire body. This learned behavior allowed the robot to traverse a gap at much higher speed in a competition on learning locomotion. The experiments for this paper were conducted only on the robot simulator.
+
+jump straight forward and not to the side, and not to fall over. The exact cost function is:
+
+d
+
+rt
+
+=
+
+rroll + ryaw + ∑
+
+a1
+
+2
+fi,t
+
++
+
+0.5a2
+
+θiT
+
+θ
+
+(a1 = 1.e − 6, a2 = 1.e − 8),
+
+i=1
+
+rroll =
+
+100 ∗ (|rollt| − 0.3)2, if (|rollt| > 0.3)
+
+0,
+
+otherwise,
+
+ryaw =
+
+100 ∗ (|yawt| − 0.1)2, if (|yawt| > 0.1)
+
+0,
+
+otherwise,
+
+φtN = 50000(goal − xnose)2,
+
+where roll, yaw are the roll and yaw angles of the robot’s body, and xnose is the position of the front tip (the “nose”) of the robot in the forward direction, which is the direction towards the goal. The multipliers for each reward component were tuned to have a balanced inﬂuence of all terms. Ten learning trials were performed initially for the ﬁrst parameter update. The best 5 trials were kept, and ﬁve additional new trials were performed for the second and all subsequent updates. Essentially, this method performs importance sampling, as the rewards for the 5 trials in memory were re-computed
+
+3164
+
+A GENERALIZED PATH INTEGRAL CONTROL APPROACH TO REINFORCEMENT LEARNING
+
+Figure 5:
+
+Sequence of images from the simulated robot dog jumping over a 14cm gap. Top: before learning. Bottom: After learning. While the two sequences look quite similar at the ﬁrst glance, it is apparent that in the 4th frame, the robot’s body is signiﬁcantly higher in the air, such that after landing, the body of the dog made about 15cm more forward progress as before. In particular, the entire robot’s body comes to rest on the other side of the gap, which allows for an easy transition to walking. In contrast, before learning, the robot’s body (and its hind legs) are still on the right side of the gap, which does not allow for a successful continuation of walking.
+
+with the latest parameter vectors. A total of 100 trials was performed per run, and ten runs were collected for computing mean and standard deviations of learning curves.
+Figure 4 illustrates that after about 30 trials (i.e., 5 updates), the performance of the robot was converged and signiﬁcantly improved, such that after the jump, almost the entire body was lying on the other side of the gap. Figure 4 captures the temporal performance in a sequence of snapshots of the robot. It should be noted that applying PI2 was algorithmically very simple, and manual tuning only focused on generated a good cost function, which is a different research topic beyond the scope of this paper.
+6. Discussion
+This paper derived a more general version of stochastic optimal control with path integrals, based on the original work by Kappen (2007) and Broek et al. (2008). The key results were presented in Table 1 and Section 2.5, which considered how to compute the optimal controls for a general class of stochastic control systems with state-dependent control transition matrix. One important class of these systems can be interpreted in the framework of reinforcement learning with parameterized policies. For this class, we derived Policy Improvement with Path Integrals (PI2) as a novel algorithm for learning a parameterized policy. PI2 inherits its sound foundation in ﬁrst order principles of stochastic optimal control from the path integral formalism. It is a probabilistic learning method without open algorithmic tuning parameters, except for the exploration noise. In our evaluations, PI2 outperformed gradient algorithms signiﬁcantly. It is also numerically simpler and has easier cost function design than previous probabilistic RL methods that require that immediate rewards are pseudo-probabilities. The similarity of PI2 with algorithms based on probability matching indicates that the principle of probability matching seems to approximate a stochastic optimal control framework. Our evaluations demonstrated that PI2 can scale to high dimensional control systems, unlike many other reinforcement learning systems.
+Some issues, however, deserve more detailed discussions in the following paragraphs.
+3165
+
+THEODOROU, BUCHLI AND SCHAAL
+
+6.1 The Simpliﬁcation λR−1 = Σε
+In order to obtain linear 2nd order differential equations for the exponentially transformed HJB equations, the simpliﬁcation λR−1 = Σε was applied. Essentially, this assumption couples the control cost to the stochasticity of the system dynamics, that is, a control with high variance will have relatively small cost, while a control with low variance will have relatively high cost. This assumption makes intuitively sense as it would be mostly unreasonable to attribute a lot of cost to an unreliable control component. Algorithmically, this assumption transforms the Gaussian probability for state transitions into a quadratic command cost, which is exactly what our immediate reward function postulated. Future work may allow removing this simpliﬁcation by applying generalized versions of the Feynman-Kac Lemma.
+
+6.2 Model-based, Hybrid, and Model-free Learning
+Stochastic optimal control with path integrals makes a strong link to the dynamic system to be optimized—indeed, originally, it was derived solely as model-based method. As this paper demonstrated, however, this view can be relaxed. The roll-outs, needed for computing the optimal controls, can be generated either from simulating a model, or by gathering experience from an actual system. In the latter case, only the control transition matrix of the model needs be known, such that we obtain a hybrid model-based/model-free method. In this paper, we even went further and interpreted the stochastic dynamic system as a parameterized control policy, such that no knowledge of the model of the control system was needed anymore—that is, we entered a model-free learning domain. It seems that there is a rich variety of ways how the path integral formalism can be used in different applications.
+
+6.3 Rules of Cost Function Design
+The cost functions allowed in our formulations can have arbitrary state cost, but need quadratic command cost. This is somewhat restrictive, although the user can be ﬂexible in what is deﬁned as a command. For instance, the dynamic movement primitives (30) used in this paper can be written in two alternative ways:
+
+1τ z˙t = ft + gtT (θ + εt ), or
+
+1τ z˙t = gtT ft
+
+θ + ε˜t , 1
+
+where the new noise vector ε˜t has one additional coefﬁcient. The second equation treats ft as another basis function whose parameter is constant and is thus simply not updated. Thus, we added ft to the command cost instead of treating it as a state cost.
+We also numerically experimented with violations of the clean distinction between state and command cost. Equation (36) could be replaced by a cost term, which is an arbitrary function of state and command. In the end, this cost term is just used to differentiate the different roll-outs in a reward weighted average, similarly as in Peters and Schaal (2008c) and Koeber and Peters (2008). We noticed in several instances that PI2 continued to work just ﬁne with this improper cost formulation.
+
+3166
+
+A GENERALIZED PATH INTEGRAL CONTROL APPROACH TO REINFORCEMENT LEARNING
+Again, it appears that the path integral formalism and the PI2 algorithm allow the user to exploit creativity in designing cost functions, without absolute need to adhere perfectly to the theoretical framework.
+6.4 Dealing with Hidden State
+Finally, it is interesting to consider in how far PI2 would be affected by hidden state. Hidden state can either be of stochastic or deterministic nature, and we consider hidden state as adding additional equations to the system dynamics (3). Section 2.3 already derived that deterministic hidden states drop out of the PI2 update equations—these states of the system dynamics were termed as “ nondirectly actuated” states.
+More interesting are hidden state variables that have stochastic differential equations, that is, these equations are uncontrolled but do have a noise term and a non-zero corresponding coefﬁcient in Gt in Equation (3), and these equations are coupled to the other equations through their passive dynamics. The noise term of these equations would, in theory, contribute terms in Equation (36), but given that neither the noise nor the state of these equations are observable, we will not have the knowledge to add these terms. However, as long as the magnitude of these terms is small relative to the other terms in Equation (36), PI2 will continue to work ﬁne, just a bit sub-optimally. This issue would affect other reinforcement learning methods for parameterized policies in the same way, and is not speciﬁc to PI2.
+6.5 Arbitrary States in the Cost Function
+As a last point, we would like to consider which variables can actually enter the cost functions for PI2. The path integral approach prescribes that the cost function needs to be a function of the state and command variables of the system equations (3). It should be emphasized that the state cost qt can be any deterministic function of the state, that is, anything that is predictable from knowing the state, even if we do not know the predictive function. There is a lot of ﬂexibility in this formulation, but it is also more restrictive than other approaches, for example, like policy gradients or the PoWER algorithm, where arbitrary variables can be used in the cost, no matter whether they are states or not.
+We can think of any variable that we would like to use in the cost as having a corresponding differential equation in the system dynamics (3), that is, we simply add these variables as state variables, just that we do not know the analytical form of these equations. As in the previous section, it is useful to distinguish whether these states have deterministic or stochastic differential equations.
+If the differential equation is deterministic, we can cover the case with the derivations from Section 2.3, that is, we consider such an equation as uncontrolled deterministic differential equation in the system dynamics, and we already know that we can use its state in the cost without any problems as it does not contribute to the probability of a roll-out.
+If the differential equation is stochastic, the same argument as in the previous section applies, that is, the (unknown) contribution of the noise term of this equation to the exponentiated cost (36) needs to be small enough for PI2 to work effectively. Future work and empirical evaluations will have to demonstrate when these issues really matter—so far, we have not encountered problems in this regard.
+3167
+
+THEODOROU, BUCHLI AND SCHAAL
+
+7. Conclusions
+The path integral formalism for stochastic optimal control has a very interesting potential to discover new learning algorithms for reinforcement learning. The PI2 algorithm derived in this paper for learning with parameterized policies demonstrated a surprisingly good performance, literally without any need for manual tuning of the parameters of the algorithm. We also demonstrated that the algorithm scales well into very high dimensional domains that were previously hardly approachable for reinforcement learning. Future work will thus allow us to focus much more on machine learning algorithms for cost function design, as the algorithmic components of the learning algorithm seem to be able to move towards a “black box” character.
+
+Acknowledgments
+This research was supported in part by National Science Foundation grants ECS-0325383, IIS0312802, IIS-0082995, IIS-9988642, ECS-0326095, ANI-0224419, the DARPA program on Learning Locomotion, the Multidisciplinary Research Program of the Department of Defense (MURI N00014-00-1-0637), and the ATR Computational Neuroscience Laboratories. J.B. was supported by a prospective researcher fellowship from the Swiss National Science Foundation. E.T. was supported by a Myronis Fellowship.
+
+Appendix A.
+
+Appendix A contains the lemmas A1 and A2 and one theorem. The theorem provides the main result of the generalized path integral control formalism expressed by (18), (19), (20). Its proof is based on results proven in the lemmas A1 and A2. In appendix B we provide the Feynman-Kac formula and we sketch the corresponding proof.
+
+Lemma 1 : The optimal control solution to the stochastic optimal control problem expressed by (1),(2),(3) and (4) is formulated as:
+
+uti = lim −R−1Gti(c)T
+dt→0
+
+p˜ (τi) ∇xti(c) S˜(τi)dτi
+
+exp (− λ1 S˜(τi)) ˜
+
+where p˜ (τi) =
+
+1˜
+
+is a path dependent probability distribution. The term S(τi) is
+
+exp (− λ S(τi))dτi
+
+a
+
+path
+
+function
+
+deﬁned
+
+as
+
+S˜(τi)
+
+=
+
+S(τi) +
+
+λ 2
+
+N−1
+∑ j=i
+
+log
+
+|
+
+Ht
+
+j
+
+|
+
+that
+
+satisﬁes
+
+the
+
+following
+
+condition
+
+limdt→0 exp − λ1 S˜(τi) dτi ∈ C (1) for any sampled trajectory starting from state xti. Moreover the
+term Htj is given by Htj = Gtj(c)R−1Gtj(c)T while the term S(τi) is deﬁned according to
+
+N−1 1 N−1
+S(τi) = φtN + ∑ qtj dt + ∑
+
+j=i
+
+2 j=i
+
+xt j+1 (c) − xt j(c) (c) 2 − ftj Ht dt.
+
+dt
+
+j
+
+Proof The optimal controls at the state xti is expressed by the equation uti = −R−1Gti∇xtiVti. Due to the exponential transformation of the value function Ψti = −λ logVti the equation of the optimal
+
+controls is written as:
+
+uti = λR−1Gti ∇xti Ψti . Ψti
+
+3168
+
+A GENERALIZED PATH INTEGRAL CONTROL APPROACH TO REINFORCEMENT LEARNING
+
+In discrete time the optimal control is expressed as follows:
+
+−1 T ∇xti Ψti(dt) uti = lim λR Gti (dt) .
+dt→0 Ψti By using equation (17) and substituting Ψ(dt)(xti,t) we have:
+
+−1 T ∇xti exp − λ1 Z(τi) dτi
+
+uti = lim λR Gti
+
+1
+
+.
+
+dt→0
+
+exp − λ Z(τi) dτi
+
+Substitution of the term Z(τi) results in the equation:
+
+ 1 ˜ λ(N−i)l  ∇xti exp − λ S(τi) − 2 log (2πdtλ) dτi
+
+uti = lim λR−1GTti
+
+.
+
+dt→0 exp − 1λ S˜(τi) − λ(N−i)l 2 log (2πdtλ) dτi
+
+Next we are using standard properties of the exponential function that lead to:
+
+ 1 ˜ λ(N−i)l  ∇xti exp − λ S(τi) exp − 2 log (2πdtλ) dτi
+
+uti = lim λR−1GTti
+
+.
+
+dt→0 exp − 1λ S˜(τi) exp − λ(N−i)l 2 log (2πdtλ) dτi
+
+The term exp
+
+−
+
+λNl 2
+
+log
+
+(2πdtλ)
+
+does not depend on the trajectory τi, therefore it can be taken
+
+outside the integral as well as outside the gradient. Thus we will have that:
+
+ λ(N−i)l
+
+1˜ 
+
+exp − 2 log (2πdtλ) ∇xti exp − λ S(τi) dτi
+
+uti = lim λR−1GTti
+
+.
+
+dt→0 exp − λ(N−i)l 2 log (2πdtλ) exp − 1λ S˜(τi) dτi
+
+The constant term drops from the nominator and denominator and thus we can write:
+
+−1 T ∇xti exp − λ1 S˜(τi) dτi
+
+uti = lim λR Gti
+
+1
+
+.
+
+dt→0
+
+exp − λ S˜(τi) dτi
+
+Under the assumption that term exp − λ1 S˜(τi) dτi is continuously differentiable in xti and dt we can change order of the integral with the differentiation operations. In general for ∇x f (x, y)dy =
+∇x f (x, y)dy to be true, f (x,t) should be continuous in y and differentiable in x. Under this assumption, the optimal controls can be further formulated as:
+
+−1 T ∇xti exp − λ1 S˜(τi) dτi
+
+uti = lim λR Gti
+
+1
+
+.
+
+dt→0
+
+exp − λ S˜(τi) dτi
+
+Application of the differentiation rule of the exponent results in:
+
+−1 T exp − λ1 S˜(τi) ∇xti − λ1 S˜(τi) dτi
+
+uti = lim λR Gti
+
+1
+
+.
+
+dt→0
+
+exp − λ S˜(τi) dτi
+
+3169
+
+THEODOROU, BUCHLI AND SCHAAL
+
+The denominator is a function of xti the current state and thus it can be pushed inside the integral of the nominator:
+
+uti = lim λR−1GtiT
+dt→0
+
+exp − λ1 S˜(τi)
+
+1˜
+
+∇xti
+
+exp − λ S(τi) dτi
+
+− 1 S˜(τi) λ
+
+dτi .
+
+ex
+
+p
+
+(−
+
+1 λ
+
+S˜(
+
+τi
+
+)
+
+)
+
+By deﬁning the probability p˜ (τi) =
+
+1˜
+
+the expression above can be written as:
+
+exp (− λ S(τi))dτi
+
+uti = lim λR−1GtiT
+dt→0
+
+p˜ (τi) ∇xti − 1λ S˜(τi) dτi .
+
+Further simpliﬁcation will result in:
+
+uti = lim −R−1GtiT
+dt→0
+
+p˜ (τi) ∇xti S˜(τi)dτi .
+
+We know that the control transition matrix has the form G(xti)T = [0T the partial derivative ∇xti S˜(τi) can be written as ∇xti S˜(τi)T = [∇x(m)S˜(τi)T
+ti
+these equations we will have that:
+
+Gc(xxti )T ]. In addition ∇ (c) S˜(τi)T ]. By using
+xti
+
+uti = lim −R−1[0T Gti(c)T ]
+dt→0
+
+p˜ (τo)
+
+The equation above can be written in the form:
+
+∇xti(m) S˜(τi) ∇xti(c) S˜(τi)
+
+dτi .
+
+uti = lim −[0T R−1Gti(c)T ]
+dt→0
+
+p˜ (τi)
+
+∇xti(m) S˜(τi) ∇xti(c) S˜(τi)
+
+dτi .
+
+or
+
+T −1 (c)T
+
+p˜ (τi) · ∇xti(m) S˜(τi)dτi
+
+uti = lim −[0 R Gti ]
+
+˜
+
+.
+
+dt→0
+
+p˜ (τi) · ∇x(c) S t (τi)dτi i
+
+Therefore we will have the result
+
+uti = lim −R−1Gti(c)T
+dt→0
+
+p˜ (τi) ∇xti(c) S˜(τi)dτi .
+
+Lemma 2 : Given the stochastic dynamics and the cost in (1),(2),(3) and(4) the gradient of the path function S˜(τi) with respect to the directly actuated part of the state xti(c)is formulated as:
+
+˜
+
+−1 (c)
+
+lim ∇x(c) S(τi) = −Hti Gti εti − bti
+
+dt→0
+
+ti
+
+3170
+
+A GENERALIZED PATH INTEGRAL CONTROL APPROACH TO REINFORCEMENT LEARNING
+
+where the function b(xti ) deﬁned as λH(xti )Φti with Hti = Gti(c)R−1Gti(c)T and the quantity Φti ∈ ℜl×1 is expressed as:
+
+
+
+
+
+−1
+trace Hti ∂x(c1) Hti 
+
+
+
+ti
+
+
+
+
+
+ 
+
+−1
+
+ 
+
+trace Hti ∂x(c2) Hti 
+
+ 1
+
+ti
+
+
+Φti =
+
+ 
+
+.
+
+. 
+
+2
+
+.
+
+
+
+
+
+
+
+
+
+.
+
+
+
+
+
+
+
+ −1  trace Hti ∂x(cl) Hti
+ti
+
+Proof We are calculating the term ∇x(c)S˜(τo) . More precisely we have shown that
+to
+
+N−1 1 N−1
+S˜(τi) = φtN + ∑ qtj dt + ∑
+
+j=i
+
+2 j=i
+
+xt j+1 (c) − xt j(c) (c) 2
+
+λ N−1
+
+− ftj Ht dt + ∑ log |Htj |.
+
+dt
+
+j 2 j=i
+
+To
+
+limit
+
+the
+
+length
+
+of
+
+our
+
+derivation
+
+we
+
+introduce
+
+the
+
+notation
+
+γt j
+
+=
+
+αT
+tj
+
+−1
+ht j
+
+αt j
+
+and
+
+αt j
+
+=
+
+(c)
+
+(c) (c)
+
+xt j+1 (c) −xt j(c) (c) 2 1
+
+xtj+1 − xtj − ftj dt and it is easy to show that dt − ftj Ht dt = dt γtj and therefore we will
+
+j
+
+have:
+
+1 N−1 tN
+
+λ N−1
+
+S˜(τi) = φtN + ∑ γtj + ∑ Qtj dt + ∑ log |Htj |.
+
+2dt j=i
+
+to
+
+2 j=i
+
+In the analysis that follows we provide the derivative of the 1th, 2th and 4th term of the cost function. We assume that the cost of the state during the time horizon Qti = 0. In cases that this is not true then the derivative ∇x(c) ∑titN Qtidt needs to be found as well. By calculating the term
+ti
+∇x(c)S˜(τo) we can ﬁnd the local controls u(τi). It is important to mention that the derivative of the
+to
+path cost S(τi) is taken only with respect to the current state xto. The ﬁrst term is:
+∇xti(c) (φtN ) = 0.
+
+1 N−1
+DERIVATIVE OF THE 2TH TERM ∇x(c) 2dt ∑i=1 γti
+ti
+The second term can be found as follows:
+
+OF THE COST S(τi).
+
+∇x(c)
+
+1 N−1
+∑ γtj .
+
+ti 2dt j=i
+
+3171
+
+THEODOROU, BUCHLI AND SCHAAL
+
+The operator ∇x(c) is linear and it can massaged inside the sum: to 1 N−1
+∑ ∇x(c) γt j .
+2dt j=i t j
+
+Terms that do not depend on xti(c) drop and thus we will have:
+
+1 ∇x(c) γti .
+2dt ti
+
+Substitution
+
+of
+
+the
+
+parameter
+
+γti
+
+=
+
+αT
+ti
+
+−1
+Hti
+
+αti will result in:
+
+1
+
+T −1
+
+∇x(c) αti Hti αti .
+
+2dt ti
+
+By making the substitution βti
+
+−1
+= Hti
+
+αti
+
+and applying the rule ∇
+
+u(x)T v(x)
+
+= ∇ (u(x)) v(x)+
+
+∇ (v(x)) u(x) we will have that:
+
+1 ∇x(c) αti βti + ∇x(c) βti αti .
+
+2dt ti
+
+ti
+
+(40)
+
+Next we ﬁnd the derivative of αto:
+
+and the result is
+
+∇x(c) αti = ∇x(c) xti+1 (c) − xti(c) − fc(xti )dt .
+
+ti
+
+ti
+
+∇x(c) t αti = −Il×l − ∇ (c) ft i xti i(c)dt. We substitute back to (40) and we will have:
+
+12dt − Il×l + ∇x(c) f t t i i(c)dt βti + ∇x(c) t β i ti αti .
+
+−1 2dt
+
+Il×l + ∇x(c) fti(c)dt
+ti
+
+1 βti +
+2dt
+
+∇x(c) t β i ti αti .
+
+After some algebra the result of ∇x(c)
+
+1 N−1
+2dt ∑i=1 γti
+
+is expressed as:
+
+ti
+
+− 12dt βti − 12 ∇x(c) f t t i i(c) βti + 12dt ∇x(c) t β i ti αti .
+
+The next step now is to ﬁnd the limit of the expression above as dt → 0. More precisely we will have that:
+
+lim − 1 βti − 1 ∇x(c) fti(c) βti + 1 ∇x(c) βti αti .
+
+dt→0 2dt
+
+2 ti
+
+2dt ti
+
+3172
+
+A GENERALIZED PATH INTEGRAL CONTROL APPROACH TO REINFORCEMENT LEARNING
+
+LIMIT OF THE FIRST SUBTERM: − 2dt1 βti
+We will continue our analysis by ﬁnding the limit for each one of the 3 terms above. The limit of the ﬁrst term is calculated as follows:
+
+1 lim − βti dt→0 2dt
+
+= − lim
+dt→0
+
+1 −1 Hti αti
+2dt
+
+1 −1 = − Hti lim αti
+
+2
+
+dt→0
+
+1 −1
+
+(c) (c) 1 (c)
+
+= − Hti lim (xti+1 − xti ) − fti .
+
+2
+
+dt→0
+
+dt
+
+LIMIT OF THE SECOND SUBTERM: − 21 ∇x(c) f t t i i(c) βti The limit of the second term is calculated as follows:
+
+− lim
+dt→0
+
+12 ∇x(c) f t t i i(c) βti
+
+1 = − ∇x(c) fc(xti ) lim βti
+
+2 ti
+
+dt→0
+
+1
+
+(c)
+
+−1
+
+= − ∇x(c) fti lim Hti αti
+
+2 ti
+
+dt→0
+
+1
+
+−1
+
+= − ∇x(c) fc(xti ) Hti lim αti
+
+2 ti
+
+dt→0
+
+= 0.
+
+The limit of the term limdt→0 αti is derived as:
+
+lim xti+1 (c) − xti(c) − fc(xti )dt = lim xtti+dt (c) − xti(c) − lim fc(xti )dt = 0 − 0 = 0.
+
+dt→0
+
+dt→0
+
+dt→0
+
+LIMIT OF THE THIRD SUBTERM: 2dt1 ∇x(c) t β i ti αti Finally the limit of the third term can be found as:
+
+1
+
+lim
+
+∇x(c) βti αti =
+
+dt→0 2dt ti
+
+= lim ∇x(c) βti lim 1 αti =
+
+dt→0 ti
+
+dt→0 2dt
+
+= lim ∇x(c) βti 1 lim (xti+1 (c) − xti(c)) 1 − fti(c) .
+
+dt→0 ti
+
+2 dt→0
+
+dt
+
+We
+
+substitute
+
+βti
+
+=
+
+−1
+Hti
+
+αti
+
+and
+
+write
+
+the
+
+matrix
+
+−1
+Hti
+
+in
+
+row
+
+form:
+
+3173
+
+THEODOROU, BUCHLI AND SCHAAL
+
+−1
+= lim ∇x(c) Hti αti
+dt→0 ti
+
+1 lim (xti(c) − xti(c)) 1 − fti(c) =
+
+2 dt→0
+
+dt
+
+ (1)−T  
+
+Hti  H(2)   −T  
+
+  ti  
+
+= lim ∇x(c)    .  αti 
+
+dt→0 ti
+
+
+.
+
+
+
+
+
+ .  
+
+
+
+
+
+Hti(l)−T
+
+1 lim
+2 dt→0
+
+(xti+1 (c) − xti(c)) 1 − fti(c) dt
+
+ (1)−T 
+
+Hti
+
+αti
+
+ Hti(2)−T αti 
+
+= lim ∇x(c)    .  1 lim (xti+1 (c) − xti(c)) 1 − fti(c) .
+
+dt→0 ti
+
+
+.
+
+ 2 dt→0
+
+dt
+
+ 
+
+.
+
+ 
+
+Hti(l)−T αti
+
+We can push the operator ∇x(c) insight the matrix and apply it to each element. ti
+
+ ∇ (c) T Hti(1)−T αti  xti  ∇ (c) T Hti(2)−T αti  xti
+
+
+
+= lim 
+
+.
+
+
+
+dt→0
+
+
+.
+
+ .
+
+T
+
+(l)−T
+
+∇ (c) Hti
+
+αti
+
+xti
+
+
+
+
+
+
+
+
+
+1
+
+(c) (c) 1 (c)
+
+
+
+ 
+
+lim (xti+1 − xti ) − fti .
+
+ 2 dt→0
+
+dt
+
+
+
+
+
+
+
+We again use the rule ∇ u(x)T v(x) = ∇ (u(x)) v(x) + ∇ (v(x)) u(x) and thus we will have:
+
+
+      = lim  dt→0      
+
+(1)−T
+
+(1)−T T 
+
+∇x(c) Hti
+
+αti + ∇x(c) αti Hti
+
+
+
+ti
+
+ti
+
+
+
+(2)−T
+
+(2)−T  T 
+
+∇x(c) H t t i i αti + ∇x(c) t αti Ht i i 
+
+.  lim (xti+1 (c) − xti(c)) 1 − fti(c) .
+
+ dt→0
+
+dt
+
+.
+
+
+
+. 
+
+∇x(c) H t t i i(l)−T αti + ∇x(c) t αti Ht i i(l)−T
+
+T 
+
+We can split the matrix above into two terms and then we pull out the terms αti and ∇x(c) t αti i respectively :
+
+3174
+
+A GENERALIZED PATH INTEGRAL CONTROL APPROACH TO REINFORCEMENT LEARNING
+
+  (1)  −T  −T   ∇x(c) Hti (1)
+
+  (2) ti −T   (2)−T    Hti 
+
+
+
+    ∇xt(c) Hti
+
+ 
+
+ 
+
+Hti
+
+ 
+
+ 
+
+i
+
+= lim αti   T  .  +    .  ∇xt(c) αti  T 
+
+dt→0
+
+.
+
+i
+
+
+
+.
+
+
+
+
+
+
+
+    .       .     ∇x(c) Hti(l)−T  Hti(l)−T 
+ti
+
+1 lim
+2 dt→0
+
+(xti+1 (c) − xti(c)) 1 − fti(c) dt
+
+T
+
+−1
+
+−1
+
+T
+
+= lim αti ∇x(c) Hti + Hti ∇x(c) αti
+
+dt→0
+
+ti
+
+ti
+
+1 lim (xti+1 (c) − xti(c)) 1 − fti(c)
+
+2 dt→0
+
+dt
+
+= lim αtiT
+dt→0
+
+−1
+
+−1
+
+T
+
+∇x(c) Hti + Hti lim ∇x(c) αti
+
+ti
+
+dt→0
+
+ti
+
+1 lim (xti+1 (c) − xti(c)) 1 − fti(c) .
+
+2 dt→0
+
+dt
+
+Since limdt→0
+
+αT
+ti
+
+lows
+
+= 01×l and limdt→0
+
+T
+∇ (c) αti
+xti
+
+= −Il×l the ﬁnal result is expressed as fol-
+
+1
+
+−1 1
+
+(c) (c) 1 (c)
+
+lim
+
+∇x(c) βti αti = −Hti
+
+lim (xti+1 − xti ) − fto .
+
+dt→0 2dt ti
+
+2 dt→0
+
+dt
+
+After we have calculated the 3 sub-terms, the 2th term of the of the derivative of path cost S(τo) can be expressed in the following form:
+
+∇xti(c)
+
+1 N−1
+∑ γtj
+2λdt j=i
+
+−1
+
+(c) (c) 1 (c)
+
+= −Hti lim (xti+1 − xti ) − fti ) .
+
+dt→0
+
+dt
+
+λ N−1
+DERIVATIVE OF THE FOURTH TERM ∇ (c) 2 ∑ j=i log |Ht j |
+xti
+The analysis for the 4th term is given below:
+
+OF THE COST S(τi).
+
+∇xti(c)
+
+λ N−1
+∑ log |Htj |
+2 j=i
+
+= λ2 ∇x(c) log t |Hti |. i
+
+If we assume that xto(c) = [xto(c1), xto(c2)....xto(cl)] and take the derivative with respect to each element we
+
+will have
+
+∂xti(ci)
+
+λ log |Hti| 2
+
+= λ 1 2 |H ∂ ti | x(ci) t |Hti |. i
+
+∂x(ci) λ log |Hti | = λ 1
+
+−1
+|Hti | trace Hti · ∂x(ci) Hti .
+
+ti 2
+
+2 |H(xti)|
+
+ti
+
+λ
+
+λ
+
+−1
+
+∂x(ci) log |Hti | = trace Hti ∂x(ci) Hti .
+
+ti 2
+
+2
+
+ti
+
+3175
+
+THEODOROU, BUCHLI AND SCHAAL
+
+Where we make used of the identity ∂det(A) = det(A)Tr A−1∂A . The result is expressed as:
+
+
+
+
+
+−1
+trace Hti ∂x(c1) Hti 
+
+
+
+ti
+
+
+
+
+
+ 
+
+−1
+
+ 
+
+trace Hti ∂x(c2) Hti 
+
+
+
+λ
+
+λ
+
+ti
+
+
+∇x(c)
+
+log |Hti|
+
+=
+
+ 
+
+.
+
+. 
+
+ti 2
+
+2
+
+.
+
+
+
+
+
+
+
+
+
+.
+
+
+
+
+
+
+
+ −1  trace Hti ∂x(cl) Hti
+ti
+
+or in a more compact form:
+
+∇xti(c)
+
+λ log |Hti| 2
+
+−1
+= Hti bti .
+
+where b(xti) = λH(xti)Φti and the quantity Φti ∈ ℜl×1 is deﬁned as:
+
+
+
+
+
+−1
+trace Hti ∂x(c1) Hti 
+
+
+
+ti
+
+
+
+
+
+ 
+
+−1
+
+ 
+
+trace Hti ∂x(c2) Hti 
+
+ 1
+
+ti
+
+
+Φti =
+
+ 
+
+.
+
+. 
+
+(41)
+
+2
+
+.
+
+
+
+
+
+
+
+
+
+.
+
+
+
+
+
+
+
+ −1  trace Hti ∂x(cl) Hti
+ti
+
+Since we computed all the terms of the derivative of the path cost S˜(τo) and after putting all the terms together we have the result expressed as follows:
+
+˜
+
+−1
+
+(c) (c) 1 (c)
+
+lim ∇x(c) S(τi) = −Hti lim (xti+1 − xti ) − fti − bti .
+
+dt→0
+
+ti
+
+dt→0
+
+dt
+
+By taking into account the fact that limdt→0 (xti+1 (c) − xti(c)) dt1 − fti(c) = Gti(c)εti we get the following ﬁnal expression:
+
+˜
+
+−1 (c)
+
+lim ∇x(c) S(τi) = −Hti Gti εti − bti .
+
+dt→0
+
+ti
+
+Theorem 3 : The optimal control solution to the stochastic optimal control problem expressed by (1),(2),(3),(4) is formulated by the equation that follows:
+
+uti = lim p˜ (τi) uL (τi) dτi,
+dt→0
+3176
+
+A GENERALIZED PATH INTEGRAL CONTROL APPROACH TO REINFORCEMENT LEARNING
+
+exp (− λ1 S˜(τi))
+
+where p˜ (τi) =
+
+1˜
+
+is a path depended probability distribution and the term u (τi) de-
+
+exp (− λ S(τi))dτi
+
+ﬁned as uL (τi) = R−1Gti(c)T Gti(c)R−1Gti(c)T Gti −1 (c)εti − bti are the local controls of each sam-
+
+pled trajectory starting from state xti. The terms εti and bti are deﬁned as εti = (xti+1 (c) − xti(c)) dt1 − fti(o) and b(xti ) = λH(xti )Φti with Hti = Gti(c)R−1Gti(c)T and Φti given in (41).
+
+Proof To prove the theorem we make use of the Lemma 2 and we substitute ∇x(c)S˜(τi) in the main
+ti
+result of Lemma 1. More precisely from lemma A1 we have that:
+
+uti = lim R−1Gti(c)T
+dt→0
+
+p˜ (τi) Ht−i 1 ∇x(c) S˜ t (τi) dτi . i
+
+The terms R−1 and Gti can be pushed insight the integral since they are independent of τi = (x1, x2, ..., xN). Thus we have the expression:
+
+uti = lim
+dt→0
+
+−1 (c)T −1
+
+˜
+
+p˜ (τi) R Gti Hti ∇xti(c) S(τi) dτi ,
+
+uti = lim
+dt→0
+
+p˜ (τi) uL(dt)(τi) dτi,
+
+where the local controls uL(dt)(τi) are given as follows:
+
+(dt)
+
+−1 (c)T −1
+
+˜
+
+uL (τi) = R Gti Hti ∇x(c) S t (τi). i
+
+After applying the limit, and making use of the result in Lemma 2 the equation above is expressed as:
+
+uti = p˜ (τi) uL(xti+1 , xti )dτi,
+
+where the local controls uL(xti+1, xti) are given as follows:
+
+−1 (c)T −1
+
+(c) (c) 1 (c)
+
+uL(τi) = uL(xti+1 , xti ) = R Gti Hti lim (xti+1 − xti ) − fti − bti ,
+
+dt→0
+
+dt
+
+or in a simpler form:
+
+−1 (c)T −1
+uL(xti+1 , xti ) = R Gti Hti (Gcεti − bti ) . By substituting with H(xti) = Gti(c)R−1Gti(c)T we have the ﬁnal result:
+uL(τi) = uL(xti+1 , xti ) = R−1Gti(c)T Gti(c)R−1Gti(c)T Gti −1 (c)εti − bti .
+
+3177
+
+THEODOROU, BUCHLI AND SCHAAL
+
+Appendix B.
+Theorem 4 : Let us assume that x satisﬁes the SDE x˙ = f(x,t) + G(x)ε(t). Then Ψ(x,to) = Ψ(x,to,tN) = E Ψ(x,tN) e ttoN − λ1 q(x)dτ if and only if Ψ(x,t) satisﬁes the backward Kolmogorov PDE:
+
+−∂t Ψt = − 1λ qt Ψt + ftT (∇xΨt ) + 12trace (∇xxΨt )Gt ΣεGtT , with boundary condition:
+
+Ψ(x,tN) = exp − 1 φ(x(tN)) . λ
+
+Proof Given that x satisﬁes the SDE x˙ = f(x,t) + G(x)ε(t) and Ψ(x,t) satisﬁes the PDE above,
+
+application
+
+of
+
+Ito
+
+lemma
+
+(Øksendal,
+
+2003)
+
+to
+
+function
+
+Y
+
+(t)
+
+=
+
+Ψ(xt , t )
+
+e
+
+t to
+
+−
+
+1 λ
+
+q
+
+(
+
+x
+
+)
+
+d
+
+τ
+
+leads
+
+to
+
+the
+
+ﬁnal
+
+result Ψ(x,to) = E Ψ(x,tN) e ttoN − λ1 q(x)dτ . This result is the solution of the linear PDE.
+
+References
+S. Amari. Natural gradient learning for over- and under-complete bases in ica. Neural Computation, 11(8):1875–83, 1999.
+A. G. Barto, R. S. Sutton, and C. W. Anderson. Neuronlike adaptive elements that can solve difﬁcult learning control problems. IEEE Transactions on Systems, Man, and Cybernetics, SMC-13(5): 115–133, 1983.
+J. Baxter and P. L. Bartlett. Inﬁnite-horizon policy-gradient estimation. Journal of Artiﬁcial Intelligence Research, 15:319–350, 2001.
+R. Bellman and R. Kalaba. Selected Papers On mathematical trends in Control Theory. Dover Publications, 1964.
+B. Van Den Broek, W. Wiegerinck, and H. J. Kappen. Graphical model inference in optimal control of stochastic multi-agent systems. Journal of Artiﬁcial Intelligence Research, 32(1):95–122, 2008.
+J. Buchli, E. Theodorou, F. Stulp, and S. Schaal. Variable impedance control - a reinforcement learning approach. In Robotics Science and Systems, 2010.
+P. Dayan and G. Hinton. Using em for reinforcement learning. Neural Computation, 9, 1997.
+M. P. Deisenroth, C. E. Rasmussen, and J. Peters. Gaussian Process Dynamic Programming. Neurocomputing, 72(7–9):1508–1524, March 2009.
+W. H. Fleming and H. M. Soner. Controlled Markov Processes and Viscosity Solutions. Applications of aathematics. Springer, New York, 2nd edition, 2006.
+3178
+
+A GENERALIZED PATH INTEGRAL CONTROL APPROACH TO REINFORCEMENT LEARNING
+M. Ghavamzadeh and E. Yaakov. Bayesian actor-critic algorithms. In ICML ’07: Proceedings of The 24th International Conference on Machine Learning, pages 297–304, 2007.
+V. Gullapalli. A stochastic reinforcement learning algorithm for learning real-valued functions. Neural Networks, 3:671–692, 1990.
+A. Ijspeert, J. Nakanishi, and S. Schaal. Learning attractor landscapes for learning motor primitives. In S. Becker, S. Thrun, and K. Obermayer, editors, Advances in Neural Information Processing Systems 15, pages 1547–1554. Cambridge, MA: MIT Press, 2003.
+D. H. Jacobson and D. Q. Mayne. Differential dynamic programming. American Elsevier Pub. Co., New York,, 1970.
+N. Jetchev and M Toussaint. Trajectory prediction: learning to map situations to robot trajectories. In ICML ’09: Proceedings of the 26th Annual International Conference on Machine Learning, pages 449–456, 2009.
+H. J. Kappen. Linear theory for control of nonlinear stochastic systems. Phys. Rev. Lett., 95:200201, Nov 2005a.
+H. J. Kappen. Path integrals and symmetry breaking for optimal control theory. Journal of Statistical Mechanics: Theory and Experiment, (11):P11011, 2005b.
+H. J. Kappen. An introduction to stochastic control theory, path integrals and reinforcement learning. In J. Marro, P. L. Garrido, and J. J. Torres, editors, Cooperative Behavior in Neural Systems, volume 887 of American Institute of Physics Conference Series, pages 149–181, February 2007.
+H. J. Kappen, W. Wiegerinck, and B. van den Broek. A path integral approach to agent planning. In AAMAS, 2007.
+H. J. Kappen, Gmez V., and Opper M. Optimal control as a graphical model inference problem. Journal for Machine Learning Research (JMLR), arXiv:0901.0633v, 2009. Submitted.
+J. Koeber and J. Peters. Policy search for motor primitives. In D. Schuurmans, J. Benigio, and D. Koller, editors, Advances in Neural Information Processing Systems 21 (NIPS 2008), pages 297–304, Vancouver, BC, Dec. 8-11, 2008. Cambridge, MA: MIT Press.
+W. Thomas Miller, Richard S., and Paul J. Werbos. Neural Networks for Control. Neural network modeling and connectionism. MIT Press, Cambridge, Mass., 1990.
+B. K. Øksendal. Stochastic Differential Equations : An Introduction with Applications. Springer, Berlin; New York, 6th edition, 2003.
+J. Peters. Machine Learning of Motor Skills for Robotics. PhD thesis, University of Southern California, 2007.
+J. Peters and S. Schaal. Policy gradient methods for robotics. In Proceedings of the IEEE International Conference on Intelligent Robotics Systems (IROS 2006), 2006a.
+J. Peters and S. Schaal. Reinforcement learning for parameterized motor primitives. In Proceedings of the 2006 International Joint Conference on Neural Networks (IJCNN 2006), 2006b.
+3179
+
+THEODOROU, BUCHLI AND SCHAAL
+J. Peters and S. Schaal. Reinforcement learning of motor skills with policy gradients. Neural Networks, 21(4):682–97, 2008a.
+J. Peters and S. Schaal. Natural actor critic. Neurocomputing, 71(7-9):1180–1190, 2008b.
+J. Peters and S. Schaal. Learning to control in operational space. International Journal of Robotics Research, 27:197–212, 2008c.
+T. Rueckstiess, M. Felder, and J. Schmidhuber. State-dependent exploration for policy gradient methods. In ECML PKDD ’08: Proceedings of the European Conference on Machine Learning and Knowledge Discovery in Databases - Part II, pages 234–249, 2008.
+S. Schaal and C. G. Atkeson. Constructive incremental learning from only local information. Neural Computation, 10(8):2047–2084, 1998.
+L. Sciavicco and B. Siciliano. Modelling and Control of Robot Manipulators. Advanced textbooks in control and signal processing. Springer, London ; New York, 2000.
+R. F. Stengel. Optimal Control and Estimation. Dover books on advanced mathematics. Dover Publications, New York, 1994.
+R. S. Sutton and A. G. Barto. Reinforcement Learning: An Introduction. Adaptive computation and machine learning. MIT Press, Cambridge, 1998.
+R. S. Sutton, D. McAllester, S. Singh, and Y. Mansour. Policy gradient methods for reinforcement learning with function approximation. In Advances in Neural Information Processing Systems 12, pages 1057–1063. MIT Press, 2000.
+E. Todorov. Stochastic optimal control and estimation methods adapted to the noise characteristics of the sensorimotor system. Neural Computation, 17(5):1084, 2005.
+E. Todorov. Linearly-solvable markov decision problems. In B. Scholkopf, J. Platt, and T. Hoffman, editors, Advances in Neural Information Processing Systems 19 (NIPS 2007), Vancouver, BC, 2007. Cambridge, MA: MIT Press.
+E. Todorov. General duality between optimal control and estimation. In In Proceedings of the 47th IEEE Conference on Decision and Control, 2008.
+E. Todorov. Classic maximum principles and estimation-control dualities for nonlinear stochastic systems. 2009a. (Submitted).
+E. Todorov. Efﬁcient computation of optimal actions. Proceedings National Academy of Science USA, 106(28):11478–83, 2009b.
+M. Toussaint and A. Storkey. Probabilistic inference for solving discrete and continuous state markov decision processes, 2006.
+N. Vlassis, M. Toussaint, G. Kontes, and Piperidis. S. Learning model-free control by a monte-carlo em algorithm. Autonomous Robots, 27(2):123–130, 2009.
+3180
+
+A GENERALIZED PATH INTEGRAL CONTROL APPROACH TO REINFORCEMENT LEARNING W. Wiegerinck, B. van den Broek, and H. J. Kappen. Stochastic optimal control in continuous
+space-time multi-agent system. In UAI, 2006. R. J. Williams. Simple statistical gradient-following algorithms for connectionist reinforcement
+learning. Machine Learning, 8:229–256, 1992. J. Yong. Relations among odes, pdes, fsdes, bsdes, and fbsdes. In Proceedings of the 36th IEEE
+Conference on Decision and Control, volume 3, pages 2779–2784, Dec 1997.
+3181
+
+

@@ -1,0 +1,460 @@
+IEEE ROBOTICS AND AUTOMATION LETTERS, VOL. 10, NO. 6, JUNE 2025
+
+5537
+
+Online Motion Generation via Tangential Sampling-Based MPC Around Nonconvex Obstacles
+Guangbao Zhao , Ninglong Jin, Jianhua Wu , Member, IEEE, and Zhenhua Xiong , Member, IEEE
+
+Abstract—Collision-free motion planning has a well-established research history, but the majority of studies have been centered around Euclidean space and conducted ofﬂine. The primary challenge in online motion planning lies in circumventing local minima, which become more pronounced in conﬁguration space. We propose an online method for generating collision-free motion in conﬁguration space that effectively avoids local minima. Our approach decomposes the optimal velocity into nominal and tangential components, with the tangential velocity optimized to facilitate escape from local minima. The tangential velocity is deﬁned in the tangential space, with its normal direction determined by the gradient of the nearest distance between the robot and obstacles, relative to the robot’s states. Direct optimization of the tangential velocity is challenging due to its dependence on varying tangent spaces. To address this, we represent the tangential velocity using the orthogonal basis of the tangent space, decoupling it from the varying tangent space. This allows explicit optimization of the tangential velocity by optimizing its components. Additionally, we introduce a warm-start operator in the tangent space to ensure the consistency and convergence. Furthermore, we propose a dynamic weight based on proximity to local minima to balance the tangential and nominal velocities, forming the optimal velocity. The effectiveness of our approach in avoiding local minima is validated through simulations and physical experiments.
+Index Terms—Nonconvex obstacle avoidance, sampling-based MPC, tangential conﬁguration space optimization.
+I. INTRODUCTION
+M ODERN robotic systems usually need to perform complex tasks in the presence of obstacles. While collisionfree motion planning has a well-established research history, most studies focus on Euclidean space and are conducted ofﬂine. Online motion generation approaches can suffer from local minima induced by non-convex obstacles, which become more pronounced in high-dimensional conﬁguration space.
+Received 26 November 2024; accepted 26 March 2025. Date of publication 14 April 2025; date of current version 25 April 2025. This article was recommended for publication by Associate Editor S. Zhao and Editor A. Bera upon evaluation of the reviewers’ comments. This work was supported in part by Shanghai Technology Innovation Action Plan under Grant 24511103303, in part by Jiangsu Provincial Science and Technology Department Program Special Funds (Basic Research on Frontier Leading Technologies) under Project SBK2023050162, and in part by the State Key Laboratory of Mechanical System and Vibration under Grant MSVZD202205. (Corresponding author: Jianhua Wu.)
+The authors are with the State Key Laboratory of Mechanical System, and Vibration, Institute of Robotics, School of Mechanical Engineering, Shanghai Jiao Tong University, Shanghai 200240, China (e-mail: zhaoguangbao@sjtu.edu.cn; ninglong_jin@sjtu.edu.cn; wujh@sjtu.edu.cn; mexiong@sjtu.edu.cn).
+This article has supplementary downloadable material available at https://doi.org/10.1109/LRA.2025.3560885, provided by the authors.
+Digital Object Identiﬁer 10.1109/LRA.2025.3560885
+
+Classical online collision-free motion generation methods include the Artiﬁcial Potential Fields (APF) [1] and the local Modulation Dynamical System (ModDS). The APF method is generally limited to convex obstacles due to its susceptibility to local minima. The convergence of ModDS can only be guaranteed for conservative obstacle types, such as convex obstacles [2] or star-shaped ones [3]. Further, saddle-point local minima remain for such shapes. These limitations reduce the effectiveness of APF and ModDS in environments with complex-shaped obstacles. Lukas et al. [4] proposed an improvement upon the ModDS by introducing additional tangential velocities through an additive nonlinear function based on reference points to alleviate spurious attractors. However, determining these reference points for high-dimensional concave obstacles remains challenging. Koptev et al. [5] proposed an approach to generate locally active obstacle-tangent deﬂections in potential local minima presented in ModDS. In addition to potential-based methods, optimization-based approaches such as [6] reformulated reactive motion planning as a quadratic programming problem, but struggle to escape local minima due to their single-horizon formulation. Recently, Model-Predictive Path Integral Control (MPPI) [7] has been used to generate collision-free trajectories online [8], [9], but these methods still face challenges in handling local minima.
+The tangential velocity is essential for steering the robot out of local minima. It is deﬁned in the tangential space, where its normal direction is determined by the gradient of the nearest distance between the robot and obstacles, relative to the robot’s states. Determining an appropriate velocity online, especially the optimal tangential velocity to escape local minima, is challenging. The primary difﬁculty lies in maintaining consistency in the tangential velocity, ensuring the direction remains stable and aligned with the target. To address this, we decompose the optimal velocity into tangential and nominal components rather than directly optimizing the overall velocity. We explicitly optimize the components along the tangent space basis to compute the tangential velocity. We introduce a warm start operator in the tangent space and leverage the receding horizon of the MPPI algorithm to ensure the convergence and consistency in tangential velocity optimization. We also adopt a dynamic weight based on the distance to local minima to combine the tangential and nominal velocities. The nominal velocity can be derived from a linear dynamical system or ModDS. The architecture of the optimization process is illustrated in Fig. 1. We refer to the proposed approach as MPPI-Tan. Simulation and physical experiments demonstrate its effectiveness in navigating
+
+2377-3766 © 2025 IEEE. All rights reserved, including rights for text and data mining, and training of artiﬁcial intelligence and similar technologies. Personal use is permitted, but republication/redistribution requires IEEE permission. See https://www.ieee.org/publications/rights/index.html for more information.
+
+Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:21:11 UTC from IEEE Xplore. Restrictions apply.
+
+5538
+
+IEEE ROBOTICS AND AUTOMATION LETTERS, VOL. 10, NO. 6, JUNE 2025
+
+Fig. 1. The architecture of the optimization, where each iteration involves multiple steps (horizons). At each step, we explicitly optimize the tangential velocity. The ﬁnal velocity is constructed by combining the tangential and nominal velocities with a dynamic weight.
+
+However, designing an appropriate potential function is difﬁcult. Alternatives, such as circular ﬁelds [18] guide the robot around obstacles, but scaling these ﬁelds to high-dimensional spaces remains challenging. The Modulation of Dynamical Systems (ModDS) [2], [3] modulates the original Dynamical Systems (DS) based on the distance to obstacles and the normal direction. However, these methods are typically limited to avoiding collisions with convex and star-shaped obstacles. Additionally, modulation matrices may introduce spurious attractors. Recent work by Fourie et al. [19] introduced on-manifold strategies for navigating non-convex obstacles, using sample-based and projection-based representations for real-time navigation. Haviland et al. [6] reformulated reactive motion control as a quadratic programming problem. However, the approach faces challenges when dealing with local minima. Methods such as [8], [9] apply receding horizons from sampling-based model predictive control [7] to help the robot escape local minima. However, these approaches still rely on speciﬁc heuristics and struggle to ﬁnd feasible solutions in cluttered environments [20], [21].
+
+the robot out of local minima. The main contributions are as follows:
+1) We propose MPPI-Tan to overcome local minima induced by concave obstacles by decomposing the optimal velocity into tangential and nominal components, and explicitly optimizing the tangential velocity along the tangent space basis.
+2) We introduce a warm start operator in the tangent space and leverage receding horizons to ensure consistency in tangential velocity optimization. Additionally, we adopt a dynamic weight adjustment strategy based on the distance to local minima to form the ﬁnal velocity.
+The rest of this paper is structured as follows. Section II presents the related works, followed by preliminaries in Section III. Whereas Section IV describes the explicit tangent space velocity optimization. The simulation and real experiments are presented in Section V, and the conclusions are drawn in Section VI.
+II. RELATED WORKS
+Traditional sampling-based methods, such as Rapidlyexploring Random Trees (RRT), Probabilistic Roadmaps (PRM), and their variants [10], [11], [12], are designed to generate collision-free paths. While offering probabilistic completeness, their computational cost can be signiﬁcant [13]. An alternative class of methods formulates motion planning as an optimization problem, aiming to minimize costs related to collisions and constraints. These include STOMP [14], CHOMP [15], and TrajOpt [16]. However, they are prone to local minima and typically operate ofﬂine. Marcucci et al. [17] proposed a compact mixed-integer optimization using Graphs of Convex Sets (GCS), reducing the problem to a convex optimization that enables fast, approximately globally optimal trajectory generation. However, constructing the GCS is time-consuming and must be done ofﬂine.
+The artiﬁcial potential ﬁeld method [1], a classical approach for online motion generation, repels the robot from obstacles.
+
+III. PRELIMINARIES
+In this section, we present a concise analysis of the distance function between the robot and its environment, as well as the gradient of the distance function with respect to the joint conﬁguration. Additionally, we provide an illustration of the sampling-based Model Predictive Control (MPC) algorithm.
+
+A. Modeling Environment Collision
+
+We consider a serial robot with m links and n revolute
+
+Degrees of Freedom (DOF). The robot’s joint state is deﬁned as a
+
+vector of joint angles q = [q1, q2, . . . , qn]T ∈ Rn. Since the
+
+number of links m typically exceeds the number of DOF n due
+
+to ﬁxed joints, we associate the k-th link with the mk-th actuated joint for convenience. Obstacles O ∈ Rd×4 are represented as
+
+either point clouds or a set of spheres, where d denotes the
+
+number of points or spheres. The ﬁrst three columns specify
+
+the sphere’s center, and the fourth column denotes its radius,
+
+which is set to zero for point clouds. Based on our previous work [22], for a query point p ∈ R3 in
+
+the workspace, we utilize a learning-based regression function
+
+N Nenv(q, p) to approximate an m-entry vector, where each
+
+entry
+
+is
+
+of
+
+the
+
+form
+
+[
+
+Γk
+
+,
+
+n
+
+T k
+
+]
+
+T
+
+∈
+
+R4.
+
+Here,
+
+Γk
+
+∈
+
+R
+
+represents
+
+the predicted minimal distance between the k-th link and the
+
+point p, while nk is the predicted unit direction vector from p
+
+to pk, where pk denotes the nearest point on the k-th link. The pk is expressed as pk = nkΓk + p. The gradient of the k-th distance function Γk(q, p) with respect to q is given by:
+
+∇qΓk = 1 Γ J k (q, p) kT (q)(pk − p) = JkT (q)nk (1)
+
+where
+
+Jk (q )
+
+=
+
+∂pk ∂q
+
+∈
+
+R3×n
+
+is
+
+the
+
+translation
+
+Jacobian
+
+matrix
+
+of the point pk with respect to q. For revolute joints, the i-th
+
+column of Jk(q) is calculated as follows:
+
+Jk,i(q) = zi × (pk − oi), i ≤ mk (2)
+
+0,
+
+mk < i ≤ n
+
+Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:21:11 UTC from IEEE Xplore. Restrictions apply.
+
+ZHAO et al.: ONLINE MOTION GENERATION VIA TANGENTIAL SAMPLING-BASED MPC AROUND NONCONVEX OBSTACLES
+
+5539
+
+navigating the robot away from local minima. However, the tangent space varies with the joint conﬁguration, making it difﬁcult to represent the tangential velocity in a single space. Therefore, directly using the tangential velocity as an optimization variable poses a challenge. To address this, we ﬁrst compute the unit orthogonal basis E(q) of the tangent space at a given joint conﬁguration q using the gradient to obstacles n(q) = ∇qΓk∗ and QR decomposition. The deﬁnition of E(q) is as:
+
+E(q) = [τ 1(q), . . . , τ n−1(q)] ∈ Rn×(n−1)
+
+(4)
+
+Fig. 2. Motion planning of a mass point, with the negative gradient to obstacles
+in red, the tangent space basis in green, the nominal velocity in blue, and the ﬁnal velocity in black. The distribution parameters of control inputs ui are optimized to compute the tangential velocities, enabling collision-free motion
+in the presence of a concave obstacle.
+
+where zi and oi denote the unit vector along the rotation axis and the position of the i-th joint frame origin, respectively. For brevity, we refer to ∇qΓk∗ , where k∗ = arg mink∈[1,...,m] Γk, as the gradient to obstacles in the following content. Similar
+to N Nenv(q, p), we utilize the implicit self-collision distance function N Nself(q) : Rn → R, adopted from [22], to estimate
+the minimum distance between the robot’s links for a given
+conﬁguration state q.
+
+B. Sampling-Based MPC
+
+The sampling-based MPC, also known as MPPI, is a stochas-
+
+tic optimization algorithm that aims to ﬁnd the optimal distri-
+
+bution of control inputs. The key parameters in MPPI are the
+
+number of sampled rollouts N and the prediction horizon length
+
+H.
+
+At
+
+the
+
+t-th
+
+iteration,
+
+a
+
+set
+
+of
+
+control
+
+inputs
+
+{u }h=1...H
+i,h i=1...N
+
+is sampled from H independent multivariate Gaussian distri-
+
+butions, parameterized by πθt = {μh, Σh}h=1...H . The corre-
+
+sponding
+
+state
+
+rollouts
+
+{x }h=1...H
+i,h i=1...N
+
+are
+
+then
+
+generated
+
+using
+
+the approximate dynamics function with the sampled control
+
+inputs. The distribution parameters are subsequently updated as
+
+follows.
+
+μt,h = (1 − αμ) μt−1,h + αμ Σt,h = (1 − ασ) Σt−1,h+
+
+i=1 N wiut,h i=1 N wi
+
+i=1 N wi (ut,h − μt,h) (ut,h − μt,h)
+
+ασ
+
+N
+
+(3)
+
+i=1 wi
+
+Here, wi = exp{−C({xi,h}h=1...H )/β}, where, β is a temperature parameter and C(·) denotes the rollout cost function.
+αμ and ασ represents step-sizes. For more details, refer to [7].
+
+IV. EXPLICIT TANGENT SPACE VELOCITY OPTIMIZATION
+The motion planning process for a mass point is illustrated in Fig. 2. The ﬁnal velocity is decomposed into nominal and tangential components. From this, it is evident that determining the tangential velocity and ensuring its consistency is crucial for
+
+where τ i(q), for i = 1, . . . , (n − 1), form a unit orthonormal basis for the tangent space, with n(q) as its normal. The corresponding tangential velocity is then expressed as q˙ tan = E(q)u, where u = [u1, u2, . . . , un−1]T ∈ Rn−1 represents the components along the tangent space basis. This representation
+decouples the control input from the varying tangent space,
+allowing for explicit control of the tangential velocity through the optimization of u. At the t-th iteration, the optimization problem can be formulated as:
+
+argmin
+U t∼πθt
+s.t.
+
+C(Qt, U t)
+q˙ nom(i) = DS(q(i)) q˙ tan(i) = E(q(i))u(i) q˙ (i) = ωvelq˙ tan(i) + (1 − ωvel) q˙ nom(i) q(i + 1) = q(i) + q˙ (i)dt
+
+(5)
+(5.1) (5.2) (5.3) (5.4)
+
+where, i = [t, t+1, . . . , t+H − 1], πθt = {μt,h, Σt,h}h=1...H represents the parameters of H independent multivariate Gaussian distributions, and dt denotes the control period. The control input over the H-horizon, denoted as U t [u(t), u(t + 1), . . . , u(t + H − 1)], has each entry sampled from the corresponding Gaussian distribution. The state rollout over the Hhorizon, denoted as Qt [q(t), q(t + 1), . . . , q(t + H)], has each entry generated using (5.4). The ﬁnal velocity, as deﬁned in (5.3), is a combination of the tangential velocity q˙ tan and the nominal velocity q˙ nom using a dynamic weight ωvel described in Section IV-C. The nominal velocity, as outlined in (5.1), is derived either from a linear dynamical system q˙ nom = f (q) = k(q∗ − q)/ q∗ − q or a modulated dynamical system q˙ nom = M (·)f (q), where q∗ represents the target conﬁguration, k is a positive amplitude constant and M (·) denotes the modulation matrix, introduced in [2].
+We employ the sampled MPC approach to solve the optimiza-
+tion problem (5), and refer to our proposed method as MPPI-Tan. The initial mean μ0 is set to 0, and the initial covariance Σ0 is set to the identity matrix to promote unbiased exploration
+in all tangential directions. Since the control inputs are repre-
+sented in different tangent spaces, to ensure the convergence and
+consistency of the tangential velocities, we introduce a warm
+start operator across different tangent spaces, as described in
+Section IV-B. The ﬂow of the MPPI-Tan algorithm is outlined
+in Algorithm 1.
+
+Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:21:11 UTC from IEEE Xplore. Restrictions apply.
+
+5540
+
+IEEE ROBOTICS AND AUTOMATION LETTERS, VOL. 10, NO. 6, JUNE 2025
+
+Algorithm 1: MPPI-Tan Collision-Free Motion.
+A. Objective Function The objective function in the MPPI algorithm deﬁnes the
+expected robot behavior. The objective function can be deﬁned as a weighted sum of several cost terms. In this paper, we consider the following cost terms.
+1) Goal Reaching: This cost term is designed to guide the robot toward the target joint conﬁguration, q∗, by measuring the distance between the current and target conﬁgurations. It is deﬁned as:
+cigoal = ||q∗ − qi,H ||2 (6) where qi,H represents the robot’s joint conﬁguration at the end of the i-th rollout. This cost term penalizes rollouts that do not sufﬁciently approach the target conﬁguration. Notably, only the ﬁnal conﬁguration of the rollout is considered, as the trajectory may need to temporarily deviate from the goal to escape local minima. This ﬂexibility enables the algorithm to explore a wider range of alternative paths before ultimately converging on an optimal solution.
+2) Consistency Constraint: This cost term is designed to prevent localized oscillations and back-and-forth movements by penalizing inconsistencies in the tangential velocities during the
+
+initial horizons of the rollouts. It is deﬁned as:
+
+T
+ciosc = αt 1 −
+
+q˙ i,t, q˙ i,t+1
+
+, t = 1, . . . , T (7)
+
+t=1
+
+q˙ i,t q˙ i,t+1
+
+where ·, · represents the dot product, and α = 0.99 is a decay factor that assigns greater weight to earlier time horizons while progressively reducing its inﬂuence as time progresses. The term q˙ i,t denotes the joint velocity at time step t in the i-th rollout, while T , set to 5in our implementation, represents the number of initial horizons considered. This cost term penalizes unexpected oscillation in the trajectory, which is especially important for ensuring smooth convergence toward the goal.
+3) Path Exploring: The cost term is designed to prevent the exploration path from becoming excessively short due to the presence of local minima. It is deﬁned as:
+
+len ||q∗ − qi,H ||2
+
+ci =
+
+(8)
+
+||qi,H − qi,0||2
+
+where qi,0 denotes the initial conﬁguration of sampled rollouts. This term encourages exploration by penalizing paths that quickly converge to a local minimum without adequately exploring the conﬁguration space. Additionally, this cost decreases as the robot approaches the target, diminishing its inﬂuence when the robot is near the target conﬁguration.
+4) Collision Avoidance: This cost term is designed to facilitate collision avoidance with both environmental obstacles and self-collisions. We employ a binary collision detection function that penalizes trajectories colliding with the obstacle. The collision avoidance cost is deﬁned as follows:
+
+H
+cicoll = ci,h coll (9)
+h=1
+
+where ccoll i,h = I(Γenv(qi,h) < denv) + I(Γself(qi,h) < dself). Here, Γenv(q) and Γself(q) denote the environment distance and self-distance estimators, respectively. The function I(·) represents the indicator function, while denv and dself correspond to the safe distances for the environment and self-collision,
+respectively.
+
+B. Warm Start Operator
+Different joint conﬁgurations correspond to distinct tangent spaces, as shown in Fig. 3(a). For the given joint conﬁgurations q1 and q2, the corresponding basis of the tangent spaces are denoted as E(q1) = [τ 11, τ 12] and E(q2) = [τ 21, τ 22], respectively. As described above, the optimal distribution parameters are presented on the basis of the tangent spaces. To ensure convergence and maintain consistency in the tangential velocity, we introduce a warm start operator, Φ(θ), for optimizing tangential velocity. This operator transforms the previous approximate solution θt−1 as the initialization for the current iteration, resulting in θˆt = Φ(θt−1), as illustrated in Fig. 3(b). When the distribution parameters are transformed from q1 to q2, the warm start operator Φ(θ) is deﬁned as follows:
+μˆ 2 = E(q2)†E(q1)μ1
+
+Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:21:11 UTC from IEEE Xplore. Restrictions apply.
+
+ZHAO et al.: ONLINE MOTION GENERATION VIA TANGENTIAL SAMPLING-BASED MPC AROUND NONCONVEX OBSTACLES
+
+5541
+
+Fig. 3. The warm start operator. (a) Tangential hyperplanes and their basis at joint conﬁgurations q1 and q2 for a 3D obstacle. (b) The control distribution πθ consists of H = 3 independent Gaussian distributions, where the warm start operator moves the distribution parameters one time step forward and replaces those at h = H − 1 with default values.
+
+Σˆ 2 = E(q2)†E(q1)Σ1E(q1)T E(q2)†T
+
+(10)
+
+where, E(q2)† denotes the pseudo-inverse of the matrix E(q2), μˆ 2 and Σˆ 2 represent the initialization mean and covariance matrix at q2, respectively.
+
+C. Dynamic Velocity Weight
+
+As the robot approaches a local minimum, the inﬂuence of the tangential velocity increases, while it decreases when the robot moves away from it. We quantify the proximity to local minima using the dot product between the gradient to obstacle and the nominal velocity direction, n(q), q˙ nom . The ﬁnal velocity is deﬁned as:
+
+q˙ = ωvelq˙ tan + (1 − ωvel) q˙ nom
+
+(11)
+
+where ωvel(q) = ωΓ(q)ωn(q)I( q − q∗ > δ), I(·) denotes the indicator function. The indicator function ensures the
+asymptotic stability properties of the nominal DS by enforcing ωvel(q) = 0 within a ball of radius δ around the target conﬁguration q∗, assuming no obstacles exist within this region. We deﬁne ωΓ(q) and ωn(q) using parameterized functions, allowing the hyperparameters to be adjusted to improve the probability of ﬁnding effective trajectories. The deﬁnitions of ωΓ(q) and ωn(q) are as follows:
+
+ωn(q) = 1 −
+
+1
+−kn n(q),q˙ nom
+
+1+e
+
+ωΓ(q) = 1 −
+
+1
+−kΓ (Γ(q )−ds )
+
+(12)
+
+1+e
+
+where Γ(q) represents the distance to the nearest obstacle, ds denotes the safe distance threshold. The positive parameters kn and kΓ control the transition widths. Fig. 4(a) shows the curve of ωn(q). A larger kn makes ωn(q) more sensitive to local minima, enhancing the role of tangential velocity. A smaller
+kn facilitates exploration near local minima. A larger kΓ causes ωΓ to approach 1 only near the safety distance ds, making the trajectory stays close to obstacles.
+The dynamic weight helps mitigate obstacle penetration in
+continuous cases. As deﬁned in [2], impenetrability is ensured
+when the velocity ﬁeld’s projection onto the obstacle gradient, n(q), vanishes on the obstacle surface ∂O, mathematically formulated as n(q)T q˙ = 0 for all q ∈ ∂O. With the
+
+Fig. 4. Online motion generation of a 2-DoF planar serial robot using MPPITan. (a) The curve of ωn. (b) The contour plot of the dynamic weight ωvel in conﬁguration space. (c) Motion from (−π, 0) to (π, 0) in task space. (d) Motion in the conﬁguration space, with tangential and nominal velocities marked in blue and red, respectively.
+Fig. 5. The reaching task for the Franka robot. (a) The default joint motion to drive the robot from the initial position (in light-green) to the goal position (in light-purple) in the reaching task. (b), (c) and (d) represent the cross-shaped obstacles with sizes of 5 and 7, as well as an I-shaped obstacle, placed in the robot’s swept area.
+velocity deﬁned as (11), the projection becomes n(q)T q˙ = (1 − ωvel)n(q)T q˙ nom. When n(q)T q˙ nom < 0 or the distance to obstacles approaches the safe threshold, the dynamic weight ωvel tends to 1, which helps mitigate obstacle penetration.
+V. SIMULATIONS AND PHYSICAL EXPERIMENTS We evaluated the MPPI-Tan algorithm through simulations and physical experiments. First, we deployed it on a 2-DOF planar serial robot to analyze the role of tangential velocity in overcoming local minima. We then applied the algorithm to a 7-DOF Franka robot in simulations for a reaching task and the Motion benchmark. Finally, we validated the algorithm through physical experiments. The implementation was in Python, running on an AMD Ryzen R4600H 2.80 GHz CPU with 16 GB RAM and an RTX1650 GPU. In our implementation, we set the number of sampled rollouts N to 50, the prediction horizon
+
+Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:21:11 UTC from IEEE Xplore. Restrictions apply.
+
+5542
+
+IEEE ROBOTICS AND AUTOMATION LETTERS, VOL. 10, NO. 6, JUNE 2025
+TABLE I PERFORMANCE COMPARISON OF REACHING TASK
+
+Fig. 6. The selected scenes used to test the performance from MotionBenchmaker. The initial joint state is in light-green and the goal joint state is in light-purple. (a) Thin Bookshelf (b) Tall Bookshelf (c) Box (d) Table Pick.
+
+where the weight is higher around local minima and the safety distance ds, ensuring that the tangential velocity dominate in these regions. This allows the robot to escape local minima and avoid collisions with obstacles effectively. The experimental results demonstrate that the incorporation of tangential velocity signiﬁcantly enhances the robot’s capability to escape local minima. Moreover, the MPPI-Tan algorithm effectively mitigates oscillations in tangential velocities, ensuring their consistency and stability during motion.
+
+B. 7-DoF Franka Robot–Reaching Task
+
+Fig. 7. Violin plot of termination error across different scenarios for each algorithm. The termination error represents the 2-norm distance between the ﬁnal joint conﬁguration and the target conﬁguration.
+length H to 15, and the integration time step to 0.2 seconds. For all baseline algorithms, we used their default hyperparameters and maintained consistent safety distance thresholds: 0.1m for the reaching task and 0.05 m for the Motion benchmark.
+In each experiment, the robot moved from an initial joint conﬁguration to a target conﬁguration, with the success rate as the performance metric. A test was considered successful if the ﬁnal joint conﬁguration was within a 2-norm distance of 0.02 radians from the target.
+A. 2-DOF Planar Serial Robot
+To illustrate the effect of the MPPI-Tan method, we deployed it on a 2-DOF planar serial robot with link lengths l1 = l2 = 3. The initial joint conﬁguration was set to (−π, 0), and the target was (π, 0). Two circular obstacles, each with a radius of 0.5, were placed at (6, 0) and (0, 4.5).
+The generated motion is illustrated in Fig. 4(c), and its motion in conﬁguration space is depicted in Fig. 4(d), with tangential and nominal velocities marked in blue and red, respectively. The nominal velocities are derived from a linear dynamical system. From the motion in Fig. 4(d), we observe that the dynamic weight reduces the nominal velocity and enhances the tangential velocity near local minima. The contour plot of the dynamic weight ωvel in conﬁguration space is shown in Fig. 4(b),
+
+To facilitate comparison with other algorithms, we consider the reaching task from [5], where the robot performs a reaching motion towards a goal conﬁguration while avoiding obstacles. The task setup is shown in Fig. 5(a), with static cross-shaped (Fig. 5(b) and (c)) or I-shaped (Fig. 5(d)) obstacles placed in front of the robot, segmenting its workspace into quarters. For each obstacle, we conducted 100 repeated reaching motions, with slight random variations in the obstacle positions. The original centers of the cross-shaped and I-shaped obstacles are located at (0.4, 0, 0.5) and (0.4, 0, 0.425) relative to the robot’s base frame.
+We compare our method with ModDS [2], the QP-based collision-free motion generation algorithm [22] (referred to simply as QP), and the MPPI-based Modulated Dynamical System (MPPI-ModDS) [5]. The results are presented in Table I, where “–” indicates failure to accomplish the task.
+C. 7-DoF Franka Robot–Motion Benchmark
+To comprehensively evaluate the performance of our proposed method, we selected 400 problems across four different test scenes and used them as motion benchmarks. The test scenes are part of a predeﬁned selection in the MotionBenchmaker [23] for the Panda robot. The selected test scenes are Thin Bookshelf, Tall Bookshelf, Box, and Table Pick, as shown in Fig. 6. In each problem, obstacle poses are deﬁned relative to the robot’s base coordinate frame, with speciﬁed initial and target joint conﬁgurations. The motion planners are tasked with online generating a trajectory between the initial and target conﬁgurations while ensuring collision avoidance. We used spherical approximations to represent these scenes, with the number of the spheres ranging from 300 to 1000.
+We added comparison experiments with STORM [8], which uses the MPPI algorithm to directly optimize joint accelerations or velocities for collision-free motion generation. We modiﬁed the original goal cost to operate in joint space. Algorithms are terminated either when the target conﬁguration is reached or
+
+Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:21:11 UTC from IEEE Xplore. Restrictions apply.
+
+ZHAO et al.: ONLINE MOTION GENERATION VIA TANGENTIAL SAMPLING-BASED MPC AROUND NONCONVEX OBSTACLES
+
+5543
+
+Fig. 8. The Real robot experiment (a) The experimental setup. (b) Snapshots from a collision-free motion planning experiment of MPPI-Tan, where the robot moved to transport and repack bottles between concave obstacles and a shelf. Sequences (1–4) illustrate the robot transferring a bottle through concave obstacles, sequences (5–8) show the robot maneuvering around the sides of the shelf, and sequences (9–12) depict the robot retrieving a bottle from the shelf and rearranging it across different levels within the shelf.
+
+TABLE II PERFORMANCE COMPARISON OF BENCHMARK
+
+TABLE III CALCULATION FREQUENCY COMPARISON
+
+when the maximum iteration limit, determined by the planning time limit, is exceeded. The termination error is deﬁned as the 2-norm distance between the ﬁnal and target conﬁgurations. The termination error for different algorithms is shown in Fig. 7, and the success rates are presented in Table II. During our experiments, the termination error of the STORM method failed to meet the tolerance threshold for the 2-norm distance to the target conﬁguration, which resulted in a low success rate within our set tolerance. Therefore, we excluded its success rate from Table II.
+D. Simulation Results and Complexity Analysis
+From the simulation results, MPPI-Tan outperforms state-ofthe-art algorithms in both success rate and termination error across the tested scenarios. Compared to STORM, MPPI-Tan beneﬁts from explicitly optimizing tangential velocity rather than directly optimizing joint velocities. The latter makes it challenging to escape local minima. In contrast, MPPI-Tan reduces the optimization space’s dimensionality by optimizing tangential velocity in the tangent space, introducing a heuristic search that simpliﬁes the optimization in high-dimensional, nonconvex spaces and improves its ability to avoid local minima. Additionally, occasional collisions were observed in motions generated by STORM, as it relies solely on a cost function to penalize collisions, without guaranteeing complete obstacle avoidance. MPPI-ModDS optimizes the modulation of Gaussian kernels within the conﬁguration space, reﬁning the potential function of the original dynamic system. In the reaching task, MPPI-ModDS performs slightly better than MPPI-Tan, where MPPI-ModDS typically requires optimizing only 2-3 Gaussian
+
+kernels, making it easier to optimize the deﬂection direction. However, MPPI-ModDS performs worse in cluttered scenarios compared to sparser ones, like the reaching task. In contrast, MPPI-Tan remains effective in both cluttered and sparse environments, demonstrating its robustness.
+In addition to the success rate, we compare the mean computation frequency of different algorithms across varying obstacle sizes, as shown in Table III, where H denotes the number of predicted horizons. Since MPPI-ModDS operates asynchronously, the two frequencies correspond to the DS frequency and the obstacle-tangent deﬂection optimization frequency. The computational complexity of our algorithm scales linearly with the prediction horizon H. STORM achieves high-frequency motion planning by using a linear approximation of the robot’s forward kinematics, enabling parallelized computation of the rollout integration within a sampling-based MPC framework. In contrast, our algorithm introduces tangential velocity at each timestep, making the system nonlinear and increasing the difﬁculty of parallelizing the multi-horizon optimization. The results in Table III indicate that H signiﬁcantly impacts the computation frequency. Therefore, a dynamic prediction horizon adjustment strategy, based on the distance from local minima, could improve the efﬁciency of MPPI-Tan.
+To provide a detailed breakdown, we further analyzed the runtime of the main computational components. The neural network N Nenv(q, p), which computes the nearest distances and gradients between the robot and obstacles, accounts for approximately 70% of the total computation time. Its computational complexity is O(mB(noNl + DNl2)), where no is the input dimension (3 in our case), m is the number of robot links, B is the batch size, Nl is the number of neurons per layer, and D is the network depth. In our implementation, B can be parallelized, but the distance
+
+Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:21:11 UTC from IEEE Xplore. Restrictions apply.
+
+5544
+
+IEEE ROBOTICS AND AUTOMATION LETTERS, VOL. 10, NO. 6, JUNE 2025
+
+inference for m robot links is performed sequentially. Therefore, parallelizing the network computations across all links would signiﬁcantly improve computational efﬁciency.
+E. Real Robot Experiments
+We further validated the performance of MPPI-Tan on a JAKA Zu7-1200 robot with 6-DOF. The experimental setup, shown in Fig. 8(a), features a scene containing concave obstacles and a shelf. The experiment involves moving the robot to transport and repack bottles between the concave obstacles and the shelf. The scenario primarily encompasses three stages: 1) The robot navigates to avoid concave obstacles along its motion path. 2) The robot avoids the sides of the shelf and places the bottle onto the shelf. 3) The robot retrieves the bottle from the shelf and rearranges it across different levels within the shelf.
+Stage 1 primarily aims to test the algorithm’s capability to navigate around concave obstacles, while stages 2 and 3 assess its performance in narrow scenarios. Fig. 8(b) showcases snapshots of a successful motion where the robot avoids colliding with concave obstacles. The supplementary video provides a comprehensive view of the entire experiment process. The robot successfully prevents collisions, navigates out of concave areas, and completes its tasks. The physical experiment results indicate that several iterations are required to determine the appropriate tangential velocities for the robot to escape local minima in narrow scenarios. This is mainly because the MPPI algorithm relies on continuous sampling to solve the optimal distribution parameters. Addressing this challenge presents a promising direction for future research.
+VI. CONCLUSION
+In this paper, we proposed MPPI-Tan, an approach for online collision-free motion generation in conﬁguration space. Our approach decouples the tangential velocity from the varying tangent space and explicitly optimizes tangential velocity components along the tangent space basis, enabling the robot to escape from local minima. Additionally, we introduce a warmstart operator in the tangent space to ensure both the convergence and consistency of tangential velocities. The optimal velocity is constructed by combining the tangential and nominal velocities, with a dynamic weight that adjusts based on the proximity to local minima. MPPI-Tan demonstrated superior performance over state-of-the-art algorithms in generating collision-free motions, particularly in complex and cluttered environments. However, the algorithm’s computational complexity currently restricts its application to static and quasi-static scenarios. Improving computational efﬁciency is a key focus for future work to extend the applicability of our approach to more environments.
+
+[2] S. M. Khansari-Zadeh and A. Billard, “A dynamical system approach to realtime obstacle avoidance,” Auton. Robots, vol. 32, pp. 433–454, 2012.
+[3] L. Huber, A. Billard, and J.-J. Slotine, “Avoidance of convex and concave obstacles with convergence ensured through contraction,” IEEE Robot. Automat. Lett., vol. 4, no. 2, pp. 1462–1469, Apr. 2019.
+[4] L. Huber, J.-J. Slotine, and A. Billard, “Avoiding dense and dynamic obstacles in enclosed spaces: Application to moving in crowds,” IEEE Trans. Robot., vol. 38, no. 5, pp. 3113–3132, Oct. 2022.
+[5] M. Koptev, N. Figueroa, and A. Billard, “Reactive collision-free motion generation in joint space via dynamical systems and sampling-based MPC,” Int. J. Robot. Res., vol. 43, no. 13, pp. 2049–2069, 2024.
+[6] J. Haviland and P. Corke, “NEO: A novel expeditious optimisation algorithm for reactive motion control of manipulators,” IEEE Robot. Automat. Lett., vol. 6, no. 2, pp. 1043–1050, Apr. 2021.
+[7] G. Williams, A. Aldrich, and E. A. Theodorou, “Model predictive path integral control: From theory to parallel computation,” J. Guid., Control, Dyn., vol. 40, no. 2, pp. 344–357, 2017.
+[8] M. Bhardwaj et al., “STORM: An integrated framework for fast joint-space model-predictive control for reactive manipulation,” in Proc. 5th Conf. Robot Learn., 2022, pp. 750–759.
+[9] C. Pezzato, C. Salmi, E. Trevisan, M. Spahn, J. Alonso-Mora, and C. Hernández Corbato, “Sampling-based model predictive control leveraging parallelizable physics simulations,” IEEE Robot. Automat. Lett., vol. 10, no. 3, pp. 2750–2757, Mar. 2025.
+[10] L. E. Kavraki, P. Svestka, J.-C. Latombe, and M. H. Overmars, “Probabilistic roadmaps for path planning in high-dimensional conﬁguration spaces,” IEEE Trans. Robot. Automat., vol. 12, no. 4, pp. 566–580, Aug. 1996.
+[11] J. J. Kuffner and S. M. LaValle, “RRT-connect: An efﬁcient approach to single-query path planning,” in Proc. ICRA. Millennium Conf. IEEE Int. Conf. Robot. Automat. Symposia Proc., 2000, pp. 995–1001.
+[12] J. D. Gammell, S.S. Srinivasa, and T. D. Barfoot, “Batch informed trees (BIT*): Sampling-based optimal planning via the heuristically guided search of implicit random geometric graphs,” in Proc. IEEE Int. Conf. Robot. Automat., 2015, pp. 3067–3074.
+[13] Z. Kingston, M. Moll, and L. E. Kavraki, “Sampling-based methods for motion planning with constraints,” Annu. Rev. Control, Robot., Auton. Syst., vol. 1, pp. 159–185, 2018.
+[14] M. Kalakrishnan, S. Chitta, E. Theodorou, P. Pastor, and S. Schaal, “STOMP: Stochastic trajectory optimization for motion planning,” in Proc. IEEE Int. Conf. Robot. Automat., 2011, pp. 4569–4574.
+[15] M. Zucker et al., “CHOMP: Covariant hamiltonian optimization for motion planning,” Int. J. Robot. Res., vol. 32, no. 9/10, pp. 1164–1193, 2013.
+[16] J. Schulman et al., “Motion planning with sequential convex optimization and convex collision checking,” Int. J. Robot. Res., vol. 33, no. 9, pp. 1251–1270, 2014.
+[17] T. Marcucci, M. Petersen, D. von Wrangel, and R. Tedrake, “Motion planning around obstacles with convex optimization,” Sci. Robot., vol. 8, no. 84, 2023, Art. no. eadf7843.
+[18] M. Becker, T. Lilge, M. A. Müller, and S. Haddadin, “Circular ﬁelds and predictive multi-agents for online global trajectory planning,” IEEE Robot. Automat. Lett., vol. 6, no. 2, pp. 2618–2625, Apr. 2021.
+[19] C. K. Fourie, N. Figueroa, and J. A. Shah, “On-manifold strategies for reactive dynamical system modulation with nonconvex obstacles,” IEEE Trans. Robot., vol. 40, pp. 2390–2409, 2024.
+[20] J. Sacks and B. Boots, “Learning to optimize in model predictive control,” in Proc. Int. Conf. Robot. Automat., 2022, pp. 10549–10556.
+[21] H. -J. Yoon, C. Tao, H. Kim, N. Hovakimyan, and P. Voulgaris, “Sampling complexity of path integral methods for trajectory optimization,” in Proc. Amer. Control Conf., 2022, pp. 3482–3487.
+[22] G. Zhao, J. Wu, and Z. Xiong, “Perceptual local collision-free motion generation for manipulators,” IEEE Robot. Automat. Lett., vol. 10, no. 1, pp. 208–215, Jan. 2025.
+[23] C. Chamzas et al., “MotionBenchMaker: A tool to generate and benchmark motion planning datasets,” IEEE Robot. Automat. Lett., vol. 7, no. 2, pp. 882–889, Apr. 2022.
+
+REFERENCES
+[1] O. Khatib, “Real-time obstacle avoidance for manipulators and mobile robots,” Int. J. Robot. Res., vol. 5, no. 1, pp. 90–98, 1986.
+
+Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:21:11 UTC from IEEE Xplore. Restrictions apply.
+
+

@@ -1,0 +1,1717 @@
+i
+Recent Advances in Path Integral Control for Trajectory Optimization: An Overview in Theoretical and Algorithmic Perspectives
+Muhammad Kazim, JunGee Hong, Min-Gyeom Kim and Kwang-Ki K. Kim∗
+
+arXiv:2309.12566v2 [cs.RO] 2 Dec 2023
+
+Abstract—This paper presents a tutorial overview of path integral (PI) approaches for stochastic optimal control and trajectory optimization. We concisely summarize the theoretical development of path integral control to compute a solution for stochastic optimal control and provide algorithmic descriptions of the cross-entropy (CE) method, an open-loop controller using the receding horizon scheme known as the model predictive path integral (MPPI), and a parameterized state feedback controller based on the path integral control theory. We discuss policy search methods based on path integral control, efficient and stable sampling strategies, extensions to multi-agent decisionmaking, and MPPI for the trajectory optimization on manifolds. For tutorial demonstrations, some PI-based controllers are implemented in Python, MATLAB and ROS2/Gazebo simulations for trajectory optimization. The simulation frameworks and source codes are publicly available at the github page.
+Index Terms—Stochastic optimal control, trajectory optimization, Hamilton-Jacobi-Bellman equation, Feynman-Kac formula, path integral, variational inference, KL divergence, importance sampling, model predictive path integral control, policy search, policy improvement with path integrals, planning on manifolds.
+I. INTRODUCTION
+Trajectory optimization for motion or path planning [1]– [3] is a fundamental problem in autonomous systems [4]– [6]. Several requirements must be simultaneously considered for autonomous robot motion, path planning, navigation, and control. Examples include the specifications of mission objectives, examining the certifiable dynamical feasibility of a robot, ensuring collision avoidance, and considering the internal physical and communication constraints of autonomous robots.
+In particular, generating an energy-efficient and collisionfree safe trajectory is of the utmost importance during the process of autonomous vehicle driving [7]–[9], autonomous racing drone [10]–[12], unmanned aerial vehicles [13], electric vertical take-off and landing (eVTOL) urban air mobility (UAM) [14]–[16], missile guidance [17], [18], space vehicle control, and satellite attitude trajectory optimization [19]–[23]
+From an algorithmic perspective, the complexity of motion planning is NP-complete [24]. Various computational methods have been proposed for motion planning, including samplingbased methods [25], [26], nonlinear programming (NLP) [27],
+The authors are with the department of electrical and computer engineering at Inha University, Incheon 22212, Republic of Korea.
+∗Corresponding author (Email: kwangki.kim@inha.ac.kr) This research was supported by the Basic Science Research Program through the National Research Foundation of Korea (NRF) funded by the Ministry of Education (NRF-2022R1F1A1076260).
+
+[28], sequential convex programming (SCP) [29]–[32], differential dynamic programming (DDP) [33]–[40], hybrid methods [41], and differential-flatness-based optimal control [42], [43].
+Optimization methods can explicitly perform safe and efficient trajectory generation for path and motion planning. The two most popular optimal path and motion planning methods for autonomous robots are gradient- and samplingbased methods for trajectory optimization. The former frequently assumes that the objective and constraint functions in a given planning problem are differentiable and can rapidly provide a locally optimal smooth trajectory [44]. However, numerical and algorithmic computations of derivatives (gradient, Jacobian, Hessian, etc.) are not stable in the worst case; preconditioning and prescaling must be accompanied by and integrated into the solvers. In addition, integrating the outcomes of perception obtained from exteroceptive sensors such as LiDARs and cameras into collision-avoidance trajectory optimization requires additional computational effort in dynamic and unstructured environments.
+Sampling-based methods for trajectory generation do not require function differentiability. Therefore, they are more constructive than the former gradient-based optimization methods for modelling obstacles without considering their shapes in the constrained optimization for collision-free path planning [26], [45]. In addition, sampling-based methods naturally perform explorations, thereby avoiding the local optima. However, derivative-free-sampling-based methods generally produce coarse trajectories with zigzagging and jerking movements. For example, rapidly exploring random trees (RRT) and probabilistic roadmap (PRM) methods generate coarse trajectories [6], [25], [46], [47]. To mitigate the drawbacks of gradient- and sampling-based methods while maintaining their advantages, a hybrid method that combines them can be considered, as proposed in [48]–[51].
+Several open-source off-the-shelf libraries are available for implementing motion planning and trajectory optimization, which include Open Motion Planning Library (OMPL) [52], Stochastic Trajectory Optimization for Motion Planning (STOMP) [53], Search-Based Planning Library (SBPL) [54], And Covariant Hamiltonian Optimization for Motion Planning (CHOMP) [55].
+The path integral (PI) for stochastic optimal control, which was first presented in [56], is another promising approach for sampling-based real-time optimal trajectory generation. In the path integral framework, the stochastic optimal control
+
+ii
+
+associated with trajectory optimization is transformed into a problem of evaluating a stochastic integral, for which Monte Carlo importance sampling methods are applied to approximate the integral. It is also closely related to the cross-entropy method [57] for stochastic optimization and model-based reinforcement learning [58] for decision making. The use of path integral control has recently become popular with advances in high-computational-capability embedded processing units [59] and efficient Monte Carlo simulation techniques [60], [61].
+There are several variations of the PI control framework. The most widely used method in robotics and control applications is the model predictive path integral (MPPI) control, which provides a derivative-free sampling-based framework to solve finite-horizon constrained optimal control problems using predictive model-based random rollouts in path-integral approximations [59], [62]–[64]. However, despite its popularity, the performance and robustness of the MPPI are degraded in the presence of uncertainties in the simulated predictive model, similar to any other model-based optimal control method. To take the plant-model mismatches of simulated rollouts into account [65], [66], adaptive MPPI [67], learningbased MPPI [68]–[70] and tube-based MPPI [71], uncertaintyaverse MPPI [72], fault-tolerant MPPI [73], safety-critical MPPI using control barrier function (CBF) [74]–[76], and covariance steering MPPI [77] have been proposed. Risk-aware MPPI based on the conditional value-at-risk (CVaR) have also been investigated for motion planning with probabilistic estimation uncertainty in partially known environments [78]– [81].
+The path integral (PI) control framework can also be combined with parametric and nonparametric policy search methods and improvements. For example, RRT is used to guide PI control for exploration [82] and PI control is used to guide policy searches for open-loop control [83], parameterized movement primitives [84], [85], and feedback control [58], [86], [87]. To smoothen the sampled trajectories generated from the PI control, gradient-based optimization, such as DDP, is combined with MPPI [88], regularized policy optimization based on the cross-entropy method is used [89], and it is also suggested to smooth the resulting control sequences using a sliding window [90], [91] and a Savitzky-Golay filter (SGF) [63], [92] and introducing an additional penalty term corresponding to the time derivative of the action [93].
+PI control is related to several other optimal control and reinforcement learning strategies. For example, variational methods of path integral optimal control are closely related to entropy-regularized optimal control [94], [95] and maximum entropy RL (MaxEnt RL) [85], [96]. The path integral can be considered as a probabilistic inference for stochastic optimal control [97]–[99] and reinforcement learning [100], [101].
+One of the most important technical issues in the practical application of path integral control is the sampling efficiency. Various importance sampling strategies have been suggested for rollouts in predictive optimal control. Several importance sampling (IS) algorithms exist [102], [103] with different performance costs and benefits, as surveyed in [104]. Adaptive importance sampling (AIS) procedures are considered within the optimal control [61], [105] and MPPI control [106].
+
+In addition to the AIS algorithms, learned importance sampling [107], general Monte Carlo methods [60], [108], and cross-entropy methods [109]–[111] have been applied to PIbased stochastic optimal control.
+Various case studies of PI-based optimal control have been published [112]: autonomous driving [62], [71], [113], [114], autonomous flying [115]–[118], space robotics [73], autonomous underwater vehicles [119], and robotic manipulation planning [120], [121]. Path integral strategies for optimal predictive control have also been adopted to visual servoing techniques [113], [122]–[124]. Recently, the MPPI was integrated into Robot Operating Systems 2 (ROS 2) [125], an open-source production-grade robotics middleware framework [126].
+We expect that more applications of path integral control will emerge, particularly with a focus on trajectory optimization of motion planning for autonomous systems such as mobile robots, autonomous vehicles, drones, and service robots. In addition, it has been shown that path integral control can be easily extended to the cooperative control of multiagent systems [127]–[131].
+There are still issues that must be addressed for scalable learning with safety guarantees in path integral control and its extended variations.
+• Exploration-exploitation tradeoff is still not trivial, • Comparisons of MPC-like open-loop control and param-
+eterized state-feedback control should be further investigated as problem and task-specific policy parameterization itself is not trivial, • Extensions to output-feedback and dual control have not yet been studied, and • Extensions to cooperative and competitive multi-agent trajectory optimization with limited inter-agent measurements and information should be further investigated. The remainder of this paper is organized as follows: Section II presents the overview of some path integral control methods. Section III reviews the theoretical background of path integral control and its variations. Section IV describes the algorithmic implementation of several optimal control methods that employ a path-integral control framework. In Section V, two MATLAB simulation case studies are presented to demonstrate the effectiveness of predictive path integral control. Section VI presents the four ROS2/Gazebo simulation results of trajectory optimization for autonomous mobile robots, in which MPPI-based local trajectory optimization methods are demonstrated for indoor and outdoor robot navigation. In Section VII, extensions of path integral control to policy search and learning, improving sampling efficiency, multi-agent decision making, and trajectory optimization of manifolds are discussed. Section VIII concludes the paper and suggests directions for future research and development of path-integral control, especially for autonomous mobile robots.
+II. OVERVIEW OF PATH INTEGRAL CONTROLLERS
+Path integral (PI) control methods stand at the forefront of contemporary research in stochastic optimal control and trajectory optimization. These techniques, primarily characterized by their robustness and versatility, have been developed
+
+iii
+
+Fig. 1. Hierarchical classification of various path integral control methods.
+
+Type Standard CEM
+CEM-RL
+Constrained CEM
+Differentiable CEM Decentralized CEM
+
+Description The standard CEM is a unified probabilistic approach for tackling combinatorial optimization, Monte-Carlo simulation, and machine learning challenges. CEM-RL merges CEM and TD3 to enhance DRL, optimizing both performance and sample efficiency. Constrained CEM is a safety-focused reinforcement learning method that learns feasible policies while effectively tracking and satisfying constraints. This introduces a gradient-based optimization into the CEM framework to improve the convergence rate. Decentralized CEM improves Cross-Entropy Method efficiency by employing a distributed ensemble of CEM instances to mitigate local optima traps.
+
+TABLE I TYPES OF CEM ALGORITHMS AND THEIR DESCRIPTION.
+
+Ref. [57] [132] [133] [134] [135]
+
+Type Standard MPPI Robust MPPI Smooth MPPI
+Log MPPI
+Tube MPPI
+MPPI Numba
+GP-MPPI
+
+Description MPPI leverages parallel optimization and generalized importance sampling for efficient navigation in nonlinear systems. It enhances off-road navigation with an augmented state space and tailored controllers, offering improved performance and robustness. It enhances MPPI by incorporating input-lifting and a novel action cost to effectively reduce command chattering in nonlinear control tasks. It enhances robotic navigation by using a normal log-normal mixture for efficient and feasible trajectory sampling in complex environments. Tube MPPI merges MPPI with Constrained Covariance Steering for robust, constraint-efficient trajectory optimization in stochastic systems. This research develops a neural network-based, risk-aware method for off-road navigation, enhancing success and efficiency by analyzing empirical traction distributions. GP-MPPI combines MPPI with sparse Gaussian Processes for improved autonomous navigation in complex environments by learning model uncertainties and disturbances, and optimizing local paths.
+
+TABLE II TYPES OF MPPI ALGORITHMS AND THEIR DESCRIPTION.
+
+Ref. [59] [71] [93] [113] [136] [80]
+[70]
+
+to tackle complex control tasks under uncertainty. Central
+
+Type Standard PI2-CMA Black-box Optimization PI2-DDP
+Information Geometric PI2
+Heuristic PI2
+Critic PI2
+
+Description It is an algorithm that merges PI2-CMA to optimize policies and auto-tune exploration noise in reinforcement learning.
+It examines the convergence of RL and blackbox optimization in PI, introducing the efficient PIBB algorithm.
+It is an advanced RL method that combines the gradient extraction principles of PI2-CMA with the feedback mechanism of DDP. It reexamines PI2, linking it with evolution strategies and information-geometric optimization to refine its cost minimization approach using natural gradient descent.
+It introduces PI2-CMA-KCCA, a RL algorithm that accelerates robot motor skill acquisition by using heuristic information from Kernel Canonical Correlation Analysis and CMA to guide Path Integral Policy Improvement. Critic PI2 combine trajectory optimization and deep actor-critic learning in a model-based RL framework for improved efficiency in continuous control tasks.
+
+Ref. [137] [138] [139] [140]
+[141]
+[142]
+
+TABLE III TYPES OF PI2-CMA ALGORITHMS AND THEIR DESCRIPTION.
+
+to these methods are Cross-Entropy Method (CEM), Model Predictive Path Integral (MPPI), and PI2-CMA, each with distinct variations and algorithmic developments. In Fig. 1, we mentioned some hierarchical structure of path integral control methods. Below, we present a structured overview of these methods, outlining their types and key characteristics.
+The Cross-Entropy Method is a probabilistic technique that iteratively refines control policies by minimizing a cost function and employing importance sampling. It has evolved significantly since its inception. Some of the CEM algorithms and there key characteristics are given in Table I. MPPI is an open-loop controller using the receding horizon scheme. It has been pivotal for real-time control with various developments focusing on improving efficiency and reducing computational load. Some of the MPPI algorithms and there key characteristics are given in Table II. PI2-CMA represents an amalgamation of path integral control with Covariance Matrix Adaptation. It’s especially suitable for problems where the cost landscape is highly non-convex or unknown. Some of the MPPI algorithms and there key characteristics are given in Table III.
+
+III. PATH INTEGRAL CONTROL: THEORY A. Stochastic optimal control Controlled stochastic differential equation Consider a controlled stochastic differential equation of the following form:
+
+dXt = f (t,Xt,π(t, Xt))dt + g(t,Xt,π(t, Xt))dWt, (1)
+
+where the initial condition is given by X0 = x0 ∈ Rn, and Wt is a standard Brownian motion. The solution to the SDE (1) associated with the Markov policy π : R × Rn → Rm is denoted by Xtπ. Cost-to-go function For a given Markov policy π, the cost-
+to-go corresponding to policy π is defined as
+
+T
+
+Gtπ = ϕ(XTπ) + L(s, Xsπ, π(s, Xsπ))ds,
+
+(2)
+
+t
+
+iv
+
+where T > 0 denotes the terminal time, L : R×Rn ×Rm → R denotes the running cost, and ϕ : Rn → R denotes the terminal cost. Expected and optimal cost-to-go function The expected
+cost-to-go function is defined as
+
+V π(t, x) = E[Gπt |Xtπ = x]
+
+(3)
+
+where the expectation is considered with respect to the proba-
+bility of the solution trajectory for the SDE (1) with an initial time and condition (t, x) ∈ R × Rn. The goal of the stochastic optimal control is to determine the optimal policy.
+
+π∗ = arg min V π(t, x)
+
+(4)
+
+π
+
+The corresponding optimal cost-to-go function is defined as V ∗(t, x) = V π∗ (t, x) = min V π(t, x) (5)
+π
+for each (t, x) ∈ [0, T ] × Rn,
+
+B. The Hamilton-Jacobi-Bellman equation
+
+The Hamilton-Jacobi-Bellman equation for the optimal costto-go function is defined as follows [143]
+
+min {L(t, x, π(t, x)) + T πV ∗(t, x)} = 0
+
+(6)
+
+π
+
+(t, x) ∈ [0, T ] × Rn. where
+
+T πV ∗(t, x) = lim E[V ∗(t+h, Xt+h π )|Xtπ = x)] − V ∗(t, x) (7)
+h→0+
+
+is a backward evolution operator defined on the functions of the class C1×C2. Additionally, the boundary condition is given by V ∗(T, x) = ϕ(x).
+
+C. Linearization of the HJB PDE
+Control affine form and a quadratic cost As a special case of (1), we consider the controlled dynamics (diffusion process)
+
+dXt = f (t,Xt)dt + g(t,Xt)(π(t, Xt))dt + dWt) , (8)
+
+and the cost-to-go
+
+T
+
+Gtπ = ϕ(XTπ) + π(s,Xsπ)⊤dWs
+
+t T 1 (9)
+
++ q(s,Xsπ) + π(s,Xsπ)⊤π(s,Xsπ) ds
+
+t
+
+2
+
+where
+
+Xπ
+s
+
+is
+
+the
+
+solution
+
+to
+
+the
+
+SDE
+
+(8)
+
+for
+
+s
+
+∈
+
+[t,
+
+T]
+
+with
+
+the
+
+initial
+
+condition
+
+Xπ
+t
+
+=
+
+xt.
+
+In
+
+this
+
+study,
+
+we
+
+assume
+
+Gπ
+t
+
+>
+
+0
+
+for all t ∈ [0, T ] and any (control) policy π.
+
+Remark. Notice that
+
+1)
+
+Gπ
+t
+
+is
+
+not
+
+adaptive
+
+with
+
+respect
+
+to
+
+the
+
+Brownian
+
+motion
+
+as it depends on (Xτπ) for τ > t.
+
+2) The second term in (9) is a stochastic integral with
+
+respect to the Brownian motion and it vanishes when
+
+taking expectation. This term will play an essential role
+
+when applying a change of measure.
+
+□
+
+The goal of stochastic optimal control for the dynamics (8) and the cost-to-go (9) is to determine an optimal policy
+
+that minimizes the expected cost-to-go with respect to the policy.
+
+V ∗(t, x) := min E[Gπt |Xtπ = x],
+
+(10)
+
+π
+
+π∗(t, x) := arg min V π(t, x),
+
+(11)
+
+π
+
+where the expectation E is considered with respect to the stochastic process Xπt:T ∼ Pπ which is the (solution) path of SDE (8).
+Theorem 1: [143]–[145] The solution of the stochastic opti-
+
+mal control in (10) and (11) is given as
+
+V ∗(t, x) = − ln E e−Gπt |Xtπ = x ,
+
+(12)
+
+and π∗(t, x) = π(t, x)
+
+E[(W
+
+s
+
+−
+
+W
+
+t
+
+)e
+
+−
+
+G
+
+π
+t|
+
+Xπ
+t
+
+=
+
+x]
+
+(13)
+
++ lim
+
+−Gπ π
+
+,
+
+s→t+ E[(s−t)e t|Xt = x]
+
+where π(t, x) denotes an arbitrary Markov policy.
+
+■
+
+Because the solution represented in Theorem 1 is defined
+
+in terms of a path integral for which the expectation E is taken with respect to the random process Xπt:T ∼ Pπ, that is,
+
+the (solution) path of the SDE (8), this class of stochastic
+
+optimal control with control-affine dynamics and quadratic
+
+control costs is called the path integral (PI) control.
+
+Solution of the HJB equation For stochastic optimal control
+
+of the dynamics (8) and (9), the HJB equation can be rewritten
+
+as [144]
+
+min q + 1 u⊤u + T uV ∗ = 0 (14)
+
+u
+
+2
+
+where T uV ∗ = ∂tV ∗ + (f + gu)⊤∂xV ∗ + 1 Tr(gg⊤∂xxV ∗) (15) 2
+with the boundary condition V ∗(T, x) = ϕ(x). In addition, the optimal state-feedback controller is given by
+
+u∗(t, x) = −g(t, x)⊤∂xV ∗(t, x) .
+
+(16)
+
+Here, Markov policy π is replaced by state-feedback control u
+
+without loss of generality. The value (i.e., the optimal expected cost-to-go) function V ∗ is defined as a solution to the second-
+
+order PDE [143], [144]
+
+0
+
+=
+
+q
+
++
+
+∂tV
+
+∗−
+
+1 (∂xV
+
+∗)⊤gg⊤∂xV
+
+∗
+
++
+
+f ⊤∂xV
+
+∗
+
+2
+
+(17)
+
+1
+
+⊤
+
+∗
+
++ 2 Tr(gg ∂xxV ) .
+
+Linearization via exponential transformation We define an
+
+exponential transformation as follows:
+
+ψ(t, x) = exp − 1 V ∗(t, x) (18) λ
+
+that also belongs to class C1 × C2 provided V ∗(t, x) does. Applying the backward evolution operator of the uncontrolled process, that is, u = 0, to the function ψ(t, x), we obtain
+
+T 0ψ = ∂tψ + f ⊤∂xψ + 1 Tr(gg⊤∂xxψ) = 1 qψ (19)
+
+2
+
+λ
+
+which is a linear PDE with the boundary condition ψ(T, x) = exp(−ϕ(x)/λ). This linear PDE is known as the backward Chapman-Kolmogorov PDE [144].
+
+v
+
+D. The Feynman-Kac formula
+The Feynman-Kac lemma [144] provides a solution to the linear PDE (19)
+
+1 0 T ψ(t, x) = E exp − q(s, Xs )ds ψ(T, xT ) (20)
+λt
+
+where ψ(T, xT ) = exp(−ϕ(x)/λ). In other words,
+ψ(t, x) = E exp − 1 Gt0 Xt0 = x (21) λ
+where the expectation E is taken with respect to the random process X0t:T ∼ P0; that is, the (solution) path of the uncontrolled version of the SDE (8)
+
+dXt0 = f (t,Xt0)dt + g(t,Xt0)dWt
+
+(22)
+
+and the uncontrolled cost-to-go is given by
+
+T
+
+Gt0 = ϕ(x0T ) + q(s, Xs0)ds
+
+(23)
+
+t
+
+which is again a nonadaptive random process. From the definition of ψ, this gives us a path-integral form for the value function:
+
+V ∗(t, x) = −λ ln E exp − 1 Gt0 Xt0 = x (24) λ
+
+(t, x) ∈ [0, T ] × Rn.
+
+E. Path integral for stochastic optimal control
+
+Path integral control Although the Feynman-Kac formula presented in Section III-D provides a method to compute or approximate the value function (24), it is still not trivial to obtain an optimal Markov policy because the optimal controller in (16) is defined in terms of the gradient of V ∗, not by V ∗. From (16) and Theorem 1, combined with the path integral control theory [64], [128], [146]–[149], we have
+
+u∗(t, x) = −g(t, x)⊤∂xV ∗(t, x)
+
+= g(t, x)⊤∂x ln ψ(t, x)
+
+⊤
+
+EP0 [exp
+
+− 1 G0
+λt
+
+s
+t g(τ, Xτ )dWτ ]
+
+= g(t, x) lim
+
+10
+
+s→t+
+
+(s − t)EP0[exp − λ Gt ]
+
+(25)
+
+where
+
+the
+
+initial
+
+condition
+
+is
+
+X0
+t
+
+=
+
+x.
+
+This
+
+is
+
+equivalent
+
+to (13) in Theorem 1.
+
+Information theoretic stochastic optimal control Regular-
+
+ized cost-to-go function
+
+π
+
+0
+
+dP π
+
+St(P ) = Gt + λ ln 0
+
+(26)
+
+dP
+
+where
+
+G0
+t
+
+is
+
+the
+
+state-dependent
+
+cost
+
+given
+
+in
+
+(23)
+
+and
+
+dP π dP 0
+
+is
+
+the Radon-Nikodym derivative1 for the probability measures
+
+Pπ and P0. Total expected cost function
+
+Vt(Pπ) = EPπ [St(Pπ)] = EP π [Gt0] + λDKL(Pπ∥P0) (27)
+
+1This R-N derivative
+
+dP π dP 0
+
+denotes the density of Pπ
+
+relative to P0. We
+
+assume that Pπ is absolutely continuous with respect to P0, denoted by
+
+Pπ ≪ P0.
+
+is known as the free energy of a stochastic control system [83], [143], [150], [151]. There is an additional cost term for the KL divergence between Pπ and P0 which we can interpret as a control cost. From Girsanov’s theorem [152], [153], we obtain the following expression for the Radon-Nikodym derivative corresponding to the trajectories of the control-affine SDE (8).
+
+dP π
+
+T1 2 ⊤
+
+= exp
+
+∥us∥ ds + us dWs
+
+(28)
+
+dP 0
+
+t2
+
+where
+
+us
+
+=
+
+π
+
+(
+
+s,
+
+Xπ
+s
+
+)
+
+is
+
+the
+
+control
+
+input
+
+and
+
+the
+
+initial
+
+condition
+
+Xπ
+t
+
+=
+
+X0
+t
+
+=
+
+xt
+
+with
+
+an
+
+initial
+
+time
+
+t
+
+∈
+
+[0, T ]
+
+can be arbitrary.
+
+The goal of KL control is to determine a probability measure
+
+that minimizes the expected total cost
+
+P∗ = Pπ∗= arg min Vt(Pπ) = arg minπ Vt(P) , (29)
+
+π
+
+P ∈∆
+
+provided
+
+V∗
+t
+
+=
+
+inf P ∈∆π
+
+Vt (P )
+
+exists,
+
+where
+
+∆π
+
+denotes
+
+the
+
+space of probability measures corresponding to a policy π.
+
+Theorem 2: [128], [149] The optimal regularized cost-to-go
+
+has zero variance and is the same as the expected total cost
+
+St(P∗) = Vt(P∗) = −λ ln EP0 [exp(−G0t /λ)] . (30)
+
+which is equivalent to (24) given in Section III-D.
+
+■
+
+In addition, the Radon-Nikodym derivative is given by
+
+dP ∗
+
+exp(−G0t /λ)
+
+0=
+
+0
+
+(31)
+
+dP EP0 [exp(−Gt /λ)]
+
+and combining (31) with the R-N derivative (28), we obtain
+
+dP ∗
+
+π
+
+= ωt
+
+dP π
+
+T1 2 ⊤
+
+1 0 (32)
+
+= exp − ∥us∥ ds − us dWs − Gt
+
+t2
+
+λ
+
+where us = π(s, Xs) is the control input following the policy
+
+π
+
+:
+
+R × Rn
+
+→
+
+Rm,
+
+and
+
+ωπ
+t
+
+is
+
+known
+
+as
+
+the
+
+importance
+
+weight [105], [149] that is also a random process.
+
+IV. PATH INTEGRAL CONTROL: ALGORITHMS
+A. MC integration: Model-based rollout
+Let a tuple (Ω, F, Q) be a probability space with a random
+T
+variable X and consider the function ℓ(X) = 0 L(Xt)dt or ℓ(X) = L(XT ). The main idea of path integral control is to compute the expectation
+
+ρ = EQ[ℓ(X)]
+
+(33)
+
+using sampling-based methods, such as Monte Carlo simula-
+
+tions. In principle, function ℓ : Ω → R can be any arbitrary real-valued function. A well-known drawback of Monte Carlo
+
+(MC) integration is its high variance.
+
+Importance sampling The goal of importance sampling [60],
+
+[108] in MC techniques is to minimize the variance in the
+MC estimation of integration, EQ[ℓ(X)] = EP [ℓ(X) ddQP ]. To reduce the variance, we want to find a probability measure P
+
+on (Ω, F) with which an unbiased MC estimate for ρ is given
+
+by
+
+1 Ns dQ
+
+ρˆ(P) =
+
+ℓ(Xi) (Xi),
+
+(34)
+
+Ns i=1 dP
+
+vi
+
+where the ith sampled path Xi is generated from density P, denoted by Xi ∼ P, for i = 1, . . . , Ns. Multiple importance sampling Multiple-based probability measures can also be used for the MC estimation.
+
+Np Nsj
+
+ρˆ({Pj }j=1 Np ) = 1
+
+j dQ j j j ℓ(Xi ) j (Xi )γ (Xi ) (35)
+
+N
+
+dP
+
+j=1 i=1
+
+where
+
+Xij
+
+∼
+
+Pj
+
+for
+
+i
+
+=
+
+1,
+
+.
+
+.
+
+.
+
+,
+
+Nj
+s
+
+and
+
+j
+
+=
+
+1, . . . , Np.
+
+Here,
+
+N=
+
+Np
+
+j
+
+j=1 Ns
+
+is
+
+the
+
+total
+
+number
+
+of
+
+sampled
+
+paths,
+
+and
+
+the
+
+reweighting function γj : Ω → R can be any function that
+
+satisfies the relation
+
+Np
+
+1
+
+jj
+
+ℓ(X)̸ = 0 ⇒
+
+Ns γ (X) = 1
+
+(36)
+
+N
+
+j=1
+
+which guarantees that the resulting MC estimation ρˆ is un-
+biased [60], [61]. For example, the flat function γj(X) =
+1 for all X or the balance-heuristic function γj(X) =
+Np j dPk
+N/ k=1Ns dPj (X) can be employed [61].
+
+B. Cross entropy method for PI: KL control
+
+The well-known cross-entropy (CE) method [57], [60], which was originally invented for derivative-free optimization, can also be applied to trajectory generation by computing the following information theory optimization:
+
+π∗ = arg min DKL(P∗∥Pπ)
+π
+
+dP ∗
+
+= arg min EP∗ ln π
+
+π
+
+dP
+
+dP∗ dP∗
+
+= arg min EPπ π ln π
+
+π
+
+dP dP
+
+(37)
+
+= arg min EX∼Pπ[ωπ(X) ln ωπ(X)]
+π
+
+π˜
+
+ωπ(X )
+
+= arg min EX∼Pπ˜ ω (X) ln π˜
+
+π
+
+ω (X)
+
+=
+
+arg min EX∼Pπ˜
+
+ω
+
+π˜
+(
+
+X
+
+)
+
+ln
+
+ω
+
+π(X)
+
+π
+
+where the importance weight is defined as:
+
+π
+
+dP∗(X) π˜ dPπ˜(X)
+
+ω (X) = π = ω (X) π
+
+(38)
+
+dP (X)
+
+dP (X)
+
+where π˜ is the baseline Markov policy. In addition, rewriting
+
+the cost function in the fourth row of (37) as Jπ(X) :=
+
+ωπ(X) ln ωπ(X), we have the following expectation minimiza-
+
+tion:
+
+min EX∼Pπ [J π(X)] .
+
+(39)
+
+π
+
+Alg. 1 summarizes the iterative procedures of CE for motion planning [110] to solve the optimization problem (39) using a sampling-based method.
+
+Remark. For expectation minimization in (39) and Alg. 1,
+
+it is common to use a parameterization of the control policy
+
+π or the resulting trajectory distribution Pπ which can be
+
+rewritten as Pπ(X) = P(X; θ). This parameterization results
+
+in a finite-dimensional optimization.
+
+□
+
+Algorithm 1 CE trajopt
+
+1: Input: K: Number of samples
+
+2: N : Decision horizon 3: π0: Initial (trial) policy
+
+4: while not converged do 5: Sample trajectories {X1, · · · , XK } from Pπi .
+πi
+6: Determine the elite set threshold: γi = J (Xκ)
+
+7:
+
+where κ denotes the index of the Ke best
+
+8:
+
+sampled-trajectory with Ke < K.
+
+9: Compute the elite set of sampled-trajectories:
+
+πi
+
+10:
+
+Ei = Xk|J (Xk) ≤ γi
+
+11: Update the policy:
+
+12:
+
+πi+1 = arg min 1
+
+J π(Xk)
+
+π |Ei| Xk∈Ei
+
+13: Check convergence
+
+14: end while
+
+C. MPC-like open-loop controller: MPPI
+
+By applying time discretization with arithmetic manipulations to (25), the path integral control becomes
+
+∗
+
+EQ[exp
+
+− 1 Gπ
+λt
+
+δu]
+
+u (t, x) = u(t, x) +
+
+1π
+
+EQ[exp − λ Gt ]
+
+where u is the nominal control input and δu is the deviation control input for exploration. Here, the expectation is considered with respect to the probability measure Q of a path corresponding to policy π.
+For implementation, the expectation is approximated using MC importance sampling as follows:
+
+K
+u∗(t, x) ≈ u(t, x) +
+k=1
+
+exp − 1λ Gπt k δuk(t, x) κ=1 K exp − λ1 Gtπκ
+
+where K is the number of sampled paths, and Gtπk is the cost-to-go corresponding to the simulated trajectory following
+
+policy πk(t, x) = u(t, x) + δuk(t, x) corresponding to the perturbed control inputs for k = 1, 2, . . . , K. This path-
+
+integral control based on forward simulations is known as
+
+the model-predictive path integral (MPPI) [59], [62], [64]. By
+
+recursively applying MPPI, the control inputs can approach the
+
+optimal points. Alg. 2 summarizes the standard procedures for
+
+the MPPI.
+
+D. Parameterized state feedback controller
+Although MPC-like open-loop control methods are easy to implement, they exhibit certain limitations. First, it can be inefficient for high-dimensional control spaces because a longer horizon results in a higher dimension of the decision variables. Second, it does not design a control law (i.e., policy), but computes a sequence of control inputs over a finite horizon, which means that whenever a new state is encountered, the entire computation should be repeated. Although a warm start can help solve this problem, it remains limited. Third, the trade-off between exploitation and exploration is not trivial.
+As an alternative to open-loop controller design, a parameterized policy or control law can be iteratively updated or
+
+vii
+
+Algorithm 2 MPPI control
+
+1: Input: K: Number of samples
+
+2: N : Decision horizon
+
+3: (u0, u1, . . . , uN−1): Initial control sequence 4: while not terminated do
+
+5: Generate random control variations δu
+
+6: for k = 1, . . . , K do
+
+7:
+
+x0 = xinit
+
+8:
+
+t0 = tinit
+
+9:
+
+for i = 0, . . . , N − 1 do
+
+10:
+
+fi = f (ti, xi)
+
+11:
+
+gi = g(ti, xi)
+
+12:
+
+u˜i,k = ui + δui,k
+
+13:
+
+xi+1 = xi + (fi + giu˜i,k)∆t
+
+14:
+
+ti+1 = ti + ∆t
+
+15:
+
+end for
+
+16:
+
+GN,k = cost(xN )
+
+17:
+
+for i = N − 1, . . . , 0 do
+
+18:
+
+Gi,k = Gi+1,k + cost(xi, u˜i,k)
+
+19:
+
+end for
+
+20: end for
+
+21: for i = 0, . . . , N − 1 do 22: wi,k = Kexp(−Gi,k/λ)
+κ=1 exp(−Gi,κ/λ)
+23: ui ← ui + k=1 K wi,kδui,k
+24: end for
+
+25: Send u0 to actuators 26: for i = 0, . . . , N − 1 do
+
+27:
+
+ui = umin(i+1,N−1)
+
+28: end for
+
+29: Update xinit, tinit by measurement 30: end while
+
+learned via model-based rollouts, from which the performance of a candidate policy of parameterization is evaluated, and the parameters are updated to improve the control performance. The main computation procedure is that from an estimate of the probability P (X|x0) of the sampled trajectories, we want to determine a parameterized policy πt(ut|xt; θt) for each time t < T that can reproduce the trajectory distribution P (X|x0), where θt ∈ Θ denotes the parameter vector that defines a feedback policy πt [58], [149]. In general, a feedback policy can be time varying, and if it is time invariant, then the time dependence can be removed; that is, θ = θt for all times t ∈ [0, T ]. In this review paper, we consider only deterministic feedback policies, but the main idea can be trivially extended to probabilistic feedback policies2.
+Linearly parameterized state feedback Consider
+
+u(t, x) = h(t, x)⊤θ
+
+(40)
+
+where h : R × Rn → Rnp is a user-defined feature of the state feedback control law. Using the model-based forward
+
+2An example of probabilistic feedback policy parameterization is a timedependent Gaussian policy that is linear in the states, πt(ut|xt; θt) ∼ N (ut|kt+Ktxt, St), in which the parameter vector is θt = (kt, Kt, St) and updated by a weighted linear regression and the weighted sample-covariance matrix [58], [154].
+
+simulations, a control parameter update rule can be applied as
+
+follows:
+K
+
+θ ← θ + wkδθk
+
+(41)
+
+k=1
+
+exp(−
+
+1 λ
+
+π
+Gt
+
+k
+
+)
+
+where wk = K
+
+1 πκ is the weight for the kth sam-
+
+κ=1 exp(− λ Gt )
+
+pled perturbation-parameter δθk of the linearly parameterized
+
+control law and πk(t, x) = h(x, t)⊤(θ + δθk) is the test or the
+
+exploration (search) policy.
+
+Nonlinearly parameterized state feedback Consider
+
+u(t, x) = π(t, x; θ)
+
+(42)
+
+where the state-feedback control law is parameterized by the control parameter θ ∈ Rnp . Using the model-based forward simulations, a control parameter update rule can be applied as
+
+follows:
+K
+
+θ ← θ + w˜kδθk
+
+(43)
+
+k=1
+
+where the weight is defined as follows:
+
+w˜k = wk[∇θπ(t, x; θ)]†[∇θπ(t, x; θ + δθk)] (44)
+
+exp(−
+
+1 λ
+
+π
+Gt
+
+k
+
+)
+
+with the weight wk = K
+
+1 πκ and the exploration
+
+κ=1 exp(− λ Gt )
+
+policy πk = π(t, x; θ + δθk). Here, [·]† denotes the pseudoin-
+
+verse.
+
+Remark (CE method for policy improvement). Parameterized state feedback controls, such as (40) and (42), can also be updated using CE methods. For example, δθk ∼ GP (0, Σ) is samples, the cost of simulated trajectories is evaluated with
+control parameters θk = θ+δθk for k = 1, . . . , K, the samples are sorted in ascending order according to the simulated
+costs, and the parameter is updated by weighted-averaging the
+sampled parameters δθk from the sorted elite set, θ ← θ + average(δθk)elite. In general, the covariance Σ can be also updated by empirical covariance of the sampled parameters δθk from the sorted elite set, Σ ← Σ+average(δθkδθk⊤)elite. □
+
+E. Policy improvement with path integrals
+Policy improvement with path integrals (PI2) is presented in [85]. The main idea of PI2 is to iteratively update the policy parameters by averaging the sampled parameters in weights with the costs of the path integral corresponding to the simulated trajectories [121]. Alg. 3 shows the pseudocode for the PI2 Covariance Matrix Adaptation (PI2-CMA) proposed in [137] based on the CMA evolutionary strategy (CMAES) [155], [156]. In [137], the PI2-CMA was compared with CE methods and CMAES in terms of optimality, exploration capability, and convergence rate. Skipping the covariance adaptation step in Alg. 3 yields a vanilla PI2. In [85], it was also shown that policy improvement methods based on PI2 would outperform existing gradient-based policy search methods such as REINFORCE and NAC.
+
+viii
+
+Algorithm 3 PI2-CMA
+
+1: Input: K: Number of samples
+
+2: N : Decision horizon
+
+3: (θ, Σ): Initial hyper-parameter
+
+4: while not terminated do
+
+5: Generate random variables θi,k ∼ GP (θ, Σ) 6: Generate random initial conditions xinit 7: for k = 1, . . . , K do
+
+8:
+
+x0 = xinit
+
+9:
+
+t0 = tinit
+
+10:
+
+for i = 0, . . . , N − 1 do
+
+11:
+
+fi = f (ti, xi)
+
+12:
+
+gi = g(ti, xi)
+
+13:
+
+ui,k = π(ti, xi; θi,k)
+
+14:
+
+xi+1 = xi + (fi + giui,k)∆t
+
+15:
+
+ti+1 = ti + ∆t
+
+16:
+
+end for
+
+17:
+
+GN,k = cost(xN )
+
+18:
+
+for i = N − 1, . . . , 0 do
+
+19:
+
+Gi,k = Gi+1,k + cost(xi, ui,k)
+
+20:
+
+end for
+
+21: end for
+
+22: for i = 0, . . . , N − 1 do
+
+23: wi,k = Kexp(−Gi,k/λ)
+κ=1 exp(−Gi,κ/λ)
+24: θi = k=1 K wi,kθi,k 25: Σi = k=1 K wi,k(θi,k − θ)(θi,k − θ)⊤
+
+26: end for
+
+27: θ ← i=0 N−1 N −1 N −i θi j=0 (N −j)
+
+28: Σ ← i=0 N−1 29: end while
+
+N−1 N −i Σi
+j=0 (N −j)
+
+V. PYTHON AND MATLAB SIMULATION RESULTS
+This section presents the simulation results of two different trajectory optimization problems: 1D cart-pole trajectory optimization and bicycle-like mobile robot trajectory tracking. The first case study demonstrates the simulation results for the cartpole system, followed by the second numerical experiment showing the local trajectory tracking of a bicycle-like mobile robot with collision avoidance of dynamic obstacles3. The details of the simulation setups and numerical optimal control problems are not presented here because of limited space, but they are available in the accompanying github page4.
+A. Cart-pole trajectory optimization
+In this section, we consider trajectory optimization for setpoint tracking in a one-dimensional (1D) cart-pole system. This system comprises an inverted pendulum mounted on a cart capable of moving along a unidirectional horizontal track.
+3Videos of simulation results are available at • https://youtu.be/zxUN0y23qio • https://youtu.be/LrYvrgju o8
+4https://github.com/iASL/pic-review.git
+
+The primary goal is to achieve a swing-up motion of the pole and subsequently maintain its stability in an upright position through horizontal movements of the cart. We considered a quadratic form for the cost function associated with each state variable. To address this challenge of stabilizing a cartpole system, we implemented several path integral methods including CEM, MPPI, and PI2-CMA delineated in Algs. 1, 2, and 3, and investigated their performances with comparison to nonlinear model predictive control (NMPC).
+Simulations are performed in Python environments. Fig. 2 illustrates the controlled trajectories of the cart-pole system under various control strategies. Fig. 3 depicts the force inputs derived from the application of each control method. These results demonstrate the effectiveness of the path integral control methods in achieving the desired control objectives for the cart-pole system. The comparative analysis of our results reveals distinct characteristics and performance efficiencies among the different path integral control methods. MPPI and CEM methods achieved better performance of stabilizing the pole as compared to NMPC and PI2-CMA. Upon fine-tuning optimization parameters, MPPI achieved faster convergence in pole stabilization than CEM, given the same prediction horizon and sample size. Such enhanced performance of MPPI is further corroborated by its superior cost-to-go metrics, as shown in Fig. 4.
+This comparison of four different PI-based control strategies stabilizing a cart-pole system reveals notable characteristics. CEM and MPPI result in smooth trajectories of the cart-pole position and lower accumulated cost-to-go, indicating better energy efficiency. In contrast, PI2-CMA and NMPC result in more aggressive control input sequences with faster responses and larger overshoots in velocities, which might increase energy use and hasten actuator degradation. However, CEM and MPPI show higher rate of input changes, which would not be desirable for real hardware implementations. Of course, this jerking behavior of control actions can be relaxed by putting rate or ramp constraints in control inputs. The appropriate choice among these PI-based control strategies would heavily depend on the specific demands of the application, balancing multiple objectives such as efficiency, responsiveness, and operational durability.
+B. Path planning for bicycle-like mobile robot
+The robot system we consider in this section is a mobile robot navigating in an environment with obstacles, aiming to follow a predefined path while avoiding collisions and staying inside a track. To evaluate the effectiveness of an MPPI controller for real-time trajectory generation with obstacle avoidance, we conducted a series of MATLAB simulations where two moving obstacles are considered in the 2D coordinates.
+We implemented the MPPI controller described in Alg. 2 for bicycle-like mobile robot navigation over a track. Fig. 5 shows the robot’s trajectory tracking while avoiding moving obstacles. Fig. 6 shows the forward and angular velocities of the robot required to follow the desired path by avoiding obstacles, which assesses the effectiveness of the controller in
+
+ix
+
+Fig. 2. Controlled trajectories of the 1D cart-pole using different methods of path integral control (CEM, MPPI,PI2-CMA) in comparison with nonlinear model predictive control (NMPC).
+Fig. 5. A capture of simulating local path planning and tracking with obstacle avoidance using an MPPI controller. An associated video of simulations is available at https://youtu.be/LrYvrgju o8.
+Fig. 3. Control inputs resulting from different methods of path integral control (CEM, MPPI,PI2-CMA) and NMPC.
+
+Fig. 4. Cost-to-go associated with different methods of path integral control (CEM, MPPI,PI2-CMA) and NMPC.
+avoiding obstacles. The results demonstrated that the MPPI controller achieved successful trajectory generation and tracking, while effectively avoiding dynamic obstacles. Throughout the simulation of mobile robot path planning, MPPI controller showed robust obstacle avoidance capabilities, successfully navigating around obstacles, and minimizing the distance with its reference.
+
+Fig. 6. Forward and angular velocity trajectories resulting from a MPPI-based controller steering a bicycle-like mobile robot.
+VI. MPPI-BASED AUTONOMOUS MOBILE ROBOT NAVIGATION IN ROS2/GAZEBO ENVIRONMENTS
+In this section, we consider two ROS2/Gazebo simulations of MPPI-based autonomous mobile robot navigation in a cafeteria environment and in a maze. We implement various path integral algorithms including MPPI, Smooth MPPI, and Log MPPI to enhance navigation and control in these complex scenarios. The SLAM toolbox is employed for mapping while Navigation2 (NAV2) is used for navigation within the ROS2 Gazebo simulation environment [125], [126]. These path integral control approaches are attractive because they are derivative-free and can be parallelized efficiently on both
+
+x
+
+CPU and GPU machines. The simulations are conducted using a computing system equipped with Intel Core i7 CPU and NVIDIA GeForce RTX 3070 GPU. These simulations are executed within the Ubuntu 22.04 operating system, leveraging the ROS2 Humble simulation platform for comprehensive analysis. The following subsections provide the details of the simulation setups and results of different MPPI-based path planning algorithms in two different scenarios. The simulation frameworks and source codes used in this study are publicly available5.
+
+A. Autonomous robot navigation in a cafeteria environment
+In this subsection, we present the simulation results of the autonomous robot navigation using different MPPI-based path planning algorithms in a cafeteria environment. The primary objective of this ROS2/Gazebo simulation is to evaluate the performance of MPPI-based path planning algorithms for a task of navigating an indoor autonomous mobile robot serving foods at different tables while avoiding obstacles in a confined and dense indoor space.
+1) Experiment setup: For the autonomous indoor robot navigation scenario, we utilize an autonomous mobile robot equipped with the necessary sensors such as a LiDAR and a camera for environmental perception. The cafeteria environment is designed using a Gazebo, accurately replicating the challenges of indoor navigation, including cluttered spaces, narrow passages, and obstacles along a path generated by a global planner, such as NavFn, as shown in Fig. 7. All three path integral controllers run in a receding-horizon fashion with 100-time steps of prediction horizon where each time-step corresponds to 0.1 sec. The number of control rollouts is 1024 and the number of sampled traction maps is 2000 at the rate of 30 Hz. It can also replan at 30 Hz while sampling new control actions and maps.
+In the simulated cafeteria scenario demonstrating the navigational efficiency in a dynamic service environment, as shown in Fig. 7, the robot is tasked to navigate a series of waypoints representing a service cycle. Commencing from the home coordinates (x = −5, y = 0.51, θ = 0.01), the robot is required to proceed to the order-taking waypoint (x = −4.85, y = −3.0, θ = 0.01). Subsequently, it traverses to serve table 2 at the coordinates (x = 4.29, y = 2.64, θ = 0.01) and upon order collection, returned to the order-taking waypoint. The mission is completed when the robot serves table 3 at the coordinates (x = −0.6, y = −1.99, θ = 0.01) and returns to the ordertaking location. The total navigational distance required for the service unit to traverse, beginning from its home location, involves a multi-point itinerary. Initially, it must travel to the order point, followed by a journey to table 2. Afterwards, it returns to the order point, from where it proceeds to serve table 3, and subsequently returns to the order-taking point. This entire route encompasses a distance of approximately 43.15 meters.
+2) Simulation results: The simulation results of autonomous robot navigation in a cafeteria environment are
+
+Fig. 7. ROS2/Gazebo simulation navigating an autonomous mobile robot in a cafeteria environment for which MPPI, Smooth MPPI, and Log MPPI are applied as local controllers.
+Fig. 8. Performance comparison of path integral controllers in terms of the longitudinal position (x).
+Fig. 9. Performance comparison of path integral controllers in terms of the orientation (θ).
+given in Fig. 7 and the accompanying video6, to illustrate and compare the effectiveness of the three path integral controllers, MPPI, Smooth MPPI, and Log MPPI. In the simulated hotel navigation task, the performance of an autonomous delivery
+
+5https://github.com/iASL/pic-review.git
+
+6https://youtu.be/3VChYScJ7oA
+
+xi
+
+robot is evaluated using the NavFn global planner, in conjunction with three local planners: MPPI, Smooth MPPI, and Log MPPI. Figs. 8 and 9 demonstrate the longitudinal position and orientation tracking of the robot pose over time.
+In the Gazebo simulations captured in Fig. 7, all three path integral controllers demonstrate remarkable indoor navigation capabilities for the differential-driving mobile robot, Turtlebot3. All three MPPI-based mobile robot navigation result in in smooth trajectory tracking while effectively avoiding obstacles and collisions in crowded cafe´ environments. Fig. 8 shows the performance of the robot’s positional components plotted over time. Each trajectory—MPPI (red line), Smooth MPPI (dark blue line), and Log MPPI (yellow line)—is compared against the ground truth (dotted light red, dotted dark blue, and dotted green lines respectively). Despite slight deviations, the path integral controllers maintained a closely matched orientation with the ground truth, signifying robust direction control. Fig. 9 shows the robot’s orientation (θ) as guided by the NavFn global planner with the three local planners. Similar to Fig. 8, the tracking performance of the three algorithms is compared against the ground truth. In Figs. 8 and 9, the legends positioned in the top right corner display the Robot Operating System (ROS) topics pertaining to the robot’s odometry and Gazebo ground truth data.
+In the simulation study shown in Figs. 7, 8, and 9, all MPPIbased path integral algorithms demonstrated high precision in trajectory tracking. Notably, Smooth MPPI (represented by a dark blue line) maintained a trajectory closest to the ground truth, especially in the simulation’s latter stages. While MPPI excelled in speed, taking less time, it exhibited higher positional and angular errors compared to Smooth MPPI and Log MPPI. Log MPPI required marginally more time than Smooth MPPI. However, in terms of both positional accuracy and angular orientation, Smooth MPPI outperformed both Log MPPI and MPPI. This highlights Smooth MPPI’s superior balance of speed and precision in trajectory tracking in a cafeteria environment.
+B. Autonomous robot navigation in maze-solving environment
+In this subsection, we detail the simulation outcomes of utilizing the different path integral controllers for the navigation of the robot in a maze-solving environment. The primary goal of a maze-solving robot is to autonomously navigate through a labyrinth from a starting point to a designated endpoint in the shortest time possible. It must efficiently map the maze, identify the optimal path, and adjust to obstacles using its onboard sensors and algorithms.
+1) Experimental setup: In our experiment, a simulated maze-solving robot was deployed in a ROS2/Gazebo environment, equipped with LiDAR and IMU sensors for navigation. The robot utilized the NavFn global planner for overall pathfinding and local controllers including MPPI, Smooth MPPI, and Log MPPI for fine-tuned maneuvering. Performance was assessed based on the robot’s ability to discover the most efficient path to the maze center, measuring metrics such as completion time and path optimality. The path integral controllers ran in a receding-horizon fashion with 100-time
+
+Controller MPPI
+Smooth MPPI Log MPPI
+
+Env.
+Cafe Maze Cafe Maze Cafe Maze
+
+Mission Time (s)
+122 59 147 75 155 75
+
+Tracking Error (ℓ∞)
+0.21 0.25 0.14 0.25 0.1 0.25
+
+TABLE IV COMPARATIVE PERFORMANCE METRICS OF DIFFERENT PATH INTEGRAL
+CONTROLLERS ACROSS DIFFERENT ENVIRONMENTS
+
+steps; each step was 0.1 s. The number of control rollouts was 1024, and the number of sampled traction maps was 2000 at a rate of 30 Hz. It could also replan at 30 Hz while sampling new control actions and maps. The computational overhead of these algorithms remained reasonable, thereby ensuring realtime feasibility for practical applications.
+In the simulated cafeteria scenario, as shown in Fig. 10, the autonomous robot was programmed to navigate from an initial location at coordinates (x = −5.18, y = −6.58, θ = 0.99) to a predetermined destination (x = 6.25, y = −1.47, θ = 0.99). The cumulative distance from the starting home location to the designated end point is approximately 26.28 meters. The objective was to optimize the route for the shortest transit time, showcasing the robot’s pathfinding proficiency in a complex simulated labyrinth.
+2) Simulation results: For the maze-solving task, the robots were similarly directed by the NavFn global planners, with the local planning algorithms tested for their path optimization efficiency. In the ROS2/Gazebo simulation, the maze-solving robot successfully navigated to the maze’s center, with the NavFn global planner and MPPI local controller achieving the most efficient path in terms of time and distance. The Smooth MPPI and Log MPPI controllers also completed the maze with competitive times, demonstrating effective adaptability and robustness in pathfinding within the complex simulated environment. Fig. 10 and a simulation video7 demonstrate the efficacy of the path integral controllers in navigating the mazesolving environment.
+Fig. 12 illustrates the robot’s orientation in a maze-solving environment. The ground truth data (dotted lines) represents the ideal orientation path for maze navigation. It is evident from the graph that the Smooth MPPI (green line) and Log MPPI (blue line) algorithms maintained a consistent orientation close to the ground truth, while the MPPI (red line) displayed marginally increased variance. The robot’s xposition component within in maze-solving environment is shown in Fig. 11, in which the ground truth path (dotted line) is tightly followed by all three algorithms. The Smooth MPPI (red line) and Log MPPI (green line) displayed almost identical performance, with MPPI (blue line) showing slight divergence yet still within an acceptable range for effective maze navigation. In evaluating speed and time efficiency, MPPI demonstrated superior performance, achieving the goal more swiftly compared to Log MPPI and Smooth MPPI. In
+7https://youtu.be/GyKDP3-NYA0
+
+xii
+
+Fig. 10. ROS2/Gazebo simulation navigating an autonomous mobile robot in a maze-solving environment for which MPPI, Smooth MPPI, and Log MPPI are applied as local controllers.
+Fig. 11. Performance comparison of path integral controllers in terms of the longitudinal position (x).
+Fig. 12. Performance comparison of path integral controllers in terms of the orientation (θ).
+Fig. 11, the legend in the top left corner illustrates the ROS topics of the robot’s odometry, whereas in Fig. 12, the top right corner legend presents the ROS topics associated with
+
+Gazebo ground truth data. The simulation results demonstrate that all considered path
+integral algorithms MPPI, Smooth MPPI, and Log MPPI perform robustly in trajectory optimization tasks for both hotel navigation and maze-solving scenarios. The angular orientation and position tracking graphs indicate that each algorithm is capable of closely following a predetermined ground truth trajectory with minimal deviation. However, minor differences in performance suggest that certain algorithms may be more suitable for specific applications, as given in Table IV. For instance, Log MPPI and Smooth MPPI’s trajectory in the hotel navigation simulation suggests a potential for finer control in more predictable environments like cafeteria or warehouse environments, whereas MPPI showed promising results in the more dynamic and fast speed tracks or environments like maze-solving context or F1Tenth racing car competitions.
+VII. DISCUSSION AND FUTURE DIRECTIONS
+A. Policy parameterization
+There are multiple ways of policy parameterizations for state-feedback [157]. For example, linear policies [157], [158], radial basis function (RBF) networks [157]–[160], and dynamic movement primitives (DMPs) [161], [162] have been commonly used for policy representations and search in robotics and control.
+Note that because the PI-based control and planning algorithms presented in Section IV are derivative-free, complex policy parameterization and optimization can be implemented without any additional effort (e.g., numerical differentiation computing gradients, Jacobians, and Hessians). This is one of the advantageous characteristics of sampling-based policy search and improvement methods such as PI.
+
+B. Path integral for guided policy search
+
+The guided policy search (GPS), first proposed in [86], is a model-free policy-based reinforcement learning (RL). Pixel-to-torque end-to-end learning of visuomotor policies has recently become popular for RL in robotics [163]. Compared with direct deep reinforcement learning, GPS has several advantages, such as faster convergence and better optimality. In the GPS, learning consists of two phases. The first phase involves determining a local guiding policy, in which a training set of controlled trajectories is generated. In the second phase, a complex global policy is determined via supervised learning, in which the expected KL divergence of the global policy from the guiding policy is minimized. The goal of the GPS framework is to solve an information-theoretic-constrained optimization of the following [87]:
+
+min Eβ[G(X)]
+
+θ,β
+
+(45)
+
+s.t. DKL(β(X)∥π(X; θ)) ≤ ϵ
+
+where the KL divergence DKL(β(X)∥π(X; θ)) can be rewritten as:
+N −1
+Eβ[DKL(β(ui|xi)∥π(ui|xi; θ))] .
+i=0
+
+xiii
+
+A baseline (Markovian) policy β(ui|xi) is a local guiding policy used to generate sampled trajectories starting with a variety of initial conditions. A parameterized policy π(ui|xi; θ) is a high-dimensional global policy learned based on the sampled trajectories generated from the baseline policy β in a supervisory manner by minimizing the KL divergence from the local policy.
+The iterative procedure for a general GPS can be summarized as follows: (Step 1) Given θˆ, solve
+βˆ = arg min Eβ[G(X)]
+β
+s.t. DKL(β(X)∥π(X; θˆ)) ≤ ϵ .
+(Step 2) Given βˆ, solve
+θˆ = arg min DKL(βˆ(X)∥π(X; θ)) .
+θ
+(Step 3) Check convergence and repeat Steps 1 and 2 until a convergence criterion is satisfied.
+Various methods have been considered to guide GPS policies. For example, gradient-based local optimal control methods such as DDP and iLQR and sampling-based local approximate optimal control methods such as PI and PI2 can be used. Among others, we claim that because of their efficiency in exploration and fast convergence rate, PI-based sampling methods could be more appropriate as guiding policies for GPS.
+C. Model-based reinforcement learning using PI-based policy search and optimization
+In control and robotics, model-based reinforcement learning (MBRL) [164]–[166] has been widely investigated because of the potential benefits of data efficiency, effective exploration, and enhanced stability, compared to model-free RL. It is natural to consider methods of path integral control for policy search and optimization in MBRL. The most well-known method of MBRL is the Dyna algorithm [167], [168] that consists of two iterative learning steps: The first step is to collect data by applying the current policy and learn dynamics model. The second step is to learn or update parameterized policies with data generated from the learned model. The second step alone is known as model-based policy optimization (MBPO) [169], [170] that is particularly related to PI-based policy search and optimization. In other words, parameterized policies discussed in Sections IV-D, IV-E, and VII-A can be improved by using sampling-based path integral control methods for MBRL and MRPO.
+D. Sampling efficiency for variance reduction
+Let us consider the importance weight defined in(38). Note that if the training policy π is optimal, then all simulated trajectories have the same weight. To measure the quality of the sampling strategy, the effective sampling size (ESS) defined as
+ESSπ = EPπ[(ωπ)2 1 ] (46)
+
+measures the variance of the importance weights and can be used to quantify the efficiency of a sampling method [171], [172]. A small ESS implies that the associated back-end tasks of estimation or control may result in a large variance. The most important sampling strategies suffer from decreasing ESS over time during prediction. Therefore, quantifying or approximating the ESS of a base-sampling strategy is a major problem in the application of path integral control [149], [173].
+
+E. Extensions to multi-agent path planning
+In the literature, there are only a few studies that extend PI control to the stochastic control of multi-agent systems (MASs): path integrals for centralized control [129], distributed control [130], [131], and a two-player zero-sum stochastic differential game (SDG) [174]. A linearly solvable linearly solvable PI control algorithm is proposed for a networked MAS in [175] and extended to safety-constrained cooperative control of MASs [176], [177] using the control barrier function (CBF) in which the barrier state augmented system is defined to take care of potential conflicts between control objectives and safety requirements.
+In path planning and control for multi-agent systems, it is common to assume that dynamics are independent but costs are interdependent. Consider the cost-to-go function defined for agent a as
+
+π¯ a
+
+¯ π¯a
+
+Ga,t = ϕa(Xa,T ) +
+
+T
+
+L(
+
+s,
+
+X¯ π¯a
+a,s
+
+,
+
+π¯
+
+a
+
+(s,
+
+X¯ π¯a
+a,s
+
+))
+
+ds,
+
+t
+
+where π¯a = (πa, πν(a)) is the joint policy of the ego agent a and its neighbourhood agent ν(a). Similarly the joint state and trajectory are defined as X¯a,s = (Xa,s, Xν(a),s) and X¯a,t = (X¯a,s)Ts=t = (Xa,s, Xν(a),s)Ts=t.
+As we have observed throughout this paper for single-agent
+cases, from an algorithmic point of view, the most important
+computation is to approximate the weights corresponding to
+the likelihood ratios using MC sampling methods. Similarly,
+policy updates or improvements in multi-agent systems can be
+
+K
+πa ← πa + wˆa,k π¯a δπa,k
+k=1
+
+where the probability weight is defined as
+
+wˆa,k π¯a =
+
+exp − λ1 Ga,t (πa,k,πν(a)) κ=1 K exp − λ1 Ga,t (πa,κ,πν(a))
+
+for which randomly perturbed policies πa,k = πa + δπa,k are used to simulate the controlled trajectories and compute the associated costs Ga,t (πa,k,πν(a)). Here, the learning process is assumed to be asynchronous, in the sense that the policies
+of the neighborhood agents ν(a) are fixed when updating the
+policy for agent a in accordance with the simulation of the augmented trajectories X¯a. Here, the individual agent’s policy can be either MPC-like open-loop (feedforward) control inputs
+or parameterized (deterministic or stochastic) state-feedback
+controllers.
+
+xiv
+
+F. MPPI for trajectory optimization on manifolds
+Trajectory optimization using differential geometry is very common in robotics and has been studied under manifolds such as special orthogonal and Euclidean groups SO(3) and SE(3) [178]–[181]. In [179], gradient-based sequential convex programming on manifolds was used for trajectory optimization. It was expected that many theoretical and computational frameworks for the optimization of manifolds [182], [183] could be applied to robotic trajectory optimization.
+Applying methods of sampling-based path integral control such as MPPI to trajectory optimization on manifolds is not trivial because it requires effective accelerated approaches to generate the sampled trajectories on manifolds and sampling trajectories on manifolds with kinematic constraints are not trivial. Thus, one could employ the methods used for unscented Kalman filtering on manifolds (UKF-M) [184]–[187]. We leave this research topic of sampling-based path integral control for trajectory optimization on manifolds for potential future work.
+G. Motion planning for mobile robots and manipulators
+While policy parameterization discussed in Section VII-A has shown great success in robotic manipulators and locomotion control, policy parameterization is not trivial and even not appropriate for path planning or trajectory optimization for autonomous mobile robots. This is because optimal trajectory should be determined by considering the relative pose of the robot with respect to the obstacles and the goal pose as well as the robot’s ego-pose. Such relative poses can be encoded into the associated optimal control problem (OCP) as constraints and feasibility of the OCP with a parameterized policy is hard to be guaranteed for mobile robot dynamic environment. This brings us a conclusion that it is more appropriate to use the MPC-like open-loop control inputs for trajectory optimization of mobile robots, which implies that MPPI and its variations would become more successful with autonomous mobile robot navigation than PI2-based policy search and optimization.
+VIII. CONCLUSIONS
+In this paper, we present an overview of the fundamental theoretical developments and recent advances in path integral control with a focus on sampling-based stochastic trajectory optimization. The theoretical and algorithmic frameworks of several optimal control methods employing the path integral control framework are provided, and their similarities and differences are reviewed. Python, MATLAB and ROS2/Gazebo simulation results are provided to demonstrate the effectiveness of various path integral control methods. Discussions on policy parameterization and optimization in policy search adopting path integral control, connections to model-based reinforcement learning, efficiency of sampling strategies, extending the path integral control framework to multi-agent optimal control problems, and path integral control for the trajectory optimization of manifolds are provided. We expect that sampling-based stochastic trajectory optimization employing path integral control can be applied to practical engineering problems, particularly for agile mobile robot navigation and control.
+
+REFERENCES
+[1] O. Von Stryk and R. Bulirsch, “Direct and indirect methods for trajectory optimization,” Annals of operations research, vol. 37, no. 1, pp. 357–373, 1992.
+[2] J. T. Betts, “Survey of numerical methods for trajectory optimization,” Journal of guidance, control, and dynamics, vol. 21, no. 2, pp. 193– 207, 1998.
+[3] A. V. Rao, “Trajectory optimization: A survey,” Optimization and optimal control in automotive systems, pp. 3–21, 2014.
+[4] H. Choset, K. M. Lynch, S. Hutchinson, G. A. Kantor, and W. Burgard, Principles of Robot Motion: Theory, Algorithms, and Implementations. Cambridge, Massachusetts: MIT Press, 2005.
+[5] J.-C. Latombe, Robot Motion Planning. New York: Springer Science & Business Media, 2012, vol. 124.
+[6] S. M. LaValle, Planning Algorithms. New York: Cambridge University Press, 2006.
+[7] B. Paden, M. Cˇ a´p, S. Z. Yong, D. Yershov, and E. Frazzoli, “A survey of motion planning and control techniques for self-driving urban vehicles,” IEEE Transactions on Intelligent Vehicles, vol. 1, no. 1, pp. 33–55, 2016.
+[8] L. Claussmann, M. Revilloud, D. Gruyer, and S. Glaser, “A review of motion planning for highway autonomous driving,” IEEE Transactions on Intelligent Transportation Systems, vol. 21, no. 5, pp. 1826–1848, 2019.
+[9] S. Teng, X. Hu, P. Deng, B. Li, Y. Li, Y. Ai, D. Yang, L. Li, Z. Xuanyuan, F. Zhu et al., “Motion planning for autonomous driving: The state of the art and future perspectives,” IEEE Transactions on Intelligent Vehicles, 2023.
+[10] Y. Song, M. Steinweg, E. Kaufmann, and D. Scaramuzza, “Autonomous drone racing with deep reinforcement learning,” in 2021 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS). IEEE, 2021, pp. 1205–1212.
+[11] Z. Han, Z. Wang, N. Pan, Y. Lin, C. Xu, and F. Gao, “Fast-Racing: An open-source strong baseline for se(3) planning in autonomous drone racing,” IEEE Robotics and Automation Letters, vol. 6, no. 4, pp. 8631– 8638, 2021.
+[12] D. Hanover, A. Loquercio, L. Bauersfeld, A. Romero, R. Penicka, Y. Song, G. Cioffi, E. Kaufmann, and D. Scaramuzza, “Autonomous drone racing: A survey,” arXiv e-prints, pp. arXiv–2301, 2023.
+[13] M. Lan, S. Lai, T. H. Lee, and B. M. Chen, “A survey of motion and task planning techniques for unmanned multicopter systems,” Unmanned Systems, vol. 9, no. 02, pp. 165–198, 2021.
+[14] M. Wang, J. Diepolder, S. Zhang, M. So¨pper, and F. Holzapfel, “Trajectory optimization-based maneuverability assessment of evtol aircraft,” Aerospace Science and Technology, vol. 117, p. 106903, 2021.
+[15] J. Park, I. Kim, J. Suk, and S. Kim, “Trajectory optimization for takeoff and landing phase of uam considering energy and safety,” Aerospace Science and Technology, vol. 140, p. 108489, 2023.
+[16] P. Pradeep, T. A. Lauderdale, G. B. Chatterji, K. Sheth, C. F. Lai, B. Sridhar, K.-M. Edholm, and H. Erzberger, “Wind-optimal trajectories for multirotor evtol aircraft on uam missions,” in Aiaa Aviation 2020 Forum, 2020, p. 3271.
+[17] H.-H. Kwon and H.-L. Choi, “A convex programming approach to midcourse trajectory optimization for air-to-ground missiles,” International Journal of Aeronautical and Space Sciences, vol. 21, pp. 479–492, 2020.
+[18] H. Roh, Y.-J. Oh, M.-J. Tahk, K.-J. Kwon, and H.-H. Kwon, “L1 penalized sequential convex programming for fast trajectory optimization: With application to optimal missile guidance,” International Journal of Aeronautical and Space Sciences, vol. 21, pp. 493–503, 2020.
+[19] I. Garcia and J. P. How, “Trajectory optimization for satellite reconfiguration maneuvers with position and attitude constraints,” in Proceedings of the 2005, American Control Conference, 2005. IEEE, 2005, pp. 889–894.
+[20] A. Weiss, F. Leve, M. Baldwin, J. R. Forbes, and I. Kolmanovsky, “Spacecraft constrained attitude control using positively invariant constraint admissible sets on SO(3)×R3,” in 2014 American Control Conference. IEEE, 2014, pp. 4955–4960.
+[21] A. Gatherer and Z. Manchester, “Magnetorquer-only attitude control of small satellites using trajectory optimization,” in Proceedings of AAS/AIAA Astrodynamics Specialist Conference, 2019.
+[22] D. Malyuta, Y. Yu, P. Elango, and B. Ac¸ıkmes¸e, “Advances in trajectory optimization for space vehicle control,” Annual Reviews in Control, vol. 52, pp. 282–315, 2021.
+
+xv
+
+[23] T. L. Dearing, J. Hauser, X. Chen, M. M. Nicotra, and C. Petersen, “Efficient trajectory optimization for constrained spacecraft attitude maneuvers,” Journal of Guidance, Control, and Dynamics, vol. 45, no. 4, pp. 638–650, 2022.
+[24] J. Canny, The Complexity of Robot Motion Planning. Cambridge, Massachusetts: MIT Press, 1988.
+[25] M. Elbanhawi and M. Simic, “Sampling-based robot motion planning: A review,” IEEE Access, vol. 2, pp. 56–77, 2014.
+[26] Z. Kingston, M. Moll, and L. E. Kavraki, “Sampling-based methods for motion planning with constraints,” Annual Review of Control, Robotics, and Autonomous Systems, vol. 1, no. 1, pp. 159–185, 2018.
+[27] J. T. Betts, Practical Methods for Optimal Control and Estimation Using Nonlinear Programming. Philadelphia, PA: SIAM, 2010.
+[28] M. Kelly, “An introduction to trajectory optimization: How to do your own direct collocation,” SIAM Review, vol. 59, no. 4, pp. 849–904, 2017.
+[29] R. Bonalli, A. Cauligi, A. Bylard, and M. Pavone, “GuSTO: Guaranteed sequential trajectory optimization via sequential convex programming,” in 2019 International conference on robotics and automation (ICRA). IEEE, 2019, pp. 6741–6747.
+[30] T. A. Howell, B. E. Jackson, and Z. Manchester, “ALTRO: A fast solver for constrained trajectory optimization,” in 2019 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS). IEEE, 2019, pp. 7674–7679.
+[31] S. G. Manyam, D. W. Casbeer, I. E. Weintraub, and C. Taylor, “Trajectory optimization for rendezvous planning using quadratic Be´zier curves,” in 2021 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS). IEEE, 2021, pp. 1405–1412.
+[32] D. Malyuta, T. P. Reynolds, M. Szmuk, T. Lew, R. Bonalli, M. Pavone, and B. Ac¸ıkmes¸e, “¡ convex optimization for trajectory generation: A tutorial on generating dynamically feasible trajectories reliably and efficiently,” IEEE Control Systems Magazine, vol. 42, no. 5, pp. 40– 113, 2022.
+[33] D. H. Jacobson and D. Q. Mayne, Differential Dynamic Programming. new York: Elsevier Publishing Company, 1970, no. 24.
+[34] D. Q. Mayne, “Differential dynamic programming–a unified approach to the optimization of dynamic systems,” in Control and dynamic systems. Elsevier, 1973, vol. 10, pp. 179–254.
+[35] Z. Xie, C. K. Liu, and K. Hauser, “Differential dynamic programming with nonlinear constraints,” in 2017 IEEE International Conference on Robotics and Automation (ICRA). IEEE, 2017, pp. 695–702.
+[36] J. Chen, W. Zhan, and M. Tomizuka, “Autonomous driving motion planning with constrained iterative LQR,” IEEE Transactions on Intelligent Vehicles, vol. 4, no. 2, pp. 244–254, 2019.
+[37] A. Pavlov, I. Shames, and C. Manzie, “Interior point differential dynamic programming,” IEEE Transactions on Control Systems Technology, vol. 29, no. 6, pp. 2720–2727, 2021.
+[38] K. Cao, M. Cao, S. Yuan, and L. Xie, “DIRECT: A differential dynamic programming based framework for trajectory generation,” IEEE Robotics and Automation Letters, vol. 7, no. 2, pp. 2439–2446, 2022.
+[39] I. Chatzinikolaidis and Z. Li, “Trajectory optimization of contactrich motions using implicit differential dynamic programming,” IEEE Robotics and Automation Letters, vol. 6, no. 2, pp. 2626–2633, 2021.
+[40] M.-G. Kim and K.-K. K. Kim, “An extension of interior point differential dynamic programming for optimal control problems with second-order conic constraints,” Transactions of the Korean Institute of Electrical Engineers, vol. 71, no. 11, pp. 1666–1672, 2022.
+[41] X. Zhong, J. Tian, H. Hu, and X. Peng, “Hybrid path planning based on safe a* algorithm and adaptive window approach for mobile robot in large-scale dynamic environment,” Journal of Intelligent & Robotic Systems, vol. 99, no. 1, pp. 65–77, 2020.
+[42] S. Sun, A. Romero, P. Foehn, E. Kaufmann, and D. Scaramuzza, “A comparative study of nonlinear MPC and differential-flatness-based control for quadrotor agile flight,” IEEE Transactions on Robotics, vol. 38, no. 6, pp. 3357–3373, 2022.
+[43] M. Faessler, A. Franchi, and D. Scaramuzza, “Differential flatness of quadrotor dynamics subject to rotor drag for accurate tracking of high-speed trajectories,” IEEE Robotics and Automation Letters, vol. 3, no. 2, pp. 620–626, 2017.
+[44] A. Domahidi and J. Jerez, “FORCES Professional,” EmbotechAG, url=https://embotech.com/FORCES-Pro, 2014–2023.
+[45] J. D. Gammell and M. P. Strub, “Asymptotically optimal samplingbased motion planning methods,” arXiv preprint arXiv:2009.10484, 2020.
+
+[46] J. J. Kuffner and S. M. LaValle, “RRT-connect: An efficient approach to single-query path planning,” in 2000 IEEE International Conference on Robotics and Automation (ICRA), vol. 2. IEEE, 2000, pp. 995– 1001.
+[47] L. Janson, B. Ichter, and M. Pavone, “Deterministic sampling-based motion planning: Optimality, complexity, and performance,” The International Journal of Robotics Research, vol. 37, no. 1, pp. 46–61, 2018.
+[48] L. Campos-Mac´ıas, D. Go´mez-Gutie´rrez, R. Aldana-Lo´pez, R. de la Guardia, and J. I. Parra-Vilchis, “A hybrid method for online trajectory planning of mobile robots in cluttered environments,” IEEE Robotics and Automation Letters, vol. 2, no. 2, pp. 935–942, 2017.
+[49] A. A. Ravankar, A. Ravankar, T. Emaru, and Y. Kobayashi, “HPPRM: Hybrid potential based probabilistic roadmap algorithm for improved dynamic path planning of mobile robots,” IEEE Access, vol. 8, pp. 221 743–221 766, 2020.
+[50] F. Kiani, A. Seyyedabbasi, R. Aliyev, M. U. Gulle, H. Basyildiz, and M. A. Shah, “Adapted-RRT: Novel hybrid method to solve threedimensional path planning problem using sampling and metaheuristicbased algorithms,” Neural Computing and Applications, vol. 33, no. 22, pp. 15 569–15 599, 2021.
+[51] Z. Yu, Z. Si, X. Li, D. Wang, and H. Song, “A novel hybrid particle swarm optimization algorithm for path planning of uavs,” IEEE Internet of Things Journal, vol. 9, no. 22, pp. 22 547–22 558, 2022.
+[52] I. A. Sucan, M. Moll, and L. E. Kavraki, “The open motion planning library,” IEEE Robotics & Automation Magazine, vol. 19, no. 4, pp. 72–82, 2012.
+[53] M. Kalakrishnan, S. Chitta, E. Theodorou, P. Pastor, and S. Schaal, “STOMP: Stochastic trajectory optimization for motion planning,” in IEEE International Conference on Robotics and Automation (ICRA). IEEE, 2011, pp. 4569–4574.
+[54] M. Likhachev, “Search-based planning lab,” 2010. [Online]. Available: http://sbpl.net/Home
+[55] M. Zucker, N. Ratliff, A. D. Dragan, M. Pivtoraiko, M. Klingensmith, C. M. Dellin, J. A. Bagnell, and S. S. Srinivasa, “Chomp: Covariant hamiltonian optimization for motion planning,” The International Journal of Robotics Research, vol. 32, no. 9-10, pp. 1164–1193, 2013.
+[56] H. J. Kappen, “Linear theory for control of nonlinear stochastic systems,” Physical review letters, vol. 95, no. 20, p. 200201, 2005.
+[57] R. Y. Rubinstein and D. P. Kroese, The Cross-Entropy Method: A Unified Approach to Combinatorial Optimization, Monte-Carlo Simulation and Machine Learning. New York: Springer-Verlag, 2004, vol. 133.
+[58] V. Go´mez, H. J. Kappen, J. Peters, and G. Neumann, “Policy search for path integral control,” in Joint European Conference on Machine Learning and Knowledge Discovery in Databases. Springer, 2014, pp. 482–497.
+[59] G. Williams, A. Aldrich, and E. A. Theodorou, “Model predictive path integral control: From theory to parallel computation,” Journal of Guidance, Control, and Dynamics, vol. 40, no. 2, pp. 344–357, 2017.
+[60] R. Y. Rubinstein and D. P. Kroese, Simulation and the Monte Carlo Method, 2nd ed. New York: John Wiley & Sons, 2016.
+[61] S. Thijssen and H. Kappen, “Consistent adaptive multiple importance sampling and controlled diffusions,” arXiv preprint arXiv:1803.07966, 2018.
+[62] G. Williams, P. Drews, B. Goldfain, J. M. Rehg, and E. A. Theodorou, “Aggressive driving with model predictive path integral control,” in IEEE International Conference on Robotics and Automation (ICRA). IEEE, 2016, pp. 1433–1440.
+[63] ——, “Information-theoretic model predictive control: Theory and applications to autonomous driving,” IEEE Transactions on Robotics, vol. 34, no. 6, pp. 1603–1622, 2018.
+[64] G. R. Williams, “Model predictive path integral control: Theoretical foundations and applications to autonomous driving,” Ph.D. dissertation, Georgia Institute of Techonology, 2019.
+[65] Y. Pan, E. Theodorou, and M. Kontitsis, “Sample efficient path integral control under uncertainty,” Advances in Neural Information Processing Systems, vol. 28, 2015.
+[66] I. Abraham, A. Handa, N. Ratliff, K. Lowrey, T. D. Murphey, and D. Fox, “Model-based generalization under parameter uncertainty using path integral control,” IEEE Robotics and Automation Letters, vol. 5, no. 2, pp. 2864–2871, 2020.
+[67] J. Pravitra, K. A. Ackerman, C. Cao, N. Hovakimyan, and E. A. Theodorou, “L1-Adaptive MPPI architecture for robust and agile control of multirotors,” in 2020 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), 2020, pp. 7661–7666.
+
+xvi
+
+[68] G. Williams, E. Rombokas, and T. Daniel, “GPU based path integral control with learned dynamics,” arXiv preprint arXiv:1503.00330, 2015.
+[69] M. Okada, T. Aoshima, and L. Rigazio, “Path integral networks: End-to-end differentiable optimal control,” arXiv preprint arXiv:1706.09597, 2017.
+[70] I. S. Mohamed, M. Ali, and L. Liu, “GP-guided MPPI for efficient navigation in complex unknown cluttered environments,” arXiv preprint arXiv:2307.04019, 2023.
+[71] M. S. Gandhi, B. Vlahov, J. Gibson, G. Williams, and E. A. Theodorou, “Robust model predictive path integral control: Analysis and performance guarantees,” IEEE Robotics and Automation Letters, vol. 6, no. 2, pp. 1423–1430, 2021.
+[72] E. Arruda, M. J. Mathew, M. Kopicki, M. Mistry, M. Azad, and J. L. Wyatt, “Uncertainty averse pushing with model predictive path integral control,” in 2017 IEEE-RAS 17th International Conference on Humanoid Robotics (Humanoids). IEEE, 2017, pp. 497–502.
+[73] M. Raisi, A. Noohian, and S. Fallah, “A fault-tolerant and robust controller using model predictive path integral control for free-flying space robots,” Frontiers in Robotics and AI, vol. 9, p. 1027918, 2022.
+[74] J. Zeng, B. Zhang, and K. Sreenath, “Safety-critical model predictive control with discrete-time control barrier function,” in 2021 American Control Conference (ACC). IEEE, 2021, pp. 3882–3889.
+[75] C. Tao, H.-J. Yoon, H. Kim, N. Hovakimyan, and P. Voulgaris, “Path integral methods with stochastic control barrier functions,” in 2022 IEEE 61st Conference on Decision and Control (CDC). IEEE, 2022, pp. 1654–1659.
+[76] J. Yin, C. Dawson, C. Fan, and P. Tsiotras, “Shield model predictive path integral: A computationally efficient robust MPC approach using control barrier functions,” arXiv preprint arXiv:2302.11719, 2023.
+[77] J. Yin, Z. Zhang, E. Theodorou, and P. Tsiotras, “Trajectory distribution control for model predictive path integral control using covariance steering,” in 2022 International Conference on Robotics and Automation (ICRA). IEEE, 2022, pp. 1478–1484.
+[78] F. S. Barbosa, B. Lacerda, P. Duckworth, J. Tumova, and N. Hawes, “Risk-aware motion planning in partially known environments,” in 2021 60th IEEE Conference on Decision and Control (CDC). IEEE, 2021, pp. 5220–5226.
+[79] Z. Wang, O. So, K. Lee, and E. A. Theodorou, “Adaptive risk sensitive model predictive control with stochastic search,” in Learning for Dynamics and Control. PMLR, 2021, pp. 510–522.
+[80] X. Cai, M. Everett, L. Sharma, P. R. Osteen, and J. P. How, “Probabilistic traversability model for risk-aware motion planning in off-road environments,” arXiv preprint arXiv:2210.00153, 2022.
+[81] J. Yin, Z. Zhang, and P. Tsiotras, “Risk-aware model predictive path integral control using conditional value-at-risk,” in 2023 IEEE International Conference on Robotics and Automation (ICRA). IEEE, 2023, pp. 7937–7943.
+[82] C. Tao, H. Kim, and N. Hovakimyan, “RRT guided model predictive path integral method,” arXiv preprint arXiv:2301.13143, 2023.
+[83] E. A. Theodorou and E. Todorov, “Relative entropy and free energy dualities: Connections to path integral and KL control,” in 2012 51st IEEE Conference on Decision and Control (CDC). IEEE, 2012, pp. 1466–1473.
+[84] A. Ijspeert, J. Nakanishi, and S. Schaal, “Learning attractor landscapes for learning motor primitives,” Advances in neural information processing systems, vol. 15, 2002.
+[85] E. Theodorou, J. Buchli, and S. Schaal, “A generalized path integral control approach to reinforcement learning,” The Journal of Machine Learning Research, vol. 11, pp. 3137–3181, 2010.
+[86] S. Levine and V. Koltun, “Guided policy search,” in International Conference on Machine Learning. PMLR, 2013, pp. 1–9.
+[87] W. H. Montgomery and S. Levine, “Guided policy search via approximate mirror descent,” Advances in Neural Information Processing Systems (NIPS), vol. 29, 2016.
+[88] M.-G. Kim and K.-K. K. Kim, “MPPI-IPDDP: Hybrid method of collision-free smooth trajectory generation for autonomous robots,” arXiv preprint arXiv:2208.02439, 2022.
+[89] D. Thalmeier, H. J. Kappen, S. Totaro, and V. Go´mez, “Adaptive smoothing for path integral control,” The Journal of Machine Learning Research, vol. 21, no. 1, pp. 7814–7850, 2020.
+[90] S. Sa¨rkka¨, “Unscented rauch–tung–striebel smoother,” IEEE transactions on automatic control, vol. 53, no. 3, pp. 845–849, 2008.
+[91] H.-C. Ruiz and H. J. Kappen, “Particle smoothing for hidden diffusion processes: Adaptive path integral smoother,” IEEE Transactions on Signal Processing, vol. 65, no. 12, pp. 3191–3203, 2017.
+
+[92]
+[93] [94]
+[95] [96] [97] [98] [99] [100] [101] [102]
+[103] [104]
+[105] [106]
+[107]
+[108] [109] [110] [111]
+[112] [113]
+[114] [115]
+
+T. Neve, T. Lefebvre, and G. Crevecoeur, “Comparative study of sample based model predictive control with application to autonomous racing,” in 2022 IEEE/ASME International Conference on Advanced Intelligent Mechatronics (AIM). IEEE, 2022, pp. 1632–1638. T. Kim, G. Park, K. Kwak, J. Bae, and W. Lee, “Smooth model predictive path integral control without smoothing,” IEEE Robotics and Automation Letters, vol. 7, no. 4, pp. 10 406–10 413, 2022. T. Lefebvre and G. Crevecoeur, “Entropy regularised deterministic optimal control: From path integral solution to sample-based trajectory optimisation,” in 2022 IEEE/ASME International Conference on Advanced Intelligent Mechatronics (AIM). IEEE, 2022, pp. 401–408. A. Lambert, A. Fishman, D. Fox, B. Boots, and F. Ramos, “Stein variational model predictive control,” arXiv preprint arXiv:2011.07641, 2020. B. Eysenbach and S. Levine, “If MaxEnt RL is the answer, what is the question?” arXiv preprint arXiv:1910.01913, 2019. P. Whittle, “Likelihood and cost as path integrals,” Journal of the Royal Statistical Society: Series B (Methodological), vol. 53, no. 3, pp. 505– 529, 1991. H. J. Kappen, V. Go´mez, and M. Opper, “Optimal control as a graphical model inference problem,” Machine learning, vol. 87, no. 2, pp. 159– 182, 2012. J. Watson, H. Abdulsamad, and J. Peters, “Stochastic optimal control as approximate input inference,” in Conference on Robot Learning. PMLR, 2020, pp. 697–716. T. Haarnoja, H. Tang, P. Abbeel, and S. Levine, “Reinforcement learning with deep energy-based policies,” in International conference on machine learning. PMLR, 2017, pp. 1352–1361. S. Levine, “Reinforcement learning and control as probabilistic inference: Tutorial and review,” arXiv preprint arXiv:1805.00909, 2018. L. Martino, V. Elvira, D. Luengo, and J. Corander, “An adaptive population importance sampler: Learning from uncertainty,” IEEE Transactions on Signal Processing, vol. 63, no. 16, pp. 4422–4437, 2015. S. U. Stich, A. Raj, and M. Jaggi, “Safe adaptive importance sampling,” Advances in Neural Information Processing Systems, vol. 30, 2017. M. F. Bugallo, V. Elvira, L. Martino, D. Luengo, J. Miguez, and P. M. Djuric, “Adaptive importance sampling: The past, the present, and the future,” IEEE Signal Processing Magazine, vol. 34, no. 4, pp. 60–79, 2017. H. J. Kappen and H. C. Ruiz, “Adaptive importance sampling for control and inference,” Journal of Statistical Physics, vol. 162, no. 5, pp. 1244–1266, 2016. D. M. Asmar, R. Senanayake, S. Manuel, and M. J. Kochenderfer, “Model predictive optimized path integral strategies,” in 2023 IEEE International Conference on Robotics and Automation (ICRA), 2023, pp. 3182–3188. J. Carius, R. Ranftl, F. Farshidian, and M. Hutter, “Constrained stochastic optimal control with learned importance sampling: A path integral approach,” The International Journal of Robotics Research, vol. 41, no. 2, pp. 189–209, 2022. B. Arouna, “Adaptative Monte Carlo method, a variance reduction technique,” Monte Carlo Methods and Applications, vol. 10, no. 1, pp. 1–24, 2004. P.-T. De Boer, D. P. Kroese, S. Mannor, and R. Y. Rubinstein, “A tutorial on the cross-entropy method,” Annals of operations research, vol. 134, no. 1, pp. 19–67, 2005. M. Kobilarov, “Cross-entropy motion planning,” The International Journal of Robotics Research, vol. 31, no. 7, pp. 855–871, 2012. W. Zhang, H. Wang, C. Hartmann, M. Weber, and C. Schute, “Applications of the cross-entropy method to importance sampling and optimal control of diffusions,” SIAM Journal on Scientific Computing, vol. 36, no. 6, pp. A2654–A2672, 2014. M. Testouri, G. Elghazaly, and R. Frank, “Towards a safe real-time motion planning framework for autonomous driving systems: An MPPI approach,” arXiv preprint arXiv:2308.01654, 2023. I. S. Mohamed, K. Yin, and L. Liu, “Autonomous navigation of AGVs in unknown cluttered environments: log-MPPI control strategy,” IEEE Robotics and Automation Letters, vol. 7, no. 4, pp. 10 240–10 247, 2022. J.-S. Ha, S.-S. Park, and H.-L. Choi, “Topology-guided path integral approach for stochastic optimal control in cluttered environment,” Robotics and Autonomous Systems, vol. 113, pp. 81–93, 2019. I. S. Mohamed, G. Allibert, and P. Martinet, “Model predictive path integral control framework for partially observable navigation: A quadrotor case study,” in 2020 16th International Conference on
+
+xvii
+
+[116] [117]
+[118] [119] [120]
+[121] [122]
+[123] [124]
+[125]
+[126] [127] [128] [129]
+[130]
+[131] [132] [133] [134] [135] [136] [137] [138]
+
+Control, Automation, Robotics and Vision (ICARCV). IEEE, 2020, pp. 196–203.
+J. Pravitra, E. Theodorou, and E. N. Johnson, “Flying complex maneuvers with model predictive path integral control,” in AIAA Scitech 2021 Forum, 2021, p. 1957.
+M. D. Houghton, A. B. Oshin, M. J. Acheson, E. A. Theodorou, and I. M. Gregory, “Path planning: Differential dynamic programming and model predictive path integral control on VTOL aircraft,” in AIAA SCITECH 2022 Forum, 2022, p. 0624.
+J. Higgins, N. Mohammad, and N. Bezzo, “A model predictive path integral method for fast, proactive, and uncertainty-aware UAV planning in cluttered environments,” arXiv preprint arXiv:2308.00914, 2023.
+P. Nicolay, Y. Petillot, M. Marfeychuk, S. Wang, and I. Carlucho, “Enhancing AUV autonomy with model predictive path integral control,” arXiv preprint arXiv:2308.05547, 2023.
+L. Hou, H. Wang, H. Zou, and Y. Zhou, “Robotic manipulation planning for automatic peeling of glass substrate based on online learning model predictive path integral,” Sensors, vol. 22, no. 3, p. 1292, 2022.
+K. Yamamoto, R. Ariizumi, T. Hayakawa, and F. Matsuno, “Path integral policy improvement with population adaptation,” IEEE Transactions on Cybernetics, vol. 52, no. 1, pp. 312–322, 2020.
+I. S. Mohamed, G. Allibert, and P. Martinet, “Sampling-based MPC for constrained vision based control,” in 2021 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS). IEEE, 2021, pp. 3753–3758.
+I. S. Mohamed, “MPPI-VS: Sampling-based model predictive control strategy for constrained image-based and position-based visual servoing,” arXiv preprint arXiv:2104.04925, 2021.
+M. Costanzo, G. De Maria, C. Natale, and A. Russo, “Modeling and control of sampled-data image-based visual servoing with threedimensional features,” IEEE Transactions on Control Systems Technology, 2023, (Early Access).
+S. Macenski, T. Moore, D. V. Lu, A. Merzlyakov, and M. Ferguson, “From the desks of ROS maintainers: A survey of modern & capable mobile robotics algorithms in the robot operating system 2,” Robotics and Autonomous Systems, p. 104493, 2023.
+S. Macenski, T. Foote, B. Gerkey, C. Lalancette, and W. Woodall, “Robot operating system 2: Design, architecture, and uses in the wild,” Science Robotics, vol. 7, no. 66, p. eabm6074, 2022.
+B. Van Den Broek, W. Wiegerinck, and B. Kappen, “Graphical model inference in optimal control of stochastic multi-agent systems,” Journal of Artificial Intelligence Research, vol. 32, pp. 95–122, 2008.
+S. A. Thijssen, “Path integral control,” Ph.D. dissertation, Radboud University, 2016.
+V. Go´mez, S. Thijssen, A. Symington, S. Hailes, and H. J. Kappen, “Real-time stochastic optimal control for multi-agent quadrotor systems,” in Proceedings of the Twenty-Sixth International Conference on Automated Planning and Scheduling (ICAPS), 2016, pp. 468–476.
+N. Wan, A. Gahlawat, N. Hovakimyan, E. A. Theodorou, and P. G. Voulgaris, “Cooperative path integral control for stochastic multi-agent systems,” in American Control Conference (ACC). IEEE, 2021, pp. 1262–1267.
+P. Varnai and D. V. Dimarogonas, “Multi-agent stochastic control using path integral policy improvement,” in American Control Conference (ACC). IEEE, 2022, pp. 3406–3411.
+A. Pourchot and O. Sigaud, “CEM-RL: Combining evolutionary and gradient-based methods for policy search,” arXiv preprint arXiv:1810.01222, 2018.
+M. Wen and U. Topcu, “Constrained cross-entropy method for safe reinforcement learning,” Advances in Neural Information Processing Systems, vol. 31, 2018.
+B. Amos and D. Yarats, “The differentiable cross-entropy method,” in International Conference on Machine Learning. PMLR, 2020, pp. 291–302.
+Z. Zhang, J. Jin, M. Jagersand, J. Luo, and D. Schuurmans, “A simple decentralized cross-entropy method,” Advances in Neural Information Processing Systems, vol. 35, pp. 36 495–36 506, 2022.
+I. M. Balci, E. Bakolas, B. Vlahov, and E. A. Theodorou, “Constrained covariance steering based Tube-MPPI,” in 2022 American Control Conference (ACC). IEEE, 2022, pp. 4197–4202.
+F. Stulp and O. Sigaud, “Path integral policy improvement with covariance matrix adaptation,” arXiv preprint arXiv:1206.4621, 2012.
+——, “Policy improvement methods: Between black-box optimization and episodic reinforcement learning,” HAL Open Science, 2012.
+
+[139]
+[140] [141] [142]
+[143] [144] [145] [146] [147] [148] [149] [150] [151] [152] [153] [154]
+[155] [156] [157] [158]
+[159]
+[160] [161] [162] [163]
+
+T. Lefebvre and G. Crevecoeur, “Path integral policy improvement with differential dynamic programming,” in 2019 IEEE/ASME International Conference on Advanced Intelligent Mechatronics (AIM). IEEE, 2019, pp. 739–745.
+P. Varnai and D. V. Dimarogonas, “Path integral policy improvement: An information-geometric optimization approach,” 2020. [Online]. Available: 10.13140/RG.2.2.13969.76645.
+J. Fu, C. Li, X. Teng, F. Luo, and B. Li, “Compound heuristic information guided policy improvement for robot motor skill acquisition,” Applied Sciences, vol. 10, no. 15, p. 5346, 2020.
+H. Ba, J. Fan, X. Guo, and J. Hao, “Critic PI2: Master continuous planning via policy improvement with path integrals and deep actor-critic reinforcement learning,” in 2021 6th IEEE International Conference on Advanced Robotics and Mechatronics (ICARM). IEEE, 2021, pp. 716–722. W. H. Fleming and H. M. Soner, Controlled Markov processes and viscosity solutions. New York: Springer Science & Business Media, 2006, vol. 25. B. Oksendal, Stochastic Differential Equations: An Introduction with Applications. New York: Springer Science & Business Media, 2013. W. H. Fleming and R. W. Rishel, Deterministic and Dtochastic Optimal Control. New York: Springer Science & Business Media, 2012, vol. 1.
+H. J. Kappen, “An introduction to stochastic control theory, path integrals and reinforcement learning,” in AIP Conference Proceedings, vol. 887, no. 1. American Institute of Physics, 2007, pp. 149–181.
+H. Kappen, “Optimal control theory and the linear bellman equation,” Barber, D.; Cemgil, AT; Chiappa, S.(ed.), Bayesian time series models, pp. 363–387, 2011.
+E. A. Theodorou, “Iterative path integral stochastic optimal control: Theory and applications to motor control,” Ph.D. dissertation, University of Southern California, 2011.
+S. Thijssen and H. Kappen, “Path integral control and state-dependent feedback,” Physical Review E, vol. 91, no. 3, p. 032104, 2015.
+W. H. Fleming and W. M. McEneaney, “Risk-sensitive control on an infinite time horizon,” SIAM Journal on Control and Optimization, vol. 33, no. 6, pp. 1881–1915, 1995.
+E. A. Theodorou, “Nonlinear stochastic control and information theoretic dualities: Connections, interdependencies and thermodynamic interpretations,” Entropy, vol. 17, no. 5, pp. 3352–3375, 2015. R. S. Liptser and A. N. Shiriaev, Statistics of Random Processes I: General Theory, 2nd ed. Heidelberg: Springer-Verlag Berlin, 2001. ——, Statistics of Random Processes II: Applications, 2nd ed. Heidelberg: Springer-Verlag Berlin, 2001.
+A. Kupcsik, M. Deisenroth, J. Peters, and G. Neumann, “Data-efficient contextual policy search for robot movement skills,” in Proceedings of the National Conference on Artificial Intelligence (AAAI). Bellevue, 2013.
+N. Hansen and A. Ostermeier, “Completely derandomized selfadaptation in evolution strategies,” Evolutionary Computation, vol. 9, no. 2, pp. 159–195, 2001. N. Hansen, “The CMA evolution strategy: A tutorial,” arXiv preprint arXiv:1604.00772, 2016. M. P. Deisenroth, G. Neumann, J. Peters et al., “A survey on policy search for robotics,” Foundations and Trends® in Robotics, vol. 2, no. 1–2, pp. 1–142, 2013.
+J. Vinogradska, B. Bischoff, J. Achterhold, T. Koller, and J. Peters, “Numerical quadrature for probabilistic policy search,” IEEE Transactions on Pattern Analysis and Machine Intelligence, vol. 42, no. 1, pp. 164–175, 2020.
+M. P. Deisenroth, D. Fox, and C. E. Rasmussen, “Gaussian processes for data-efficient learning in robotics and control,” IEEE Transactions on Pattern Analysis and Machine Intelligence, vol. 37, no. 2, pp. 408– 423, 2013.
+M. Thor, T. Kulvicius, and P. Manoonpong, “Generic neural locomotion control framework for legged robots,” IEEE Transactions on Neural Networks and Learning Systems, vol. 32, no. 9, pp. 4013–4025, 2020.
+S. Schaal, J. Peters, J. Nakanishi, and A. Ijspeert, “Learning movement primitives,” in Robotics research. the eleventh international symposium. Springer, 2005, pp. 561–572.
+A. J. Ijspeert, J. Nakanishi, H. Hoffmann, P. Pastor, and S. Schaal, “Dynamical movement primitives: Learning attractor models for motor behaviors,” Neural computation, vol. 25, no. 2, pp. 328–373, 2013.
+S. Levine, C. Finn, T. Darrell, and P. Abbeel, “End-to-end training of deep visuomotor policies,” The Journal of Machine Learning Research, vol. 17, no. 1, pp. 1334–1373, 2016.
+
+xviii
+
+[164] [165]
+[166] [167] [168]
+[169] [170]
+[171] [172] [173] [174] [175]
+[176]
+[177]
+[178] [179]
+[180]
+[181] [182] [183] [184] [185]
+[186]
+
+A. S. Polydoros and L. Nalpantidis, “Survey of model-based reinforcement learning: Applications on robotics,” Journal of Intelligent & Robotic Systems, vol. 86, no. 2, pp. 153–173, 2017. L. C. Garaffa, M. Basso, A. A. Konzen, and E. P. de Freitas, “Reinforcement learning for mobile robotics exploration: A survey,” IEEE Transactions on Neural Networks and Learning Systems, vol. 34, no. 8, pp. 3796–3810, 2021. T. M. Moerland, J. Broekens, A. Plaat, C. M. Jonker et al., “Modelbased reinforcement learning: A survey,” Foundations and Trends® in Machine Learning, vol. 16, no. 1, pp. 1–118, 2023. R. S. Sutton, “Integrated architectures for learning, planning, and reacting based on approximating dynamic programming,” in Machine Learning Proceedings 1990. Elsevier, 1990, pp. 216–224. M. Deisenroth and C. E. Rasmussen, “PILCO: A model-based and data-efficient approach to policy search,” in Proceedings of the 28th International Conference on machine learning (ICML-11), 2011, pp. 465–472. M. Janner, J. Fu, M. Zhang, and S. Levine, “When to trust your model: Model-based policy optimization,” Advances in neural information processing systems, vol. 32, pp. 1–9, 2019. T. Yu, G. Thomas, L. Yu, S. Ermon, J. Y. Zou, S. Levine, C. Finn, and T. Ma, “MOPO: Model-based offline policy optimization,” Advances in Neural Information Processing Systems, vol. 33, pp. 14 129–14 142, 2020. J. H. Kotecha and P. M. Djuric, “Gaussian sum particle filtering,” IEEE Transactions on signal processing, vol. 51, no. 10, pp. 2602–2612, 2003. J. S. Liu, Monte Carlo Strategies in Scientific Computing. New York: Springer, 2001, vol. 75. Q. Zhang and Y. Chen, “Path integral sampler: A stochastic control approach for sampling,” in International Conference on Learning Representations, 2022. A. Patil, Y. Zhou, D. Fridovich-Keil, and T. Tanaka, “Risk-minimizing two-player zero-sum stochastic differential game via path integral control,” arXiv preprint arXiv:2308.11546, 2023. N. Wan, A. Gahlawat, N. Hovakimyan, E. A. Theodorou, and P. G. Voulgaris, “Distributed algorithms for linearly-solvable optimal control in networked multi-agent systems,” arXiv preprint arXiv:2102.09104, 2021. L. Song, N. Wan, A. Gahlawat, C. Tao, N. Hovakimyan, and E. A. Theodorou, “Generalization of safe optimal control actions on networked multiagent systems,” IEEE Transactions on Control of Network Systems, vol. 10, no. 1, pp. 491–502, 2022. L. Song, P. Zhao, N. Wan, and N. Hovakimyan, “Safety embedded stochastic optimal control of networked multi-agent systems via barrier states,” in 2023 American Control Conference (ACC). IEEE, 2023, pp. 2554–2559. M. Watterson, S. Liu, K. Sun, T. Smith, and V. Kumar, “Trajectory optimization on manifolds with applications to SO(3) and R3 × S2,” in Robotics: Science and Systems, 2018, p. 9. R. Bonalli, A. Bylard, A. Cauligi, T. Lew, and M. Pavone, “Trajectory optimization on manifolds: A theoretically-guaranteed embedded sequential convex programming approach,” arXiv preprint arXiv:1905.07654, 2019. M. Watterson, S. Liu, K. Sun, T. Smith, and V. Kumar, “Trajectory optimization on manifolds with applications to quadrotor systems,” The International Journal of Robotics Research, vol. 39, no. 2-3, pp. 303– 320, 2020. T. Osa, “Motion planning by learning the solution manifold in trajectory optimization,” The International Journal of Robotics Research, vol. 41, no. 3, pp. 281–311, 2022. N. Boumal, B. Mishra, P.-A. Absil, and R. Sepulchre, “Manopt, a Matlab toolbox for optimization on manifolds,” The Journal of Machine Learning Research, vol. 15, no. 1, pp. 1455–1459, 2014. N. Boumal, An introduction to optimization on smooth manifolds. Cambridge University Press, 2023. H. M. Menegaz, J. Y. Ishihara, and H. T. Kussaba, “Unscented Kalman filters for Riemannian state-space systems,” IEEE Transactions on Automatic Control, vol. 64, no. 4, pp. 1487–1502, 2018. M. Brossard, A. Barrau, and S. Bonnabel, “A code for unscented Kalman filtering on manifolds (UKF-M),” in IEEE International Conference on Robotics and Automation (ICRA). IEEE, 2020, pp. 5701– 5708. K. Li, F. Pfaff, and U. D. Hanebeck, “Unscented dual quaternion particle filter for SE(3) estimation,” IEEE Control Systems Letters, vol. 5, no. 2, pp. 647–652, 2020.
+
+[187] T. Cantelobre, C. Chahbazian, A. Croux, and S. Bonnabel, “A realtime unscented Kalman filter on manifolds for challenging AUV navigation,” in IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS). IEEE, 2020, pp. 2309–2316.
+
+

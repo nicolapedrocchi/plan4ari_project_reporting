@@ -1,0 +1,17 @@
+\section{Sampling-based optimal planning: state of the art}\label{sec:sbp}
+
+\begin{planbox}
+To be completed by the T4.2 team: informed sets, admissible informed and local sampling, adaptive exploration/exploitation, anytime and multi-query planning with path reuse (Project Description, \S A.4.2). The subsections below summarise the elements of the updated review that affect the revised architecture.
+\end{planbox}
+
+\subsection{Speed of sampling-based planners}
+Vectorising forward kinematics and collision checking with CPU SIMD instructions accelerates any sampling-based planner by more than two orders of magnitude, with median planning times of tens of microseconds for a 7-DoF arm on a single core and support for low-power ARM boards~\cite{thomason2024vamp}. GPU-parallel motion generation (parallel IK, geometric planning, particle-based seeding and L-BFGS) plans collision-free arm motions in tens of milliseconds~\cite{sundaralingam2023curobo}. For Plan4ARI this makes sampling-based planning usable inside the online loop, e.g.\ to plan transfer motions for reconfiguration at every cycle, and to evaluate station candidates exhaustively.
+
+\subsection{Tolerance-aware Cartesian path planning}
+Industrial processes (welding, spraying, machining) prescribe a Cartesian path with tolerances. The reference open-source approach, Descartes, samples each path point within its tolerances, computes all IK solutions and searches a layered graph; its evaluation on arc welding documents memory growth, the absence of any speed model and torch ``jumps'' within the tolerance range~\cite{demaeyer2017descartes}. Extensions handle external axes~\cite{sun2020externalaxis}, anytime refinement around a guide path minimising reconfigurations~\cite{wang2025anytimetracking}, dynamic programming with an explicit breakpoint cost~\cite{yin2024dpbreakpoints}, global co-optimisation of tool orientation, redundancy and timing~\cite{chen2025cooptimization} and warm-started optimisation with tolerance windows~\cite{weingartshofer2023pathframework}. These are the deterministic baselines of the revised plan.
+
+\subsection{Task localisation and base placement}
+Base placement has evolved from reachability maps~\cite{makhal2018reuleaux} to set-cover formulations minimising the number of stations~\cite{nguyen2023taskclustering}, placement for sets of continuous paths~\cite{weingartshofer2021tcpbase}, joint base--path optimisation~\cite{zhao2025bstar} and placement scored by true cycle time~\cite{wachter2024tcpbase}. None checks constant-speed feasibility or orientation cones at station level, which motivates stage P2 of the pipeline (Section~\ref{sec:pipeline}).
+
+\subsection{Sampling-based planners guiding local optimisers}
+Planner-provided nominal trajectories improve the sample efficiency of MPPI~\cite{tao2023rrtmppi}; MPPI can also mix samples from arbitrary ancillary controllers, including global planners~\cite{trevisan2024biasedmppi}. This is the mechanism by which the T4.2 planner and the MPPI look-ahead are coupled.

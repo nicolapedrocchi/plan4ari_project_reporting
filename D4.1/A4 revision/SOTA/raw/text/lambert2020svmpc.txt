@@ -1,0 +1,1376 @@
+arXiv:2011.07641v4 [cs.RO] 12 Apr 2021
+
+Stein Variational Model Predictive Control
+Alexander Lambert1,2 ∗ Adam Fishman2,3 Dieter Fox2,3
+Byron Boots2,3 Fabio Ramos2,4
+1 Georgia Tech 2 NVIDIA 3 University of Washington 4 The University of Sydney
+Abstract: Decision making under uncertainty is critical to real-world, autonomous systems. Model Predictive Control (MPC) methods have demonstrated favorable performance in practice, but remain limited when dealing with complex probability distributions. In this paper, we propose a generalization of MPC that represents a multitude of solutions as posterior distributions. By casting MPC as a Bayesian inference problem, we employ variational methods for posterior computation, naturally encoding the complexity and multi-modality of the decision making problem. We present a Stein variational gradient descent method to estimate the posterior directly over control parameters, given a cost function and observed state trajectories. We show that this framework leads to successful planning in challenging, non-convex optimal control problems. The supplementary video can be viewed here: https://youtu.be/pgBCii1NfA0
+Keywords: Model Predictive Control, Variational Inference
+1 Introduction
+Model predictive control (MPC) is a powerful framework for sequential decision making in robotics [1, 2]. This success can be largely attributed to its simplicity and scalability in dealing with stochastic, non-stationary optimization problems encountered on real systems. MPC has been applied effectively in different areas, including autonomous driving [1–3], humanoid locomotion [4], and dextrous manipulation [5]. However, common approaches to MPC often fall short in their ability to adequately contend with complex, multi-modal distributions over possible actions. For instance, such distributions may arise from non-convexity of constraints, such as obstacles [6, 7] or from multiple goal locations [8]. Although common sampling-based SOC algorithms have been shown to exhibit symmetry-breaking in the presence of sudden disturbances [9] and multiple optima [10], the sampling scheme may inadequately resolve the true posterior [6]. We require a new class of MPC algorithms that can effectively contend with complex, non-Gaussian distributions.
+In the following, we formulate MPC as a Bayesian inference problem, where the target posterior is deﬁned directly over control policy parameters or control inputs, as opposed to joint probabilities over states and actions [11, 12]. By taking this perspective, we can construct a relative-entropy minimization problem to approximate the posterior, and leverage recent advances in variational inference [13–15] to derive the optimal distribution over parameters. Speciﬁcally, we use Stein variational gradient descent (SVGD) [16], to infer a set of solutions which constitute a nonparametric approximation to the posterior distribution over decision parameters, given state observations and a deﬁned cost function. The generality of this approach offers ﬂexibility in designing appropriate MPC algorithms, and is closely related to common MPC approaches. Additionally, we show how this framework can be extended to general trajectory optimization problems.
+Related Work The duality between probabilistic inference and optimization for stochastic optimal control (SOC) has been examined extensively in previous work [17–20]. A wide range of approximate inference methods have been proposed, including Expectation-Propagation (EP) and moment-matching approaches to control and trajectory optimization [3, 19]. These methods typically assume a restricted form of the target posterior distribution over controls (usually in the exponential family), which, under simplifying assumptions, return the optimal control input. However, these distributions are often insufﬁciently expressive for many SOC problems, where non-convexity may arise from nonlinear dynamics or non-convex cost functions, for instance. Our interpretation of MPC as an approximate inference problem is perhaps most closely related to the
+∗E-mail: alambert6@gatech.edu
+
+formulation presented in [11, 18]. Here, an iterative KL-minimization problem for ﬁnite-horizon problems is presented, where the prior is deﬁned to be the control distribution obtained from the previous iteration. However, this does not include a strategy for contending with non-stationary distributions, where the posterior may change between iterations, and the analysis is restricted to exact inference of the log-partition function.
+Expectation-Maximization (EM) approaches to SOC have also been considered [21–23], which iteratively optimize a variational lower-bound. However, these approaches share the limitations inherent with common EM strategies, in that the form of the posterior distribution is assumed to be known and tractable. Additionally, representations based on mixture models must contend with mode-collapse and poor local minima, especially prevalent in higher dimensions [24, 25]. These issues can be mitigated, for example, by introducing entropy regularization heuristics [22].
+The Path Integral (PI) formulation of stochastic optimal control [26–28] bears close resemblance to the open-loop-controls characterization of our proposed approach, where a particular choice of the marginal log-likelihood is assumed to contain an exponentiated cost. In fact, PI attempts to minimize a variational lower-bound with respect to the controlled stochastic dynamics. This follows from the perspective presented here. This comparison applies equally to KL-control [20], the discrete-time counterpart to PI-control. A more detailed discussion is included in appendix E.
+The application of SVGD for approximate inference in decision making problems has been previously explored in the context of maximum entropy reinforcement learning, where policies are trained using collected experience and updated ofﬂine. In [29], the network-based policy is represented using a set of Stein particles to generate a single-step action. However, it is unclear how to appropriately design kernels and evaluate them efﬁciently in order to counter the effects of increasing dimensionality (i.e. network size) using this approach. By contrast, the soft Q-learning algorithm [30] evaluates the SVGD gradient over single-step actions. This is then subsequently backpropagated through the policy to update the parameters. To our knowledge, the non-parametric variational inference approach of [16] has yet to be applied to MPC, or general SOC and planning problems. The dependence on length of the planning horizon poses interesting challenges for scaling and sample-efﬁcient computation. Furthermore, the proposed approach is developed with the online setting in mind, and addresses the problem of rapidly-changing, non-stationary target distributions. Lastly, we make explicit connections to existing SOC methods from a theoretical standpoint.
+
+2 Model Predictive Control
+
+We consider the discrete-time stochastic dynamical system: xt+1 ∼ f (xt, ut), where at time t, the system state is denoted by xt ∈ Rn and the control input as ut ∈ Rd. The stochastic transition map f : Rn × Rd → Rn randomly produces the subsequent state xt+1 and this state is accompanied by an instantaneous cost c(xt, ut).
+Over a time horizon H, we deﬁne a control trajectory as a sequence of control inputs beginning at time t : Ut (ut, ut+1, ..., ut+H−1). Similarly, we deﬁne the state trajectory: Xt (xt, xt+1, ..., xt+H−1, xt+H ). The total cost incurred over H timesteps can then be speciﬁed as
+
+H −1
+
+C(Xt, Ut) = cterm(xt+H ) + c(xt+h, ut+h),
+
+(1)
+
+h=0
+
+where cterm(·) is the terminal cost. As in [2], we deﬁne an instantaneous feedback policy, πθt (xt), as a parameterized probability distribution p(ut|xt; θt) used to generate a control input at time t given the xt, i.e., ut ∼ πθt (xt), where θt ∈ Θ, is the set of feasible parameter values. MPC
+describes the process of ﬁnding the optimal, time-indexed sequence of policy parameters θt
+(θt, θt+1, ..., θt+H−1), which determine the sequence of instantaneous feedback policies πθt πθt , πθt+1 , ..., πθt+H−1 . At each time step, we must ﬁnd θt, the parameters that deﬁne the optimal policy. We can do this by deﬁning a statistic J(·) on cost C(Xt, Ut) where the minimal J(·) occurs at the optimal θt. In real-world situations, the true dynamics function f is often unavailable, and is commonly estimated using a parameterized function fˆξ with parameters ξ. As such, we deﬁne the
+surrogate loss function Jˆ(πθ; xt) = Eπθ,fˆξ C(Xt, Ut) . For each MPC-step, the optimal decision
+is deﬁned as θt = arg minθ Jˆ(πθ; xt) which parameterizes the optimal policy πθt , from which we
+
+2
+
+can sample a new control value for the ﬁrst timestep: ut ∼ πθt (xt) = p(ut|xt; θt). This is then executed on the physical system to generate the next state value: xt+1 ∼ f (xt, ut).
+
+3 Bayesian Model Predictive Control
+MPC as Bayesian Inference Optimal control can be framed as Bayesian inference by considering the distribution over parameters θ. Similarly to [12, 18], we introduce an auxiliary binary random variable Oτ ∈ {0, 1} to indicate optimality of the state-action trajectory τ = (Xt, Ut) with respect to the cost function C(·). Using Bayes’ rule, the distribution of parameters θ conditioned on the requirement for optimal trajectories (Oτ = 1) and the current state xt can be expressed as
+pt(θ|Oτ = 1; ξ, xt) = pt(Oτ = 1|θ; ξ, xt) pt(θ; xt) , (2) pt(Oτ = 1|θ; ξ, xt) pt(θ; xt) dθ
+where explicit dependence on state xt is included for generality. In the remaining discussion, we will denote Oτ = 1 simply as Oτ without ambiguity. The likelihood pt(Oτ |θ; ξ, xt) is deﬁned as the marginal probability over all possible control and state trajectories:
+
+pt(Oτ |θ; ξ, xt) =
+
+p(Oτ |Xt, Ut) p(Xt, Ut |θ; ξ, xt) dUt dXt
+
+(3)
+
+where p(Oτ |Xt, Ut) is the probability of optimality given the observed trajectory τ = (Xt, Ut), and p(Xt, Ut|θ; ξ, xt) is the joint probability of state-control trajectories, conditioned on parameters θ and assumed dynamics model fˆξ = pξ(xt+1|xt, ut). In the discrete-time case, the joint probability
+can be factorized as
+
+H −1
+
+p(Xt, Ut|θ; ξ, xt) =
+
+pξ(xt+h+1|xt+h, ut+h)πθh (xt+h),
+
+(4)
+
+h=0
+
+where the current state xt is observed. If dynamics parameters must also be inferred, the equations can be extended to include ξ as an inference variable, where the posterior is deﬁned over both
+parameters: pt(θ, ξ|Oτ ; xt) ∝ pt(Oτ |θ, ξ; xt) pt(θ|ξ; xt) p(ξ), suggesting the deﬁnition of an alternative latent random variable, such as Θ = (θ, ξ).
+
+We can further model p(Oτ |Xt, Ut) using a non-negative function L(τ ) ∝ p(Oτ |Xt, Ut), which we refer to as the “cost-likelihood". This is deﬁned to be the composition L = g ◦ C of the cost function C(·) with a monotonically decreasing function g(·). The likelihood in (3) then takes the form
+
+pt(Oτ |θ; ξ, xt) ∝ L(τ ) p(τ |θ; ξ, xt) dτ = Eπθ,fˆξ L(τ ) .
+
+(5)
+
+Nonparametric Bayesian MPC Instead of performing inference over policy parameters, the Bayesian MPC formulation can be used for inference over control input sequences. In this case, the
+inference variable θ is deﬁned as the sequence of open-loop controls: θ (ut, ut+1, ..., ut+H−1). This can be interpreted as a nonparametric version of Bayesian-MPC, as no assumption is made on the existence of a parametrized policy π. Although the relationship in (2) still holds, the likelihood function pt(Oτ |θ; ξ, xt) must then be re-deﬁned as
+
+pt(Oτ |θ; ξ, xt) = p(Oτ |Xt, θ) p(Xt|θ; ξ, xt) dXt ∝ Efˆξ L(Xt, θ) ,
+
+(6)
+
+where p(Xt|θ; ξ, xt) is the probability of state trajectories, conditioned on decisions θ and assumed dynamics model fˆξ = pξ(xt+1|xt, ut). In the discrete-time case, this can be written as the product
+of state transition probabilities along a trajectory:
+
+H −1
+
+p(Xt|θ; ξ, xt) = pξ(xt+h+1|xt+h, θt+h) .
+
+(7)
+
+h=0
+
+Furthermore, if we assume a ﬁxed current state (xt = const.), we can apply this model to trajectory optimization problems by performing approximate inference on the posterior p(θ|Oτ ; ξ), and taking the maximum a posteriori estimate, θ∗ = arg maxθ p(θ|Oτ ; ξ).
+
+3
+
+4 Inference for Bayesian MPC
+
+Variational Inference Variational inference poses posterior estimation as an optimization task where a candidate distribution q∗(θ) within a distribution family Q = {q(θ)} is chosen to best
+approximate the target distribution p(θ|Oτ ). This is typically obtained by minimizing the KullbackLeibler (KL) divergence:
+
+q∗ = arg min DKL (q(θ)||p(θ|Oτ )) .
+
+(8)
+
+q∈Q
+
+The solution also maximizes the Evidence Lower Bound (ELBO), as expressed by the following objective (details in appendix D):
+
+q∗ = arg min −Eq log p(Oτ |θ) + DKL (q(θ) || p(θ)) .
+
+(9)
+
+q∈Q
+
+This optimization seeks to maximize the log-likelihood of the observations with the ﬁrst term while penalizing for differences between the target and the prior with the second term. For a high-capacity model space Q that includes the target distribution, the second term becomes increasingly small. Selecting a model space Q with both high capacity and computational efﬁciency is critical to variational inference, but remains a challenging problem.
+
+Stein Variational Gradient Descent In order to circumvent the challenge of determining an
+appropriate Q, while also addressing (8), we develop an algorithm based on Stein variational
+gradient descent (SVGD) for Bayesian inference. The nonparametric nature of SVGD is
+advantageous as it removes the need for assumptions on restricted parametric families for q. This approach approximates a posterior p(θ|x) with a set of particles {θi}m i=1, θi ∈ Rp. The particles are iteratively updated according to
+
+θi ← θi + φ∗(θi)
+
+(10)
+
+given a step-size . The function φ∗(·) lies in the unit-ball of an Rp-valued reproducing kernel Hilbert space (RKHS) of the form H = H0 × ...H0, where H0 is a scalar-valued RKHS with kernel k(θ , θ). It characterizes the optimal perturbation or velocity ﬁeld (i.e. gradient direction) which
+maximally decreases the KL-divergence:
+
+φ∗ = arg max − ∇ DKL q[ φ]||p(θ|x) s.t. φ H ≤ 1 ,
+
+(11)
+
+φ∈H
+
+where q[ φ] indicates the particle distribution resulting from taking an update step θ = θ + φ(θ). This has been shown to yield a closed-form solution [16] which can be interpreted as a functional
+gradient in RKHS and approximated with the set of particles:
+
+m
+
+φˆ∗(θ) = 1
+
+k(θj, θ)∇θj log p(θj||x) + ∇θj k(θj, θ) .
+
+(12)
+
+m j=1
+
+Eq. 12 has two terms that control different aspects of the algorithm. The ﬁrst term is essentially a scaled gradient of the log-likelihood over the posterior’s particle approximation. The second term is known as the repulsive force. Intuitively, it pushes particles apart when they get too close to each other and prevents them from collapsing into a single mode. This allows the method to approximate complex, possibly multi-modal posteriors in MPC. When there is only a single particle, the method reduces to a standard optimization of the log-likelihood or a MAP estimate of the posterior as the repulsive force term vanishes, i.e. ∇θk(θ, θ) = 0. SVGD’s optimization structure empirically provides better particle efﬁciency than other popular sampling procedures, such as Markov Chain Monte Carlo [31].
+
+5 Stein Variational MPC
+In this section we present our novel method for Stein inference, speciﬁcally designed around MPC requirements. The full algorithm can be found in appendix B.
+Posterior Sequential Updates As described in Section 3, the Bayesian interpretation of MPC seeks to ﬁnd the posterior distribution over decision parameters at time t. Recalling Eq. 2:
+pt(θ|Oτ ; ξ, xt) = pt(Oτ |θ; ξ, xt) q˜t(θ; xt) . (13) pt(Oτ |θ; ξ, xt) q˜t(θ; xt) dθ
+
+4
+
+with a prior q˜t(θ; xt). Our approach approximates the posterior over decision parameters using
+
+a weighted set of particles {θi}m i=1, where the proposal q is deﬁned as the empirical distribution
+
+q(θ) =
+
+m i=1
+
+wiδ(θi)
+
+with
+
+weights
+
+evaluated
+
+according
+
+to:
+
+i
+
+pt(Oτ |θi; ξ, xt) q˜t(θ; xt)
+
+w= m
+
+j
+
+(14)
+
+j=1 pt(Oτ |θ ; ξ, xt) q˜t(θ; xt)
+
+such that i=1 m wi = 1. Following the procedure outlined in (10)-(12), an SVGD update can be computed for the individual particles by computing the functional gradient
+
+m
+
+φˆ∗(θi) = 1
+
+k(θj , θi)∇θj log pt(θj |Oτ ; ξ, xt) + ∇θj k(θj , θi)
+
+(15)
+
+m j=1
+
+and performing the gradient step: θi ← θi + φˆ∗(θi) . The evaluation of (15) requires computation of the log-posterior gradient, which can be written as the sum of the gradients of both the log-prior and log-likelihood:
+
+∇θi log pt(θi|Oτ ; ξ, xt) = ∇θi log pt(Oτ |θi; ξ, xt) + ∇θi log q˜t(θi; xt)
+
+(16)
+
+= ∇θi log Eπ i ,fˆξ L(τ ) + ∇θi log q˜t(θi; xt)
+
+(17)
+
+θ
+
+The ﬁrst RHS term requires that we deﬁne the cost-likelihood function L. The SV-MPC framework allows for different possible deﬁnitions for L. We will consider two in particular:
+
+• Exponentiated Utility (EU): L(τ ) = exp (−αC(Xt, Ut)) , where α > 0 (18)
+
+• Probability of Low Cost (PLC): L(τ ) = 1C≤Cmax (C(Xt, Ut))
+
+(19)
+
+It is generally assumed that the cost function C(Xt, Ut) is non-differentiable with respect to the decision parameter θ, and that resulting expectations are difﬁcult to evaluate analytically.
+As such, the gradients can be estimated via Monte-Carlo sampling, where a set of N control and state trajectory samples are drawn from the policy and the modeled dynamics: {τ s}Ns=1 ∼ p(Xt, Ut|θ; ξ, xt), where τ s = (Xts, Uts). This leads to the following approximation:
+
+Eπθi ,fˆξ L(τ )∇θi log πθi ∇θi log Eπθi ,fˆξ L(τ ) = ≈
+Eπθi ,fˆξ L(τ )
+
+N s=1
+
+L(τ
+
+s)∇θi
+
+log
+
+πθi
+
+(Uts)
+
+Ns=1 L(τ s)
+
+(20)
+
+For a single particle (m = 1), the full gradient in (15) reduces to : φ∗(θ) = ∇θ log pt(θ|Oτ ; ξ, xt). SVGD then produces a local MAP estimate of the posterior distribution over θ. As a result, the SV-MPC update step exhibits strong similarity to common MPC algorithms (such as MPPI [1] and CEM [32]) depending on the chosen likelihood function, exhibiting equivalence under parameter values and choice of prior. Discussion of these comparisons can be found in appendix F.
+A signiﬁcant advantage of the SV-MPC formulation is the robustness to highly-peaked posterior distributions. If particles are initialized poorly, or if the target posterior changes signiﬁcantly between time-steps, many particles may ﬁnd themselves in regions of low-probability. Indeed, this may occur frequently for likelihoods p(Oτ |θi; ξ, xt) with exponentiated cost (see appendix F, for example). However, the shared gradient terms in (15) allow these particles to overcome this degeneracy quickly, while avoiding collapse due to the repulsive term (the reader may refer to Figure 1. in [33] for an intuitive illustration of this phenomenon.) As a consequence, SV-MPC avoids the problem of particle depletion often encountered in Sequential Monte Carlo methods [34].
+Kernels for trajectories High-dimensional inference problems pose signiﬁcant challenges for SVGD as the repulsive force given by the derivative of the kernel with respect to the inputs diminishes as the dimensionality increases [35]. Inspired by probabilistic graphical models and the conditional independence assumptions encoded in Markov random ﬁelds, we tackle this issue by devising a kernel that factorizes a high-dimensional input into a sum of kernels deﬁned over cliques of dimensions. This allows the exploitation of the Markov structure of the trajectories to address the curse of dimensionality. For example, assume that the posterior over the parameters θ satisﬁes the conditional independence relations encoded in a graph G = (V, E), with vertices V,
+
+5
+
+and edges E such that p(θ) ∝ d∈E ψd(θd) (dt)∈E ψdt(θd, θt), where ψd(θd) and ψdt(θd, θt) are unary and pairwise potential functions respectively. We deﬁne the kernel over parameters as,
+
+k(θ, θ ) = k(θd, θd) +
+
+k(θ(d,t), θ(d,t))
+
+(21)
+
+d∈V
+
+(d,t)∈E
+
+The kernel is a sum of positive semi-deﬁnite kernels, so the result is a valid reproducing kernel
+
+Hilbert space [36] but less sensitive to the curse of dimensionality. In this paper we adopt the smooth RBF kernel; k(θ, θ ) = exp − θ − θ 22/h , where h is evaluated using the median heuristic on the set of particles: h = med {θi} 2 / log m.
+
+Action Selection The variational inference
+
+System
+
+Simulated Rollouts
+
+procedure results in an approximation of the
+
+posterior distribution over θ. Following this
+
+step, a decision must be made on θt, such
+
+that a control action can be generated from the
+
+resulting policy πθt and executed on the real system. Here we outline two possible methods
+
+for choosing an appropriate θt.
+
+We can ﬁrst consider the relative probabilistic
+
+weight of the particles as an approximation to
+
+their posterior probabilities:
+
+wi =
+
+p(Oτ |θi; ξ, xt) q˜t−1(θi)
+
+(22) Figure 1: 7-DOF manipulation task. The SV-
+
+m j=1
+
+p(Oτ
+
+|θj
+
+;
+
+ξ,
+
+xt)
+
+q˜t−1(θj
+
+)
+
+MPC framework is capable of reasoning over multi-
+
+≈ p(θi|Oτ ; ξ, xt).
+
+modal distributions of trajectories in high-dimensional (23) spaces. Here, the controller iteratively explores the
+
+One strategy to selecting θt is to pick the highest-weighted particle θt = θi∗ , which
+
+corresponds to the approximate MAP solution:
+
+i∗ = arg max[wi]
+
+(24)
+
+i
+
+≈ arg max p(θi|Oτ ; ξ, xt). (25)
+i
+
+posterior over joint-velocities by simulating trajectories in parallel (green frame) in order to guide the system (orange frame). Each particle-generated distribution is shown by a unique coloring over the generated state trajectories, as seen from a top-down view of the workspace. The robot arm manages to reach the goal (red), while avoiding poor local minima.
+
+An alternative approach is to randomly sample from the posterior distribution, which can be
+
+approximated by sampling from the set of particles according to their weight wi. This can be performed by drawing from the categorical distribution over particle weights: i∗ ∼ Cat(wi).
+
+Shifting the distribution The prior q˜t(θ; xt) is deﬁned as the marginalized transition over the approximate posterior distribution obtained from the previous iteration: q˜t(θ; xt) =
+pt(θ|θt−1; xt)qt−1(θt−1)dθt−1, with the transition probability pt(θ|θt−1; xt) including a dependence on the currently observed state xt for generality. This operation is akin to the prediction step commonly found in Bayes ﬁltering and sequential Monte-Carlo methods, and can be interpreted
+as a probabilistic version of the shift operator deﬁned in [2] which serves to bootstrap the previous
+MPC solution to initialize the current iteration. Further details can be found in appendix C.
+
+Non-parametric SV-MPC In the setting where inference must be performed over open-loop controls θt = Ut, we can deﬁne the cost-likelihood as a function of state: L = L(Xt). A cost on control can be replaced by deﬁning an additional prior factor p(θ), which can be combined with the
+transition probability above. For further details, refer to appendix G.
+
+Trajectory optimization The variational inference framework deﬁned by SV-MPC can be modiﬁed to accommodate general motion planning problems common to many robotics applications. This special case can be considered by (1) using the non-parametric formulation, (2) assuming a stationary posterior distribution (no shifting), and (3) deﬁning a deterministic dynamics model f¯ such that state trajectory probabilities can be represented as p(X|θ) = δ(X − f¯(θ, x0)). A prior over sequences p(θ) can be deﬁned to encourage desired behavior such as smoothness [37]. Because individual particles are not guaranteed to produce a MAP estimate once the SVGD optimization has converged, they can be subsequently reﬁned by applying stochastic gradient descent (SGD) using posterior gradients without kernelization. Selection of a feasible and optimal plan can be generated by simply picking the best particle. The resulting algorithm, SV-TrajOpt, is described in Algorithm 2, with the likelihood gradient derived in appendix H.
+
+6
+
+t = 25
+
+50
+
+100
+
+150
+
+200
+
+SV-MPC
+
+MPPI
+
+Figure 2: Planar Navigation Task. The robot (orange dot) attempts to reach the goal location (red cross) while avoiding obstacles. Each frame depicts the environment state at a particular time-step, along with the distributions of sampled state-trajectory rollouts generated by the MPC controllers using the modeled dynamics. Each trajectory color is associated with a single particle from SV-MPC. The multi-modal distribution of SVMPC is able to explore passages between obstacles and ﬁnd shorter paths to the goal.
+6 Experiments
+In the following section, apply SV-MPC to common robotics problems: navigation, manipulation and locomotion. We end with an example of the SV-TrajOpt algorithm applied to a planar motionplanning scenario. All control algorithms were implemented in PyTorch, with batched gradient computation across particles and parallel generation of rollouts using either simulated or analytic dynamical models. Additional experimental details and results can be found in the appendix.
+Planar Navigation We construct a 2D robot navigation task, where a holonomic point-robot must reach a target location while avoiding obstacles (Figure 2). Hitting an obstacle will cause the agent to "crash" and prevent any further movement. This added non-differentiability makes the problem particularly challenging, but also suitable for sampling-based control schemes. The system exhibits stochastic dynamics, and is deﬁned as a double-integrator model with additive Gaussian noise. The SV-MPC controller with exponentiated-utility (EU) is compared against MPPI (Figure 2) and CEM. We provide additional quantitative results in (appendix K).
+Manipulation We demonstrate SV-MPC on a 7-DOF reaching task (Figure 1). Velocity-based control commands are generated in the conﬁguration space of a simulated robot manipulator, which
+
+xee
+
+6V-03C (8 (P 4, nV 32) 0.8
+
+0.6
+
+0.4
+
+0.2
+
+CT(xT) 411.26
+
+0.2
+
+0.0
+
+033, (nV 128)
+CT(xT) 813.13
+
+C(0 (nV 128)
+CT(xT) 713.12
+
+yee
+
+zee
+
+0.7 0.6 0.5
+
+0 20 40 60 80 100 120
+
+0 20 40 60 80 100 120
+
+0
+
+20 40 60 80 100 120
+
+7iPeVteS
+Figure 3: Manipulation. Examples of end-effector Cartesian trajectories resulting from application of different MPC algorithms on the Franka reaching experiment. The relative distance to the ﬁxed target location is plotted over the length of each episode. The dashed red line indicates the coordinates of the target. The sample-
+averaged terminal cost for the ﬁnal state CT (xT ) is evaluated over the 24 independent trials. With four particles (m = 4), SV-MPC with Exponentiated utility likelihood manages to avoid bad local minima, despite highervariance gradients due to fewer samples used to evaluate gradients (ns = 32 vs. ns = 128).
+
+7
+
+(a) Exponentiated Utility (EU)
+
+(b) Probability of Low-Cost (PLC)
+
+Figure 4: Stochastic HalfCheetah. Comparisons of cumulative-reward distributions over 16 independent trials, with mean and standard deviations shown. SV-MPC is capable of ﬁnding high-reward trajectories, using the same total amount of samples as MPPI and CEM.
+
+t = 0
+
+10
+
+100
+
++ 50
+
+Figure 5: Motion Planning. SV-TrajOpt is applied to a velocity-controlled planar robot with fullydifferentiable costs. Each blue state-trajectory results from a single particle control-sequence. Particles are randomly initialized from the prior (t = 0), and are optimized until convergence (t = 10, 100). Independent local MAP approximations are generated after 50 SGD iterations, with the lowest-cost particle shown in green.
+must reach a stationary goal in its work-space. We leverage the GPU-accelerated Isaac-Gym library [38] for parallel computation of trajectory rollouts in simulation during MPC iterations.
+A sampling-based SV-MPC controller is compared against MPPI and CEM for an open-loop, constant-covariance Gaussian control distribution: πθ = N (Ut; θ, Σ). The obstacles and the target are placed in order to demonstrate a local-minima trap: given a ﬁnite H, the optimal control solution is to move left. However, the opening between the obstacles in this direction is too narrow for the robot to move through. To avoid getting stuck, a sampling-based control scheme must generate a sequence which will move the robot in the other direction. For a uni-modal distribution, this may have a very low-probability, and recovery will not occur. Increasing the sampling covariance would mitigate this, but would require a larger amount of samples to reduce variance.
+Examples of trajectory executions are shown in Figure 3. The total number of generated control samples is held constant across algorithms. Both MPPI and CEM tend towards the sub-optimal local minimum, leading the robot to get stuck between two obstacles. Using a particle-based representation of the posterior, SV-MPC can resolve multiple optima simultaneously, switching to lower-cost modes around obstacles and successfully reaching the goal.
+Stochastic Half-Cheetah To test our approach on a complex nonlinear system with discontinuous dynamics, we consider an environment common in many Reinforcement Learning benchmarks: the Half-Cheetah [39]. We use a stochastic version of the dynamics with additive noise in the control space. The cumulative rewards over multiple trials are plotted in Figure 4.
+Motion Planning We use the SV-TrajOpt algorithm to infer a distribution over optimal control sequences for a planar motion planning problem on a point robot (Figure 5). The robot must ﬁnd a velocity-based control sequence which results in a low-cost, feasible path around a set of obstacles to reach the goal. The occupancy map is fully-differentiable, allowing a gradient on obstacle cost to be computed numerically. A ‘smoothness’ prior is deﬁned over velocities as a multi-variate Gaussian with a tri-diagonal precision matrix, which favors low-acceleration trajectories.
+8
+
+7 Conclusion
+A novel formulation for Bayesian model predictive control is presented, where inference is performed directly over the control parameters and inputs. An algorithm for approximate inference is then proposed, where the posterior is represented as a set of particles and is optimized via SVGD. In contrast to pure Monte-Carlo sampling methods, gradient-based information can be exploited to improve particle efﬁciency, where many computationally-intensive operations can be run in parallel using effective GPU implementation. The ﬂexibility of the approach can accommodate different cost transformations to modulate risk-seeking behavior, and can naturally be extended to trajectory optimization problems. We compare against common MPC baselines, demonstrating improved performance on a variety of control tasks.
+References
+[1] G. Williams, P. Drews, B. Goldfain, J. M. Rehg, and E. A. Theodorou. Information-theoretic model predictive control: Theory and applications to autonomous driving. IEEE Transactions on Robotics, 34(6):1603–1622, 2018.
+[2] N. Wagener, C.-A. Cheng, J. Sacks, and B. Boots. An online learning approach to model predictive control. In Robotics: Science and Systems, 2019.
+[3] G. Williams, P. Drews, B. Goldfain, J. M. Rehg, and E. A. Theodorou. Aggressive driving with model predictive path integral control. In 2016 IEEE International Conference on Robotics and Automation (ICRA), pages 1433–1440. IEEE, 2016.
+[4] M. Kasaei, N. Lau, and A. Pereira. A robust closed-loop biped locomotion planner based on time varying model predictive control. arXiv preprint arXiv:1909.06873, 2019.
+[5] V. Kumar, E. Todorov, and S. Levine. Optimal control with learned local models: Application to dexterous manipulation. In 2016 IEEE International Conference on Robotics and Automation (ICRA), pages 378–383. IEEE, 2016.
+[6] H. J. Kappen. Path integrals and symmetry breaking for optimal control theory. Journal of statistical mechanics: theory and experiment, 2005(11):P11011, 2005.
+[7] V. Gómez, S. Thijssen, A. Symington, S. Hailes, and H. J. Kappen. Real-time stochastic optimal control for multi-agent quadrotor systems. In Twenty-Sixth International Conference on Automated Planning and Scheduling, 2016.
+[8] W. Wiegerinck, B. v. d. Broek, and H. Kappen. Stochastic optimal control in continuous spacetime multi-agent systems. arXiv preprint arXiv:1206.6866, 2012.
+[9] G. Williams, B. Goldfain, P. Drews, K. Saigol, J. M. Rehg, and E. A. Theodorou. Robust sampling based model predictive control with sparse objective information. In Robotics: Science and Systems, 2018.
+[10] H. J. Kappen. Linear theory for control of nonlinear stochastic systems. Physical review letters, 95(20):200201, 2005.
+[11] K. Rawlik, M. Toussaint, and S. Vijayakumar. On stochastic optimal control and reinforcement learning by approximate inference. In Twenty-Third International Joint Conference on Artiﬁcial Intelligence, 2013.
+[12] S. Levine. Reinforcement learning and control as probabilistic inference: Tutorial and review. arXiv preprint arXiv:1805.00909, 2018.
+[13] M. I. Jordan, Z. Ghahramani, and et al. An introduction to variational methods for graphical models. In Machine Learning, pages 183–233. MIT Press, 1999.
+[14] M. J. Beal. Variational algorithms for approximate bayesian inference. Technical report, University College London, 2003.
+[15] M. Wainwright and M. Jordan. Graphical Models, Exponential Families, and Variational Inference. Foundations and Trends in Machine Learning, 1(1-2):1–305, 2008.
+9
+
+[16] Q. Liu and D. Wang. Stein variational gradient descent: A general purpose bayesian inference algorithm. In D. D. Lee, M. Sugiyama, U. V. Luxburg, I. Guyon, and R. Garnett, editors, Advances in Neural Information Processing Systems 29, pages 2378–2386. Curran Associates, Inc., 2016.
+[17] E. Todorov. General duality between optimal control and estimation. In 2008 47th IEEE Conference on Decision and Control, pages 4286–4292. IEEE, 2008.
+[18] K. Rawlik, M. Toussaint, and S. Vijayakumar. Approximate inference and stochastic optimal control. arXiv preprint arXiv:1009.3958, 2010.
+[19] M. Toussaint. Robot trajectory optimization using approximate inference. In Proceedings of the 26th annual international conference on machine learning, pages 1049–1056. ACM, 2009.
+[20] H. J. Kappen, V. Gómez, and M. Opper. Optimal control as a graphical model inference problem. Machine learning, 87(2):159–182, 2012.
+[21] M. Toussaint and A. Storkey. Probabilistic inference for solving discrete and continuous state markov decision processes. In Proceedings of the 23rd international conference on Machine learning, pages 945–952, 2006.
+[22] M. Okada and T. Taniguchi. Variational inference mpc for bayesian model-based reinforcement learning. In Conference on Robotics Learning (CoRL), 2019.
+[23] J. Watson, H. Abdulsamad, and J. Peters. Stochastic optimal control as approximate input inference. In Conference on Robot Learning, pages 697–716, 2020.
+[24] C. M. Bishop. Pattern recognition and machine learning. springer, 2006.
+[25] D. Ormoneit and V. Tresp. Averaging, maximum penalized likelihood and bayesian estimation for improving gaussian mixture probability density estimates. IEEE Transactions on Neural Networks, 9(4):639–650, 1998.
+[26] E. Theodorou, J. Buchli, and S. Schaal. A generalized path integral control approach to reinforcement learning. The Journal of Machine Learning Research, 11:3137–3181, 2010.
+[27] E. A. Theodorou and E. Todorov. Relative entropy and free energy dualities: Connections to path integral and kl control. In 2012 IEEE 51st IEEE Conference on Decision and Control (CDC), pages 1466–1473. IEEE, 2012.
+[28] E. A. Theodorou. Nonlinear stochastic control and information theoretic dualities: Connections, interdependencies and thermodynamic interpretations. Entropy, 17(5):3352– 3375, 2015.
+[29] Y. Liu, P. Ramachandran, Q. Liu, and J. Peng. Stein variational policy gradient. In Conference on Uncertainty on Artiﬁcial Intelligence (UAI), 2017.
+[30] T. Haarnoja, H. Tang, P. Abbeel, and S. Levine. Reinforcement learning with deep energybased policies. In International Conference on Machine Learning (ICML), pages 1352–1361, 2017.
+[31] W. Y. Chen, A. Barp, F.-X. Briol, J. Gorham, M. Girolami, L. Mackey, and C. J. Oates. Stein point markov chain monte carlo. In ICML, 2019.
+[32] Z. I. Botev, D. P. Kroese, R. Y. Rubinstein, and P. L’Ecuyer. The cross-entropy method for optimization. In Handbook of statistics, volume 31, pages 35–59. Elsevier, 2013.
+[33] Q. Liu. Stein variational gradient descent: Theory and applications.
+[34] N. Kantas, J. Maciejowski, and A. Lecchini-Visintini. Sequential monte carlo for model predictive control. In Nonlinear model predictive control, pages 263–273. Springer, 2009.
+[35] J. Zhuo, C. Liu, J. Shi, J. Zhu, N. Chen, and B. Zhang. Message passing Stein variational gradient descent. In J. Dy and A. Krause, editors, Proceedings of the 35th International Conference on Machine Learning, volume 80 of Proceedings of Machine Learning Research, pages 6018–6027, Stockholm, Sweden, 10–15 Jul 2018. PMLR.
+10
+
+[36] B. Schölkopf and A. Smola. Learning with Kernels - Support Vector Machines, Regularization, Optimization and Beyond. MIT Press, Cambridge, MA, 2001.
+[37] M. Mukadam, J. Dong, X. Yan, F. Dellaert, and B. Boots. Continuous-time gaussian process motion planning via probabilistic inference. The International Journal of Robotics Research, 37(11):1319–1340, 2018.
+[38] M. Macklin, K. Erleben, M. Müller, N. Chentanez, S. Jeschke, and V. Makoviychuk. Nonsmooth newton methods for deformable multi-body dynamics. ACM Transactions on Graphics (TOG), 38(5):1–20, 2019.
+[39] G. Brockman, V. Cheung, L. Pettersson, J. Schneider, J. Schulman, J. Tang, and W. Zaremba. Openai gym. arXiv preprint arXiv:1606.01540, 2016.
+[40] S. S. Varadhan. Large deviations and applications. SIAM, 1984. [41] C. Hartmann, L. Richter, C. Schütte, and W. Zhang. Variational characterization of free energy:
+Theory and algorithms. Entropy, 19(11):626, 2017.
+11
+
+A Notation
+The table below summarizes notation used throughout the paper.
+
+Notation
+xt Xt ut Ut τ fˆξ(·, ·) C(·, ·) πθt (·) θt πθt (·) L(·) q(·) φ(·)
+φˆ(·) k(·, ·)
+
+Table 1: Notations and deﬁnitions
+Description
+System state at time t State trajectory: sequence of length H + 1, from time t Control input at time t Control trajectory: sequence of length H, from time t State-control trajectory tuple, τ = (Xt, Ut) Modeled system dynamics, parameterized by ξ Total cost for horizon H Policy at time t parameterized by θt Sequence of policy parameters or control inputs Sequence of control policies Cost-likelihood function Approximate posterior distribution Perturbation direction or velocity ﬁeld that decreases the KL divergence between the particle distribution and target distribution
+Approximated perturbation direction over particles Kernel specifying a reproducing kernel Hilbert space
+
+B Algorithm
+
+Algorithm 1: Stein Variational MPC * Components which apply only in the presence of a parameterized policy π are marked in red. Input: Initial state x0, dynamics fˆξ, cost-likelihood L, prior p0(θ; ·), kernel k, policy π
+
+Initialize q˜0(θ) = p0(θ; x0) Sample {θi}m i=1 ∼ q˜0(θ) for t = 0, 1, ..., T − 1 do
+for i = 1, 2, ..., m do in parallel
+
+∇θi log pt(θi|Oτ ; ξ, xt) = ∇θi log Eπ i ,fˆξ L(τ ) + ∇θi log q˜t(θi)
+θ
+
+end
+
+for i = 1, 2, ..., m do in parallel
+
+∆θi ← 1m
+
+m j=1
+
+k(θj ,
+
+θi)∇θj
+
+log
+
+pt(θj |Oτ
+
+;
+
+ξ,
+
+xt)
+
++
+
+∇θj
+
+k(θj ,
+
+θi)
+
+θi ← θi + ∆θi end
+wi ← p(Oτ |θi; xt)q˜t(θi)
+
+wi ←
+
+wi m j=1 wj
+
+Pick θ∗ (using (22) or (24), for example)
+
+Get control input: ut ← θ∗ or sample ut ∼ πθt∗ (xt)
+
+Sample true dynamics: xt+1 ∼ f (xt, ut)
+
+Shift particles: θ˜i = Φ(θi)
+
+Update prior:
+
+q˜t+1(θ; xt+1) =
+
+m i=1
+
+wi
+
+pt
+
+(θ|θ˜i
+
+;
+
+xt+1
+
+)
+
+end
+
+12
+
+Algorithm 2: SV-TrajOpt
+Input: Initial state x0, dynamics f , cost function C, prior p0(θ), kernel k, termination condition Done(·)
+
+Sample {θi}m i=1 ∼ p0(θ)
+
+Set ∆θi = Inf ∀ i ∈ 1 : m
+
+while Done({∆θi}) is False do
+for i = 1, 2, ..., m do in parallel Forward dynamics : Xi = X(f, θi, x0)
+
+∇θi log p(θi|Oτ ; ξ) = −α∇θi C(Xi) + ∇θi log p0(θi)
+
+end
+
+for i = 1, 2, ..., m do in parallel
+
+∆θi ← 1m
+
+m j=1
+
+k(θj ,
+
+θi)∇θj
+
+log
+
+p(θj |Oτ
+
+;
+
+ξ)
+
++
+
+∇θj
+
+k(θj ,
+
+θi)
+
+θi ← θi + ∆θi end
+end
+
+(Optional: SGD reﬁnement) for iter = 1, ..., N do
+∆θi ← ∇θi log p(θi|Oτ ; ξ)
+θi ← r∆θi ∀ i ∈ 1 : m end
+
+∀i∈1:m
+
+θ∗ = arg maxθi log p(θi|Oτ ; ξ)
+
+C Shift operation
+
+As described in Section 5, the proposal distribution q is propagated after each round of MPC by marginalizing over the previous solution:
+
+q˜t+1(θ; xt+1) = pt(θ|θt; xt+1)qt(θt)dθt
+
+(26)
+
+given a transition probability, pt(θ|θt−1; xt). This operation serves to approximate the prior at the new iteration. Given the empirical distribution qt, we can simplify the expression above:
+
+m
+
+m
+
+q˜t+1(θ; xt+1) =
+
+pt(θ|θt; xt+1) wiδθi (θt)dθt = wipt(θ|θi; xt+1)
+
+(27)
+
+i=1
+
+i=1
+
+resulting in a mixture of conditional probabilities.
+
+In many open-loop MPC implementations [1, 2], it is assumed that the solution does not change signiﬁcantly between each round, given an accurate dynamics model and sufﬁciently high controller frequency to resolve the dynamics and possible perturbations. This motivates a common heuristic used to reduce the computational burden between timesteps, which is to shift the control distribution πθt , forward-in-time by one step. That is, given an initial parameter sequence θt = (θt, θt+1, ..., θt+H−1):
+
+θ˜t+1 = Φ(θt)
+
+(28)
+
+= (θt+1, θt+2, ..., θt+H−1, θ˜t+H−1)
+
+(29)
+
+where the new parameter θ˜t+H−1 is chosen to reﬂect the expected ﬁnal action. In the implementation, we adopt a similar heuristic, where the empirical distribution is ﬁrst shifted deterministically according to:
+
+θ˜i = Φ(θi) ∀ i ∈ 1 : m
+
+(30)
+
+13
+
+and setting the resulting distribution as q˜t(θ) = qt(θ). The shifted particles, θ˜i, are then used in the following iteration to approximate the posterior, and the prior is updated according to (27). The shift operation can then be summarized by the following two sub-steps:
+
+1. Shift particles: θ˜i = Φ(θi) 2. Update prior: q˜t+1(θ; xt+1) =
+
+m i=1
+
+wi
+
+pt
+
+(θ|θ˜i
+
+;
+
+xt+1
+
+)
+
+D Variational Inference
+
+In variational inference, a target distribution p(θ|Oτ ) is approximated by a candidate q∗(θ), belonging to a speciﬁed family of distributions Q = {q(θ)}, by minimizing the KL-divergence:
+
+q∗ = arg min DKL (q(θ)||p(θ|Oτ ))
+
+(31)
+
+q∈Q
+
+The optimal distribution q∗ is also the solution to the following objective:
+
+q∗ = arg max Eq log p(Oτ |θ) − DKL (q(θ) || p(θ))
+
+(32)
+
+q∈Q
+
+Proof 1:
+
+q∗ = arg min DKL (q(θ)||p(θ|Oτ ))
+
+(33)
+
+q∈Q
+
+= arg min log q(θ)dq(θ) − log p(θ|Oτ )dq(θ)
+
+(34)
+
+q∈Q
+
+= arg min log q(θ)dq(θ) − log p(Oτ |θ)dq(θ) − log p(θ)dq(θ) + log Z (35)
+q∈Q
+
+= arg min log q(θ)dq(θ) − log p(Oτ |θ)dq(θ) − log p(θ)dq(θ)
+
+(36)
+
+q∈Q
+
+= arg min Eq log q(θ) − Eq log p(Oτ |θ) + log p(θ)
+
+(37)
+
+q∈Q
+
+= arg max Eq log p(Oτ |θ) − DKL (q(θ) || p(θ))
+
+(38)
+
+q∈Q
+
+where Z is the normalizing constant. The functional in the objective is also known as the variational free energy Fq(θ) := Eq log p(Oτ |θ) − DKL (q(θ) || p(θ)).
+An alternative derivation, which is relevant to the discussion in Appendix E, can be found by deriving the lower-bound to the log marginal-likelihood:
+
+Proof 2:
+
+log Ep p(Oτ |θ) = log p(Oτ |θ)p(θ)dθ
+
+(39)
+
+= log p(Oτ |θ)p(θ)dθ
+
+(40)
+
+p(θ) = log p(Oτ |θ) q(θ) q(θ)dθ (41)
+p(θ) = log Eq p(Oτ |θ) q(θ) (42) ≥ Eq log p(Oτ |θ)p(θ) (43)
+q(θ) p(θ)
+= Eq log p(Oτ |θ) − Eq log q(θ) (44)
+
+= Eq log p(Oτ |θ) − DKL (q(θ) || p(θ))
+
+(45)
+
+14
+
+where (43) results from log-concavity and application of Jensen’s inequality. Equality is obtained when q matches the posterior probability. In other words, provided that p(θ|Oτ ) ∈ Q, we have:
+q∗(θ) = p(Oτ |θ) p(θ) = p(θ|Oτ ) (46) p(Oτ |θ) p(θ)dθ
+As such, we can deﬁne the minimization:
+
+− log Ep p(Oτ |θ) = min −Eq log p(Oτ |θ) + DKL (q(θ) || p(θ))
+
+(47)
+
+q∈Q
+
+E Connection to Path Integral Control
+
+The equation derived in (47) is well-known in statistical thermodynamics, where the random variable under consideration is the energy C(x) : Ωx → R, a non-negative real-valued measurable property, and x ∈ Rn is the state of the system. The Helmholtz free energy of C, with respect to probability density p, is deﬁned as the function :
+
+1 − α log Ep exp (−αC(x)) , (48)
+where α > 0 is the (inverse) temperature. The corresponding variational inequality, known as the Donsker-Varadahn principle [40, 41], relates the free energy as the Legendre transform of the entropy:
+
+1
+
+1
+
+1
+
+− log Ep exp (−αC(x)) = min − Eq log exp (−αC(x)) + DKL (q(x) || p(x)) (49)
+
+α
+
+qα
+
+α
+
+1
+
+= min Eq C(x) + DKL (q(x) || p(x))
+
+(50)
+
+q
+
+α
+
+Following the same derivation presented in (39)-(47), the solution is then found to be the Gibbs distribution:
+q∗ = exp (−αC(x)) p(x) . (51) exp (−αC(x)) p(x)dx
+
+In the context of stochastic dynamics, the above is also applicable to random paths generated by a Markov diffusion process [41]. This can then be extended to optimal control, by addressing the KL-minimization problem between controlled and uncontrolled stochastic systems. The connection was developed and explored for continuous-time dynamics in previous work, such as [27, 28]. Here, the nonlinear-afﬁne dynamics under consideration are subject to Brownian motion:
+
+xt+1 = f¯(xt) + G(xt)ut + B(xt)wt, wt ∼ N (0, Σ)
+
+(52)
+
+= f (xt, ut)
+
+(53)
+
+for the discrete-time case. For a SOC expected-cost objective:
+
+T1
+
+min J (Xt) = min Ef cterm(xT ) + ct(xt) + ut Rut ,
+
+(54)
+
+Ut
+
+Ut=(u0,...,uT )
+
+2
+
+t=0
+
+the optimal control distribution could be derived by a change of measure using Girsanov’s theorem, which was shown to satisfy the Hamilton-Jacobi-Bellman (HJB) equations for optimality. To solve the HJB equations, an exponentiated form of the value function, the desirability-function, was deﬁned: Ψ(xt) = exp (−αV(xt)). By application of the Feynman-Kac lemma, the transformed HJB partial differential equation can be solved as:
+
+Ψ(xt) = exp (−αC(Xt)) pf (Xt; xt)dXt
+
+(55)
+
+= Epf exp (−αC(Xt))
+
+(56)
+
+15
+
+where pf denotes the passive dynamics i.e. the probability density of trajectories Xt, resulting from the stochastic dynamics f (xt, ut) with ut = 0. Under the assumption that R = 1α Σ−1, this can then be used to evaluate the optimal control law:
+
+ut∗ = −αΣ G(xt) ∇xV(xt)
+
+= Σ G(xt) ∇x log Ψ(xt) = Σ G(xt) ∇xΨ . (57)
+Ψ
+
+For receding-horizon control, we can borrow from [1] and consider a discrete-time case of PathIntegral control for a nonlinear stochastic dynamical system:
+
+xt+1 = f¯(xt, vt), vt ∼ p(vt|ut)
+
+(58)
+
+with nominal deterministic dynamics f¯, commanded control input ut, and stochastic perturbations vt which are exhibited in the control input channel. The uncontrolled system is then realized when ut = 0, and is controlled otherwise. Given a sequence of perturbations: Vt = (vt, vt+1, ...vt+H−1), we can write the resulting state trajectory as Xt = F (xt, Vt), where F performs consecutive application of the dynamics f¯ given xt and a sequence Vt. We can then consider probability distributions directly over Vt, with p(Vt) for uncontrolled dynamics and q(Vt|Ut) for the controlled system, with the sequence of control inputs given by Ut = (ut, ut+1, ...ut+H−1). A cost on state C(Xt) is mapped to the random variable Vt by the convolution S = C ◦ F . Similarly to equations (47) and (50) above, we then seek a solution to minimize the variational objective:
+
+q∗ = arg min DKL (q || q∗(Vt) )
+
+(59)
+
+q
+
+1
+
+1
+
+q = arg min − α Eq log exp (−αS(Vt)) + α DKL (q || p) (60)
+
+1 q = arg min Eq S(Vt) + α DKL (q || p) (61)
+
+where the optimal distribution is then known to be
+
+q∗(Vt) = exp (−αS(Vt)) p(Vt) . (62) exp (−αS(Vt)) p(Vt)dVt
+
+Although we have the form of the optimal control distribution, an analytic solution is generally intractable due to the partition function. The algorithm for Model Predictive Path Integral Control (MPPI) [1, 3] proceeds by deﬁning a surrogate cross-entropy minimization problem:
+
+min DKL (q∗(Vt) || q)
+
+(63)
+
+q∈Q
+
+for a tractable family of distributions Q, typically ﬁxed-covariance Gaussians with mean parameters µt = Ut and an equivalent assumption on the controlled dynamics distribution.
+
+In the SV-MPC framework, the original variational objective of Path Integral control can be addressed, where
+
+min DKL (q || q∗(Vt) ) .
+
+(64)
+
+q∈Q
+
+We can apply the non-parametric Bayesian-MPC formulation (Setion 3) to solve for q∗(Vt) directly over Vt, setting the inference parameter to be θ = Vt with a prior given by the passive dynamics p(θ; xt) = p(Vt). The likelihood term p(Oτ |θ; ξ, xt) can be derived by using the exponentiatedutility L(Xt) = exp (−αC(Xt)) and deﬁning a dirac measure over state trajectories to denote the probability density of Xt given θ:
+
+p(Oτ |θ; ξ, xt) ∝ exp (−αC(Xt)) δ(Xt − F (xt, θ))dXt
+
+(65)
+
+= exp (−αC(F (xt, θ)))
+
+(66)
+
+= exp (−αS(θ)) .
+
+(67)
+
+16
+
+where we drop ξ-notation for the dynamics parameters for simplicity.
+
+We then recover the Bayesian formulation:
+
+q∗(θ) = p(Oτ |θ; ξ, xt) p(θ; xt) (68) p(Oτ |θ; ξ, xt) p(θ; xt)dθ
+
+= exp (−αS(θ)) p(θ; xt) (69) exp (−αS(θ)) p(θ; xt)dθ
+
+= p(θ|Oτ ; ξ, xt)
+
+(70)
+
+Approximate inference on the posterior p(θ|Oτ ; ξ, xt) can then be performed using Algorithm 1.
+
+We can further consider the special case of control-afﬁne dynamics of the form:
+
+xt+1 = f¯(xt) + G(xt)(ut + vt), vt ∼ N (0, Σ).
+
+(71)
+
+with passive dynamics:
+
+xt+1 = f¯(xt) + G(xt)vt, ut = 0 ∀ t .
+
+(72)
+
+We refer to this in trajectory-wise form as Xt = F (xt, Vt).
+
+By application of (57), the optimal control action can then be determined :
+
+u∗t = Σ G(xt) ∇xΨ = Σ G(xt) (73) ∇xEVt∼p(Vt) exp(−αS(Vt))
+
+Ψ
+
+EVt∼p(Vt) exp(−αS(Vt))
+
+EVt∼p(Vt) exp(−αS(Vt))∇xS(Vt)|x=xt
+
+= −αΣ G(xt)
+
+(74)
+
+EVt∼p(Vt) exp(−αS(Vt))
+
+≈ −αΣ G(xt) i=1 m exp(−αS(θi))∇xS(θi)|x=xt m (75) i=1 exp(−αS(θi))
+
+where ∇xS(θi)|x=xt is the gradient of the path cost with respect to the current state xt. This can be expressed in terms of the nominal dynamics by using the chain rule:
+
+∇xS(θi) |x=xt = dC(Xt) · dF (x, θi) (76)
+
+dXt Xt=F (xt,θi)
+
+dx x=xt
+
+Numerical evaluation of this gradient can be performed via backpropagation for each i-th particle.
+
+F Likelihood functions
+
+Exponentiated Utility (EU) By picking the cost-likelihood to be: L(τ ) = exp (−αC(Xt, Ut)), we obtain the likelihood function
+
+Eπθ,fˆξ L(τ ) = Eπθ,fˆξ exp (−αC(Xt, Ut)) .
+
+(77)
+
+This is otherwise known as the Free-Energy of the cost function C(xt, ut) [27], as well as the "soft maximum" or "risk-aware" loss. This yields the likelihood-gradient:
+
+∇θ log Eπθ,fˆξ L(τ ) = ∇θ log Eπθ,fˆξ exp (−αC(Xt, Ut))
+
+(78)
+
+Eπθ,fˆξ exp (−αC(Xt, Ut)) ∇θ log πθ
+
+=
+
+(79)
+
+Eπθ,fˆξ exp (−αC(Xt, Ut))
+
+As α → ∞, regions of high-cost are assigned lower probability, making the distribution of resulting policies risk-averse. Conversely, as α → 0, high-cost regions have higher likelihood, making the policy distributions more risk-seeking.
+
+17
+
+With this form of the gradient, we can choose a control policy as a sequence of Gaussian distributions
+over open-loop controls with ﬁxed covariance: given that πθt = πθt , πθt+1 , ..., πθt+H−1 , we
+have the instantaneous policy πθt = N (µt, Σt), our decision parameter is thus θt = µt = (µt, µt+1, ...µt+H−1), where µt ∈ Rd, Σt ∈ Rd×d. Considering the SV-MPC step in (15) for a single particle, we can derive the update for a parameter element h ∈ (t, t + 1, ..., t + H − 1):
+
+θh = θh + ∇θh log pt(Oτ | θ; ξ, xt) + ∇θh log q˜t(θ)
+
+(80)
+
+Eπθ,fˆξ exp (−αC(Xt, Ut)) ∇θh log πθh
+
+= θh +
+
++ ∇θh log q˜t(θ)
+
+(81)
+
+Eπθ,fˆξ exp (−αC(Xt, Ut))
+
+= θh + Σ−t 1 Eπθ,f + ∇θh log q˜t(θ) (82) ˆξ exp (−αC(Xt, Ut)) (uh − θh) Eπθ,fˆξ exp (−αC(Xt, Ut))
+
+= (I − Σ−t 1) θh + Σ−t 1 Eπθ,f + ∇θh log q˜t(θ) (83) ˆξ exp (−αC(Xt, Ut)) uh Eπθ,fˆξ exp (−αC(Xt, Ut))
+
+where the gradient of the log-prior will depend on the particular choice of transition probability,
+
+pt(θ|θ˜; xt+1), used in the shift operation (see Appendix C). The update reduces to that found in
+
+MPPI [1] if we consider the control distribution to be uncorrelated across dimensions (as is often
+
+done in practice): Σt = σt2I. Setting the step-size to controls, pt(θ|θ˜; xt+1) = U (θmin, θmax):
+
+= σ2, and assuming a uniform prior on
+
+θh = (I − σt2 σt−2I) θh + σt2 σt−2I Eπθ,f + 0 (84) ˆξ exp (−αC(Xt, Ut)) uh Eπθ,fˆξ exp (−αC(Xt, Ut))
+
+Eπθ,fˆξ exp (−αC(Xt, Ut)) uh
+
+=
+
+,
+
+(85)
+
+Eπθ,fˆξ exp (−αC(Xt, Ut))
+
+recovering the MPPI update rule.
+
+Probability of Low Cost (PLC) Similarly to [2], we can incorporate a threshold-utility to indicate preference for costs below a given threshold, using the indicator function: L(τ ) =
+1C≤Ct,max (C(Xt, Ut)). The likelihood then takes the form
+
+Eπθ,fˆξ L(τ ) = Eπθ,fˆξ 1C≤Ct,max (C(Xt, Ut)) .
+
+(86)
+
+with the resulting gradient:
+
+∇θ log Eπθ,fˆξ
+
+L(τ )
+
+Eπθ,fˆξ 1C≤Ct,max (C(Xt, Ut))∇θ log πθ
+=
+Eπθ,fˆξ 1C≤Ct,max (C(Xt, Ut))
+
+(87)
+
+The threshold parameter Ct,max is set adaptively as the largest cost of the top member in the elite fraction of sampled trajectories. Using the same derivation for the case of Exponentiated Utility likelihood, the choice of a Gaussian policy with a threshold-utilty reduces to the update rule for the Cross Entropy Method [32]:
+
+Eπθ,fˆξ 1C≤Ct,max (C(Xt, Ut))uh
+
+θh =
+
+.
+
+Eπθ,fˆξ 1C≤Ct,max (C(Xt, Ut))
+
+(88)
+
+G Nonparametric Bayesian MPC
+
+Inference can be performed directly over the posterior of control input sequences θ (ut, ut+1, ..., ut+H−1). Assuming the likelihood gradient in the Bayesian MPC setting can be
+
+18
+
+derived for differentiable dynamics:
+
+Efˆξ L(Xt) ∇θ log p(Xt|θ; ξ, xt)
+
+∇θ log Efˆξ L(Xt) =
+
+(89)
+
+Efˆξ L(Xt)
+
+Similarly to the parametric formulation, the form of the cost-likelihood L will result in a particular update rule. The gradient can generally be evaluated by approximating the expectations with Monte Carlo sampling of state trajectories given the controlled stochastic dynamics., and evaluating the gradients on sampled trajectories. Under certain conditions, however, it may be evaluated in closed form. Such is the case for a Linear-Quadratic-Gaussian (LQG) system, for example [27].
+
+H Motion Planning
+
+A special case can be considered for deterministic dynamics. We can deﬁne the stochastic
+dynamics using a dirac measure on the space of trajectories: p(Xt|θ; ξ, xt) = δ(Xt − Xt), where Xt = F (θ, ξ, xt), and F performs consecutive application of the deterministic dynamics f . Setting L(Xt, θt) = exp(−αC(Xt, θt)), the gradient then reduces to :
+
+∇θ exp (−αC(Xt, θ)) δ(Xt − Xt)dXt
+
+∇θ log Efˆξ L(Xt, θ) =
+
+(90)
+
+exp (−αC(Xt, θ)) δ(Xt − Xt)dXt
+
+= ∇θ exp −αC(Xt, θ) (91) exp −αC(Xt, θ)
+
+= −α exp −αC(Xt, θ) ∇θC(Xt, θ) (92) exp −αC(Xt, θ)
+
+= −α∇θC(Xt, θ)
+
+(93)
+
+The gradient can then be evaluated in a straightforward manner via back-propagation on the cost function, through the dynamics.
+
+I Complexity
+The implementation of SV-MPC requires the computation of the kernel Gram-matrix K(θi, θj) ∀ i, j ∈ (1, ..., m) for the SVGD update. This requires an inner-product operation for all particle pairs, resulting in a computational complexity of O(m2hd) (where m : number of particles, h : horizon, d : control dimension). However, by exploiting structured kernels for trajectories, the scaling with respect to the horizon can be removed by parallel computation of kernel factors. Evaluation of a kernel factor is then a constant-time operation (O(1)), and the overall SVMPC complexity reduces to O(m2). In practice a relatively low order of particles is required: m << 1 × 103. The core bottleneck is typically the generation of rollout trajectories from control samples during each iteration of MPC, which can be performed in parallel but is linear in time with respect to the horizon h. As with most MPC applications, the horizon length, number of samples, etc. can be varied to balance accuracy with runtime complexity, depending on the constraints of the system.
+
+J Experimental Details
+The environment and controller parameters used in the experiments are summarized in tables 2 and 3, respectively. Note for Table 3: the utility function parameter, such as α and elite fraction, share the same values as those used by SV-MPC for either EU or PLC likelihood.
+Planar navigation The SV-MPC controller with exponentiated-utility (EU) is constructed with a set of 6 to 32 particles, where the gradient of each particle is estimated via Monte-Carlo sampling of control and state trajectories. At each round, the best-performing particle is chosen to generate the action using (24).
+
+19
+
+For state xt = (xt, x˙ t) and control ut = x¨t, where xt, x˙ t, x¨t are the 2D position, velocity and acceleration, respectively, and the xgoal the target 2D goal position, we deﬁne the instantaneous and terminal costs (with respect to (1)):
+
+c(xt, ut) = 0.5(xt − xgoal) (xt − xgoal) + 0.25x˙ t x˙ t + 0.2x¨t x¨t
+
+(94)
+
+cterm(xt) = 1000(xt − xgoal) (xt − xgoal) + 0.1x˙ t x˙ t
+
+(95)
+
+Manipulation Leveraging parallel simulation provides the ability to efﬁciently compute highlyresolved geometric constraints between the robot and obstacles, eliminating the need for coarselydeﬁned heuristics for collision detection (such as signed-distance ﬁelds [37]). Although the dynamics are deterministic, the problem remains challenging since the posterior probability distribution implies a nonlinear mapping (via inverse kinematics) from the work-space to the sampling space.
+
+The cost-function consists of a cost on cartesian distance-to-goal from the end-effector, as well as a penalty on control. For state xt = (et, e˙t) and control ut = q˙t, where et, e˙t, are the cartesian end-effector positions and velocities, respectively, q˙ the joint velocities, and the egoal the target 3D goal position, we deﬁne the instantaneous and terminal costs (with respect to (1)):
+
+c(xt, ut) = 1(et − egoal) (et − egoal) + 0.25e˙t e˙t + 0.1q˙t q˙t
+
+(96)
+
+cterm(xt) = 5000(et − egoal) (et − egoal) + 0.1e˙t e˙t
+
+(97)
+
+Stochastic HalfCheetah We modify the cost function to reward forward velocity only if the agent is forward-facing, as done in [22], along with a control penalty. Without this alteration, progress can be made fairly easily by applying torque commands in a single direction, and ‘cart-wheeling’ the system. For instantaneous forward velocity vt and body angle β,
+c(xt, ut) = 0.1ut ut − vt (1 + sgn(cos β)) (98) 2
+
+Motion Planning The dynamics consist of a deterministic, velocity controlled single-integrator
+
+model on the 2D position: xt+1 = xt + ut∆t, where xt, ut ∈ Rd×1 (d = 2). In the example, we use a constant-control (i.e. zero-acceleration) prior on velocities: ut+1 = ut + wt, wt ∼ N (0, Σ).
+
+We can construct the prior over sequences by ﬁrst considering the convolution of control inputs over
+
+the planning horizon T :  u0  I 0 0 · · · 0  w−1 
+
+ u1  I I 0 · · · 0  w0 
+
+ 
+
+u2
+
+ = I
+
+I
+
+I
+
+···
+
+0 
+
+w1
+
+ ,
+
+(99)
+
+. .
+
+ ..
+
+..
+
+..
+
+..
+
+ .   . 
+
+.
+
+.. . .
+
+.
+
+uT −1
+
+I I I · · · I wT −2
+
+where we assume the initial control is drawn from the same zero-mean distribution: u0 = w−1 ∼
+N (0, Σ). For the sequences U [u0, u1, ..., uT −1] and W [w−1, w0, w1, ..., wT −2] , we can write the above as:
+
+U = LW
+
+(100)
+
+with L deﬁned as the lower-triangular matrix. We can then deﬁne the prior over control sequences:
+
+U ∼ p(U ) = N (0, Σ)
+
+(101)
+
+with covariance Σ = LDLT , where D = diag(Σ, Σ, ..., Σ) ∈ RT d×T d. Note that the precision matrix Σ−1 is tri-diagonal, implying a graphical structure with Markovian dependencies. In the SV-MPC optimization, the prior can also be interpreted as a penalty which encourages smooth state trajectories (similarly to the GP-prior described in [37]). In the motion planning problem, we use this multi-variate Gaussian as the prior over particles: p(θ) = N (0, Σ).
+
+Furthermore, the cost function deﬁned for this problem includes a smooth obstacle cost-map. This is generated using a bi-modal mixture of Gaussians, with the probability of collision given by pobs(xt). The cost function is then:
+
+c(xt) = 1 × 105 pobs(xt)
+
+(102)
+
+cterm(xt) = 1000(xt − xgoal) (xt − xgoal)
+
+(103)
+
+20
+
+Experiment
+
+Episode length
+
+Planar Nav.
+
+300
+
+Manipulation 150
+
+Stoch.
+
+300
+
+HalfCheetah
+
+Table 2: Environment Parameters
+
+Trials
+
+state control control
+
+space space limits
+
+(xt ∈) (ut ∈)
+
+25
+
+R4
+
+R2 [−50, 50]
+
+24
+
+R14
+
+R7
+
+[−1, 1]
+
+16
+
+R18
+
+R6
+
+[−1, 1]
+
+timestep (∆t)
+0.015 0.067 0.05
+
+dyn. noise σ2dyn
+0.1 — 0.25
+
+Table 3: Experiment Controller Settings. Planar Nav. Manipulation
+
+Planning Horizon (H)
+
+64
+
+64
+
+Warm-start iterations
+
+30
+
+25
+
+Optimization iterations per timestep
+
+1
+
+1
+
+Control variance (σ2)
+
+100
+
+0.25
+
+num. particles (m)
+
+6, 12, 32
+
+4
+
+num. ctrl. samples per particle
+
+8
+
+32
+
+SV-MPC step-size ( )
+
+10
+
+0.1
+
+cost-likelihood (L(·))
+
+EU
+
+EU
+
+MPPI
+
+num. control samples inverse-temperature (α)
+
+32
+
+128
+
+1 × 10−3
+
+0.1
+
+CEM
+
+num. control samples elite fraction
+
+32
+
+128
+
+0.1
+
+0.1
+
+Stoch. HalfCheetah
+30 20 5 1 5 32 1 EU, PLC 160 1 160 0.1
+
+K Additional Results
+
+Planar Navigation Table 6, we include quantitative summaries of performance across control types. The performance of the SV-MPC controller improves with increasing particle number.
+
+Figure 6: Statistics for planar navigation task over 25 trials (4x4 obstacle grid)
+
+Controller
+SV-MPC MPPI CEM
+
+Num. of particles
+32 12 6 — —
+
+Avg. cost of success (×103)
+20.7 21.8 25.6 26.5 25.4
+
+Success rate (%)
+96 96 84 64 64
+
+21
+
+

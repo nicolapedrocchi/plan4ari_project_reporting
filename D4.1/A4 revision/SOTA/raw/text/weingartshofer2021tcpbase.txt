@@ -1,0 +1,1806 @@
+2021 IEEE International Conference on Robotics and Automation (ICRA 2021) May 31 - June 4, 2021, Xi'an, China
+
+2021 IEEE International Conference on Robotics and Automation (ICRA) | 978-1-7281-9077-8/21/$31.00 ©2021 IEEE | DOI: 10.1109/ICRA48506.2021.9561900
+
+Optimal TCP and Robot Base Placement for a Set of Complex Continuous Paths
+Thomas Weingartshofer1, Christian Hartl-Nesic1 and Andreas Kugi1,2
+
+Abstract— The robot base placement of an industrial robot in ﬂexible production lines is crucial due to the limited workspace of robots, in particular for complex continuous paths that change frequently. Costly and time-consuming repositioning of the robot can be avoided by merely adapting the tool center point (TCP) of the robot, which is the focus of this work. To this end, an algorithm for the optimal TCP placement for a set of tool paths is proposed. This algorithm is based on a fast joint-space path planner which is capable of moving through kinematic singularities and takes into account wide turning ranges of individual robot axes. Furthermore, the proposed concept also applies to the optimal robot base placement. The feasibility of the approach is demonstrated for a trim application in shoe production for a set of 44 complex continuous tool paths.
+I. INTRODUCTION
+While designing a production cell with an industrial robot, the position and orientation, i.e. the pose, of the robot base relative to the workpiece has to be chosen appropriately. In a ﬂexible robot work cell, however, products and robot tool paths may change frequently, possibly exceeding the capabilities of the work cell. Instead of adapting the complete setup or remounting the robot, which is a costly and timeconsuming process, it is often sufﬁcient to merely adapt the tool center point (TCP) of the robot using simple mechanical adapters. In this work, we focus on optimal placement of the TCP, which gained little attention in the literature so far.
+Most works in the literature deal with base pose optimization only, considering different properties of the robot, i.e. kinematics [1], dynamics [2], manipulability [3], stiffness [4], and time-optimality [5]. For example, the stiffness and deformation of individual axes are considered for the base placement in milling tasks [6] to satisfy the high accuracy requirements. In some applications, i.e. mostly for milling and welding tasks, continuous end-effector paths are investigated. In [7] and [8], the elastostatic model of the robot is used to ﬁnd the optimal workpiece placement for continuous paths by minimizing the distance between the robot tool and its desired path. In [9], genetic algorithms are used that consider kinematic and dynamic manipulability and milling forces for a given trajectory. A fast search for a feasible workpiece pose is shown in [10] for a 7 degrees of freedom (DOF) robot with a tool axis redundancy, by successively considering additional constraints in an optimization problem. Other
+1T. Weingartshofer, C. Hartl-Nesic and A. Kugi are with the Automation and Control Institute, TU Wien, 1040 Vienna, Austria, {weingartshofer,hartl,kugi}@acin.tuwien.ac.at
+2A. Kugi is with the Center for Vision, Automation & Control, AIT Austrian Institute of Technology GmbH, 1210 Vienna, Austria, andreas.kugi@ait.ac.at
+
+works concerned with robot base placement only consider individual poses instead of continuous paths, e.g., for spot welding [11], [12], short seam welding [13] or pick-andplace tasks using mobile robots [14]. Further works are focused on capability and reachability maps which are mostly used to position robots in grasping tasks, e.g., [15], [16] and [17].
+For most applications, industrial robots with 6-DOF, a spherical wrist and axis ranges wider than 360° are used. Therefore, more than the usual 8 inverse kinematics solutions, which result in the same end-effector pose, have to be considered. In [18], the feasibility of the whole path is investigated while focusing mainly on cycle times. The work [19] combines two optimization loops, where in the inner loop, a redundant DOF is used to avoid singularities and the dynamical limits and in the outer loop, a particle swarm optimization searches for the global optimal robot base pose. Although wide axis ranges are considered in both works, the same solution of the inverse kinematics is used throughout a single path execution.
+A survey of sampling-based path planning methods which systematically incorporate constraints is given in [20]. The graph-based Descartes algorithm described in [21] considers movements through multiple inverse kinematic solutions. However, this planner only outputs a single solution for each path planning problem and exhibits comparably long computation times. More advanced path planning algorithms like [22] and [23] cover a wider range of applications, but also suffer from higher computational costs. Hence, they could not be used for our purpose.
+In this work, a fast joint-space path planner is proposed which considers all feasible kinematic solutions arising from wide turning ranges of robot axes. Additionally, this planner is capable to generate multiple joint-space paths besides moving through kinematic singularities. Based on the output of the joint-space path planner, the optimal TCP is determined as the solution of an optimization problem, in which the joint-space motions and robot limits are considered. To the best of the authors’ knowledge, such an approach has not been proposed in the literature yet. This work shows that adapting the TCP for a misplaced robot can avoid repositioning of the robot base. Furthermore, not only one path is considered, but a set of paths is taken as input for the optimization. The robot cell is only productive if the robot can execute all desired paths. The optimization problem is formulated in a general way, such that it is also applicable to optimal robot base placement.
+
+978-1-7281-9077-8/21/$31.00 ©2021 IEEE
+
+9659
+
+Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:14:31 UTC from IEEE Xplore. Restrictions apply.
+
+This paper is organized as follows. In Section II, the kinematic model of a general robot is introduced and the inverse kinematics is summarized. The underlying joint-space path planner is proposed in Section III. The optimization algorithm is stated in Section IV, where the optimization criteria are described in detail. In Section V, the proposed algorithm is applied to a trim application, where the optimal robot base and the TCP placement are calculated for a set of 44 complex continuous paths. Finally, conclusions are drawn in Section VI.
+II. MATHEMATICAL ROBOT MODEL In this section, the mathematical model of a general robot with f DOF is introduced [24]. For the actual application in Section V, the 6-DOF robot KUKA CYBERTECH KR8 R1620 with a spherical wrist is used, see Fig. 2.
+
+A. Forward Kinematics
+
+The forward kinematics of a robot with f DOF describes
+
+the end-effector frame E w.r.t. the robot base frame B in the
+
+form
+
+pE
+
+E
+
+B
+
+yB = E = h(q) ,
+
+(1)
+
+φB
+
+using the Cartesian position (pEB)T =
+
+xE
+B
+
+yE
+B
+
+zE
+B
+
+∈ R3
+
+and the EULER angles (φEB)T =
+
+φE
+B,z
+
+φE
+B,y
+
+φE
+B,x
+
+∈ R3
+
+in TAIT-BRYAN convention, i.e. a sequence of rotations
+
+around the axes z, y and x. Note that also a lower-
+
+dimensional output space may be chosen in (1). The vector
+
+qT = q1 · · · qf consists of the robot joint angles, which
+
+are also called a joint conﬁguration. Equivalently, the end-
+
+effector
+
+pose
+
+yE
+B
+
+is
+
+written
+
+as
+
+a
+
+homogeneous
+
+transformation
+
+in the form
+
+E
+
+REB(q) pEB(q)
+
+REB (φEB )
+
+pE
+B
+
+HB(q) =
+
+=
+
+0
+
+1
+
+0
+
+1
+
+, (2)
+
+with
+
+the
+
+Cartesian
+
+position
+
+pE
+B
+
+and
+
+the
+
+rotation
+
+matrix
+
+RE
+B
+
+∈
+
+SO(3),
+
+which
+
+is
+
+computed
+
+by
+
+using
+
+E
+φB
+
+from
+
+(1).
+
+In
+
+the
+
+remainder
+
+of
+
+this
+
+work,
+
+the
+
+notations
+
+yB
+A
+
+and
+
+HB
+A
+
+according
+
+to (1) and (2) are employed for all transformations between
+
+any frames A and B.
+
+B. Inverse Kinematics The inverse function of h(q) in (1) is the inverse kine-
+matics of a robot, formally written as
+
+Q = h−1(yBE ) ,
+
+(3)
+
+where Q is the set of all possible solutions qk and k is the solution index. The solution of (3) requires the use of trigonometric functions like atan2(y, x) : R × R → [−π, π], which considers the four quadrants of the input arguments y and x [24]. Robot joints with a wide turning range beyond [−π, π] provide additional feasible solutions, which are found by adding ±2π accordingly.
+
+III. JOINT-SPACE PATH PLANNER The algorithm for the optimal TCP placement in Section IV is based on the results of a joint-space path planner which is introduced in this section. In the following, the TCP frame is denoted by T . The objective of the path planner is to ﬁnd all feasible continuous joint-space paths P for a given task-space path H, also denoted as tool path. The task-space path H is deﬁned as a sequence containing the homogeneous transformations HB,d T ,i , i = 1, . . . , n. The joint-space path planner is formulated in Algorithm 1 in the following.
+
+Algorithm 1 Joint-space path planner
+
+Require: HB,d T ,i , i = 1, . . . , n INITIALIZE:
+
+for i = 1 to n do
+
+E ,i
+
+T ,i T −1
+
+HB ← HB,d HE
+
+Qi ← h−1 yBE,i
+
+Li ← feasibleSolutionIndices(Qi)
+
+end for
+
+SEARCH CONTINUOUS JOINT-SPACE PATHS:
+
+C ← L1
+
+∀c ∈ C : Pc ← {q1c}
+
+for i = 2 to n do
+
+for all Pc, c ∈ C do
+
+lmin ← arg minl∈Li
+
+qi
+l
+
+−
+
+lastElement(Pc)
+
+2
+
+if
+
+i
+qlmin
+
+− lastElement(Pc)
+
+2
+
+<T
+
+then
+
+Pc
+
+←
+
+Pc
+
+∪
+
+{qi }
+lmin
+
+else
+
+C ←C\c
+
+end if
+
+end for
+
+end for
+
+First, in the initialization phase of Algorithm 1, the inverse kinematics from Section II-B is applied to each pose HB,d T ,i of the path using
+
+E ,i
+
+T ,i T −1
+
+HB = HB,d HE
+
+(4a)
+
+Qi = h−1 yBE,i , (4b)
+
+for i = 1, . . . , n to obtain the sets Qi containing s ∈ N
+
+inverse
+
+kinematic
+
+solutions
+
+qi
+k
+
+for
+
+all
+
+poses
+
+yBE ,i .
+
+Let
+
+Li
+
+denote the index set of feasible solutions of Qi, i.e. all inverse
+
+kinematic solutions which satisfy the kinematic constraints
+
+like mechanical joint limits. Note that if the DOF of the robot
+
+are larger than the dimension of the output space in (1) the
+
+sets Qi have to be sampled accordingly [21]. Then, starting
+
+with c ∈ L1, all possible sequences of feasible continuous
+
+joint-space paths Pc are determined. The ﬁrst element of the
+
+sequence Pc, c ∈ L1, corresponds to the inverse kinematics
+
+solution q1c. The second element of the sequence Pc, c ∈ L1,
+
+is obtained by minimizing the Euclidean distance q2l −q1c 2
+
+for all l ∈ L2, where lmin refers to the index of the
+
+solution with minimum distance. If
+
+q2 − q1
+
+lmin
+
+c
+
+2
+
+<
+
+T,
+
+with a user-deﬁned threshold T , then the second element
+
+9660 Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:14:31 UTC from IEEE Xplore. Restrictions apply.
+
+q1
+
+q2
+
+q3
+
+1
+
+1
+
+1
+
+q1
+
+q2
+
+q3
+
+2
+
+2
+
+2
+
+q1
+
+q2
+
+q3
+
+3
+
+3
+
+3
+
+q1
+
+q2
+
+q3
+
+4
+
+4
+
+4
+
+q1
+
+q2
+
+q3
+
+5
+
+5
+
+5
+
+P2 “ tq12, q23, q32, . . . u P4 “ tq14, q24, q35, . . . u Fig. 1. Example of the path planner searching for continuous paths, where grey nodes represent non-feasible joint conﬁgurations. Thereby, solid arrows represent transitions with the shortest Euclidean distance, while dashed arrows represent discarded transitions between feasible joint conﬁgurations.
+
+of
+
+the
+
+sequence
+
+Pc
+
+is
+
+2
+qlmin ,
+
+otherwise
+
+Pc
+
+is
+
+discarded
+
+and
+
+a
+
+new index set C of feasible continuous joint-space paths is
+
+deﬁned as C = L1 \ c . This procedure is now sequentially
+
+applied to all further path points i = 3, . . . , n. With this
+
+approach, multiple continuous joint-space paths Pc, c ∈ C,
+
+are found for a given task-space path H. This joint-space
+
+path planner is capable of considering movements through
+
+kinematic singularities and wide turning axis ranges, since
+
+every possible sequence of inverse kinematic solutions is
+
+examined.
+
+A visual representation of the search for continuous join-
+
+space paths is shown in Fig. 1. In this ﬁgure, light grey nodes
+
+represent non-feasible solutions due to kinematic constraints,
+
+while black nodes represent feasible joint conﬁgurations.
+
+The shortest Euclidean distances are indicated as arrows
+
+with solid lines and the dashed lines represent discarded
+
+transitions.
+
+IV. OPTIMAL TCP PLACEMENT
+
+In this section, the algorithm to determine the optimal
+
+pose
+
+yT
+E
+
+of the TCP frame T
+
+w.r.t. the end-effector frame
+
+E is described. By simply adapting the TCP of the robot
+
+using an optimization-based approach, redesigning the robot
+
+work cell and repositioning of the robot can be avoided.
+
+First, in Section IV-A, a set of paths is introduced as input
+
+for the optimization. Second, the objective function and the
+
+optimization criteria are presented in Section IV-B and third,
+
+the optimization algorithm is speciﬁed in detail in Section IV-
+
+C. Finally, in Section IV-D, the algorithm is adapted for
+
+optimal robot base placement.
+
+A. Set of Paths
+
+The set of tool paths {H1, . . . , Hm} is considered as input
+
+for the algorithm. The joint-space path planning algorithm
+
+from Section III is executed for all tool paths Hj, j =
+
+1,
+
+.
+
+.
+
+.
+
+,
+
+m,
+
+for
+
+a
+
+given
+
+TCP
+
+pose
+
+yT
+E
+
+,
+
+resulting
+
+in
+
+the
+
+feasible
+
+joint-space paths P j = {Pcj | c ∈ Cj}, j = 1, . . . , m, for
+
+all tool paths. Note that Cj is the index set for the feasible solutions of the corresponding path j. Each tool path Hj consists of nj poses.
+
+B. Objective Function and Optimization Criteria
+
+The objective function f (yET ) computes a scalar measure
+
+for
+
+a
+
+given
+
+TCP
+
+pose
+
+yT
+E
+
+.
+
+The
+
+results
+
+of
+
+the
+
+joint-space
+
+path planner from Section III are used as qualitative and
+
+quantitative measure in the objective function of the opti-
+
+mization. Note that the optimization problem is formulated
+
+as a maximization problem.
+
+The objective function f (yET ) consists of four terms
+
+T a1f1(yET ) + a2f2(yET ) + a3f3(yET ) + a4f4(yET )
+
+f (yE ) =
+
+,
+
+a1 + a2 + a3 + a4 (5)
+
+where the coefﬁcients at are manually tuned weights of the
+
+individual terms ft(yET ), t = 1, . . . , 4. The individual terms
+
+ft(yET ) are constructed as follows:
+
+• The term f1(yET ) accounts for the number of feasible
+
+inverse kinematic solutions si,j for every path point i =
+
+1, . . . , nj of every tool path j = 1, . . . , m, i.e.
+
+T 1 m 1 nj
+
+f1(yE ) =
+
+si,j .
+
+(6)
+
+sm j=1 nj i=1
+
+Note that the pre-factor in (6) normalizes the function. The constant s denotes the maximum number of inverse kinematics solutions for the robot. The term (6) locally generates a gradient in a meaningful direction and, thus, local minima are avoided in the objective function (5). • The function f2(yET ) corresponds to the number of feasible continuous solutions for each tool path j =
+
+1, . . . , m m
+
+T
+
+1
+
+f2(yE ) =
+
+|Cj| ,
+
+(7)
+
+sm j=1
+
+where |Cj| denotes the cardinality of the set Cj. The higher the objective term (7), the more tool paths are continuously executable by the robot. • By including f3(yET ) in the objective function, the joint movement between consecutive path points is minimized for continuous paths. The objective term f3(yET ) is deﬁned as
+
+m
+
+nj −1
+
+T
+
+1
+
+1
+
+f3(yE ) =
+
+i+1 i −1
+q −q 2 ,
+
+m j=1 (nj −1)|Cj | c∈Cj i=1
+
+(8)
+
+where qi is the ith element of the sequence Pcj. Again,
+
+the pre-factors normalize the objective term (8).
+
+• A robot setup is more ﬂexible, if it is also able to
+
+execute paths, for which the TCP was not optimized.
+
+Hence, the last term f4(yET ) considers the reserves of
+
+the joint angles to the respective mechanical joint limits
+
+qh,min and qh,max, h = 1, . . . , f during the robot motion
+
+and is given by
+
+T 1 m 1 nj f4(yE ) =
+m j=1 nj |Cj | c∈Cj i=1
+
+q¯(qi)
+
+−1 2
+
+, (9)
+
+9661
+
+Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:14:31 UTC from IEEE Xplore. Restrictions apply.
+
+with qi ∈ Pcj, where the vector-valued function q¯T(q) = q¯1 · · · q¯f contains the entries
+
+q¯h = 2qh − (qh,max + qh,min) , qh,max − qh,min
+
+h = 1, . . . , f . (10)
+
+C. Optimization Algorithm Using the objective function (5), the optimization problem
+for the optimal TCP placement is formulated as
+
+T
+
+T
+
+yE,opt = arg max f (yE )
+
+yTE ∈R6
+
+T
+
+T
+
+T
+
+s.t. yE,min ≤ yE ≤ yE,max .
+
+(11a) (11b)
+
+Note that f (yET ) is not continuously differentiable. Furthermore, the path planning is computationally quite expensive, in particular if a large set of paths is considered. Therefore, a surrogate optimization approach is chosen. Speciﬁcally, the MATLAB implementation SURROGATEOPT is used to solve (11), which uses an approximation of the objective function to search for the global optimum [25]. Additionally, the parallel nature of this algorithm is utilized to reduce the computation time.
+
+D. Robot Base Placement By considering a new optimization variable, the problem
+(11) is adapted in a straightforward way for optimal robot base placement, which is described in this section. To this end, the offset frame O is introduced and the homogeneous transformation HB,d T ,i from (4) is reformulated as
+
+T ,i O
+
+O O T ,i
+
+HB,d(xB ) = HB (xB )HO,d ,
+
+(12)
+
+with the new optimization variable (xOB )T =
+
+xO
+B
+
+yO
+B
+
+and
+
+a
+
+constant
+
+height
+
+zO
+B
+
+=
+
+0.193 m.
+
+Note
+
+that
+
+the
+
+tool
+
+paths
+
+HO,d T ,i in (12) are now speciﬁed w.r.t. the offset frame O.
+
+The optimization problem (11) is adapted in the form
+
+O
+
+O
+
+xB,opt = arg max f (xB )
+
+xO B ∈R2
+
+O
+
+O
+
+O
+
+s.t. xB,min ≤ xB ≤ xB,max ,
+
+(13a) (13b)
+
+which is again solved with the surrogate optimization approach.
+
+V. RESULTS In this section, the optimal placement of the TCP and the robot base is applied to a robot work cell performing a trim application. Thereby, a robot trims excess material from a shoe sole arising from injection molding, which is a common task in semi-automated shoe manufacturing. In this application, the 6-DOF robot KUKA CYBERTECH KR8 R1620 with a spherical wrist is used, see Fig. 2. The DENAVIT-HARTENBERG parameters [24] as well as the mechanical joint limits qmin and qmax of the robot are listed in Tab. I. Note that the range of joint 3 is constrained additionally by the workshop ﬂoor and the energy chain of the tool. The robot base and the TCP have to be placed such that all 22 trim paths for the left and the right shoe, i.e.
+
+d4
+
+d6
+
+x2, x3
+
+x4, x5 xE E T
+
+zT
+
+a3 z3 z5,zE
+
+z2
+
+z4
+
+q3
+
+q4
+
+q5 q6 xT
+
+a2
+
+q2
+
+z1
+
+x1
+
+d1 q1 z0
+x0 B a1 Fig. 2. Coordinate frames of the KUKA CYBERTECH KR8 R1620 with revolute joints qh turning around the zh−1 axes, h = 1, . . . , 6.
+
+44 paths in total, are executable. Two of the trim paths are shown in Fig. 3, where the robot base frame B is located at the origin. All trim paths are described in the offset frame O. All feasible joint-space solutions for a single trim path with n = 638 are found in less than 100 ms using the fast jointspace path planner from Section III on a CORE i7-8700K with 16 GB RAM.
+
+A. Optimal Robot Base Placement
+
+In this section, the placement of the robot base for
+
+the trim application is investigated, which is analogous
+
+to workpiece placement. The homogeneous transformation
+
+HT
+E
+
+in
+
+(4)
+
+is
+
+taken
+
+from
+
+the
+
+existing
+
+tool
+
+as
+
+(yT )T
+E ,ex
+
+=
+
+−0.066 m 0 0.269 m π 0.719 rad −π .
+
+To illustrate and discuss the objective function f (xOB )
+
+for the surrogate optimization algorithm, a MONTE-CARLO
+
+simulation
+
+in
+
+the
+
+admissible
+
+range
+
+of
+
+xO
+B
+
+is
+
+performed
+
+and
+
+shown in Fig. 4. In this ﬁgure, dark blue areas represent high
+
+values of the objective function and red areas indicate low
+
+values. Furthermore, Fig. 4 reveals three distinct plateaus,
+
+originating from the objective term f2(yET ). For a robot base
+
+placement
+
+xO
+B
+
+in
+
+the
+
+blue
+
+area,
+
+the
+
+joint-space
+
+paths
+
+for
+
+TABLE I DENAVIT-HARTENBERG PARAMETERS OF THE
+KUKA CYBERTECH KR8 R1620, SEE [26]
+
+h
+
+Θh
+
+dh(mm) ϑh(°) ah(mm) qh,min/max(°)
+
+1
+
+q1
+
+450
+
+−90
+
+150
+
+±170
+
+2
+
+q2
+
+0
+
+0
+
+810
+
+3 q3 − π2
+
+0
+
+−90
+
+20
+
+4
+
+q4
+
+660
+
+90
+
+0
+
+−185/65 60/163 ±185
+
+5
+
+q5
+
+0
+
+−90
+
+0
+
+±120
+
+6
+
+q6
+
+80
+
+0
+
+0
+
+±350
+
+9662 Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:14:31 UTC from IEEE Xplore. Restrictions apply.
+
+zB (m) 0.5
+
+q¯h
+
+for
+
+xO
+B
+
+=
+
+xO
+B,sub
+
+q¯h
+
+for
+
+xO
+B
+
+=
+
+xO
+B,opt
+
+1 h=1
+
+h=2
+
+h=3
+
+0.5
+
+0.25
+
+O
+
+0
+
+0 −0.5
+
+0.5 0B
+
+−1 1 1 h=4 h=5 h=6
+
+yB (m)
+
+0.5
+
+0.5
+
+−0.5 0
+
+xB (m)
+
+Fig. 3. Example trim paths for the left and the right shoe given in the offset frame O.
+
+1 all trim paths can be solved by the algorithm. The green
+area marks positions, where only a subset of trim paths can be solved and in the red area, none of the trim paths are
+0.5 executable by the robot.
+
+With
+
+the
+
+boundaries
+
+(xO )T
+B,min
+
+=
+
+0 −1 m and
+
+(xO )T
+B,max
+
+=
+
+1.5 m
+
+1 m given by the possible workspace
+
+xB (m) at the production line, the optimal robot base placement
+
+0 OT (xB,opt) =
+
+0.902 m
+
+0.003 m
+
+(14)
+
+is
+
+obtained.
+
+This
+
+optimal
+
+point
+
+xO
+B,opt
+
+is
+
+found
+
+by
+
+applying
+
+the surrogate optimization, in which the objective function
+
+(5) is evaluated about 25 times. If the robot base is placed at
+
+this
+
+optimal
+
+point
+
+xO ,
+B,opt
+
+all
+
+44
+
+trim
+
+paths
+
+can
+
+be
+
+executed
+
+with the TCP on the robot.
+
+For a single trim path, Fig. 5 shows a comparison of the
+
+1
+
+0.75
+
+0.25
+
+0.5
+
+0
+
+−0.5
+
+−1 0 200 400 600 0 200 400 600 0 200 400 600
+
+i
+
+i
+
+i
+
+Fig. 5. Joint-space paths normalized to the respective joint limit for the optimal robot base placement (xOB,opt)T = 0.902 m 0.003 m in blue and for the suboptimal placement (xOB,sub)T = 0.8 m −0.4 m in red.
+
+joint-space
+
+paths
+
+for
+
+two
+
+different
+
+robot
+
+base
+
+placements
+
+xO
+B
+
+,
+
+i.e.
+
+the
+
+optimal
+
+point
+
+xO
+B,opt
+
+from
+
+(14)
+
+shown
+
+in
+
+blue
+
+and
+
+a
+
+suboptimal
+
+point
+
+(xO )T
+B,sub
+
+=
+
+0.8 m
+
+−0.4 m depicted
+
+in red. Thereby, the joint angles are normalized to [−1, 1]
+
+in the range [qmin, qmax] according to Tab. I. Although all
+
+desired trim paths can be executed for both placements, a
+
+distinct difference is clearly visible in the joint-space paths.
+
+In particular for joint q3, the joint motions for the suboptimal
+
+placement provide less reserves to the joint limits of the
+
+robot, cf. Tab. I. This is taken into account by the objective
+
+function f4(yET ) from Section IV-B, which penalizes joint-
+
+space path points close to the joint limits. Furthermore, Fig. 5
+
+reveals that the wide turning range of joint 6 is necessary to
+
+perform the continuous motion along the complex trim path.
+
+(m)
+
+yO
+B
+
+0.25
+
+0 −0.25
+
+xO
+B,opt
+
+−0.5
+
+−0.75
+
+−1 0
+
+0.25 0.5 0.75 1
+
+xO
+B
+
+(m)
+
+1.25 1.5
+
+0.2 B. Optimal TCP Placement
+
+In this section, the optimal TCP placement is investigated
+
+0.15 for all 44 trim paths considering the suboptimal robot place-
+
+ment (xOB )T = 0.6 m −0.4 m . Note that with this place-
+
+ment, only a subset of all trim paths can be executed with the
+
+0.1
+
+available
+
+tool
+
+yT
+E ,ex
+
+introduced
+
+in
+
+Section
+
+V-A,
+
+see
+
+Fig.
+
+4.
+
+The optimization problem (11) is solved with the boundaries
+
+(yT )T
+E ,min
+
+=
+
+−0.2 m
+
+−0.2 m
+
+0.2 m
+
+−π
+
+−π/2
+
+−π
+
+0.05
+
+and
+
+(yT )T
+E ,max
+
+=
+
+0.2 m 0.2 m 0.4 m π π/2 π ,
+
+which arise from the mechanical limits for the construction
+
+of the trim tool.
+
+0
+
+The
+
+optimal
+
+TCP
+
+pose
+
+yT
+E ,opt
+
+for
+
+the
+
+optimization
+
+problem
+
+(11) is found as
+
+T
+
+T
+
+(yE ,opt )
+
+=
+
+[−0.079
+
+m
+
+0.039 m
+
+0.309 m
+
+Fig. 4. Grid-based MONTE-CARLO simulation with contour lines with the optimal robot base placement xOB,opt.
+
+2.849 rad 0.805 rad 3.040 rad] (15) = [(pTE,opt)T (φTE,opt)T] ,
+
+9663
+
+Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:14:31 UTC from IEEE Xplore. Restrictions apply.
+
+for which all trim paths can be solved and therefore a
+
+repositioning of the robot can be avoided. Figure 6 illustrates
+
+the updated MONTE-CARLO simulation from Fig. 4 with
+
+the
+
+optimal
+
+TCP
+
+pose
+
+yT
+E ,opt
+
+from
+
+(15).
+
+In
+
+this
+
+ﬁgure,
+
+the
+
+investigated
+
+point
+
+xO
+B
+
+is
+
+now
+
+located
+
+in
+
+the
+
+blue
+
+area,
+
+which
+
+again refers to the area where all desired trim paths can be
+
+executed by the robot. Note that this point was located in
+
+the
+
+green
+
+area
+
+in
+
+Fig.
+
+4
+
+using
+
+the
+
+previous
+
+TCP
+
+yT .
+E ,ex
+
+In order to validate this result qualitatively, the admissible
+
+area of the TCP pose is investigated by visualizing the objec-
+
+tive
+
+function
+
+f
+
+(yET
+
+)
+
+from
+
+(5)
+
+for
+
+the
+
+6-dimensional
+
+space
+
+yT
+E
+
+using two 3-dimensional MONTE-CARLO simulations for the
+
+position and the orientation part separately. In Fig. 7, the
+
+MONTE-CARLO
+
+simulation
+
+of
+
+the
+
+Cartesian
+
+position
+
+pT
+E
+
+is
+
+shown
+
+whereas
+
+the
+
+orientation
+
+of
+
+the
+
+TCP
+
+T
+φE
+
+is ﬁxed at
+
+the
+
+found
+
+optimum
+
+T
+φE ,opt .
+
+Note
+
+that
+
+only
+
+TCP
+
+positions
+
+pT
+E
+
+for which all trim paths can be executed are plotted. The
+
+blue dots mark high values of the objective function and low
+
+values are drawn in red. Clearly a gradient in the objective
+
+function is visible, which guides the optimization algorithm
+
+towards
+
+the
+
+optimal
+
+position
+
+pT .
+E ,opt
+
+Similarly,
+
+a
+
+MONTE-
+
+CARLO
+
+simulation
+
+of
+
+the
+
+EULER
+
+angles
+
+T
+φE
+
+using the ﬁxed
+
+optimal
+
+TCP
+
+position
+
+pT
+E ,opt
+
+from
+
+(15)
+
+is
+
+depicted
+
+in
+
+Fig.
+
+8.
+
+Again,
+
+only
+
+data
+
+points
+
+T
+φE
+
+are shown, with which the robot
+
+can execute all 44 desired trim paths. The feasible areas in
+
+Fig. 8 are more distinct compared to Fig. 7 for the TCP
+
+position
+
+pT
+E
+
+.
+
+Note
+
+that
+
+the
+
+apparent
+
+four
+
+separated
+
+areas
+
+are
+
+in fact connected due to the periodicity of the EULER angles
+
+φT
+E ,z
+
+and
+
+φTE ,x .
+
+Therefore,
+
+the
+
+objective
+
+function
+
+f (yET )
+
+exhibits a distinct maximum which is found by the surrogate
+
+optimization.
+
+0.4
+
+(m)
+
+zT
+E
+
+0.3
+
+0.2
+
+−0.2
+
+0
+
+yT
+E
+
+(m)
+
+pT
+E ,opt
+0 −0.1 −0.2 0.2 0.2 0.1 xT (m)
+E
+
+Fig. 7. Grid-based MONTE-CARLO simulation of the TCP position pTE with ﬁxed orientation φTE,opt and high objective term values in blue.
+
+(rad)
+
+π
+π 2T
+φE ,opt 0 − π2
+−π
+
+φT
+E ,z
+
+− 2π 0 π
+
+φT
+E ,y
+
+(rad)
+
+2
+
+π 2π 0 − 2π −π
+
+φT
+E ,x
+
+(rad)
+
+Fig. 8. Grid-based MONTE-CARLO simulation of the TCP orientation φTE with ﬁxed position pTE,opt and high objective term values in blue.
+
+1
+
+(m)
+
+0.75
+
+0.25
+
+0.5
+0.2 0.25
+
+0
+
+0.15
+
+−0.25 xOB 0.1 −0.5 0.05
+−0.75
+
+yO
+B
+
+−1
+
+0
+
+0 0.25 0.5 0.75 1 1.25 1.5
+
+xO
+B
+
+(m)
+
+Fig. 6. Grid-based MONTE-CARLO simulation with contour lines using the TCP pose yTE,opt.
+
+VI. CONCLUSIONS In order to improve the ﬂexibility of robot work cells, an algorithm for the optimal TCP and robot base placement for a given set of complex task-space paths is proposed. To this end, a fast joint-space path planner is developed which calculates all feasible continuous joint-space paths. This planner takes into account all possible inverse kinematics solutions, including axes with wide turning ranges and moving through singular points. The optimization-based placement of the TCP and the robot base is performed using a surrogate optimization and systematically considers the distance to the respective joint limits. The proposed algorithm is applied in a trim application in shoe manufacturing to ﬁnd the optimal robot base placement and the optimal TCP placement in case of a suboptimally placed robot base. This work shows that in some cases it is sufﬁcient to adapt the TCP of the robot tool instead of redesigning the robot work cell. Additionally, placing the robot base optimally increases the reserves to the respective robot joint limits. Future work focuses on incorporating collision avoidance and the dynamic properties of the robot into the joint-space path planner for applications in constrained environments.
+
+9664 Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:14:31 UTC from IEEE Xplore. Restrictions apply.
+
+REFERENCES
+[1] G. Pamanes and S. Zeghloul, “Optimal placement of robotic manipulators using multiple kinematic criteria,” in Proceedings of the IEEE International Conference on Robotics and Automation. USA, 1991, pp. 933–938.
+[2] A. Nektarios and N. A. Aspragathos, “Optimal location of a general position and orientation end-effector's path relative to manipulator's base, considering velocity performance,” Robotics and ComputerIntegrated Manufacturing, vol. 26, no. 2, pp. 162–173, 2010.
+[3] B. Nelson and M. Donath, “Optimizing the Location of Assembly Tasks in a Manipulator's Workspace,” Journal of Robotic Systems, vol. 7, no. 6, pp. 791–811, 1990.
+[4] U. Schneider, J. R. D. Posada, and A. Verl, “Automatic Pose Optimization for Robotic Processes,” in Proceedings of the IEEE International Conference on Robotics and Automation. USA, 2015, pp. 2054–2059.
+[5] J. Feddema, “Kinematically Optimal Robot Placement for Minimum Time Coordinated Motion,” in Proceedings of the IEEE International Conference on Robotics and Automation. USA, 1996, pp. 3395–3400.
+[6] Y. Lin, H. Zhao, and H. Ding, “Posture optimization methodology of 6R industrial robots for machining using performance evaluation indexes,” Robotics and Computer-Integrated Manufacturing, vol. 48, pp. 59–72, 2017.
+[7] C. Dumas, S. Caro, S. Garnier, and B. Furet, “Workpiece placement optimization of six-revolute industrial serial robots for machining operations,” in Proceedings of the ASME Conference on Engineering Systems Design and Analysis. France, 2012, pp. 419–428.
+[8] S. Caro, C. Dumas, S. Garnier, and B. Furet, “Workpiece Placement Optimization for Machining Operations with a KUKA KR2702 robot,” in Proceedings of the IEEE International Conference on Robotics and Automation, Germany, 2013, pp. 2921–2926.
+[9] G.-C. Vosniakos and E. Matsas, “Improving feasibility of robotic milling through robot placement optimisation,” Robotics and Computer-Integrated Manufacturing, vol. 26, no. 5, pp. 517–525, 2010.
+[10] R. K. Malhan, A. M. Kabir, B. Shah, and S. K. Gupta, “Identifying Feasible Workpiece Placement with Respect to Redundant Manipulator for Complex Manufacturing Tasks,” in Proceedings of the IEEE International Conference on Robotics and Automation. Canada, 2019, pp. 5585–5591.
+[11] D. Spensieri, J. S. Carlson, R. Bohlin, J. Kressin, and J. Shi, “Optimal robot placement for tasks execution,” Procedia CIRP, vol. 44, pp. 395– 400, 2016.
+[12] S. Mitsi, K.-D. Bouzakis, D. Sagris, and G. Mansour, “Determination of optimum robot base location considering discrete end-effector positions by means of hybrid genetic algorithm,” Robotics and ComputerIntegrated Manufacturing, vol. 24, no. 1, pp. 50–59, 2008.
+[13] W. Bu, Z. Liu, and J. Tan, “Industrial robot layout based on operation sequence optimisation,” International Journal of Production Research, vol. 47, no. 15, pp. 4125–4145, 2009.
+[14] J. Xu, K. Harada, W. Wan, T. Ueshiba, and Y. Domae, “Planning an Efﬁcient and Robust Base Sequence for a Mobile Manipulator Performing Multiple Pick-and-place Tasks,” in Proceedings of the IEEE International Conference on Robotics and Automation. France, 2020, pp. 11 018–11 024.
+[15] N. Vahrenkamp, T. Asfour, and R. Dillmann, “Robot placement based on reachability inversion,” in Proceedings of the IEEE International Conference on Robotics and Automation. Germany, 2013, pp. 1970– 1975.
+[16] A. Makhal and A. K. Goins, “Reuleaux: Robot Base Placement by Reachability Analysis,” in Proceedings of the IEEE International Conference on Robotic Computing. USA, 2018, pp. 137–142.
+[17] F. Zacharias, C. Borst, and G. Hirzinger, “Capturing robot workspace structure: representing robot capabilities,” in Proceedings of the IEEE International Conference on Intelligent Robots and Systems. USA, 2007, pp. 3229–3236.
+[18] B. Kamrani, V. Berbyuk, D. Wa¨ppling, U. Stickelmann, and X. Feng, “Optimal robot placement using response surface method,” The International Journal of Advanced Manufacturing Technology, vol. 44, no. 1-2, pp. 201–210, 2009.
+[19] N. C. N. Doan and W. Lin, “Optimal robot placement with consideration of redundancy problem for wrist-partitioned 6R articulated robots,” Robotics and Computer-Integrated Manufacturing, vol. 48, pp. 233–242, 2017.
+
+[20] Z. Kingston, M. Moll, and L. E. Kavraki, “Sampling-Based Methods for Motion Planning with Constraints,” Annual Review of Control, Robotics, and Autonomous Systems, vol. 1, pp. 159–185, 2018.
+[21] J. D. Maeyer, B. Moyaers, and E. Demeester, “Cartesian path planning for arc welding robots: Evaluation of the descartes algorithm,” in Proceedings of the IEEE International Conference on Emerging Technologies and Factory Automation. Cyprus, 2017, pp. 1–8.
+[22] D. Rakita, B. Mutlu, and M. Gleicher, “RelaxedIK: Real-time Synthesis of Accurate and Feasible Robot Arm Motion.” in Proceedings of Robotics: Science and Systems. USA, 2018, pp. 26–30.
+[23] K. Hauser, “Continuous Pseudoinversion of a Multivariate Function: Application to Global Redundancy Resolution,” Goldberg K., Abbeel P., Bekris K., Miller L. Algorithmic Foundations of Robotics XII. Springer Proceedings in Advanced Robotics, vol. 13, pp. 496–511, Cham: Springer, 2020.
+[24] B. Siciliano, L. Sciavicco, L. Villani, and G. Oriolo, Robotics: Modelling, Planning and Control. London: Springer, 2009.
+[25] H.-M. Gutmann, “A Radial Basis Function Method for Global Optimization,” Journal of Global Optimization, vol. 19, no. 3, pp. 201–227, 2001.
+[26] KUKA Deutschland GmbH, Spez KR CYBERTECH nano V2, 2018.
+
+9665 Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:14:31 UTC from IEEE Xplore. Restrictions apply.
+
+

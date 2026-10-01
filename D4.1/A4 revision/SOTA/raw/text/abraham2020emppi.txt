@@ -1,0 +1,572 @@
+IEEE ROBOTICS AND AUTOMATION LETTERS. PREPRINT VERSION. ACCEPTED JANUARY, 2020
+
+1
+
+Model-based Generalization under Parameter Uncertainty using Path Integral Control
+Ian Abraham1,2, Ankur Handa1, Nathan Ratliff1, Kendall Lowrey1,3, Todd D. Murphey2 and Dieter Fox1,3
+
+arXiv:2006.03106v1 [cs.RO] 4 Jun 2020
+
+Fig. 1. Environments where we test our method on model-based control for generalizing under parameter uncertainty. Top row illustrates the experimental test beds where we test object reconﬁguration, opening drawers, and nonprehensile manipulation under parameter uncertainty. Bottom row illustrates a sample set of the simulated environments where we tested our method. From left to right we have the Shadow hand manipulating a dice, a half-cheetah robot performing a backﬂip, and the Adroit hand opening a door.
+
+Abstract—This work addresses the problem of robot interaction in complex environments where online control and adaptation is necessary. By expanding the sample space in the free energy formulation of path integral control, we derive a natural extension to the path integral control that embeds uncertainty into action and provides robustness for model-based robot planning. Our algorithm is applied to a diverse set of tasks using different robots and validate our results in simulation and real-world experiments. We further show that our method is capable of running in real-time without loss of performance. Videos of the experiments as well as additional implementation details can be found at https://sites.google.com/view/emppi .
+Index Terms—Model Learning for Control, Learning and Adaptive Systems
+I. INTRODUCTION
+A S the complexity of tasks and environments that robots are expected to work in increases, so will the need for robots to rapidly learn from experience, adapt to sensory input, and model their environments for planning. Robots can not solely learn from experience as this can be computationally and energetically costly, requiring many trials which can cause
+Manuscript received: September, 10, 2019; Revised November, 15, 2019; Accepted January, 15, 2020.
+This paper was recommended for publication by Dongheui Lee upon evaluation of the Associate Editor and Reviewers’ comments. This work was carried out as part of an internship at NVIDIA.
+1 NVIDIA, USA 2 Northwestern University, Evanston, IL 60208, USA 3 University of Washington, Seattle, WA 98105, USA
+email : i-abr@u.northwestern.edu, ahanda@nvidia.com, nratliff@nvidia.com, kendall.lowrey@gmail.com, t-murphey@northwestern.edu, dieterf@nvidia.com
+Digital Object Identiﬁer (DOI): see top of this page.
+
+damage to the robot over time. Furthermore, experiencebased learning may not generalize to immediate changes in the environment. Similarly, robots can not solely spend their time modeling and planning in the environment as the interactions can be complex and difﬁcult to model online. This work presents a method which provides a solution to these issues through optimizing and adapting an ensemble of physics simulators that capture the underlying structure and complexities of the world while adapting to physical variations in an online model-based control paradigm.
+Learning robot tasks in physics simulators and applying the learned skills to the real world (also known as sim-toreal) has been studied quite extensively [1], [2], [3], [4]. All the learning occurs on detailed physics simulators which handles complex friction, contact, and multi-body interactions. These simulators often run faster than real-time, allowing for additional computation to occur. The simulated robot can explore and test skills in the simulation before attempting the task in the real world, avoiding damage to itself and the environment. A common problem with simulated learning is poor performance of learned skills when transferred into the real world. The poor performance is attributed to what is known as a reality gap [3] where imprecise physical parameters and physics interactions in the simulated world render simulated learned skills useless. Existing work tries to overcome these faults by diversifying the physical parameters of the world [2], improving the accuracy of the physics simulators [1], or updating the simulator parameters after real-world experience [5]. While currently the state of the art, these methods work in two-stages: train in simulation, then apply to real-world. Our work uses the fact that current simulators can perform faster than real time, further improving
+
+2
+
+IEEE ROBOTICS AND AUTOMATION LETTERS. PREPRINT VERSION. ACCEPTED JANUARY, 2020
+
+the capabilities of sim-to-real in an online setting where we formulate stochastic model-based control with an ensemble of physics simulators with parameter variations, enabling us to synthesis a control signal for robotic systems that naturally encodes parameter uncertainty and adapting the simulator parameters online.
+Our approach expands upon the free energy formulation of model-predictive path integral control (MPPI) [6], [7], [8], [9] by naturally encoding variations in physical parameters and structure in physics engine into online control synthesis. Any synthesized control signal is able to generalize to variations in the simulated worlds while adapting to the uncertainty to solve the task. The control synthesis generates actions that initially are conservative, eventually adapting and becoming more exploitative as sensory input is acquired. Thus, our contribution is an online ensemble model-based control algorithm that completes tasks while being robust and adaptive to parameter uncertainty. Simulated and real-world examples validate our approach for generalizing to model-based uncertainty.
+The paper is structured as follows: Section II provides a discussion on related work, Section III formalizes and introduces the problem statement, Section IV derives the algorithm used in this paper, results and conclusion are presented in Section V and VI.
+II. RELATED WORK
+Current state-of-the-art in simulated robot skill learning works in two stages: ﬁrst learn in simulation and then apply the learned skills in the real-world [2], [5], [4]. These methods work by using reinforcement learning techniques [10], [11] in simulation in order to synthesize a policy for a task. These methods often fail due to a mismatch between physical parameters in the real and simulated world. The work in [5] tries to overcome the mismatch issue by “closing the loop” on the learning process. This loop-closure effectively allows the simulation to be updated at every attempt at a task in the real-world. Other work presents an approach for the modelmismatch problem using robust control and ﬁne-tuning of a simulation to better predict physical phenomena [1] or learning policies from an ensemble of simulated environments [12]. Our work combines these two stages of learning in simulation and adapting based on real-world experience. As a result, we are able to solve tasks immediately by synthesizing controls that generalize to various simulated environmental parameters.
+Our approach mirrors model-based optimal control method (in particular ensemble model-based control [13], [14], [15], [16]) which have existed for some time. Speciﬁcally, we use an ensemble [17], [18] of physics simulators in receding horizon to generate an optimal control sequence which we apply to the robot. Prior work uses motion primitives and policies [17], [16], or standard trajectory optimization with PD control feedback to handle the ensemble models [18]. The main difference is that we utilize the free energy formulation for a stochastic control problem to directly incorporate the uncertainty in the ensemble into synthesis of the control. This enables us to handle the uncertainty as a natural extension to stochastic model-based control. Furthermore, utilizing stochastic control allows us to handle discontinuous events without
+
+concern which is often difﬁcult to handle for common modelbased controllers [13], [14], [19]. Last, our approach is able to adapt to real-world experience through online adaptation of the parameters and receding horizon control which allows for reactive planning while generalizing to local variations in the physical parameters of the simulated world.
+The work in [20], [21] ﬁrst introduced the idea of using simulators with system identiﬁcation to improve the performance of sim-to-real transfer. The mention work shows that the reality gap can be overcome when a policy is trained to be invariant to the variations found in the physical parameters. The main difference between this work and our own is that we apply this approach online and illustrate that complex systems can be modeled and controlled in real-time in a receding horizon controller formulation that can generalize to the variations in the physics simulators. In contrast, [20] uses a series of learned policies using reinforcement learning and an online system identiﬁcation function to counteract the reality gap. Similarly, [21] learns a family of policies and then searches for the best policy. These methods require the need to learn the policies a-priori from data which is a rigid process and difﬁcult to adapt online. We extend these ideas to online model-based receding horizon control where we weigh in the variations in the simulated physical worlds and update them online to provide informed and reactive control.
+
+III. PROBLEM STATEMENT
+Let us ﬁrst consider the partially unknown dynamics 1 of a robot and the objects in the environment as a stochastic dynamical system of the form
+
+xt+1 = f (xt, ut + δut; θ)
+
+(1)
+
+where xt ∈ Rn is the state of the system at time t, ut ∈ Rm is the control input to the system, δut ∼ N (0, Σ) is normally distributed noise with variance Σ ∈ Rm×m, f : Rn ×Rm ×Rp → Rn is the transition model, and θ ∼ p(θ¯) is a set of physical parameters sampled from a distribution p(θ¯) with mean θ¯ ∈ Rp. Let us assume that we can sample a set of N parameters {θn}Nn=1 such that each parameter describes a candidate transition model. The problem is to ﬁnd
+the sequence of controls ut∀t ∈ {0, . . . , T − 1} for a robotic
+system such that it solves a task speciﬁed by the cost function
+
+T
+S(x0, x1, . . . , xT ) = S(v) = m(xT ) + (xt) (2)
+t=0
+subject to uncertainty in the transition model parameters θ. Here, (x) : Rn → R and m(x) : Rb → R are the state dependent running cost and terminal cost respectively for the value function S(v), and v = {v0, v1, . . . , vT −1} is the sequence of stochastic controls vt = ut +δut that generate the states xt. The speciﬁed problem is equivalent to the stochastic optimal control problem
+1We assume we at least know the type of robot and how it is articulated.
+
+ABRAHAM et al.: MODEL-BASED GENERALIZATION USING PATH INTEGRAL CONTROL
+
+3
+
+Fig. 2: Time series images of (top) half-cheetah backﬂip where the link masses and joint damping values are unknown, (middle) inhand manipulation of the dice while the mass of the dice is unknown, and (bottom) opening a door where the articulation of the door is unknown. Using our method, all tasks are successful regardless of uncertainty in the parameters of the simulated environments.
+
+ut = arg min Eθ∼p(θ¯),Q [S(v)]
+
+(3)
+
+ut∀t∈[0,T −1]
+
+T −1
+
+= arg min Eθ∼p(θ¯),Q m(xT ) +
+
+(xt)
+
+ut∀t∈[0,T −1]
+
+t=0
+
+where E is the expectation operator with respect to the distribution p(θ¯) and the open-loop control distribution Q, i.e., the distribution of admissible control sequences.
+Assuming that the true physical system parameters reside within a local minima2 of the set of parameters {θn}, a solution to (3) will be a sequence of controls that can generalize
+amongst the variations in the physical parameters. As an aside,
+we treat each of these parameters as a particle (similar to a particle ﬁlter) that describes the simulated world. Then p(θn)3 is viewed as the weight of the particle and how likely the
+particle is in representing the real world. The optimal sequence
+of controls would then be a sample from an optimal control distribution Q which is used in the following Section IV in developing the proposed algorithm.
+
+IV. ENSEMBLE MODEL-PREDICTIVE PATH INTEGRAL CONTROL (EMPPI)
+In this section, we present ensemble model-predictive path integral control (EMPPI) as a natural extension to the information theoretic approach to the path integral control problem [6]. The concept behind path integrals is to indirectly solve for (3) by minimizing the free energy of the control system [22]. For a full derivation of model predictive path integral control, we refer the reader to [6]. We start with the deﬁnition of the free energy formulation that is introduced in [6]. Here, the sample
+2Local minima refers to the, often common, coupling between physical parameters that result in similar or apparent behavior of rigid bodies given another set of distinct parameters.
+3This expression is used as short hand for the likelihood p(θn | θ¯).
+
+space of the free energy formulation of the control system is
+
+expanded in order to incorporate model uncertainty into the
+
+control problem. This enables us to derive the controller that
+
+best generalizes to the parameter uncertainty as well as synthe-
+
+size actions that encourage robustness given the uncertainty.
+
+Using Jensen’s inequality and importance sampling, the free energy4 of the stochastic control system in question is deﬁned
+
+as
+
+1 F (v) = −λ log Ep(θ¯),P exp − λ S(v)
+
+p(v)
+
+1
+
+≤ −λEp(θ¯),Q log q(v) exp − λ S(v)
+
+p(v) ≤ Ep(θ¯) EQ [S(v)] − λEQ log q(v)
+
+≤ Ep(θ¯) [EQ [S(v)] + λDKL (Q P)]
+
+(4)
+
+where P and Q are the control noise of the uncontrolled system distribution and the open loop control distribution deﬁned by
+the probability density functions
+
+T −1
+
+p(v) =
+
+((2π
+
+)m
+
+|Σ
+
+|
+
+)−
+
+1 2
+
+exp
+
+t=0
+
+T −1
+
+q(v) =
+
+((2π
+
+)m
+
+|Σ
+
+|
+
+)−
+
+1 2
+
+exp
+
+t=0
+
+− 1 vt Σ−1vt and (5) 2
+− 1 (vt − ut) Σ−1(vt − ut) 2
+
+respectively. Here, Σ ∈ Rm×m is the covariance of the control signal, λ is a positive scalar variable known as the
+temperature [6], [23], and DKL(Q P) is the Kullback-Leibler (KL) divergence measure between Q and P. From (4), it can be seen that choosing q(v) p(v) ∝ 1/ exp − λ1 S(v) reduces the KL-divergence to −E[S(v)] which converts the free energy into a constant and an equality which corresponds to the
+control objective in (3). This suggests we can solve the
+
+4We refer the reader to the work in [6], [22] for more information on path integral control and free energy formulations.
+
+4
+
+IEEE ROBOTICS AND AUTOMATION LETTERS. PREPRINT VERSION. ACCEPTED JANUARY, 2020
+
+Task name Dimensions
+
+Running cost (xt) Terminal Cost m(xT )
+
+Uncertain Param.
+
+Init. Distr.
+
+Samples Hyper Param.
+
+Half-cheetah backﬂip
+
+x ∈ R18 u ∈ R6
+
+Inhand Manipulation
+(Shadow)
+
+x ∈ R61 u ∈ R20
+
+Opening Door (Adroit)
+
+x ∈ R60 u ∈ R28
+
+Opening Cabinet (Franka)
+
+x ∈ R20 u ∈ R7
+
+Nonprehensile Manipulation
+(Franka)
+
+x ∈ R20 u ∈ R7
+
+Object Reconﬁguration
+(Franka)
+
+x ∈ R20 u ∈ R7
+
+10x2vel + 60(xrot + 2π)2
+
+body mass x6, joint damping x7
+
+uniform(1, 6) uniform(1, 6)
+
+N = 20 K =4
+
+400 ppalm − pobj 2 + 10 log(Robj −1Rtarg) Fr + 0.1 xvel 2
+m(xT ) = 100 ppalm − pobj 2
+
+dice mass, ﬁnger actuator
+gains x18
+
+uniform(0.01, 0.1) N = 20 uniform(0.01, 5) K = 2
+
+80 ppalm − phandle 2 + 0.01 xvel 2 + 100xhinge
+
+door hinge axis and position
+
+binomial(1, 0.5) uniform(0.1, 0.5)
+
+N = 40 K =1
+
+Reach: 200 log(Rgripper −1 Rhandle) Fr + 200 pgripper − phandle + 0.01 xvel 2 drawer hinge axis normal([1, 0, 0], 0.6I) N = 10
+
+100px, handle + 40 pgripper − phandle
+
+Pull:
+
++ 40 log(Rgripper −1 Rhandle) Fr
+
+and position uniform(−0.2, 0.2) K = 2
+
+pgripper − pobject + 2 ptarget − pobject +
+
+object mass
+
+normal(0.25, 0.1) N = 10
+
+Fcontact and friction coeff. normal(7.5e−3, 0.01) K = 1
+
+pgripper − pobject + 10 qtarget − qobject +
+
+object mass
+
+normal(1.0, 0.1) N = 10
+
+Fcontact and friction coeff. normal(7.5e−3, 0.01) K = 1
+
+Σ = 0.5I λ = 0.1 T = 40 σ¯2 = 0.01 Σ = 0.8I λ = 0.001 T = 20 σ¯2 = 1 Σ = 0.2I λ = 0.8 T = 30 σ¯2 = 0.01
+Σ = 1.0I λ = 0.8 T = 20 σ¯2 = 0.01
+Σ = 0.08I λ = 0.02
+T =8 σ¯2 = 0.2 Σ = 0.08I λ = 0.02
+T =8 σ¯2 = 0.2
+
+TABLE I: Task speciﬁcations for each example presented in this work. The running cost for each task is shown (terminal cost only shown if
+used). The uncertain parameter in each task is described whose initial sampling distribution is described in the following column respectively. The variables p, q, F, R refer to the position, quaternion, force, and rotation matrix. The parameter σ¯2 refers to the diagonal variance used in the likelihood model (empirically chosen). Last, the number of simulator samples N and trajectory samples per parameter K is shown
+for each task.
+
+stochastic optimal control problem by instead solving for the corresponding sample-based optimization:
+
+ut = arg min Ep(θ¯) [DKL (Q Q)]
+
+(6)
+
+ut
+
+which is equivalent to solving for the control problems spec-
+iﬁed in (3) and (4) where Q is replaced with the optimal distribution Q and the uncontrolled system noise distribution P becomes the open-loop control distribution Q.
+Since we do not have access to Q and thus can not directly sample from the optimal distribution, Q is deﬁned through its probability density function
+
+1
+
+1
+
+q (v) = exp − S(v) p(v).
+
+(7)
+
+η
+
+λ
+
+Using importance sampling by multiplying by p(s)/p(s), we can decoupling the expectation over the parameter distribution and separate (6) into two parts. 5 The resulting optimization in (6) using the density functions in (5) is deﬁned as the closed form solution
+q (v) p(v) ut Ω ut = Ep(θ¯) arg min q (v) log p(v) q(v) dv
+q(v) ut Ω = Ep(θ¯) arg max q (v) log p(v) dv
+
+= Ep(θ¯) q (v)vtdv
+
+(8)
+
+Ω
+
+where going from the ﬁrst step to the second step in (8) is a result of separating the inner integral into two parts where one
+
+5This is possible as the optimization is not over the parameters θ.
+
+of the parts does not depend on ut, and Ω is the sample space of Rm × T − 1. Using iterated expectations and the change of variable vt = ut + δut, we write Eq.(8) as
+
+N11 ut = Ep(v) η exp − λ S(v) vt
+n=1
+
+θn p(θn)
+
+where the inner expectation is conditioned on a single pa-
+
+rameter θn through the forward prediction of the physics model. Generating samples from p(v), we obtain the recursive
+
+solution
+
+NK
+
+ut ← ut +
+
+ω(vt,k,n)δut,k,n
+
+(9)
+
+n=1 k=1
+
+where
+
+ω(vt,k,n) =
+
+exp − 1λ S˜(vt,k,n) − β p(θn)
+
+N n=1
+
+k=1 K exp − 1λ S˜(vt,k,n) − β
+
+β = arg min S˜(τt,k,n)
+k,n
+
+, p(θn)
+
+is the sample weights deﬁned as a softmax function for numerical stability [6] (normalizes the weight contribution from the cost function and p(θ)), and
+
+T −1
+
+S˜(vt,k,n) =
+
+(xt,k,n) + λut Σ−1δut,k,n + m(xT,k,n),
+
+t
+
+is the value function starting at any time t ∈ [0, T − 1] of the planning horizon. Here, the random control vt,k,n is indexed based on the time, samples for the parameters, and the trajectory samples. Note that each trajectory sample has
+
+ABRAHAM et al.: MODEL-BASED GENERALIZATION USING PATH INTEGRAL CONTROL
+
+5
+
+a constant parameter θn which is used to simulate forward given the control vt. Thus the solution ut is the solution that generalizes best to the set of parameters given the likelihood that the parameter represents the true system dynamics.
+By recursively updating the distribution p(θn), the control solution is able to have immediate impact on the performance of the task during execution. Each parameter is updated based on how well it is able to predict the subsequent state of the robotic system given the applied control, that is
+
+p(θn) ← p(xt+1|xt, ut, θn)p(θn)/η
+
+(10)
+
+where η is a normalization constant, and p(xt+1|xt, ut, θn) is assumed a Gaussian likelihood function [24] with diagonal
+variance parameters set in Table I . Each parameter is resampled with the current mean when 1/ n p(θn)2 < Neff where Neff = 0.5N K to avoid a degenerate set of weights. This effective sample size cutoff is often used with particle ﬁlters
+[25] which provides an estimate on how much each sampled parameter has an effect on the mean of the distribution p(θ¯).
+When this condition is met, each θn is resampled with added noise to encourage diversity in synthesis of the controller.
+Algorithm 1 illustrates the pseudocode for our method.
+
+Algorithm 1 Ensemble Model-Predictive Path Integral Control (EMPPI)
+
+1: initialize: sim f (x, u; θ), parameter distribution p(θ¯) with
+
+N parameter samples, K number of trajectory samples,
+
+time horizon T , objective , terminal cost m, control noise
+
+Σ, temperature parameter λ, ut = 0 ∀t ∈ [0, T − 1], real
+
+world time τ = 0
+
+2: while task not done do
+
+3: sample state x¯τ from robot environment
+
+4: set each sim f with sampled state x0,k,n ← x¯τ
+
+5: for θn ∈ {θ1, . . . , θN } do
+
+6:
+
+for k ∈ {1, . . . , K} do
+
+7:
+
+for t ∈ {0, . . . , T − 1} do
+
+8:
+
+sample δut,k,n ∼ N (0, Σ)
+
+9: set local cost variable stk,n using xt, ut 10: stk,n = (xt,k,n) + λut Σ−1δut,k,n
+
+11:
+
+update state with transition model
+
+12:
+
+xt+1,k,n = f (xt,k,n, ut + δut,k,n; θn)
+
+13:
+
+add terminal cost
+
+14: sTk,n = m(xT,k,n)
+
+15: for t ∈ {0, . . . , T − 1} do
+
+˜
+
+T k,n
+
+16:
+
+S(τt,k,n) ← j=t sj
+
+17: ut ← ut + n=1 k=1 N K ω(vt,k,n)δut,k,n
+
+18:
+
+update parameter distribution from past state x−1
+
+and control u−1
+
+19: p(θn) ← p(x0 | x−1, u−1, θn)p(θn)/η
+
+20: resample p(θ) if 1/ n p(θn)2 < Neff
+
+21: optional apply ﬁlter to ut
+
+22: apply u0 to robot and shift control sequence
+
+V. RESULTS
+In this section, we evaluate our method against a diverse set of robotic systems and tasks (both in simulation and in
+
+Fig. 3: Online improvement of half-cheetah body masses (kg) and joint damping (kg/s) values during backﬂip maneuver. Each line corresponds to the squared error of the individual estimate of the half-cheetah’s joint damping values and body masses.
+the experiments). The focus of this section is to show that our method is robust to various kinds of uncertainty while enabling the robotic system to complete the task at hand. Furthermore, we aim to show that our method’s performance does not degrade when compared to model-based control with perfect information about the physical environment. For each simulated system we artiﬁcially added zero-mean noise (σ2 = 0.001) to each state measurement to simulate real-world noisy measurements. Each example is able to successfully complete the task within the ﬁrst initial run of the algorithm. Subsequent runs are done to analyze the convergence of the parameter distribution. We refer the reader to the paper site https://sites.google.com/view/emppi for an ablation study on the parameters N and K of EMPPI using the cart pole swingup task where the mass and inertia of the pole are uncertain as well as a comparison of EMPPI to MPPI with a learned model.
+A. Simulated Results
+Half-cheetah Backﬂip: We evaluate EMPPI on a variety of simulated systems (see Fig. 2). The ﬁrst example is using the half-cheetah robot. It is assumed that we do not have full knowledge of the half-cheetah’s joint damping as well as body masses (see Table I for parameter detail). The goal is for the half-cheetah to attempt a full backﬂip while there is uncertainty in the parameters of the robot itself. The state space is the joint poses and velocities as well as the x − y position and rotation of the largest body. The control space is the applied joint torques to the half-cheetah.
+Figure 3 shows that our method is able to predict the true parameters of the half-cheetah’s body mass and joint damping values within 1000 time steps. The robot is run until it can accomplish a backﬂip, the system is reset and continues trying to backﬂip. Initially, the proposed method generates a control signal that attempts to backﬂip. During this process, state data is collected which updates the parameter belief. Note that the half-cheetah is able to successfully backﬂip within 400 time steps which suggests only a partial estimate of the true parameters is needed for successful backﬂip. We reset the robot to the start position once the backﬂip is accomplished. Therefore, EMPPI is able to accomplish the task regardless of the imperfect estimates of each link mass and joint damping. This is a direct result of formulating the control problem with the uncertainty in the physics simulation parameters.
+
+6
+
+IEEE ROBOTICS AND AUTOMATION LETTERS. PREPRINT VERSION. ACCEPTED JANUARY, 2020
+
+(a) Success Rate Over Time
+1.0
+
+0.8
+
+Success Rate (%)
+
+0.6
+
+0.4
+
+0.2 0.0
+0.0
+1.0 0.8 0.6 0.4 0.2
+
+MPPI w/ imperfect model MPPI w/ perfect knowledge EMPPI
+
+2.5 5.0 7.5 10.0 12.5 15.0 17.5 20.0 Time (s)
+
+(b) Proportional Actuator Gain Error
+
+P gain0 P gain1 P gain2 P gain3 P gain4 P gain5 P gain6 P gain7 P gain8
+
+P gain9 P gain10 P gain11 P gain12 P gain13 P gain14 P gain15 P gain16 P gain17
+
+Normalized Absolute Error
+
+0.0
+
+0
+
+2
+
+4
+
+6
+
+8
+
+10
+
+Time (s)
+
+Fig. 4: Comparison of our method (EMPPI) on the Shadow hand dice manipulation task when there is uncertainty in the proportional actuator gains of the ﬁnger of the Shadow hand. Success rate is calculated as the sum of total successful attempts at manipulating the dice divided by the total attempts made within the allotted time (variance derived from testing over 5 trials). (a) Our method is shown to maintain similar success rates compared to MPPI with perfect information. Initializing MPPI with a model with incorrect parameters results in signiﬁcant performance loss. (b) EMPPI is able to achieve accurate estimate the uncertain parameters within 4 seconds.
+
+With this formulation, each synthesized action is robust to the uncertainty of the physical parameters while exploiting the dynamic structure provided by the physics engine.
+Shadow Hand Manipulation for EMPPI Comparison: The following example uses the Shadow Dexterous robot hand for inhand manipulation of a dice [26]. The goal is for the robot to move the dice to the target orientation (< 0.15 2 error in quaternions) without dropping the dice. The state space includes the joint poses and velocities of the hand as well as the pose of the dice. The control space includes the target joint poses which is wrapped in a proportional controller.
+This example is used to compare the performance of EMPPI against MPPI with perfect knowledge and MPPI with imperfect model information. Here, the uncertainty resides in the ﬁnger joint proportional actuator gains of the Shadow hand. We initialize p(θ¯) using a uniform distribution (see Table I) where we sample the actuator gains. Figure 4 illustrates the performance of our method against MPPI with perfect model parameters and MPPI with imperfect model parameters. Our method is shown to perform comparably to MPPI with perfect knowledge even when the physical parameters are still incorrect. It takes around 4 seconds for the estimate of the actuator gains to converge to the true value. During the time, the controller is still able to provide a robust signal that utilizes the ensemble of physics simulators with the variations in the actuator gain to improve the overall performance of the task.
+Opening Doors with Adroit Hand In this example, we
+
+deal with generalizing uncertainty of articulated objects in the environment. Speciﬁcally, we test our method against uncertainty in the articulation of doors and drawers. The task of the robot is to grab onto a handle and open the door when the robot does not know how the door will open. This is an important task as often robots do not have full knowledge of how doors are articulated in the world. We ﬁrst test this in simulation using the Adroit hand door environment [27], [28]. The state space includes the joint poses and velocities of the Adroit hand and arm as well as the hinge rotation (the location of the hinge is unknown). The control space includes the desired joint positions and the arm position in the world.
+Figure 2 illustrates a successful execution of the Adroit hand opening the door over a distribution of possible articulations depicted by the arrows. Each candidate joint in p(θ¯) has a joint axis and joint pose for the door where the value of p(θn) is illustrated using the transparency of the arrow. For the purpose of illustration we chose to sample each joint axis and pose from a uniform distribution over vertical and horizon poses, and a binomial distribution of axes spread away from the handle position. In Fig. 2, we see that our method controls the Adroit hand toward the handle of the door, forcing an interaction with the door. This interaction provides state feedback through the actuator forces, the hand joint poses, and the handle position. The state feedback is then used to update the estimated door articulation as shown in the time series images in Fig. 2 where the hand is shown to successfully open the door.
+B. Experiments
+In this section, we provide three real-world experiments using EMPPI with the Franka Panda robot arm. The ﬁrst experiment is planar pushing on a block with unknown mass and sliding friction towards a target location, second is object reconﬁguration where the mass and the sliding friction of the object is unknown, and last is opening a cabinet drawer with uncertain articulation. Note that here, collisions are handled through a partial model6 of the objects in the simulation environment. We refer the reader to the videos of each result in https://sites.google.com/view/emppi , Table I for parameters and Fig. 6 for the time series images of the experimental results.
+Object Manipulation: In this task, the goal is for the Panda robot to push an object towards a target where the mass and sliding friction of the object is unknown. The geometry of the object is loaded into the simulation where contacts are resolved. Therefore the state space includes the joint position and velocities of the robot and the position and orientation of the object. The object position and orientation are calculated using tracking tags. The generated control signal directly controls the joint velocities of the Panda robot. During the experimental trial, we found that the Panda arm would initially contact the object in a conservative manner, making light taps at the object to move it towards the target. As the state of the object and the robot are collected, the certainty in the sliding
+6Compliance of the manipulation of objects not assumed and a partial model of the cabinet only consisting of a hand is used for handling collisions.
+
+ABRAHAM et al.: MODEL-BASED GENERALIZATION USING PATH INTEGRAL CONTROL
+
+7
+
+Fig. 5: Time-series images of real-world experiments of EMPPI using Franka Panda robot. Starting at the top, we show the Panda arm pushing a block whose mass and sliding friction is unknown towards the bottom of the target tag at the lower left of the image. Next is the Panda arm rotating a block whose mass and friction is unknown towards a desired target conﬁguration. Last, is the Panda arm opening a drawer where the articulation of the drawer is unknown. Each of the examples are done in real-time on a single roll-out of robot running EMPPI.
+
+Fig. 6: Rendering of the model uncertainty in the cabinet articulation used for the Franka Panda robot arm example. Joints whose axis points perpendicular to the drawer are prismatic joints, all others are revolute joints. Our method synthesizes a control signal that generalizes to the uncertainty in the drawer’s articulation. After detecting the movement of the handle, the distribution of parameters collapses to reﬂect the real-world cabinet.
+
+friction and the object mass continued enabling the robot arm to push the object towards the target location below the tag on the table. We found that there was signiﬁcant coupling between the mass of the object and the sliding friction where the estimated mass was predicted to be 0.256 kg where the actual mass was 0.164 kg. This results in an apparent added mass due to the friction between the object and the table due to the coupling between mass and friction in rigid body movement. Regardless of the inaccuracies, having an ensemble of these models where the variations in the parameters is part of the control synthesis allows a robotic system to adapt to uncertain parameters and achieve the task in real-time. Furthermore, having physics simulations render the behavior of the object allows for a more structured approach to model-based control and is shown to be capable of online use without a loss of performance.
+Object Reconﬁguration: In this example, the goal is for the Panda robot to rotate the object into a target conﬁguration. The state and control spaces remain the same as with the prior experiment. As in the previous example, the uncertainty resides in the mass of the object and the friction between the object and the table. The goal is to rotate the object 90 degrees on its side (chicken side up). This required EMPPI to generate actions for the Panda arm to compensate for
+
+uncertainty in the sliding of the object while not losing control of the object due to uncertainty in the mass. We found that the solution that EMPPI had come up with was to quickly brush across the top of the object and then tip the object on its side so that the object would naturally rotate over. This is an interesting solution for two reasons: the ﬁrst is that EMPPI avoided actions which would unnecessarily slide the object, and the second is that the task had occurred quickly enough that the uncertainty in the parameters were unable to converge. Suggesting that EMPPI was able to plan for the uncertainty and generate actions which would have the best outcome despite the worse-case set of parameters which would cause an unsuccessful trial of the task. We recommend the reader see the results in the attached multimedia and in https://sites.google.com/view/emppi .
+Opening Drawer: In this last example, the task is to open the drawer where there is uncertainty in how the drawer is articulated. The state space is the same as the prior experiment except the position and orientation of the handle is measured. The control space is converted to joint position control of the robot to ensure safe planning when interacting with the cabinet. We initialize the distribution of simulations using a normal distribution biased towards outward prismatic motion with a wide variance (see Table I). We found that this
+
+8
+
+IEEE ROBOTICS AND AUTOMATION LETTERS. PREPRINT VERSION. ACCEPTED JANUARY, 2020
+
+encourages pulling motions that do not damage the cabinet nor the robot while still providing a sufﬁcient amount of samples. In Figure 6, we illustrate a depiction of the model simulations of the candidate joint axis. Note that axes whose largest unit value points upward or horizontally are speciﬁed as revolute joints where the unit values pointing outward perpendicular to the drawer are prismatic. In addition, the shown cabinet model is used as illustration, but does not exist in the models used for EMPPI. Instead, only the geometry of the handle is used for handling contacts where the position is handled through object tracking. During execution of the task, the uncertainty of the articulation does not change until the robot measures the movement of the drawer. At that time, the set of candidate parameters {θn}Nn=1 collapses into a distribution of prismatic joints (which reﬂects the real-world articulation).
+VI. CONCLUSION
+In conclusion, we present a method that can synthesize control signals to complete a task while under parameter uncertainty. Our method utilizes the structure and complexity provided by physics engines to create a model-based controller that can generalize to parameter uncertainty. We show that our method is a natural extension to path integral control and is robust to various forms of uncertainty. We illustrate its effectiveness using a series of tasks with high dimensional robots. Last, our approach is experimentally validate our approach and provide some future work for improvements to the method.
+REFERENCES
+[1] J. Tan, T. Zhang, E. Coumans, A. Iscen, Y. Bai, D. Hafner, S. Bohez, and V. Vanhoucke, “Sim-to-real: Learning agile locomotion for quadruped robots,” in Proceedings of Robotics: Science and Systems, June 2018.
+[2] X. B. Peng, M. Andrychowicz, W. Zaremba, and P. Abbeel, “Sim-toreal transfer of robotic control with dynamics randomization,” in IEEE International Conference on Robotics and Automation, 2018, pp. 1–8.
+[3] N. Jakobi, P. Husbands, and I. Harvey, “Noise and the reality gap: The use of simulation in evolutionary robotics,” in European Conference on Artiﬁcial Life, 1995, pp. 704–720.
+[4] J. Tobin, R. Fong, A. Ray, J. Schneider, W. Zaremba, and P. Abbeel, “Domain randomization for transferring deep neural networks from simulation to the real world,” in IEEE/RSJ International Conference on Intelligent Robots and Systems, 2017, pp. 23–30.
+[5] Y. Chebotar, A. Handa, V. Makoviychuk, M. Macklin, J. Issac, N. Ratliff, and D. Fox, “Closing the sim-to-real loop: Adapting simulation randomization with real world experience,” arXiv preprint arXiv:1810.05687, 2018.
+[6] G. Williams, N. Wagener, B. Goldfain, P. Drews, J. M. Rehg, B. Boots, and E. A. Theodorou, “Information theoretic MPC for model-based reinforcement learning,” in IEEE International Conference on Robotics and Automation, 2017.
+[7] G. Williams, P. Drews, B. Goldfain, J. M. Rehg, and E. A. Theodorou, “Aggressive driving with model predictive path integral control,” in IEEE International Conference on Robotics and Automation, 2016, pp. 1433– 1440.
+
+[8] G. Williams, B. Goldfain, P. Drews, K. Saigol, J. Rehg, and E. A. Theodorou, “Robust sampling based model predictive control with sparse objective information,” in Robotics Science and Systems, 2018.
+[9] E. Theodorou, J. Buchli, and S. Schaal, “A generalized path integral control approach to reinforcement learning,” Journal of Machine Learning Research, vol. 11, no. Nov, pp. 3137–3181, 2010.
+[10] J. Schulman, S. Levine, P. Abbeel, M. Jordan, and P. Moritz, “Trust region policy optimization,” in International Conference on Machine Learning, 2015, pp. 1889–1897.
+[11] J. Schulman, F. Wolski, P. Dhariwal, A. Radford, and O. Klimov, “Proximal policy optimization algorithms,” arXiv preprint arXiv:1707.06347, 2017.
+[12] A. Rajeswaran, S. Ghotra, B. Ravindran, and S. Levine, “Epopt: Learning robust neural network policies using model ensembles,” in International Conference on Learning Representations (ICLR), 2016.
+[13] Y. Tassa, N. Mansard, and E. Todorov, “Control-limited differential dynamic programming,” in IEEE International Conference on Robotics and Automation, 2014, pp. 1168–1175.
+[14] W. Li and E. Todorov, “Iterative linear quadratic regulator design for nonlinear biological movement systems.” in International Conference on Informatics in Control, Automation and Robotics, 2004, pp. 222–229.
+[15] Y. Tassa, T. Erez, and E. Todorov, “Synthesis and stabilization of complex behaviors through online trajectory optimization,” in IEEE/RSJ International Conference on Intelligent Robots and Systems, 2012, pp. 4906–4913.
+[16] F. Stulp, E. Theodorou, J. Buchli, and S. Schaal, “Learning to grasp under uncertainty,” in IEEE International Conference on Robotics and Automation (ICRA), 2011, pp. 5703–5708.
+[17] A. Becker and T. Bretl, “Motion planning under bounded uncertainty using ensemble control.” in Robotics: Science and Systems, 2010.
+[18] I. Mordatch, K. Lowrey, and E. Todorov, “Ensemble-cio: Full-body dynamic motion planning that transfers to physical humanoids,” in IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), 2015, pp. 5307–5314.
+[19] E. Todorov and W. Li, “A generalized iterative LQG method for locallyoptimal feedback control of constrained nonlinear stochastic systems,” in Proceedings of the American Control Conference, 2005, pp. 300–306.
+[20] W. Yu, J. Tan, C. K. Liu, and G. Turk, “Preparing for the unknown: Learning a universal policy with online system identiﬁcation,” in Proceedings of Robotics: Science and Systems, 2017.
+[21] W. Yu, C. K. Liu, and G. Turk, “Policy transfer with strategy optimization,” in International Conference on Learning Representations, 2019.
+[22] E. A. Theodorou and E. Todorov, “Relative entropy and free energy dualities: Connections to path integral and kl control,” in IEEE Conference on Decision and Control (CDC), 2012, pp. 1466–1473.
+[23] Y. Chebotar, M. Kalakrishnan, A. Yahya, A. Li, S. Schaal, and S. Levine, “Path integral guided policy search,” in IEEE International Conference on Robotics and Automation, 2017, pp. 3381–3388.
+[24] M. Deisenroth and C. E. Rasmussen, “Pilco: A model-based and data-efﬁcient approach to policy search,” in Proceedings of the 28th International Conference on machine learning (ICML-11), 2011, pp. 465–472.
+[25] M. Speekenbrink, “A tutorial on particle ﬁlters,” Journal of Mathematical Psychology, vol. 73, pp. 140–152, 2016.
+[26] M. Plappert, M. Andrychowicz, A. Ray, B. McGrew, B. Baker, G. Powell, J. Schneider, J. Tobin, M. Chociej, P. Welinder, et al., “Multi-goal reinforcement learning: Challenging robotics environments and request for research,” arXiv preprint arXiv:1802.09464, 2018.
+[27] V. Kumar, Z. Xu, and E. Todorov, “Fast, strong and compliant pneumatic actuation for dexterous tendon-driven hands,” in IEEE International Conference on Robotics and Automation, 2013, pp. 1512–1519.
+[28] A. Rajeswaran, V. Kumar, A. Gupta, G. Vezzani, J. Schulman, E. Todorov, and S. Levine, “Learning complex dexterous manipulation with deep reinforcement learning and demonstrations,” in Proceedings of Robotics: Science and Systems, 2018.
+
+

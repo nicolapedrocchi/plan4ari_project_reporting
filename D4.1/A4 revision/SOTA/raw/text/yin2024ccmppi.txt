@@ -1,0 +1,904 @@
+Chance-Constrained Information-Theoretic Stochastic Model Predictive Control with Safety Shielding
+Ji Yin1, Panagiotis Tsiotras1, Karl Berntorp⋆
+
+arXiv:2408.00494v2 [cs.RO] 15 Aug 2024
+
+Abstract— This paper introduces a novel nonlinear stochastic model predictive control path integral (MPPI) method, which considers chance constraints on system states. The proposed belief-space stochastic MPPI (BSS-MPPI) applies Monte-Carlo sampling to evaluate state distributions resulting from underlying systematic disturbances, and utilizes a Control Barrier Function (CBF) inspired heuristic in belief space to fulfill the specified chance constraints. Compared to several previous stochastic predictive control methods, our approach applies to general nonlinear dynamics without requiring the computationally expensive system linearization step. Moreover, the BSS-MPPI controller can solve optimization problems without limiting the form of the objective function and chance constraints. By multi-threading the sampling process using a GPU, we can achieve fast real-time planning for time- and safety-critical tasks such as autonomous racing. Our results on a realistic race-car simulation study show significant reductions in constraint violation compared to some of the prior MPPI approaches, while being comparable in computation times.
+I. INTRODUCTION
+Safety is a pivotal concern in the expanding global robotics industry, directly influencing the range of robotic applications. Hence, the importance of safety in robot applications cannot be understated and it is paramount when humans interact with robots, which operate autonomously, often with unpredictable motions. This unpredictability necessitates stringent safety measures to prevent any potential harm to individuals, especially those unaccustomed to interacting with robots [1].
+Over a span of 30 years, 37 robot-related accidents were reported, with 27 incidents resulting in a worker’s death between 1984 and 2013. This data underscore the necessity of safety protocols to prevent workplace fatalities [2]. The evolution of robotic systems from performing static manipulation tasks into more collaborative and dynamic, further emphasizes the need for robust safety processes [3]. To address safety and increase robot reliability, it is crucial to consider uncertainties in robot planning and control. Uncertainties, such as dynamical disturbances, can lead to unpredictable robot behavior, which, in turn, might pose risks to human operators or other robots working in proximity. For instance, an autonomous vehicle might fail to respond
+1Ji Yin and Panagiotis Tsiotras are with D. Guggenheim School of Aerospace Engineering, Georgia Institute of Technology, GA. This work has been partially supported by ONR award N00014-23-1-2353 and NSF award CPS-2211755. Ji Yin was an intern at MERL at the time of this research and this support was not applied to the work at MERL. {jyin81,tsiotras}@gatech.edu
+⋆ Corresponding author: Karl Berntorp, Mitsubishi Electric Research Labs (MERL), Cambridge, MA, USA. Email: karl.o.berntorp@ieee.org.
+
+adequately to unexpected road conditions, endangering the safety of its occupants and other road users.
+Many control systems are designed based on deterministic models of the real robot dynamics; these controllers may fail to function as intended due to unexpected disturbances, leading to sub-optimal or even unsafe operations. To this end, during the last decade numerous efforts have been made towards control design incorporating model and environment uncertainties, for example, in a stochastic model-predictive control (SMPC) framework [4]. However, the ability to handle nonlinear dynamics and/or non-Gaussian uncertainties in a computationally efficient manner is still a concern.
+We propose a novel control approach that considers chance constraints in belief space, using path integral and control barrier functions (CBFs) theories. Specifically, we design a heuristic in belief space inspired by discrete-time CBFs (DCBFs) to push the probability of collision lower than a user-specified threshold and integrate it with the Shield Model Predictive Path Integral (Shield-MPPI) of [5] to achieve real-time planning. We call the resulting control method the belief-space stochastic MPPI (BSS-MPPI). By using Monte-Carlo sampling to evaluate the state distributions, we estimate a general distribution and extract the first two moments into the state-dependent part of the objective function of the optimization problem, and solve for a solution fulfilling chance constraints for safety. However, BSS-MPPI can also integrate with other, nonsampling based uncertaintypropagation schemes, such as nonlinear Kalman filters.
+Compared to most previous trajectory optimization methods that consider chance constraints, our approach differs in the following ways:
+a) First, BSS-MPPI solves a nonlinear stochastic optimal control problem by forward simulation, hence avoiding the computationally-expensive explicit optimization and linearization steps. It can achieve real-time planning on either CPU or GPU by multi-threading.
+b) Second, BSS-MPPI can be applied to more general nonlinear stochastic systems. Previous works that consider chance constraints mostly assume linear/linearized dynamics, linear constraints, and some specific form of disturbances (e.g., Gaussian), which limit the range of applicability in robotic systems.
+c) Third, finding a verified nonsaturating CBF (with bounded control input) is difficult for high-dimensional systems [6]. We design CBF-inspired heuristics that provide better scalability at the cost of less formal guarantees and apply them to high-dimensional belief space.
+
+A. Related Work
+Controlling the evolution of state uncertainties to fulfill safety requirements is not a trivial task. There are many works in the literature that study motion planning under uncertainties using chance constraints. For instance, distributional (e.g., covariance) steering is a recent technique that is used to steer an initial distribution to a target distribution of target mean and covariance values, while subject to chance constraints. For unmanned ground vehicles (UGVs) In [7], [8], the authors formulate covariance steering as a convex optimization problem and use its solution to plan trajectories for linearized vehicle models with additive Gaussian noise in challenging environments. For unmanned aerial vehicles (UAVs), [9] utilize covariance control to achieve path planning with obstacles, and [10] uses this technique for altitude control of a rocket. Other related approaches include [11], which reformulates obstacle avoidance chance constraints using the signed distance function and applies the sequential convex programming (SCP) algorithm, and [12], which considers the chance-constrained trajectory optimization problem by integrating the constraints into the cost functions and uses dynamic programming to obtain a solution. These approaches all require linearization of the dynamics, or using a discretized state space, which makes real-time planning and replanning computationally challenging, especially for high-dimensional systems. The authors of [13] and [14] propose the use of stochastic CBFs (SCBF), which provide 100% safety assurance for a system with Brownian noise in continuous space. However, the theoretical guarantees of their approach include an implicit assumption that the control inputs and the dynamical system must be unbounded, which is not practical for many robotic systems.
+Compared to many other nonlinear controllers, such as SCP, iLQR, and iLQG, MPPI implements the optimal control problem by forward simulation using the original nonlinear dynamics and hence avoids the linearizations involved in the explicit optimal control solvers. MPPI does not restrict the form of the objective function, which can be nonconvex and discrete. However, the base MPPI uses only deterministic dynamics. To improve the robustness of MPPI, many variants of the algorithm have been developed [15]–[17]. In particular, [18], [19] introduce penalty costs for constraint violations due to dynamical and environmental uncertainties to the MPPI objective function, but they do not provide theoretical guarantee for probablistic constraint satisfaction. The work [20] also uses chance constraints, but it assumes linear systems and Gaussian disturbances, hence resulting in Gaussian posterior densities, which are restrictive.
+
+II. SHIELD-MPPI REVIEW Consider a general nonlinear dynamical system,
+
+xk+1 = f (xk, uk),
+
+(1)
+
+where xk ∈ D ⊆ Rnx is the state, uk ∈ Rnu ∼ N (vk, Σϵ) is the control input with the mean control vk at time step k = 0, . . . , K − 1 and constant covariance Σϵ. Let ϕ(x)
+denote the terminal state cost, q(x) the step state cost, and λ
+
+the weight for control cost. Then, the Shield MPPI (S-MPPI) controller solves the following problem,
+
+min J(v) =
+v K −1
+E ϕ(xK ) +
+k=0
+
+q(xk) + λ vk⊺Σϵ−1vk 2
+
+, (2)
+
+subject to (1) with initial condition x0 = x(0), and the firstorder DCBF safety condition,
+
+sup h(f (xk, vk)) − h(xk) ≥ −p(h(xk)),
+
+(3)
+
+v∈U
+
+for k = 0, . . . , K − 1, where the continuous function h(·) : Rn → R is the DCBF that defines a safe set in the state space,
+
+S := {x ∈ D|h(x) ≥ 0}.
+
+(4)
+
+The function p(·) is a class-κ function that is strictly increasing such that p(0) = 0. Fulfilling the DCBF constraint (3) will ensure that the system stays within the safe set S, and the S-MPPI achieves this by minimizing the violation of (3) using path integral and gradient-based optimizations [5].
+Compared to the original MPPI [21], S-MPPI has three major advantages. First, the vanilla MPPI requires a significant amount of sample trajectories (normally thousands of samples) at each time step for its success, thus often requiring the multi-threading computational ability offered by modern GPUs, which are expensive and generally not available on smaller-size robots. On the other hand, S-MPPI typically requires an order of magnitude less trajectories to achieve equivalently satisfactory, and even safer performance. Second, S-MPPI is less sensitive to cost parameter variations, saving efforts for cost engineering and allowing for more general, less task-specific cost designs. Third, S-MPPI is safer than the MPPI, in general.
+Despite all the attractive properties of S-MPPI, it is still a control approach that uses only deterministic dynamics. To remedy this, we introduce a CBF-inspired heuristic to S-MPPI, such that the resulting Belief-space MPPI (BSSMPPI) can consider model uncertainties and plan in the belief space.
+
+III. PROBLEM FORMULATION
+In this paper, the objective is to solve the optimal control problem,
+
+min J(v), subject to,
+
+(5a)
+
+v
+
+xk+1 = f (xk, uk, wk), uk ∼ N (vt, Σϵ),
+
+(5b)
+
+Pr(xk ∈ F ) > 1 − Pfail, for k = 0, . . . , K − 1, (5c)
+
+x0 = x(0),
+
+(5d)
+
+where the dynamical noise wk in (5b) can take arbitrary forms, F in (5c) is the feasible region, and (5c) denotes the set of chance constraints where the probability of violating the constraint is below a specified threshold value Pfail. In Sec. IV we explain our proposed method, BSS-MPPI, for
+solving (5).
+
+IV. BELIEF-SPACE MPPI
+In this section, we briefly review the MPPI control update law and develop the BSS-MPPI algorithm by integrating the chance constraint (5c) using a proposed belief-space heuristic in discrete time.
+
+A. MPPI Control
+The novel BSS-MPPI controller has an objective function in the same form as the original MPPI, thus we can use the MPPI control update law. The MPPI algorithm solves an optimization problem by sampling control inputs and forward simulating a large number of trajectories. Assuming that the algorithm has M trajectory samples with prediction horizon K, for the problem (2) subject to (1), the MPPI algorithm has the following control update law,
+
+M
+
+M
+
+v+ = ωmum/ ωm,
+
+(6)
+
+m=1
+
+m=1
+
+where the mth sample control sequence um =
+
+{um 0 ,
+
+..
+
+.
+
+,
+
+u
+
+m K
+
+−
+
+1
+
+}
+
+,
+
+um
+t
+
+∼
+
+N (vk,
+
+Σϵ),
+
+and
+
+where
+
+ωm = exp − 1 (Sm − β) . (7) λ
+
+Note that β = minm=1,...,M Sm in (7) is introduced to prevent numerical overflow, and Sm is the cost of the mth
+sample trajectory, given by,
+
+K −1
+Sm = ϕ(xm K ) + q(xm k ) + γ(vkm)⊺Σϵ−1ukm. (8)
+k=0
+
+B. CBF-inspired heuristic considering chance constraints
+1) Safe heuristic in belief space: To fulfill the chance constraint (5c), we choose a safe set S ⊂ F, such that,
+
+x¯ ∈ S ⇐⇒ Pr(x ∈ F ) > 1 − Pfail, Pfail ∈ (0, 1], (9)
+
+where x¯ = E[x]. We introduce the following assumption on the feasible region:
+
+Assumption 1 The feasible region F is defined by the intersection of Z inequalities, such that,
+
+Z
+F := {x : ci(x) < 0}, i = 1, . . . , Z. (10)
+i=1
+
+Using Assumption 1 and the Boole-Bonferroni inequality [22], any state xk subject to the constraints,
+
+Pr(ci(x) ≥ 0) ≤ pi, i = 1, . . . , Z,
+Z
+pi ≤ Pfail.
+i=1
+
+(11a) (11b)
+
+also satisfy the original constraint (5c). From (11), we can approximate each chance constraint by
+
+ci(x¯k) + νi ηi⊺Σkηi ≤ 0, (12)
+
+where Σk ∈ Rnx×nx is the covariance of xk, ηi = ∇xci(x¯k), and νi is the back-off coefficient [23]. We can combine x¯ and Σ and form a belief-space system,
+zˆ = x¯ , (13) vec(Σ)
+where zˆ ∈ Z ⊆ Rnz , nz = nx(nx + 1). Hence, following from (4) and (12), we obtain the following heuristic,
+
+hi(zˆ) = −ci(x¯) − νi ηi⊺Σηi, (14)
+
+with a superlevel set Si containing all states satisfying (12),
+
+Si = {zˆ ∈ Z|hi(zˆ) ≥ 0}.
+
+(15)
+
+Consequently, the overall safe heuristic for Problem (5) can be chosen as
+
+h(zˆ) = min(h1(zˆ), . . . , hZ (zˆ)),
+
+(16)
+
+with a corresponding safe set S ⊆ Z being the intersection of all superlevel sets Si for i = 1, . . . , Z, given by,
+
+Z
+
+S = Si.
+
+(17)
+
+i=1
+
+Remark 1 The back-off coefficient value νi for each de-
+
+terministic chance constraint is computed to ensure the
+
+probability level pi in the chance constraint. One option
+
+is to use the Cantelli-Chebyshev inequality, that is, νi =
+
+1−pi pi
+
+,
+
+which
+
+holds
+
+regardless
+
+of
+
+the
+
+underlying
+
+probability
+
+distribution. However, as a consequence, it may lead to
+
+relatively conservative bounds [23]–[25]. Alternatively, for
+
+approxim√ately normal-distributed state trajectories, we can set νi = 2erf−1(1 − 2pi) where erf−1 is the inverse error
+
+function. The paper [26] discusses an alternative, sampling-
+
+based approach for constraint tightening.
+
+2) Safety condition: Assume the belief-space state follows the system zˆk+1 = fz(zˆk, vk). The safety condition for the heuristic (16) is given by,
+
+h(zˆk+1) − h(zˆk) ≥ −p(h(zˆk)),
+
+(18)
+
+where p(·) is a class-κ function. Satisfying (18) gives us two properties,
+
+Property IV.1 Given an initial condition zˆ0 ∈ S and a control sequence {vk}∞ k=0 such that all (zˆk, vk) pairs satisfy (18), then zˆk ∈ S for all k ∈ Z≥0.
+Property IV.2 Let zˆ0 ∈ Z \ S and let a control sequence {vk}∞ k=0 such that, for all k ∈ Z≥0, the pair (zk, vk) satisfies (18). Then the state zk converges to the safe set S asymptotically.
+
+The proofs of both properties are provided in [5].
+
+Remark 2 If there always exists a control v such that (18) is satisfied for all zˆ ∈ Z, h(zˆ) becomes a discretetime control barrier function (DCBF). The HJ reachability analysis, which is commonly used to find verified CBFs,
+
+however, is computationally intractable for systems of high dimensions [27]. For this reason, finding verified CBFs for belief-space systems is difficult in most cases due to large dimensionality. The proposed BSS-MPPI minimizes violation of (18) and achieves an average 98.7% satisfaction rate of (18) in our simulations, effectively keeping system states within the safe set and significantly reduces collision rates.
+
+C. Augmented System
+Note that the MPPI objective function (2) and the corresponding control update law (6)-(8) share the same statedependent step cost q(·), which can be of arbitrary form. To integrate the DCBF with chance constraints into the MPPI objective function and the control update law, we introduce a system in belief space that includes the mean and covariance of the system (5b), then augment the new system to combine two states in one, such that the safety condition (18) can be included in the step running cost q(·).
+1) Belief-space system: We can separate the system state following (5b) into the mean and disturbed parts,
+
+xk = x¯k + x˜k.
+
+(19)
+
+Given a sequence of sampled controls u = [u0, . . . , uK−1], the mean state x¯k follows the nominal system,
+
+x¯k+1 = f¯(x¯k, uk) = E[f (xk, uk, wk)],
+
+(20)
+
+and the covariance propagation evolves according to
+
+Σxk+1 = Cov[f (xk, uk, wk)] = fΣ(Σxk , uk).
+
+(21)
+
+We can then describe (5b) using the belief-space system (13),
+
+zˆk+1 = x¯k+1 =
+
+f¯(x¯k, uk)
+
+vec(Σxk+1 )
+
+vec(fΣ(Σxk , uk))
+
+= fz(zˆk, uk).
+
+(22a) (22b)
+
+In some cases, as demonstraded in our simulations, only part of the uncertainty covariance matrix is needed, thus a smaller state space can be used. For linear systems with Gaussian additive disturbances and for systems with nonlinearities on a specific form, f¯ and fΣ can be expressed analytically [28]. For nonlinear systems, data-driven approaches, such as neural nets and Gaussian processes [29]–[31] can be used to model the mean and covariance propagations. In this work, we propose to apply Monte-Carlo sampling to estimate the empirical mean and covariance propagation, such that,
+
+N −1
+
+1
+
+n
+
+x¯k+1 = E[xk+1] ≈ N xk+1, (23)
+
+n=0
+
+and,
+
+Σxk+1 = E x˜k+1x˜k+1 ⊺
+
+N −1
+
+1
+
+n
+
+n
+
+⊺
+
+≈ N − 1 (xk+1 − x¯k+1)(xk+1 − x¯k+1) ,
+
+n=0
+
+(24)
+
+where xnk+1 = f (xnk , uk, wkn) is the state of the nth trajectory sample following the control sequence u at time k + 1.
+
+2) Augmented belief-space system: Since the costs ϕ(xK)
+
+and q(xk) in the objective function (2) are only dependent
+
+on the state at a single time step, it is difficult to integrate
+
+the safety condition (18) directly, which includes two con-
+
+secutive system states. To this end, we introduce, for each
+
+k = 1, . . . , K, the augmented state zk = (zk(1), zk(2)) = (zˆk, zˆk−1) ∈ R2nz and the corresponding augmented belief-
+
+space system.
+
+
+
+zk+1 = zk+1 (2)  (1) = fz(zk(1), uk) zˆk+1 (1) = zˆ . (25)
+
+zk+1
+
+zk
+
+k
+
+D. Safety-aware Objective Function
+
+We can apply the MPPI algorithm to the augmented system (25) with cost,
+
+min J(v) = E
+v
+
+K−1
+ϕa(zK ) +
+k=0
+
+qa(zk) + λ vk⊺Σϵ−1vk , 2 (26)
+
+to yield a sequence of optimal controls. Note that the step running cost qa(·) is dependent on two consecutive states of the belief-space system (22). Taking a linear class-κ function,
+it follows from (18) that,
+
+h(zˆk) − (1 − β)h(zˆk−1) ≥ 0,
+
+(27)
+
+where β ∈ (0, 1), and h(·) is designed following (14) and (16). The resulting safe condition violation cost is
+
+Csafe(zk) = C max{−h(zk(1)) + (1 − β)h(zk(2)), 0}. (28)
+
+Hence, the state-dependent costs are
+
+qa(zk) = q(zk(1)) + Csafe(zk), ϕa(zK ) = ϕ(zK(1)) + Csafe(zK ).
+
+(29a) (29b)
+
+For convenience, we set z0(2) = zˆ−1 = zˆ0, such that Csafe(z0) = 0. The optimal control sequence can be calculated by (6), (7), and (8), using (29) as the state-dependent running costs. The modified objective function (26) integrates the chance constraint (5c) by converting it into a cost minimization problem, which minimizes (5a) while penalizing any violations of the safety condition (18) to fulfill (5c).
+
+V. ALGORITHM
+Algorithm 1 gives the pseudo-code for the proposed BSSMPPI. Line 2 obtaines the estimated robot state, lines 3-4 initialize states and trajectory costs, line 5-7 sample control sequences, and lines 8-9 propagate the mean states and corresponding covariances.
+In [7], [32], [33], the mean and covariance dynamics are modeled analytically and can be used to directly compute the next states. If the system is complex and highly nonlinear, such that the mean and covariance dynamics are difficult to model, lines 8-9 can be implemented by Algorithm 2, which utilizes Monte-Carlo sampling to approximate mean and covariance propagation and is generally applicable.
+
+The disturbance wk in Algorithm 2 can be either from a fixed or a conditional (e.g., state-dependent) distribution. Lines 10-15 in Algorithm 1 use the augmented belief space system (25) to evaluate the simulated trajectory costs S˜m, and compute the optimal controls using the control update law (6). Line 16 sends the safe control command to the actuators, and line 17 resets the nominal control sequence for the next control iteration. Fig. 1 shows the proposed architecture.
+
+Algorithm 1: Belief-space stochastic MPPI Algo-
+
+rithm
+
+Given: Shield-MPPI costs q(·), ϕ(·), parameters γ, Σϵ;
+
+Input : Initial control sequence v
+
+1 while task not complete do
+
+2 x¯0, Σx0 ← GetStateEstimate();
+
+3 for m ← 0 to M − 1 in parallel do
+
+4
+
+x¯m 0 ← x¯0,
+
+zm
+0
+
+←
+
+[x¯
+
+⊺ 0
+
+,
+
+vec
+
+(Σx
+
+0
+
+)
+
+,
+
+x¯
+
+⊺ 0
+
+,
+
+vec
+
+(Σ
+
+x
+
+0
+
+)]⊺
+
+,
+
+S˜m ← 0;
+
+5
+
+Sample
+
+ϵm
+
+←
+
+{ϵm 0 ,
+
+..
+
+.
+
+,
+
+ϵ
+
+m K−1
+
+};
+
+6
+
+for k ← 0 to K − 1 do
+
+7
+
+um k ← vk + ϵm k ;
+
+8
+
+x¯m k+1 ← f¯(x¯m k , um k );
+
+9
+
+m
+Σxk+1
+
+←
+
+fΣ
+
+(Σ
+
+m xk
+
+,
+
+uk
+
+);
+
+10
+
+zm k+1 ←
+
+[(x¯
+
+m k+1
+
+)⊺
+
+,
+
+vec
+
+(Σm xk
+
++1
+
+)
+
+,
+
+(x¯
+
+m k
+
+)⊺
+
+,
+
+vec
+
+(Σm xk
+
+)]⊺
+
+11
+
+S˜m ←
+
+S˜m
+
++
+
+q(x¯m k )
+
++
+
+γv⊺Σ−1um
+kϵ k
+
++
+
+Csafe(zkm);
+
+12
+
+end
+
+13
+
+S˜m ← S˜m + ϕ(x¯m K ) + Csafe(zKm);
+
+14 end
+
+15 vsafe ← OptimalControl({S˜m}M m=−01, {um}M−1 m=0 ); 16 ExecuteCommand(v0safe); 17 v ← vsafe;
+
+18 end
+
+Algorithm 2: Mean and Covariance Propagation
+
+Given: System with disturbance f (x, u, w),
+
+noise distribution p(w|x).
+
+Input : x¯k, Σxk , uk; 1 for n ← 0 to N − 1 in parallel do
+
+2 Sample xnk ∼ N (x¯k, Σxk ), wk ∼ p(wk|xk); 3 xnk+1 = f (xnk , uk, wk)
+
+4 end
+
+5
+
+x¯k+1 ←
+
+1 N
+
+n=0 N −1 xk+1 n
+
+6 Σxk+1 ← N−1 1 n=0 N−1(xk+1 n − x¯k+1)(xk+1 n − x¯k+1)⊺
+
+VI. SIMULATION STUDY
+In this section, we evaluate the proposed BSS-MPPI on a simulated vehicle-dynamics racing example, where the objective is to conclude a lap of a race course subject to minimizing a control objective. We develop the CBF-inspired
+
+heuristic for the considered application, and carry out a Monte-Carlo simulation study to evaluate the performance of the proposed BSS-MPPI (BSS-MPPI). We compare it with other state-of-the-art MPPI-based control approaches, in particular, the original MPPI (MPPI, [21]) and the more recent S-MPPI (S-MPPI, [5]).
+
+A. Experimental Setup
+
+We use the AutoRally racing platform [34] to evaluate our method. The AutoRally is a 1m long, 0.4m wide electric vehicle with mass 22kg whose dynamics mimic a real vehicle. We model the dynamics using the discretetime system (1), based on the planar single-track vehicle model [35] sketched in Fig. 2. The system state is x = [vX , vY , ψ˙, ωF , ωR, eψ, eY , s]⊤, where vX is the longitudinal vehicle velocity, vY is the lateral vehicle velocity, ψ˙ is the yaw rate, ωF , ωR is the front and rear wheel-speed, respectively, eY is the lateral deviation from the centerline, eψ is the yaw-angle deviation with respect to the centerline heading, and s is the path coordinate in the road-aligned frame. The control input is u = [δ, T ]⊤ where δ is the steering angle at the front wheel and T is the throttle. The tires are modeled by the Pacejka tire model and we use the friction ellipse to model combined slip [36].
+We use the state-dependent running cost
+
+q(xm k ) = (xm k − xg)⊤Q(xm k − xg) + 1(xm k ),
+
+(30)
+
+where Q = diag(qvX , qvY , qψ˙ , qωF , qωR , qeψ , ey, qs) is the cost-weight matrix, xg = diag(vg, 0, . . . , 0) sets the target
+velocity, and
+
+1(xkm) = 0, if xm k satisfies the constraints, (31) Cobs, otherwise,
+is the collision penalty cost. Since BSS-MPPI extends SMPPI by introducing chance constraints into the problem formulation, our evaluation is mostly focused on the ability of BSS-MPPI to satisfy the constraints under disturbed, that is, uncertain, dynamics. We have executed 200 Monte-Carlo simulations where the vehicle is tasked to complete a lap of the AutoRally racetrack subject to zero-mean Gaussian process noise, wk ∼ N (0, Σw) with the reference velocity vg = 6 m/s.
+To verify the performance sensitivity to the tuning of the objective function, we vary qey in (30) while keeping the other variables fixed. The reason is that the lateral deviation cost qey has a large impact on the maneuvering performance, and thereby it also has implications on the constraint satisfaction. A relatively small qey favors cutting corners while a large qey makes the system stay close to the track centerline. Hence, a large qey reduces the risk of a collision against the track boundaries, but may lead to less efficient trajectories.
+B. Belief-Space Control Barrier Function Design
+Assuming that the racing track has constant width 2wT, we want to keep the vehicle’s lateral deviation ey from the track
+
+Fig. 1: BSS-MPPI control architecture.
+
+lf
+
+lr
+
+vf
+
+vr
+
+αf
+
+X
+
+ψ
+
+αr
+
+δ
+
+β
+
+x
+Fr
+
+x
+
+y
+
+v
+
+Ff
+
+Ff
+
+y
+
+Y
+
+Fr
+
+Fig. 2: The planar single-track vehicle model used to model the AutoRally
+
+in Sec. VI.
+
+centerline bounded by |ey| ≤ wT for some given collision probability δ. Hence, we can write the chance constraints as
+
+P (ey < wT) > 1 − ϵ, P (ey > −wT) > 1 − ϵ,
+
+(32a) (32b)
+
+which keeps the chances of collision avoidance for each track boundary above 1 − ϵ. The chance constraints (32) are equivalent to
+
+P (ey ≥ wT) ≤ ϵ, P (ey ≤ −wT) ≤ ϵ.
+
+(33a) (33b)
+
+It follows from (11a), (12) that (33) can be converted to deterministic chance constraints,
+
+e¯y − wT + νσy ≤ 0, e¯y + wT − νσy ≥ 0,
+
+(34a) (34b)
+
+where σy is the standard deviation of ey, obtained from the Monte-Carlo covariance propagation (see Algorithm 2). Since (34a) and (34b) are symmetric, we can combine them to form a single inequality,
+
+|e¯y| ≤ wT − νσy.
+
+(35)
+
+Hence, we can formulate the DCBF
+
+h(x) = (wT − νσy)2 − e2y,
+
+(36)
+
+and the corresponding safe set is (4). We implement t√he chance constraints with the back-off coefficient ν = 2erf−1(1 − 2ϵ) (see Remark 1), which for the considered application turned out to be a good compromise between conservativeness and safety.
+
+Fig. 3: S-MPPI and BSS-MPPI trajectory visualization for a set of MonteCarlo runs where the objective is to conclude a lap clock-wise. The trajectories generated by BSS-MPPI consider disturbances and are more conservative, resulting in lower speeds but fewer collisions
+C. Simulation Results
+To illustrate, Fig. 3 shows the trajectories for a set of runs produced by S-MPPI and BSS-MPPI when trying to manuever a lap of the race track. The trajectories produced by SMPPI have a tendency to go close to the track boundaries and on several occasions also cross the track boundaries, indicating a subsequent crash. In contrast, owing to the chance constraints, BSS-MPPI trajectories tend to push closer to the track center, thus yielding safer trajectories.
+To quantify the results, we have executed the different controllers using different tuning parameters, and for each set of parameters, we have executed the scenario in Fig. 3 for 100 Monte-Carlo runs using different noise realizations and initial conditions. Table I shows the number of crashes and collisions, and the corresponding ratios for different number of trajectories for MPPI, S-MPPI, and BSS-MPPI, respectively. We define a collision to occur when the vehicle deviates from the middle of the lane with more than 1.8m (which defines the chance constraint for the lateral deviation), and similarly we define a crash to occur when the vehicle goes outside of the (assumed constant) lanewidth wT = 2m from the center of the lane, indicating a severe constraint violation. With this
+
+TABLE I: Crash ratio, collision ratio, and computational speed results for 100 Monte-Carlo runs for a particular choice of cost function and qey = 0.1, and a control horizon of 20 steps. When a crash occurs, the particular Monte-Carlo run is terminated. The simulations use an Nvidia RTX2060
+GPU and the computational speed is the average time it takes to execute
+the respective method one time step.
+
+Method
+MPPI, M = 30, 000 S-MPPI, M = 5, 000 S-MPPI, M = 20, 000 BSS-MPPI, M N = 100 · 50 BSS-MPPI, M N = 500 · 40 BSS-MPPI, M N = 1, 000 · 20
+
+Crashes
+93% 8% 8% 4% 0% 0%
+
+Collisions
+230% 13% 13% 10% 1% 2%
+
+Speed [Hz]
+58.1 55.3 42.9 43.1 39.7 39.1
+
+notion, we can quantify the number of constraint violations, in addition to quantifying the number of times the controllers heavily violates the constraints.
+Irrespective of the number of trajectories used, BSSMPPI experiences substantially fewer crashes and collisions throughout the 100 Monte-Carlo runs. The vanilla MPPI (MPPI) crashes at almost all of the 100 Monte-Carlo runs and has on average 2.3 constraint violations per lap. The number of crashes and collisions for S-MPPI is more or less constant irrespective of the number of trajectories, while the safety of BSS-MPPI improves as the number of trajectories involved to approximately solve the optimal control problem increases. With a sufficiently large M N , the collisions and crashes almost diminish. Even if the number of trajectories used to approximate the covariance propagation N is large, BSS-MPPI is not able to recover appropriately if the number of sampled control sequences M is small.
+To illustrate the sensitivity to cost function designs, Figs. 4 and 5 display the crash and collision rates for different values of M and N as a function of qey (the lateral deviation cost term) along with the 1-σ confidence interval. It is clear that BSS-MPPI, the crash rate is relatively insensitive to the value of qey , while for S-MPPI with both M = 5000 and M = 20, 000, the crash and collision rates generally reduce with increasing qey . This is because s qey increases, the lateral deviation term dominates the cost function and for qey = 40, the controller tries to stay in the middle of the track and does not allow for closely tracking other objectives of the cost function. Furthermore, using M N = 5, 000 in BSSMPPI in general leads to fewer crashes and collisions than S-MPPI except for a very large penalization on the lateral deviation. However, again, such large penalization leads to other objectives of the cost function to be ignored. We can also see that the difference in crash rates between using M = 5, 000 and M = 20, 000 in S-MPPI is small. Since S-MPPI does not account for any uncertainty, increasing the number of sampled control sequences M will only help marginally in improving performance.
+Fig. 6 displays heatmaps of the crash and collision rates to traverse a lap of the track using BSS-MPPI with different number of sampled control sequences M and uncertainty evaluation trajectories N . It is clear that increasing N leads to fewer crashes, as the belief space trajectories and chance constraints are better approximated. However, only increasing N is not sufficient, since using a small M implies limited
+
+Collision rate [-] Collision rate [-]
+
+Crash rate [-]
+
+Crash rate [-]
+
+1.00
+
+0.75 0.50 0.25
+
+MPPI N = 30000 S-MPPI N = 5000 S-MPPI, N = 20000 BSS-MPPI, NM = 1000 * 20 BSS-MPPI, NM = 100 * 50
+
+0.00 0 10 20 30 40 0.15
+
+0.10
+
+0.05
+
+0.00 0 10 20 30 40
+qey
+Fig. 4: Crash-rate comparison between BSS-MPPI and S-MPPI as function of qey , with a zoom-in in the lower plot. The curves represent average performance over 100 Monte-Carlo runs with the shaded tubes showing the 1-σ confidence intervals.
+
+2
+
+MPPI N = 30000
+
+S-MPPI N = 5000
+
+S-MPPI, N = 20000
+
+1
+
+BSS-MPPI, NM = 1000 * 20
+
+BSS-MPPI, NM = 100 * 50
+
+0 0 10 20 30 40
+qey
+0.2
+
+0.1
+
+0.0 0 10 20 30 40
+qey
+Fig. 5: Collision-rate comparison between BSS-MPPI and S-MPPI as function of qey corresponding to Fig. 4. Since there can be multiple collisions (i.e., constraint violations) during a lap, the ratio can be greater than one.
+exploration of the optimal controls. Hence, the optimal choice is a trade-off between control exploration, uncertainty propagation, and computational resources.
+VII. CONCLUSION
+We presented a novel MPPI controller that accounts for system uncertainty by leveraging a CBF-inspired heuristic to satisfy chance constraints. The method can handle nonlinear dynamics and solves the underlying nonlinear stochastic optimal control problem by forward simulation of control and uncertainty trajectories, thus avoiding explicit linearization and optimization steps. The results as verified on a highfidelity simulation environment indicate that our method effectively reduces the number of constraint violations, while at the same time achieving computational times comparable to previous MPPI approaches.
+In the future, we plan to evaluate the proposed method on an experimental setup, as well as extend it to perceptionaware control.
+
+100.0
+
+M
+500.0
+
+1000.0
+
+Crash rate [-], BSS − M P P I 0.150
+
+0.15
+
+0.15
+
+0.08
+
+0.03
+
+0.125
+
+0.100
+
+0.01
+
+0.03
+
+0
+
+0
+
+0.075
+
+0.050
+
+0.03
+
+0
+
+0.02
+
+0
+
+0.025
+
+0.000
+Collision rate[-], BSS − M P P I 0.30
+
+0.3
+
+0.25
+
+0.13
+
+0.09
+
+0.25
+
+0.20
+
+0.02
+
+0.04
+
+0.06
+
+0.01
+
+0.15
+
+0.10
+
+0.05
+
+0.02
+
+0.02
+
+0.05
+
+0.05
+
+100.0
+
+M
+500.0
+
+1000.0
+
+10.0
+
+20.0
+
+30.0
+
+40.0
+
+N
+
+Fig. 6: Crash and collision rates as a function of the number of control
+
+sequences M and covariance-propagation trajectories N , with qey = 0.1.
+
+REFERENCES
+
+[1] S. Tzafestas, Introduction to mobile robot control. Elsevier, 2014. [Online]. Available: https://books.google.com/books?id= VVz1uQEACAAJ
+[2] T. M. Anandan. Robot safety, everything but routine. [Online]. Available: https://www.automate.org/industry-insights/ robot-safety-everything-but-routine#:∼:text=Over%20a%2030, Bureau%20of%20Labor%20statistics
+[3] G. Burdick. A closer look at the robotics safety process. [Online]. Available: https://ehsdailyadvisor.blr.com/2022/02/ the-robotics-safety-process/#:∼:text=Updated%3A%20Feb%2017% 2C%202022%20Industrial,collaborative%20and%20mobile%20in% 20nature
+[4] A. Mesbah, “Stochastic model predictive control: An overview and perspectives for future research,” IEEE Control Systems Magazine, vol. 36, no. 6, pp. 30–44, 2016.
+[5] J. Yin, C. Dawson, C. Fan, and P. Tsiotras, “Shield model predictive path integral: A computationally efficient robust mpc method using control barrier functions,” IEEE Robotics and Automation Letters, vol. 8, no. 11, pp. 7106–7113, 2023.
+[6] O. So, Z. Serlin, M. Mann, J. Gonzales, K. Rutledge, N. Roy, and C. Fan, “How to train your neural control barrier function: Learning safety filters for complex input-constrained systems,” arXiv preprint arXiv:2310.15478, 2023.
+[7] K. Okamoto and P. Tsiotras, “Optimal stochastic vehicle path planning using covariance steering,” IEEE Robotics and Automation Letters, vol. 4, no. 3, pp. 2276–2281, 2019.
+[8] J. Yin, Z. Zhang, E. Theodorou, and P. Tsiotras, “Trajectory distribution control for model predictive path integral control using covariance steering,” in International Conference on Robotics and Automation (ICRA), Philadelphia, PA, May 2022, pp. 1478–1484.
+[9] L. Blackmore, M. Ono, and B. C. Williams, “Chance-constrained optimal path planning with obstacles,” IEEE Transactions on Robotics, vol. 27, no. 6, pp. 1080–1094, 2011.
+[10] T. Lew, F. Lyck, and G. Mu¨ller, “Chance-constrained optimal altitude control of a rocket,” in European Conference for Aeronautics and Space Sciences (EUCASS), 2019.
+[11] T. Lew, R. Bonalli, and M. Pavone, “Chance-constrained sequential convex programming for robust trajectory optimization,” in 2020 European Control Conference (ECC), 2020, pp. 1871–1878.
+[12] M. Ono, M. Pavone, Y. Kuwata, and J. Balaram, “Chance-constrained dynamic programming with application to risk-aware robotic space exploration,” Autonomous Robots, vol. 39, 12 2015.
+[13] A. Clark, “Control barrier functions for stochastic systems,” Automatica, vol. 130, p. 109688, 2021. [Online]. Available: https: //www.sciencedirect.com/science/article/pii/S0005109821002089
+[14] O. So, A. Clark, and C. Fan, “Almost-sure safety guarantees of stochastic zero-control barrier functions do not hold,” 2023.
+
+[15] H. Lee, T. Kim, J. Mun, and W. Lee, “Learning terrain-aware kinodynamic model for autonomous off-road rally driving with model predictive path integral control,” arXiv preprint arXiv:2305.00676, 2023.
+[16] K.-P. Kim and C.-H. Lee, “Adaptive weight model predictive path integral control for multiconstrained missile guidance,” Journal of Aerospace Information Systems, pp. 1–18, 2024.
+[17] N. Hatch and B. Boots, “The value of planning for infinite-horizon model predictive control,” in 2021 IEEE International Conference on Robotics and Automation (ICRA). IEEE, 2021, pp. 7372–7378.
+[18] J. Yin, Z. Zhang, and P. Tsiotras, “Risk-aware model predictive path integral control using conditional value-at-risk,” 2022. [Online]. Available: https://arxiv.org/abs/2209.12842
+[19] E. Arruda, M. J. Mathew, M. Kopicki, M. Mistry, M. Azad, and J. L. Wyatt, “Uncertainty averse pushing with model predictive path integral control,” in IEEE-RAS 17th International Conference on Humanoid Robotics (Humanoids), Birmingham, UK, Nov 2017, pp. 497–502.
+[20] I. M. Balci, E. Bakolas, B. Vlahov, and E. A. Theodorou, “Constrained covariance steering based tube-mppi,” in 2022 American Control Conference (ACC), 2022, pp. 4197–4202.
+[21] G. Williams, P. Drews, B. Goldfain, J. M. Rehg, and E. A. Theodorou, “Information-theoretic model predictive control: Theory and applications to autonomous driving,” IEEE Transactions on Robotics, vol. 34, no. 6, pp. 1603–1622, 2018.
+[22] A. Pre´kopa, “Boole-bonferroni inequalities and linear programming,” Operations Research, vol. 36, no. 1, pp. 145–162, 1988.
+[23] R. Quirynen and K. Berntorp, “Uncertainty propagation by linear regression kalman filters for stochastic nmpc,” IFAC-PapersOnLine, vol. 54, no. 6, pp. 76–82, 2021, 7th IFAC Conference on Nonlinear Model Predictive Control NMPC 2021. [Online]. Available: https: //www.sciencedirect.com/science/article/pii/S2405896321013021
+[24] D. Telen, M. Vallerio, L. Cabianca, B. Houska, J. V. Impe, and F. Logist, “Approximate robust optimization of nonlinear systems under parametric uncertainty and process noise,” J. Proc. Control, vol. 33, pp. 140–154, 2015.
+[25] M. M. Sean Vaskov, Rien Quirynen and K. Berntorp, “Frictionadaptive stochastic nonlinear model predictive control for autonomous vehicles,” Vehicle System Dynamics, vol. 62, no. 2, pp. 347–371, 2024.
+[26] A. P. Vinod and S. Di Cairano, “Sample quantile-based programming for non-convex separable chance constraints,” in 2023 American Control Conference (ACC), 2023, pp. 1517–1522.
+[27] I. M. Mitchell, “The flexible, extensible and efficient toolbox of level set methods,” J. Scientific Computing, vol. 35, pp. 300–329, 2008.
+[28] M. F. Huber, F. Beutler, and U. D. Hanebeck, “Semi-analytic Gaussian assumed density filter,” in Amer. Control Conf. San Francisco, CA, Jun. 2011.
+[29] G. Williams, N. Wagener, B. Goldfain, P. Drews, J. M. Rehg, B. Boots, and E. A. Theodorou, “Information theoretic mpc for model-based reinforcement learning,” in 2017 IEEE International Conference on Robotics and Automation (ICRA), 2017, pp. 1714–1721.
+[30] L. Hewing, J. Kabzan, and M. N. Zeilinger, “Cautious model predictive control using gaussian process regression,” IEEE Transactions on Control Systems Technology, vol. 28, no. 6, pp. 2736–2743, 2020.
+[31] G. Cao, E. M.-K. Lai, and F. Alam, “Gaussian process model predictive control of an unmanned quadrotor,” Journal of Intelligent & Robotic Systems, vol. 88, pp. 147–162, 2017.
+[32] M. Goldshtein and P. Tsiotras, “Finite-horizon covariance control of linear time-varying systems,” in 2017 IEEE 56th Annual Conference on Decision and Control (CDC), 2017, pp. 3606–3611.
+[33] A. Jain, T. Nghiem, M. Morari, and R. Mangharam, “Learning and control using gaussian processes,” in 2018 ACM/IEEE 9th International Conference on Cyber-Physical Systems (ICCPS), 2018, pp. 140– 149.
+[34] B. Goldfain, P. Drews, C. You, M. Barulic, O. Velev, P. Tsiotras, and J. M. Rehg, “AutoRally: An open platform for aggressive autonomous driving,” IEEE Control Syst. Mag., vol. 39, no. 1, pp. 26–55, 2019.
+[35] K. Berntorp, B. Olofsson, K. Lundahl, and L. Nielsen, “Models and methodology for optimal trajectory generation in safety-critical road– vehicle manoeuvres,” Veh. Syst. Dyn., vol. 52, no. 10, pp. 1304–1332, 2014.
+[36] H. B. Pacejka, Tire and Vehicle Dynamics, 2nd ed. Oxford, United Kingdom: Butterworth-Heinemann, 2006.
+
+

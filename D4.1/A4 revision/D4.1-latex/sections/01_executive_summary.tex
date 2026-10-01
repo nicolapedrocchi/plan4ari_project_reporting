@@ -1,0 +1,15 @@
+\section{Executive summary}\label{sec:exec}
+
+\begin{planbox}
+D4.1 updates the scientific plan of Activity~4 with the state of the art that emerged after the submission of \PlanARI. The original pillars --- informed sampling-based planning with multi-path reuse (T4.2) and MPC micro-interpolation in the Core IPC (T4.3) --- are \textbf{retained}; an \textbf{MPPI-based look-ahead layer is added} between them, and the end-to-end pipeline is made explicit, starting from the \textbf{optimal localisation of the robot with respect to the task}.
+\end{planbox}
+
+Since the proposal, sampling-based motion planning has become fast enough to answer collision-free queries in microseconds on a standard CPU~\cite{thomason2024vamp}, and Model Predictive Path Integral (MPPI) control has matured into a practical, derivative-free receding-horizon method for manipulators and mobile robots, with open implementations and industrial adoption in the ROS\,2 navigation stack~\cite{williams2018tro,bhardwaj2021storm,macenski2023nav2survey}. A review of 119 sources (Sections~\ref{sec:method}--\ref{sec:software}) led to the following decisions:
+\begin{itemize}
+\item \textbf{Sampling-based planning and MPPI.} MPPI is adopted as a \emph{stochastic look-ahead} that explores the task redundancy (tool roll, orientation tolerance, external axes, base) ahead of the robot, handles discrete configuration alternatives as multiple goals and reacts to scene changes. Sampling-based planning remains in charge of transfer motions, station-level feasibility and multi-path reuse (Section~\ref{sec:arch}).
+\item \textbf{Explicit pipeline.} Scene model $\rightarrow$ task segmentation $\rightarrow$ optimal task localisation (stations, base, rail) $\rightarrow$ segment feasibility and cost-to-go $\rightarrow$ online execution (MPPI + transfers) $\rightarrow$ Core-IPC path--velocity MPC.
+\item \textbf{Open IPC / Core IPC.} All stochastic computation runs in the Open IPC; the Core IPC receives smooth references and enforces hard limits and safety rules deterministically at 1\,kHz.
+\item \textbf{Robot-agnostic framework.} Kinematic and task descriptions are inputs; inverse-kinematics solution classes generalise the classical eight solutions of spherical-wrist arms to cuspidal arms, extended joint ranges, external axes and mobile bases.
+\item \textbf{Benchmarking (T4.7).} A catalogue of 17 applications; arc welding of large structures (reference demonstrator) is validated on real hardware, \textbf{all other applications are benchmarked in simulation}.
+\end{itemize}
+The expected effects are a reduction of reconfigurations and safety-induced idle time, constant process speed within tolerance, and portability across robot kinematics, while keeping the computation-time KPI comparable with the OMPL baseline of the proposal (CPU-first design).

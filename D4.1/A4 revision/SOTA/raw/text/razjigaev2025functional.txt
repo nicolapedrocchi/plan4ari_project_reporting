@@ -1,0 +1,588 @@
+1
+Fast Functionally Redundant Inverse Kinematics for Robotic Toolpath Optimisation in Manufacturing Tasks
+Andrew Razjigaev, Hans Lohr, Alejandro Vargas-Uscategui, Peter C. King, and Tirthankar Bandyopadhyay
+
+arXiv:2512.10116v1 [cs.RO] 10 Dec 2025
+
+Abstract—Industrial automation with six-axis robotic arms is critical for many manufacturing tasks, including welding and additive manufacturing applications; however, many of these operations are functionally redundant due to the symmetrical tool axis, which effectively makes the operation a five-axis task. Exploiting this redundancy is crucial for achieving the desired workspace and dexterity required for the feasibility and optimisation of toolpath planning. Inverse kinematics algorithms can solve this in a fast, reactive framework, but these techniques are underutilised over the more computationally expensive offline planning methods. We propose a novel algorithm to solve functionally redundant inverse kinematics for robotic manipulation utilising a task space decomposition approach, the damped leastsquares method and Halley’s method to achieve fast and robust solutions with reduced joint motion. We evaluate our methodology in the case of toolpath optimisation in a cold spray coating application on a non-planar surface. The functionally redundant inverse kinematics algorithm can quickly solve motion plans that minimise joint motion, expanding the feasible operating space of the complex toolpath. We validate our approach on an industrial ABB manipulator and cold-spray gun executing the computed toolpath.
+Index Terms—Robot Kinematics, Redundant Manipulators, Functional Redundancy, Toolpath Optimisation, Additive Manufacturing
+
+(a) Workspace limit in a 6 DOF task
+
+I. INTRODUCTION
+Industrial automation solutions in manufacturing rely on six-axis robotic manipulators to accurately position tools and sensors to perform various tasks. The applications of sixaxis manipulators include machining, painting, spraying, welding, grinding, laser-cutting, and additive manufacturing (AM), where the robot uses its 6 degrees of freedom (DOF) to move tools attached to its end-effector along a predefined path that is generally tangent to the surface of a workpiece.
+Traditional industrial robot motion planning requires practitioners to define toolpaths in a 3D Cartesian operation space of 6 DOF; however, the practical operation of these tools does not require constraints in all DOF. The most notable case is the symmetrical tool axis, where rotation about that axis is irrelevant to the task. For instance, the cutting profile of a tool in machining is symmetrical, as is the shape of the deposition profile of AM processes such as welding in wirearc AM (WAAM) or in coating and spraying processes such as cold spray AM.
+Consequently, toolpaths for these applications only need constraints in 5 DOF, introducing kinematic redundancy where the six-axis manipulator has a single DOF greater than the
+This work was supported by CSIRO’s Early Research Career Postdoctoral and Engineering Fellowship. Financial support from CSIRO’s Future Digital Manufacturing Fund is also gratefully acknowledged.
+A. Razjigaev, H. Lohr, A. Vargas-Uscategui, P. King and T. Bandyopadhyay are with the CSIRO, Australia. andrew.razjigaev@csiro.au
+
+(b) Workspace limit in a 5 DOF task
+Fig. 1: Comparison of the maximum reach of a welding tool moving along a line in the x-axis on a six-axis robot when constrained with a 6 DOF task versus a 5 DOF task
+number of variables that are necessary to describe the given task. The literature on robot kinematics [1] describes this type of redundancy as functional redundancy r < m, as the task has r = 5 components in the operation space of m = 6, despite that the robot is fully actuated in joint space, i.e. n = m = 6. In terms of motion planning with functionally redundant manipulators, solving the path in the operation space given the reduced constraints in the task is a type of taskconstrained planning often described as a semi-constrained or an under-defined Cartesian path planning problem [2].
+Motion planning with kinematic redundancy can provide greater dexterity and versatility to a manipulator in a number of different situations [1]. We illustrate these benefits in Fig. 1 where a six-axis Fanuc LRmate200ic robot, is
+
+2
+
+tasked with moving a weld torch along a line on the xaxis in our robot modelling and toolpath generation software called Continuous3DTM [3], [4]. Continuous3DTM is software made by CSIRO that has been designed for robotic additive manufacturing and repair techniques. For example, Lomo et al. recently used Continuous3DTM to 3D print a titanium-based engine bracket by cold spray additive manufacturing [5], [6]. In coupling toolpath generation with robot motion planing, Continuous3DTM aims to provide a more optimum solution for the execution of additive toolpaths robotically. Defining the task in 6 DOF as in 1a imposes an unnecessary constraint on the manipulator that reduces its reachable workspace. In contrast, defining the task in 5 DOF as in 1b allows the robot to use the redundant DOF to achieve a more reachable workspace with more intuitive movement. Exploiting functional redundancy can help optimise toolpath planning as it increases the set of feasible configurations, allowing motion planners to optimise trajectories for feasibility and performance by avoiding collisions, singularities, and minimising the motion, torque and energy involved in the task. However, despite these benefits, the literature seldom utilises inverse kinematics solvers for functionally redundant robots, especially in the domain of additive manufacturing where smooth continuous end effector motions have to be strictly adhered to.
+A. Related Work
+The literature on functionally redundant robot motion either resolves the redundancy in the path planning step or in the inverse kinematics step. The distinction is that the path planning approach solves the under-defined variables in the task such that r becomes fully defined in m. On the other hand, the inverse kinematics approach employs techniques in the solver such that the effective operation space m reduces to match the size of r. Both approaches have their benefits; the path planning approach produces a task that is executable by the traditional fully actuated inverse kinematics controller, but it is an offline method that requires pre-computation of the trajectory beforehand. While the inverse kinematics approach requires a controller customised to the task r, but it is an online method that can be executed in real-time, suitable for reactive motion control applications.
+Amongst the path planning approaches in the literature, solving the under-defined variables in the task is a type of task-constrained motion planning and is solved with sampling and graph-based methods. For instance, the Descartes semiconstrained Cartesian path planning library by the ROS Industrial consortium would sample 6 DOF poses within the constraints of the functionally redundant task and build a collision-free graph in configuration space where the solver searches for the best path that minimises joint motion [2]. This approach also allows the task to have a tolerance of admissible values; for example, representing acceptable deviation of the tool approach angle as a cone of admissible orientations all of which can further increase the feasibility and smoothness of the robot motion. Sun et al. incorporated these techniques in the case of coordinated motion with external axes [7]. Malhan et al. discuss the use of tolerance cones for orientation, spheres
+
+for position, as well as considering dynamically changing tool centre points (TCP), all within their path planner [8]. Sampling methods in functionally redundant motion have also been used to inform slicing algorithms in additive manufacturing to solve kinematically preferred rastering directions [9]. However, an evaluation of graph-based techniques, particularly Descartes, has proven to be computationally expensive at large toolpaths in terms of both computation time and memory requirements [10]. Weingartshofer et al. proposed an optimisation framework for solving semi-constrained paths, however, they are also computationally expensive [11]. Path planning solvers for finding motion for functionally redundant manipulators are highly flexible and practical, but can suffer due to computationally complexity in larger toolpaths.
+As opposed to planning, functionally redundant motion can be accounted for in the inverse kinematics solver, particularly using redundancy resolution techniques. A classic approach to solve functionally redundant inverse kinematics is to add virtual joints to the end of the kinematic model, where the under-defined variables in the task become the values of the virtual joint positions [12]. This approach converts the functionally redundant problem into an intrinsically redundant one, increasing the size of n and shifting the difference between r and m towards a difference between m and n. In this case, task priority redundancy resolution techniques are employed [13], where the inverse kinematics solver can fulfil the primary task of reaching the target while utilising the Null Space for secondary objectives, which is the set of redundant self-motion configurations that do not change the TCP location [1]. In the context of functional redundancy, the Null Space also includes the set of configurations that fulfil all r components in the task. Baron et al. used this method to achieve joint limit avoidance as the secondary objective [12]. However, adding virtual joints increases the robot DOF n, which can complicate the inverse kinematics process, increasing the size and ill-conditioning of the Jacobian matrix. To counteract this, research has focused on decomposition techniques that eliminate the components in m and reduce them to r, resulting in a smaller Jacobian of size r by n. Huo et al. proposed a twist decomposition approach (TWA) that can reduce the size of the Jacobian based on an orthogonal decomposition of the desired twist within the task priority inverse kinematics algorithm [14]. Huo et al. applied this decomposition with redundancy resolution to solve functionally redundant motion in a welding task with secondary objectives that avoided joint limits and singularities, which improved its overall motion along a toolpath [15], [16]. However, Zlajpah et al. proved that the formulation of TWA was mathematically inconsistent, proposing the consistent task-space decomposition (TSD) method [17], based on their formulation of a kinematic velocity controller for a changing task space [18], [19]. Zlajpah et al. demonstrated that functionally redundant inverse kinematics can be solved efficiently in a real-time controller; however, these fundamental techniques are still niche and underutilised in the literature.
+B. Contribution
+Exploiting redundancy is a key technique in optimising toolpaths for kinematic performance and feasibility, especially
+
+3
+
+in functionally redundant tasks that are under-constrained in operation space. However, the literature predominantly resolves this with offline planning methods, seldom utilising the fast online control methods. Online control methods can potentially produce effective toolpaths with minimum computation, which can be essential for real-time control applications and in solving more computationally complex planning problems. One example is multi-levelled optimisation of slicing parameters and workpiece position with semi-constrained paths for kinematic performance in AM.
+In this paper, we propose a novel algorithm to solve functionally redundant inverse kinematics that is fast and simple to compute, robust to singularities and minimises the joint motion in fulfilling the task. Our algorithm achieves these qualities by incorporating task space decomposition, damped least squares (Levenberg-Marquardt optimisation) and Halley’s method. We demonstrate the applicability of our algorithm in optimising toolpaths to reduce robot motion and increase the feasible operating space, where a robot is tasked with performing a complex non-planar toolpath in cold spray AM.
+
+II. PROBLEM FORMULATION
+In our manufacturing application, a toolpath is generated using slicing algorithms in our software, Continuous3DTM [3], [4]. This toolpath is the desired trajectory of the TCP throughout the duration of the task. We can represent this trajectory as a discrete array of N target poses relative to the robot’s origin.
+Td(k) = 0⊤ Rd(k) td(k) 1 , k = 0, 1, . . . , N (1)
+Where Td is a 3D homogeneous transform containing a rotation matrix Rd ∈ SO(3) and a translation vector td ∈ R3 at any time step k. The rotation matrix encapsulates the normal vector of the task, where the z-axis of the TCP coordinate frame must align. Since the task is only concerned with this alignment, we have 5 DOF functional redundancy as the tool is unconstrained to rotate about this normal vector.
+Initially, this rotation is an arbitrary value, and the inverse kinematics solver must find a joint trajectory that fulfils the task, minimising its motion. For each sample k, the functionally redundant inverse kinematics solver must solve the joint position vector q, which represents the configuration of n DOF on the robot.
+
+q = [q1, q2, . . . , qn]T
+
+(2)
+
+With the inverse kinematics solution of q, we can compute the new TCP trajectory in our 6 DOF operating space using the forward kinematics, f (q), to solve the end-effector pose Te.
+
+Te = f (q) = T1(q1)T2(q2) · · · Tn(qn)
+
+(3)
+
+The following sections shall describe the method of solving the inverse kinematics for q as well as how to decompose the task as a 5 DOF problem.
+
+III. DAMPED LEAST SQUARES INVERSE KINEMATICS
+The general approach to solving inverse kinematics in a fully actuated 3D operating space r = m = 6 is to use the resolved-motion rate-control scheme, utilising the instantaneous relationship between the end-effector and joint velocities.
+
+dx = Jdq
+
+(4)
+
+Where end-effector 6 DOF position and orientation velocities, dx ∈ Rm=6, is a 6 × 1 vector and the joint velocities, dq ∈ Rn, is a n×1 vector. J is the manipulator Geometric Jacobian matrix of size 6×n that contains the partial derivatives relating dq and dx. The inverse kinematics is solved iteratively
+with the Newton-Raphson method designed to reduce the error e to zero, which is a 6 × 1 vector, a spatial twist between the end-effector pose Te and the desired target pose Td [20].
+
+e = log(TeT−d 1)
+
+(5)
+
+To converge the error, dx is set in the direction of e; however, at large magnitudes, the iterative steps become inaccurate, so the magnitude is usually saturated by a value emax.
+
+e,
+
+if ∥e∥ ≤ emax
+
+dx =
+
+e
+
+(6)
+
+emax · ∥e∥ , if ∥e∥ > emax
+
+We can then use dx to solve the joint update dq by computing the pseudo-inverse of the Jacobian matrix n × 6.
+
+dq = J†dx
+
+(7)
+
+The Moore-Penrose expression of the pseudo-inverse, J† = JT (JJT )−1 provides a minimum-norm solution minimising the residual error ∥dx − Jdq∥2. However, when the pseudoinverse is evaluated near, but not exactly at a singularity, it can result in a poorly behaved solution, giving large commanded joint angles and destabilising the iterative algorithm [20], [21]. Conversely, the damped least-squares approach (Levenburg-Marquardt optimisation) can resolve this issue as it minimises both the residual error and the joint update ∥dx − Jdq∥2 + λ∥dq∥2 where λ is a damping factor used to regularise convergence. This gives us a singularity robust pseudo-inverse [21].
+
+J† = JT (JJT + λ2I)−1
+
+(8)
+
+Overall, for each ith iteration of the solver, the update is computed in Eq. 9 with the damped least squares pseudoinverse.
+
+dq = JT (JJT + λ2I)−1dx
+
+(9)
+
+The joint positions q iteratively converge to the inverse kinematics solution until the error e converges towards zero.
+
+qi+1 = qi + dq
+
+(10)
+
+The following section describes how damped least squares changes in formulation with the task-space decomposition to achieve functional redundancy.
+
+4
+
+IV. TASK SPACE DECOMPOSITION APPROACH
+In functional redundancy, we must decompose and reduce both J and dx into the new task of r components. This changes the formulation of Eq. 7 with the modified Jacobian Jˆ, a r × n matrix and dxˆ, a r × 1 vector.
+
+Lloyd et al. presented that H can be efficiently computed based on the variables in the Jacobian J. The algorithm can also be damped, requiring two steps to combine the first- and second-order derivatives. The first step is the damped NewtonRaphson step producing the joint update ∂qdnr.
+
+dq = Jˆ†dxˆ
+
+(11)
+
+To compute Jˆ and dxˆ, task-space decomposition requires them to be transformed with respect to the desired target frame Td [17], [18]. Given that the velocities in J and dx are with respect to the origin, the twist transformation, R˜ t, is a 6 × 6 matrix that transforms them to be with respect to the desired target frame.
+
+∂qdnr = JT (JJT + λ2I)−1dx
+
+(19)
+
+The second step produces the damped Halley’s step to
+compute the final joint update dq based on the augmented matrix A, with the multiplication [H∂qdnr] ∈ R6×n.
+
+dq = AT (AAT + λ2I)−1dx
+
+(20)
+
+˜
+
+Rd 03×3
+
+Rt =
+
+(12)
+
+03×3 Rd
+
+Where Rd is the rotation matrix of the desired target frame relative to the robot’s origin. With the quantities expressed relative to the target frame, a task projection matrix Tt performs the decomposition and reduction to tasks r to the Jacobian and twist.
+
+Jˆ = TtR˜ tJ
+
+(13)
+
+dxˆ = TtR˜ tdx
+
+(14)
+
+The task projector matrix, Tt is a mask computed as a sub-matrix (of size r × 6) of the identity I6×6 depending on components selected in r. For the case of achieving a 5 DOF task, Tt = Tr=5 eliminates the rotation about the z-axis, making Jˆ a 5 × n and dxˆ a 5 × 1 vector.
+
+1 A = J + 2 H∂qdnr (21)
+
+This
+
+method
+
+minimises
+
+∥dx
+
+−
+
+Jdq
+
+−
+
+1 2
+
+Hdqdq∥2
+
++
+
+λ∥dq∥2,
+
+simultaneously solving the quadratic system while minimising
+
+the joint update dq.
+
+Applying the task-space decomposition with Halley’s
+
+method requires transforming the accelerations in the kine-
+
+matic Hessian with respect to the target frame, as well as
+
+decomposing it into r tasks with the task projection matrix
+
+Tt.
+
+Hˆ = TtR˜ tH
+
+(22)
+
+Where Hˆ ∈ Rr×n×n is the modified Hessian for the task
+of r components. Substituting Eq. 13 and 22 into 21 produces the modified augmented matrix Aˆ .
+
+Tr=5 = I5×5 05×1
+
+(15)
+
+In the case of achieving a 3 DOF task where the robot is only concerned of achieving the position, Tr = Tr=3 eliminates all orientation, making Jˆ a 3 × n and dxˆ a 3 × 1.
+
+Tr=3 = I3×3 03×3
+
+(16)
+
+Consequently, the variables in Eq. 13 and 14 can be substi-
+tuted into Eq. 9 to compute the inverse kinematics solution, which minimises ∥dxˆ − Jˆdq∥2 + λ∥dq∥2.
+
+dq = JˆT (JˆJˆT + λ2I)−1dxˆ
+
+(17)
+
+The following section describes how to achieve faster convergence of this algorithm with Halley’s method.
+
+V. FAST CONVERGENCE WITH HALLEY’S METHOD
+Lloyd et al. proposed using Halley’s method, a third-order algorithm that uses both the first- and second-order derivatives to iteratively solve inverse kinematics much faster than the classic Newton-Raphson approach [20]. This requires the computation of the kinematic Hessian H ∈ R6×n×n, a rank-3 tensor that is the derivative of the Jacobian J.
+
+∂
+
+H= J
+
+(18)
+
+∂q
+
+Aˆ = TtR˜ tJ + 1 TtR˜ tH∂q
+
+(23)
+
+2
+
+Aˆ
+
+=
+
+TtR˜ t(J
+
++
+
+1 Hδq)
+
+=
+
+TtR˜ tA
+
+(24)
+
+2
+
+Consequently, Eq. 24 shows that the modified augmented matrix can be computed the same way that the other modified terms are, as in Eq. 13, and 14. The resulting damped NewtonRaphson step with functional redundancy is then computed based on Eq. 17.
+
+∂qdnr = JˆT (JˆJˆT + λ2I)−1dxˆ
+
+(25)
+
+The second damped Halley’s step with functional redun-
+dancy is computed based on Eq. 20 using the modified augmented matrix Aˆ from Eq. 24.
+
+dq = Aˆ T (Aˆ Aˆ T + λ2I)−1dxˆ
+
+(26)
+
+The resulting joint update dq solves the functionally re-
+dundant problem quickly with reduced motion minimising the quantity ∥dxˆ − Jˆdq − 12 Hˆ dqdq∥2 + λ∥dq∥2, simultaneously solving the quadratic system while minimising the joint up-
+date. Pseudo-code of the solver is presented in algorithm 1.
+
+5
+
+Algorithm 1 Functionally Redundant Inverse Kinematics (FRIK) algorithm
+
+Require: Desired end-effector pose Td, initial joint configu-
+
+ration q0, convergence tolerance ϵ
+
+Ensure: Joint configuration q such that the r-DOF task-space
+
+projection of f (q) matches that of Td
+
+1: q ← q0
+
+2: repeat
+
+3: Compute current end-effector pose: Te ← f (q) 4: Compute pose error: dx ← log(TeT−d 1) 5: Decompose into task space: dxˆ ← TtR˜ t dx
+
+6: if ∥dxˆ∥ < ϵ then
+
+7:
+
+break
+
+8: end if ∂f (q)
+9: Compute manipulator Jacobian: J ← ∂q
+10: Project to task space: Jˆ ← TtR˜ tJ
+
+11: (1) Damped Newton–Raphson step:
+
+∂qdnr ← JˆT (JˆJˆT + λ2I)−1dxˆ
+
+12: Form augmented matrix: A ← J + 12 H ∂qdnr 13: Project to task space: Aˆ ← TtR˜ tA 14: (2) Damped Halley’s step:
+
+dq ← Aˆ T (Aˆ Aˆ T + λ2I)−1dxˆ
+
+15: Update joint configuration: q ← q + dq 16: until maximum iterations reached or ∥dxˆ∥ < ϵ 17: return q
+
+VI. EXPERIMENTAL VALIDATION: TOOLPATH OPTIMISATION
+To test the proposed functionally redundant inverse kinematics (FRIK) solver in algorithm 1, a simulation in Continuous3DTM is set up to evaluate its effectiveness in improving the kinematic performance in executing a complex non-planar toolpath. As in our problem formulation, this toolpath initially has a manual ad hoc selection of the rotation about the symmetrical tool axis as needed in programming sixaxis manipulators. We shall compare the robot motion plan in executing this toolpath with the motion plan generated by our FRIK algorithm, which will treat the symmetrical tool axis as a redundant DOF, i.e. a 5 DOF task, automatically selecting the appropriate rotation for that axis so that it minimises the robot motion.
+The work-cell has an ABB IRB4600 robot holding an Impact Innovations GmbH 5/11 cold spray gun (Rattenkirchen, Germany) as its end-effector, as illustrated in Fig. 2. The Denavit-Hartenberg parameters of the robot are presented in Table I, which were automatically computed in Continuous3DTM [4]. The robot assumes the starting configuration of q0.
+
+q0 = [−112°, −7°, 57°, −80°, −34°, 9°]T
+
+(27)
+
+The toolpath is a spiral coating trajectory on the surface of
+a cone (100mm in diameter and 50mm in height) generated by the non-planar slicing algorithm in Continuous3DTM [4] as
+
+Fig. 2: Experimental setup for simulation of the FRIK toolpath.
+
+TABLE I: Denavit-Hartenberg parameters
+
+DOF 1 2 3 4 5 6
+
+a (mm) 175 900
+174.56 0 0 0
+
+α (radians) −π/2 0 −π/2 −π/2 −π/2 0
+
+d (mm) 329.5
+0 0 960 0 135
+
+θ (radians) 0
+−π/2 0 π π 0
+
+visualised in Fig. 2. The ad hoc selection of the rotation about the symmetrical tool axis is selected such that the x-axis stays aligned with the x-axis of the origin of the cone. Our FRIK solver, algorithm 1, is developed in C++ with the Eigen linear algebra library.
+In this experiment, we first find an appropriate placement of the workpiece (the cone) so that it is reachable in the robot’s workspace and compare the feasible operating space between running the ad hoc and FRIK-designed toolpaths. Then, we assess the joint-space trajectory between the two motion plans. Lastly, we validate the trajectory by FRIK in the physical robot work-cell.
+A. Workpiece Placement Analysis
+In the work cell, the placement of the workpiece is constrained by the surface of a wall at the base frame of the robot, specifically the -Y-Z plane, with the robot positioned as shown in Fig. 2. Dividing the plane into a grid of 100mm voxels allows us to assess whether the placement of the workpiece at each voxel results in a reachable toolpath. If so, we can determine the average manipulability in the motion plan and
+
+6
+
+Z position [m] Manipulability Z position [m] Manipulability
+
+Ad hoc Toolpath Operating Space
+2.4
+
+2.0 70000 60000
+1.6 50000
+
+1.2
+
+40000
+
+0.8
+
+30000
+
+0.4
+
+20000
+
+0.0 Robot base 10000
+
+0.0 0.4 0.8 1.2 1.6 2.0
+
+-Y position [m]
+
+FRIK Toolpath Operating Space
+2.4 60000
+2.0 50000 1.6 40000 1.2 30000 0.8 20000 0.4 Robot base 10000 0.00.0 0.4 0.8 1.2 1.6 2.0
+-Y position [m]
+
+Fig. 3: Feasible workpiece placement with ad hoc path
+
+Fig. 4: Feasible workpiece placement with FRIK path
+
+TABLE II: Workpiece Placement Analysis
+
+Reachable Voxels Maximum manipulability (wJL)
+Mean manipulability (w¯JL) Std. dev. manipulability (σwJL )
+
+Ad hoc 75
+77,039.853 34,933.768 20,160.141
+
+FRIK 144 63,308.970 25,303.924 15,443.855
+
+% Change 92
+-17.82 -27.57 -23.39
+
+hence produce a map to find the feasible operating space. For this measurement, we take the joint-limit constrained Yoshikawa’s manipulability index in Eq. 28 based on [22].
+
+wJL(q) = det JWJT
+
+(28)
+
+Where W is a diagonal weighting matrix of size n × n containing joint limit penalties si(qi) for each ith joint.
+
+W(q) = diag(s1(q1), s2(q2), . . . , sn(qn)) (29)
+
+(qmax i − qi)(qi − qmin i )
+
+si(qi) =
+
+max
+
+min 2
+
+(30)
+
+(qi − qi )
+
+Figs. 3 and 4 illustrate the feasible operating space as heat maps between the toolpaths designed ad hoc and FRIK, respectively. The resulting feasible operating space for FRIKdesigned toolpaths is visibly greater, emphasising how exploiting the redundant DOF helps the robot to achieve a more reachable workspace. Table II compares the size and distribution of the ad hoc and FRIK toolpath operating spaces.
+FRIK has a substantial 92% increase in the number of reachable voxels compared to the ad hoc selection. FRIK also appears to spread the dexterity in the robot workspace; however, the peak of the distribution is lower than the ad hoc toolpath. The overall increase in workspace has not resulted in finding more dexterous positions, causing the mean manipulability and its standard deviation to decrease. This reduction in dexterity is a trade-off for increasing the reachable workspace. There are a few cases, near the base of the robot,
+
+where FRIK struggled to find a feasible motion, whereas the ad hoc selection was successful. This might reflect a limitation in FRIK, in that the inverse kinematics solver finds a locally optimal solution for instantaneous joint updates but may not achieve global optimality over long trajectories. Further work to improve our algorithm would involve integrating an initial search method to find the optimal q0 and solve the global trajectory with greater manipulability.
+
+B. Joint Trajectory Analysis
+To assess the reduction in robot motion, we shall analyse the joint-space trajectory of q during the execution of the ad hoc and FRIK-designed toolpaths. The workpiece is kept at a constant position of y = −1.1m and z = 0.9m. Figs. 8 illustrates the joint-space trajectory of all 6 DOF for both cases in degrees. Table III and Fig. 5 compare the overall distance traversed by each joint for both cases in degrees. As expected, FRIK has changed the distribution of motion along each joint, reducing joint numbers 3, 4 and 6 while concentrating more of the effort towards certain joint numbers 1, 2 and 5. This redistribution of joint motion resulted in decreasing the overall Euclidean distance traversed in joint space q by 16.66%. Therefore, FRIK changed the distribution of motion along each joint to achieve a more efficient trajectory in joint-space.
+
+TABLE III: Joint Travel Comparison of FRIK and ad-hoc paths
+
+Joint
+J1 J2 J3 J4 J5 J6 Overall (6D)
+
+ad hoc [deg]
+95.711 178.869 206.085 356.713 141.283 387.944 685.549
+
+FRIK [deg]
+102.347 221.398 165.112 97.687 379.122 187.004 571.313
+
+% Change
+6.93 23.78 -19.88 -72.61 168.34 -51.80 -16.66
+
+7
+
+Distance [deg]
+
+Joint Trajectory Length Comparison
+600 ad hoc FRIK 400 200
+0 J1 J2 J3 J4 J5 J6 6D) verall ( O
+
+Fig. 5: Joint Travel Comparison of FRIK and ad-hoc paths
+
+TABLE IV: FRIK Computation Time in Conical Toolpath
+
+Number of Linear Move Commands Simulation Steps (N )
+Average Processing time per step (µs) Total Processing Time (s)
+
+Timed Results 717
+81,746 196.0 3.69
+
+C. Robot Validation
+To validate the proposed method with real robotic hardware, the FRIK-designed conical toolpath is exported as a robot program, with Continuous3DTM, that can be executed in ABB RobotStudio® (Zurich, Switzerland) for our cold spray robotic work cell in CSIRO’s Lab22 in Melbourne. Fig. 6 shows the real setup of the robot in the lab. The FRIK algorithm was implemented in C++ and executed on a 13th Gen Intel i7 laptop with 32 GB RAM. The resulting processing time of the conical toolpath is presented in Table IV, each target pose was processed in approximately 200µs or 0.2ms, suitable for real-time control.
+Fig. 7 shows frames extracted from the robot validation experiment video of the FRIK planned conical toolpath. Figs. 9 shows the data captured in RobotStudio® tracking the joint trajectory during toolpath execution. The resulting trajectory demonstrates the behaviour as expected by the simulation; however, there are discrepancies in the joint trajectory, particularly with joints 4, 5 and 6. These discrepancies are due to the miscalibration of the location of the conical toolpath in the scene and the real lab setup. This highlights that kinematicallybased toolpath processors, such as our FRIK algorithm, are susceptible to accuracy issues in setup in both simulated and real applications. Poor calibration can potentially compromise the benefits of using FRIK, which is a limitation of its usage.
+VII. DISCUSSION
+The evaluated toolpath in this study was a non-planar spiral trajectory on the surface of a cone, which requires significant amounts of re-orientation of the tool, leaving only a small feasible operating space. The challenging toolpath makes it difficult for a practitioner to select the rotation about the
+
+Fig. 6: Experimental setup for robot validation of the FRIK toolpath.
+redundant tool z-axis. Manual selection often results in an infeasible or inefficient motion plan. The resulting ad hoc selection results in a reduced operating space with difficulty in placing the workpiece, unintuitive robot movement, and placing significant emphasis on certain joints. Instead, allowing the redundant tool z-axis to be unconstrained, our FRIK algorithm was able to quickly and effectively exploit the redundant DOF, finding a reachable solution requiring minimum motion in terms of distance traversed in joint space. Exploiting the redundant symmetrical tool axis increases the reachable workspace by 92% and reduces overall joint motion by 17%. The results show that utilising FRIK in this toolpath helps to increase both the operating space of the toolpath and achieve more efficient robot movement.
+Although our FRIK algorithm has demonstrated effectiveness in finding feasible motion plans using a fast reactive inverse kinematics controller, a few limitations must be acknowledged. Firstly, FRIK with damped least squares is a local optimiser finding a solution that minimises the instantaneous joint update dq depending on the initial configuration q0. This greedy approach might not be globally optimal across large trajectories, which the more computationally intensive
+
+8
+
+(a) t = 10 s
+
+(b) t = 16 s
+
+(c) t = 23 s
+
+(d) t = 29 s
+
+Fig. 7: Sequential frames extracted from robot validation experiment video of the FRIK planned conical toolpath.
+
+planning approaches would be able to solve as well as find the best q0. Also, while a damped FRIK can minimise the joint update and find a singularity robust solution, it does not necessarily use the redundancy for obstacle avoidance, jointlimit avoidance, torque optimisation or energy minimisation. These capabilities can be achieved in conjunction with the damped least squares as discussed in [21], but these secondary objectives are beyond the scope of this paper. When validating the robot motion plan in the lab, the miscalibration of the toolpath location resulted in affecting the real joint trajectory, highlighting the algorithm’s sensitivity to the simulation-toreal gap. Lastly, the formulation of FRIK does not solve the more flexible, partially defined constraints described in semiconstrained path planning literature, such as the tolerance cone of admissible orientation. Future work may consider formulating FRIK to achieve these more flexible constraints and secondary objectives, as well as combinations with planning approaches to find globally optimal solutions.
+VIII. CONCLUSION
+In this paper, we develop a novel algorithm, FRIK, to solve functionally redundant inverse kinematics that is fast and simple to compute while minimising joint motion to fulfil the task. We used our algorithm to optimise the robot motion plan in executing a complex non-planar toolpath for a cold spray application where the z-axis of the tool is redundant and unconstrained. FRIK increased the feasible workspace by 92% while reducing total joint-space traversal by 17%, demonstrating its effectiveness in exploiting functional redundancy for complex toolpaths. In future work, we can consider improving our method by applying different secondary objectives and working with other types of constraints in semi-constrained paths. Further work would focus on addressing the sim-toreal gap by synchronising the scene in Continuous3DTM with communication from the real robot. Combining the FRIK approach with sampling-based global planning can be an extension for finding globally optimal toolpaths.
+REFERENCES
+[1] J. M. Rigelsford, “Modelling and control of robot manipulators,” Industrial Robot-an International Journal, vol. 27, 2000. [Online]. Available: https://api.semanticscholar.org/CorpusID:110855367
+
+[2] S. Edwards, J. Nicho, J. Meyer et al., “Descartes joint trajectory planner for semi-constrained cartesian paths,” in ROS-Industrial Community Meeting at ICRA, May 2015, alpha release announced May 26, 2015.
+[3] P. King, A. Vargas-Uscategui, and H. Lohr, “Continuous3d,” available online at: https://research.csiro.au/continuous3d/product-overview/, last accessed on 10.09.2024.
+[4] H. Lohr, P. King, A. P. Vargas, C. Chu, J. M. Roberts, and M. Teixeira, “Continuous3d, an end-to-end solution for robotic additive manufacturing,” MODSIM2023, 25th International Congress on Modelling and Simulation., 2023. [Online]. Available: https: //api.semanticscholar.org/CorpusID:260750127
+[5] F. Lomo, A. Vargas-Uscategui, P. King, M. Patel, and I. Cole, “Microstructure and mechanical properties of heat-treated cold spray additively manufactured titanium metal matrix composites,” Journal of Manufacturing Processes, vol. 99, pp. 12–26, 2023. [Online]. Available: https://www.sciencedirect.com/science/article/pii/S1526612523004395
+[6] F. Lomo, M. Patel, A. Vargas-Uscategui, P. King, and I. Cole, “A design and optimisation framework for cold spray additive manufacturing of lightweight aerospace structural components,” Additive Manufacturing, vol. 78, p. 103891, 2023. [Online]. Available: https://www.sciencedirect.com/science/article/pii/S2214860423005043
+[7] Y. Sun, X. Meng, M. Yu, and H. Tang, “Semi-constrained path planning for industrial robot with external axis,” in 2020 Chinese Automation Congress (CAC), 2020, pp. 6180–6185.
+[8] R. K. Malhan, S. Thakar, A. M. Kabir, P. Rajendran, P. M. Bhatt, and S. K. Gupta, “Generation of configuration space trajectories over semiconstrained cartesian paths for robotic manipulators,” IEEE Transactions on Automation Science and Engineering, vol. 20, pp. 193–205, 2023. [Online]. Available: https://api.semanticscholar.org/CorpusID: 246769803
+[9] D.-Q. Bi, F. Xie, and K. Tang, “Generation of efficient isoplanar printing path for multi-axis fdm printing,” Journal of Manufacturing and Materials Processing, 2021. [Online]. Available: https://api.semanticscholar.org/CorpusID:236220678
+[10] J. De Maeyer, B. Moyaers, and E. Demeester, “Cartesian path planning for arc welding robots: Evaluation of the descartes algorithm,” in 2017 22nd IEEE International Conference on Emerging Technologies and Factory Automation (ETFA), 2017, pp. 1–8.
+[11] T. Weingartshofer, B. Bischof, M. Meiringer, C. Hartl-Nesic, and A. Kugi, “Optimization-based path planning framework for industrial manufacturing processes with complex continuous paths,” Robotics and Computer-Integrated Manufacturing, vol. 82, p. 102516, 2023. [Online]. Available: https://www.sciencedirect.com/science/article/pii/ S0736584522001983
+[12] L. Baron, “A joint-limits avoidance strategy for arc-welding robots,” in International Conference on Integrated Design and Manufacturing in Mechanical Engineering, May 2000, presented at NFT’00, focusing on joint-limits avoidance in 6-DOF arc-welding trajectories.
+[13] Y. Nakamura, H. Hanafusa, and T. Yoshikawa, “Task-priority based redundancy control of robot manipulators,” The International Journal of Robotics Research, vol. 6, no. 2, pp. 3–15, 1987. [Online]. Available: https://doi.org/10.1177/027836498700600201
+[14] L. Huo and L. Baron, “Kinematic inversion of functionally-redundant serial manipulators: Application to arc-welding,” Transactions of The Canadian Society for Mechanical Engineering, vol. 29, pp. 679–690,
+
+9
+
+J1 [deg]
+
+J2 [deg]
+
+FRIK vs Ad-hoc Joint Trajectories
+
+90
+
+ad hoc
+
+FRIK
+
+100
+
+110
+
+20 0 20 40
+60 40 20 0
+
+100 150 200
+
+J3 [deg]
+
+J4 [deg]
+
+J5 [deg]
+
+0 50
+
+J6 [deg]
+
+100 50 0
+
+0
+
+10
+
+20
+
+30
+
+40
+
+Time [s]
+
+Fig. 8: Joint Trajectory of the FRIK and ad-hoc paths
+
+Real vs Simulated Joint Trajectories
+
+Real
+
+90
+
+Sim
+
+100
+
+110
+
+J1 [deg]
+
+J2 [deg]
+
+0 20 40
+
+J3 [deg]
+
+J4 [deg]
+
+J5 [deg]
+
+60
+40
+20
+50 0 50 100
+25 0 25 50
+0 50 100 150
+0 10 20 30 40 50
+Time [s]
+Fig. 9: Joint Trajectory of the simulated and real robot
+
+J6 [deg]
+
+10
+2005. [Online]. Available: https://api.semanticscholar.org/CorpusID: 125367165 [15] ——, “The joint-limits and singularity avoidance in robotic welding,” Ind. Robot, vol. 35, pp. 456–464, 2008. [Online]. Available: https://api.semanticscholar.org/CorpusID:31925526 [16] ——, “The self-adaptation of weights for joint-limits and singularity avoidances of functionally redundant robotic-task,” Robotics and Computer-integrated Manufacturing, vol. 27, pp. 367–376, 2011. [Online]. Available: https://api.semanticscholar.org/CorpusID:120441357 [17] L. Zˇ lajpah and A. Mu¨ller, “A task space decomposition algorithm for the inverse kinematics of functionally redundant manipulators*,” 2021 20th International Conference on Advanced Robotics (ICAR), pp. 1048–1053, 2021. [Online]. Available: https://api.semanticscholar.org/CorpusID: 245708011 [18] L. Zˇ lajpah, “Kinematic control of redundant robots in changing task space,” in Advances in Robot Design and Intelligent Control, A. Rodic´ and T. Borangiu, Eds. Cham: Springer International Publishing, 2017, pp. 3–11. [19] L. Zˇ lajpah and T. Petri, “Unified virtual guides framework for path tracking tasks,” Robotica, vol. 38, pp. 1807 – 1823, 2019. [Online]. Available: https://api.semanticscholar.org/CorpusID:201245200 [20] S. Lloyd, R. A. Irani, and M. Ahmadi, “Fast and robust inverse kinematics of serial robots using halley’s method,” IEEE Transactions on Robotics, vol. 38, no. 5, pp. 2768–2780, 2022. [21] A. S. Deo and I. D. Walker, “Overview of damped least-squares methods for inverse kinematics of robot manipulators,” Journal of Intelligent and Robotic Systems, vol. 14, pp. 43–68, 1995. [Online]. Available: https://api.semanticscholar.org/CorpusID:31950949 [22] N. Vahrenkamp and T. Asfour, “Representing the robot’s workspace through constrained manipulability analysis,” Autonomous Robots, vol. 38, pp. 17 – 30, 2014. [Online]. Available: https://api. semanticscholar.org/CorpusID:18003794
+
+

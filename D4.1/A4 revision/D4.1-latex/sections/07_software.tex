@@ -1,0 +1,21 @@
+\section{Software frameworks and industrial toolchain}\label{sec:software}
+
+\begin{table}[h]
+\centering\small
+\caption{Framework matrix (candidates for the Plan4ARI toolchain).}\label{tab:frameworks}
+\begin{plangrid}{|L{3.0cm}|L{3.3cm}|Y|L{2.6cm}|}
+\planheadrow \thead{Tool} & \thead{Language / hardware} & \thead{Scope} & \thead{Role in Plan4ARI}\\ \hline
+OMPL / MoveIt\,2 & C++, CPU & sampling-based planners, ROS\,2 integration & KPI baseline (proposal) \\ \hline
+VAMP~\cite{thomason2024vamp} & C++/Python, CPU SIMD & vectorised sampling-based planning & transfers, station checks, rollout primitives \\ \hline
+Descartes~\cite{demaeyer2017descartes} & C++, ROS & tolerance-aware Cartesian path planning & deterministic baseline \\ \hline
+cuRobo~\cite{sundaralingam2023curobo} & CUDA & GPU motion generation & GPU track baseline \\ \hline
+MPPI-Generic~\cite{vlahov2024mppigeneric} & CUDA C++ & MPPI, Tube-MPPI, RMPPI & GPU MPPI reference \\ \hline
+STORM~\cite{bhardwaj2021storm} & PyTorch, GPU & joint-space MPPI for arms & MPPI reference \\ \hline
+Nav2 MPPI controller~\cite{macenski2023nav2survey} & C++, CPU & AMR local control & AMR baseline \\ \hline
+acados~\cite{verschueren2022acados} & C, code generation & embedded NMPC & Core-IPC MPC candidate \\ \hline
+Isaac Gym / MuJoCo-MJX~\cite{makoviychuk2021isaacgym,dierking2026parallelsbmpc} & GPU physics & simulator-in-the-loop sampling MPC & simulation benchmarks \\ \hline
+MI.RA/Dexter (COMAU) & dockerised actions & low-code platform, digital twin & integration target (T4.4) \\ \hline
+\end{plangrid}
+\end{table}
+
+Logging, benchmarking, continuous integration and traceability are handled in T4.6 and in the benchmark repository (Section~\ref{sec:bench}).

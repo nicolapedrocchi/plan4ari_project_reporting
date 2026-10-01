@@ -1,0 +1,579 @@
+RRT Guided Model Predictive Path Integral Method
+Chuyuan Tao†, Hunmin Kim‡, and Naira Hovakimyan†
+
+arXiv:2301.13143v1 [cs.RO] 30 Jan 2023
+
+Abstract— This work presents an optimal sampling-based method to solve the real-time motion planning problem in static and dynamic environments, exploiting the Rapid-exploring Random Trees (RRT) algorithm and the Model Predictive Path Integral (MPPI) algorithm. The RRT algorithm provides a nominal mean value of the random control distribution in the MPPI algorithm, resulting in satisfactory control performance in static and dynamic environments without a need for ﬁne parameter tuning. We also discuss the importance of choosing the right mean of the MPPI algorithm, which balances exploration and optimality gap, given a ﬁxed sample size. In particular, a sufﬁciently large mean is required to explore the state space enough, and a sufﬁciently small mean is required to guarantee that the samples reconstruct the optimal controls. The proposed methodology automates the procedure of choosing the right mean by incorporating the RRT algorithm. The simulations demonstrate that the proposed algorithm can solve the motion planning problem in real-time for static or dynamic environments.
+I. INTRODUCTION
+Motion planning problems have been widely discussed in recent years in the ﬁeld of robotics, such as self-driving car navigation, automatic drone, and bipedal robots [1], [2], [3], [4], [5]. The main goal of motion planning problems is to ﬁnd a path for the agents to move from an initial position to a target position in fully-known environments while preventing collisions. However, it still remains challenging to solve the optimal motion planning problems efﬁciently in dynamic environments and implement the algorithms on the robotic systems in real-time.
+For motion planning problems, sampling-based methods have been proven to be effective for complex systems since the methods avoid calculating the derivatives of the dynamic equation and the cost function. In particular, the Probabilistic Roadmap (PRM) algorithm [6] is the ﬁrst sampling-based algorithm that solves the motion planning problem. The algorithm utilizes a local planner to connect the sampling conﬁguration in free space. The Rapid-exploring Random Trees (RRT) algorithm [7], [8], one of the most famous sampling-based algorithms, combines the exploration of the conﬁguration space and the biased sampling around the goal conﬁguration space. Most of the RRT algorithm variants can efﬁciently solve motion planning problems but can not ﬁnd an optimal solution. The RRT* algorithm has been developed in [9] to ﬁnd an optimal solution by using incremental
+This research is supported by NSF CPS #1932529, AFOSR #FA955021-1-0411, NASA #80NSSC22M0070 and #80NSSC20M0229 awards.
+†Chuyuan Tao and Naira Hovakimyan are with the Department of Mechanical Science and Engineering, University of Illinois at UrbanaChampaign, USA. {chuyuan2, nhovakim}@illinois.edu
+‡Hunmin Kim is with the Department of Electrical and Computer Engineering, Mercer University, USA. kim h@mercer.edu
+
+rewirings of the graph to provide an asymptotically optimal solution to the motion planning problems. However, compared to the RRT algorithm, the RRT* algorithm and its variants have a relatively longer execution time because the algorithm calculates the neighboring nodes and rewires the graph.
+Most RRT and RRT* algorithms can not handle dynamic environments since it requires one to abandon the current result path, and the new path grows from scratch. Dynamic Rapidly-exploring Random Trees (DRRTs) algorithm [10] was developed to address the problem by trimming the original results and exploring to get the target again. In [11], the authors provide a variant of replanning RRT algorithms combined with the Multipartite RRT (MP-RRT) algorithm. The MP-RRT algorithm biases the sampling distribution towards previous useful states and analytically computes which part of the previous RRT results can be re-utilized. Yet, both algorithms could not guarantee an optimal solution to the motion planning problem since the algorithms are based on non-optimal RRT algorithms. Thus, we provide a different approach to solving optimal real-time motion problems.
+One alternative way to efﬁciently solve optimal motion planning problems with dynamic environments is to use the Model Predictive Integral Control (MPPI) algorithm [12], [13]. By sampling the forward trajectories of dynamic systems, the MPPI algorithm avoids calculating the derivatives of the dynamic functions or the cost functions [14]. Since the forward trajectories can be sampled efﬁciently by Graphic Processing Units (GPUs), the algorithm can be applied to diverse robotic systems with ﬁnishing the calculation in a ﬁxed time [15]. The MPPI algorithm enables real-time implementation by adjusting the ﬁxed computation time, whereas a longer computation time reduces the optimality gap. Since the algorithm solves the motion planning problem iteratively, the algorithm can handle dynamic environments directly. However, the performance of the algorithm is inﬂuenced by the hyper-parameters dramatically, especially the mean value of the control input sample distribution. Intuitively, a small mean value may result in conservative exploration, and a large mean value may result in risky behaviors. Especially in dynamic environments, to get better performance, a timevarying mean value is needed. Thus, in this work, we utilize the RRT algorithm to design a better sample mean to guide the MPPI algorithm in exploring the workspace and sampling the trajectories.
+The idea of using the RRT and RRT* algorithms to solve motion planning problems in dynamic environments is inspired by [16]. In this work, the authors propose the RRTX algorithm, which combines the replanning ideas provided in
+
+1
+
+the DRRT algorithm and RRT* algorithm to continuously update the path during the exploration when the environment changes. However, the algorithms require large computation power and are hard to implement on the robots in real-time.
+The idea of using a nominal or baseline controller to improve the performance of the MPPI algorithm is inspired by [17], [18]. In [17], the authors present a method using the entire planning tree from RRT* algorithm to approximate the value functions in the MPPI algorithm. However, due to the learning procedure in the algorithm, the cost of ﬁnding an optimal solution to the motion planning problem is computationally expensive. In [18], the authors control the variance of the MPPI algorithm to handle the dynamic environments and provide a faster running time and better collision avoidance in a ground unicycle simulation. However, the algorithm requires the linearized dynamic model, which results in expensive computation for complex or highdimension systems.
+Contribution. This work presents a real-time samplingbased algorithm to solve the motion planning problem. We use the RRT algorithm to provide a nominal mean value for the random control distribution of the MPPI algorithm. The proposed algorithm advances the RRT algorithm in terms of dynamic environment navigation and optimality, and with respect to the MPPI algorithm, it reduces the need to ﬁnetune the mean value. We provide simulation results and sample size analysis to discuss the importance of tuning the mean value in the original MPPI algorithm. In particular, the sampling-based algorithms need sufﬁciently large means to explore the state space and sufﬁciently small means to guarantee that the samples reconstruct the optimal control. Thus, our proposed method avoids ﬁne-tuning the mean value by using the nominal path provided by the RRT algorithms. Our algorithm ﬁnds the optimal solutions by allowing the MPPI algorithm to explore freely, and it has a better performance in running time by using the RRT algorithm to provide a nominal path to guide the MPPI algorithm. If the MPPI algorithm reaches the area where the nominal path provided by the RRT algorithm has not been explored before, our algorithm uses a real-time Replanning RRT algorithm to provide new nominal paths. Finally, we implement our algorithm on a unicycle robot and solve the motion planning problem in static and dynamic environments.
+The rest of the paper is organized as follows. Section II formulates the optimal motion planning problems. Section III proposes the RRT-MPPI algorithm to solve the motion planning problems provided in Section II. We show the necessity of an automated design procedure for an RRT-based MPPI algorithm by demonstrating that a large mean is desired for exploration purposes in Section III-B and by showing that a small mean is desired to reduce the optimality gap in Section IV, given ﬁxed sample size. Section V provides simulations for a ground robot navigating through static and dynamic environments. We also compare the running time of the original MPPI algorithm and our RRT-based MPPI algorithm.
+
+II. PROBLEM STATEMENT
+Let X d denote the d dimensional space and Xobs ⊂ X d be the obstacle space. We deﬁne the free space Xf = X d \ Xobs, where the robot can reach. The start and goal states are xs and xg, respectively. We assume that the robot has a nonlinear control afﬁne dynamical system:
+
+dxt = (f (xt) + g(xt)ut)dt + σ(xt)dWt,
+
+(1)
+
+where xt ∈ Rn is the state, f : Rn → Rn, g : Rn → Rn×m and σ : Rn → Rn are locally Lipschitz continuous functions, and dWt is a Wiener process with dWkdWl = νkl(xt, ut, t)dt.
+Problem 1: Given X , Xobs, xg, and xt(0) = xs, we aim to ﬁnd the optimal control input u∗ that would lead to the short-
+est path to state xg in the static or dynamic environments (i.e., time-varying Xobs). Speciﬁcally, we aim to minimize the cost functions S(xt, ut), deﬁned as:
+
+t+T −1
+
+S(xt, ut) = φ(xt+T ) +
+
+q(xj, uj)
+
+(2)
+
+j=t
+
+subject to xj ∈ Xf , where q(xj, uj) is a running cost function, and φ(xt+T ) is the terminal cost function.
+
+III. APPROACH
+To this end, we propose the RRT-guided MPPI algorithm in Section III-C, which addresses Problem 1. By generating mean values using the RRT (presented in Section III-A), the MPPI algorithm (presented in Section III-B) does not need ﬁne parameter tuning in dynamic environments. Furthermore, the MPPI algorithm provides real-time implementable optimal control inputs.
+
+Algorithm 1 RRT algorithm
+Given: Initial vertices S ← {ss} Given: Initial edges ε ← ∅ for i = 1, ..., n do
+ssample ←SampleState(); snear ←NearestNeighbor(S, ssample); s ←Steer(snear, ssample, γ); if ObstacleFree(snear, s) then
+S ← S ∪ {s}; ε ← ε ∪ {(snear, s)}; end if if d(s, sg) < γ then S ← S ∪ {sg}; ε ← ε ∪ {(s, sg)}; return p = ExtractPath (S, ε) end if end for
+
+A. Rapidly-Exploring Random Trees Algorithm
+We present the RRT algorithm in Algorithm 1. The algorithm uses function SampleState() to uniformly sample a new state ssample in the conﬁguration space X . Then, the algorithm ﬁnds the nearest vertex snear with function
+
+2
+
+NearestNeighbor() and projects the sample state ssample to the ball with radius γ with function Steer(). If the new edge between the snear and s is free from collision, the projected state s will be added to the vertex set, and the new edge (s, snearest) will be added to the vertex set. If the new vertex s is within a radius γ of the goal state sgoal, then the RRT reaches the target and returns the path p. Otherwise, the algorithm adds the new vertex and advances the exploration.
+The RRT algorithm focuses on fast iteration while not guaranteeing ﬁnding the optimal solution to the motion planning problem. RRT* [9] is the ﬁrst variant of the RRT algorithm that could ensure asymptotic optimality. By allowing the new vertices to ”rewire” graph edges within the local neighborhood, the algorithm guarantees asymptotic optimality with the cost of increasing running time. However, the computation time of the RRT* algorithm also increases dramatically, and it is hard to implement the algorithm in real-time. In this work, instead of using the RRT* algorithm, we utilize the MPPI algorithm to ﬁnd the optimal solution to the motion planning problems.
+
+B. Model Predictive Path Integral Control Algorithm
+
+In this section, we introduce the MPPI algorithm [14],
+[15] to solve the motion planning problems. First, we need
+to sample K trajectories with time horizon T with random
+control input ui,j ∼ N (µ, Σ), where i = 1, · · · , K is the sample trajectory index. In each trajectory τi, we denote ui = [ui,t, . . . , ui,t+T −1]T the actual control input sequence, and [xi,t+1, . . . , xi,t+T ]T the states of the current sample trajectory. The evaluated cost for ith trajectory is given by
+
+t+T −1
+
+S(τi) = φ(xi,t+T ) +
+
+q(xi,j , ui,j ),
+
+(3)
+
+j=t
+
+where q(xi,j , ui,j ) = (xg − xi,j )T (xg − xi,j ) + 12 uTi,j Rui,j , where R is a positive deﬁnite control penalty matrix. We deﬁne the weight of ith trajectory ωi as:
+1 ωi = exp(− λ (Si)),
+where λ is the parameter that decides how much we trust the better-performed trajectories. Then the MPPI algorithm updates the control input using the following equation
+
+i=1 K ωiui,j
+
+uj =
+
+K
+
+(4)
+
+i=1 ωi
+
+for j = t, · · · , t + T − 1, which approximates the optimal
+
+control inputs using sampled trajectories.
+
+In conclusion, the MPPI algorithm uses sample trajectories
+
+to ﬁnd the optimal control input to solve the motion planning
+
+problem. Because the MPPI algorithm avoids calculating the
+
+derivatives of the nonlinear dynamic systems or the value
+
+functions, it can be implemented in real-time with the help
+
+of parallel computations on the GPUs, even for complex
+
+dynamic systems.
+
+While the MPPI algorithm has clear merits mentioned
+
+in the previous paragraph, its performance is dramatically
+
+inﬂuenced by the mean of the control input distribution. In
+
+Fig. 1: MPPI algorithm with various mean values in a static environment.
+the unicycle simulations presented in ﬁgure 1, the MPPI algorithm may fail to solve the motion planning problems due to the bad choice of the mean value. In ﬁgure 1, the red path is the result when the mean value of the control input is µ = [1, 0]T , the yellow path is the result when the mean value is µ = [1, 1]T , and the green path is the result when the mean value is µ = [0, 0]T . We can ﬁnd out easily that a smaller mean value hinders the exploration and cannot ﬁnish the path planning task in the provided horizon. A larger mean value may result in a safety violation. If the mean value is large, the MPPI algorithm is more aggressive and ﬁnishes the task faster. However, it also provides more risky control inputs and should require a larger sample size to get an optimal solution. We will show a required sample size analysis in Section IV.
+An example of MPPI trajectory in a dynamic environment is shown in Figure 2, where we increase the radius of circle obstacles by 2 and 4. The mean value for the MPPI is [1, 0]T , which has a perfect performance in a static environment but fails the task, being stuck in between obstacles in dynamic environments, as the second ﬁgure shown in Figure 2. Thus, we can conclude that for a dynamic environment, the MPPI algorithm needs a time-varying mean value to obtain a ﬁne performance. To automate the procedure of choosing dynamic mean values, we combine it with the RRT algorithm.
+C. Replanning RRT Guided MPPI Algorithm
+We propose a new sampling-based method that utilizes the RRT algorithm to guide the MPPI algorithm to solve the optimal motion planning problem deﬁned in Problem 1. Our algorithm performs well without tuning the mean value of the control distribution. Our algorithm also has a fast running speed, and thus it can be implemented in real-time.
+First, we use the RRT algorithm to provide an ofﬂine nominal path pn, which provides a possible solution to solve the motion planning problem. Although the RRT algorithm has a relatively fast iteration speed, the algorithm is still hard to implement in real-time, which will also be shown later in the simulations. So we ﬁrst run the RRT algorithm ofﬂine,
+
+3
+
+Fig. 2: Results with MPPI algorithm in dynamic environments. In the ﬁrst environment, the radius of the circle obstacles increases by 2 at time t = 0.5s. The solid line represents the radius before the environment changes, and the dotted line represents the radius after the environment changes. The MPPI algorithm can still handle the change without changing the mean value. In the second environment, the radius increases by 4 at time t = 0.5s as well. The MPPI algorithm with a ﬁxed mean value fails to ﬁnish the task.
+
+not in real-time. Since the RRT algorithm only provides the state information instead of the control information, we then use Lyapunov controllers or PD controllers to obtain a nominal control input un in real-time. However, since the RRT algorithm cannot guarantee the optimal solution, we use the MPPI algorithm with nominal control input un as the mean of the random control distribution to explore an optimal control input u∗ at each time step.
+As the difference between the nominal control input un and the optimal control input u∗ becomes increasingly large, the optimal control input may lead the agents to reach the area where the path pn of the RRT algorithm never reached before. In this case, the nominal path may have a negative inﬂuence on the MPPI algorithm. To address this issue, we use the replanning idea ﬁrst presented in the DRRT algorithm, where the agents replan under the changing environment. However, unlike the DRRT algorithm, our algorithm replans when the nominal controllers un are no longer helpful. In our implementation, we use a distance R to justify if the replanning is needed. We use a NearestNeighbor() function to calculate the distance between the current state x and its closest point xn in the nominal path, and if the distance is larger than R, our algorithm replans.
+The detail of the Replanning RRT algorithm is presented in algorithm 2. Our replanning RRT algorithm has a different input compared to the previous RRT algorithm, where the vertices set S is given by the previous nominal path pn, and vertices set S contains the start state ss. Next, we sample the state ssample and ﬁnd the nearest neighbor snear and project the states s same way as the RRT algorithm in Algorithm 1. However, we will also ﬁnd the closest state snear to the vertices set S . Then we check if the new edges (snear, s) are in the collision-free space Xf . Finally, we repeat the previous procedure until the distance between new vertex s and target state sg or closest state on the nominal path snear is smaller than the radius γ and return the new path p. Since our replanning algorithm uses the MPPI algorithm to give a
+
+penalty to the obstacles at each time step, we do not need to trim the previous result. As a result, the proposed algorithm is signiﬁcantly faster than the original RRT algorithm and can be implemented on the robots in real-time.
+Algorithm 2 Replanning RRT algorithm
+Given: Vertices S ← [p], S ← [ss] Given: Edges ε ← ∅ for i = 1, ..., n do
+ssample ←SampleState(); snear ←NearestNeighbor(S, ssample); snear ←NearestNeighbor(S , ssample); s ←Steer(ssample, snear, γ) if ObstacleFree(snear, s) then
+S ← S ∪ {s}; ε ← ε ∪ {(snear, s)}; end if if d(s, sg) < γ or d(s, snear) < γ then S ← S ∪ {sg} or S ← S ∪ {snear}; ε ← ε ∪ {(s, sg)} or ε ← ε ∪ {(s, snear)}; return p = ExtractPath (S , ε) end if end for
+With the new nominal path S , we then use the Lyapunov controllers or the PD controllers to get the new nominal control input un. We can obtain a sampled trajectory τi = [xi,t, ..., xi,t+T −1]T with the new distribution N (un, Σ), where T is the time horizon of the MPPI algorithm and Σ is the ﬁxed variance. Then we calculate the cost of the ith sampled trajectory by using the quadratic cost function S(·) and using the following equation, we calculate the weight of each trajectory:
+1 ωi = exp − λ S(τi) − min(S(τi)) . (5)
+Note that we need to ﬁnd the minimum value of all
+
+4
+
+trajectories to prevent the numerical instability of the algorithms [18]. Finally, we use the normalized trajectory weights to calculate the control update law: for j = t, · · · , t + T − 1,
+
+i=1 K ωiui,j
+
+uj =
+
+K
+
+.
+
+(6)
+
+i=1 ωi
+
+The proposed RRT-guided MPPI algorithm is summarized in Algorithm 3.
+
+Algorithm 3 RRT-MPPI algorithm Given: Number of sample trajectories K and timesteps T ;
+
+Given: Initial variance Σ0; Given: Cost function parameters φ, q, R, λ; while task is not completed do
+Use RRT algorithm to get initial path pn for j ← t to t + T − 1 do
+Find the nearest state s ∈ pn to the current state x; if d(s, x) ≥ R then
+Use Replanning RRT algorithm to get new pn Find new nearest state s ∈ pn end if Get nominal control mean value un = L(s, x) for i ← 0 to K − 1 do Generate control variations ui,j ∼ N (un, Σ0); Simulate discrete dynamic (10) to obtain xi,j; Calculate cost function S(τi) += q(xi,j, ui,j); end for Calculate the terminal cost S(τi) += φ(xi,t+T ) end for β ← mini[S(τi)]; Get sample weights ωi; Update control input using ωi,j and ui,j; Send ut to actuator; end while
+
+IV. SAMPLE SIZE ANALYSIS
+
+In this section, we show that if the mean value of the MPPI increases, the required sample size also increases. On the other hand, a sufﬁciently large sample size is required to explore the free space, as shown in Section III-B. As a result, we emphasize the necessity of an automated design procedure for a time-varying mean value by the RRT algorithm.
+In the MPPI algorithm, the sample size signiﬁcantly inﬂuences the performance and running time. We provide the analysis of the required sample size of the MPPI algorithm based on the error between optimal control input provided by the Hamilton-Jacobi-Bellman (HJB) equation and its sampling-based approximation.
+The MPPI algorithm [15] solves an optimal control problem with a quadratic control cost and a state-dependent cost. The corresponding value function V (xt) is then deﬁned as:
+
+T ∆t
+
+min E φ(xT ) +
+
+q (xt, ut)dt ,
+
+(7)
+
+ut
+
+t
+
+where q is the continuous-time version of the cost-to-go in (2) and ∆t is the sampling time. With the boundary condition V (xT ) = φ(xT ), the solution to the stochastic HJB equation [19], [20] for the system deﬁned in (1) and the value function deﬁned in (7) is given as follows:
+
+u∗(xt) = −Rt−1g(xt)T V (xt).
+
+(8)
+
+However, the Partial Differential Equations (PDEs) are hard to solve for the curse of dimensionality. Thus, the algorithm uses exponential transformation of the value function V (xt) = −λ log(Φ(xt)) to make the HJB linear in Φ. The linearity allows us to solve the problem with forwardsampling. The iterative control update law can be calculated as a ratio of the expectations (the detailed derivations, see [21], [22]):
+u(xt)∗ = E[exp(−(1/λ))S(τ )σ(xt)dWt] , (9) E[exp(−(1/λ)S(τ )]
+T ∆t
+where S(τ ) = φ(xT ) + t0 q (xt, t)dt, and τ is a random trajectory process. The continuous-time trajectories are sampled as a discretized system according to
+√ dxt = (f (xt) + g(xt)ut) ∆t + σ(xt)δt ∆t, (10)
+
+where δt is the time-varying vector of standard normal Gaussian random variables, and ∆t denotes the time step of the time-discretization, and we use Euler–Maruyama method [23]. Then the discrete-time control update law to approximate the optimal control becomes
+
+i=0 K−1 exp(−(1/λ)S(τi))δui,j
+
+uj ≈
+
+K −1
+
+,
+
+(11)
+
+i=0 exp(−(1/λ)S(τi))
+
+where δui,j can be considered as a random control input, and S(τ ) = φ(xi,t+T ) + j=t t+T −1 q(xi,j , δui,j ).
+In conclusion, the MPPI algorithm uses Monte Carlo (MC) methods to approximate the optimal control solution (9) with the sampling-based control input (11). Our previous works on the sampling complexity of the MPPI method [24], [25] use Hoeffding’s inequality and Chebyshev’s inequality to provide the required sample size given error bounds and risk probability. Compared to the previous work, we focus on the inﬂuence of the mean of the sampling control distribution instead of the variance and prove that a larger mean of the random control distribution requires a larger sample size. Note that, while we only discuss the case of one-dimensional control input δuj ∼ N (µ, Σ) for notational simplicity, the result can be extended to high-dimensional control input straightforwardly.
+We divide the expectation of the control input (11) to two different parts and the deﬁne each part to be E1 and E2, the deﬁnitions of E1 and E2 are expressed as:
+
+1
+
+E1 = E[ω] = E[exp(− λ S(τi))],
+
+ωδu
+
+(12)
+
+E2 = E E[ω] .
+
+5
+
+The MC integration used in the MPPI algorithm to approximate those terms are deﬁned as Eˆ1 and Eˆ2:
+
+T
+
+Eˆ1 =
+
+1 exp(− S(τi)),
+
+λ
+
+i=1 (13)
+
+K
+
+Eˆ2 = 1 ( ωiδui ).
+
+K i=1 E[ω]
+
+We deﬁne the error bounds 1, 2 and the risk probability ρ1, ρ2 by:
+P Eˆ1 − E1 ≥ 1 ≤ ρ1, (14)
+P Eˆ2 − E2 ≥ 2 ≤ ρ2.
+
+We make the following assumptions for the MPPI algorithm:
+Assumption 1: We suppose that the running cost function q(xi,t, ui,t) and terminal cost function φ(xi,t+T ) are quadratic functions.
+Assumption 2: Assume that the error bound 1 of Chebyshev’s inequality is smaller than the expectation of ω
+1 1 < E[exp(− λ S(τi))]. Theorem 1: If Assumptions 1 and 2 are satisﬁed, and given the same sampling complexity error bounds 1, 2 and risk probabilities ρ1, ρ2, the required sample size K = max(K1, K2) becomes larger as the mean of random control distribution E[δu] becomes larger. To prove the main theorem, we need the following intermediate results, lemmas. Lemma 1: ([25]) For any random variables X, Y , we have:
+Var [XY ] ≤ 2Var [X]Var [Y ] + 2Var [Y ] E[X]2. Lemma 2: It holds that Var [ω] ≤ (1 − E[ω]) E[ω] ≤ E[ω] ≤ 1.
+Proof: Since ω = exp(− λ S(τ) ) and since the cost-to-go function S(τ ) ≥ 0 by Assumption 1, then ω ∈ [0, 1] is a bounded random variable and its variance is also bounded.
+
+With the above lemmas, we have the following proof for Theorem 1:
+Proof: We ﬁrst ﬁnd the required sample size K1. Since ω ∈ [0, 1], using Hoeffding’s inequality, we have:
+
+P{|Eˆ1 − E[ω]| ≥
+
+1} ≤ 2 exp
+
+K1
+
+2 1
+
+−
+
+2
+
+(ωmax − ωmin)
+
+≤ 2 exp(−K1 21).
+
+By the deﬁnition of risk probability ρ1, we have:
+
+P{|Eˆ1 − E[ω]| ≥ 1} ≤ ρ1 = 2 exp(−K1 21), (15)
+
+So the sample size K1 has the following formulation:
+
+K1 = − 21 log ρ1 . (16)
+
+1
+
+2
+
+Next, we calculate the required sample size K2. Using Chebyshev’s inequality, we have:
+
+P E2 − Eˆ2 ≥
+
+≤ ρ2 = 2 Var[E2] . K2 2
+
+Next, we ﬁnd an upper bound of the variance of E2:
+
+Var [E2] = Var ωδut E[ω]
+
+1 = E[ω]2 Var [ω[δut]]
+
+2Var [ω]Var [δu] + 2Var [ω] E[δu]2 ≤ E[ω]2
+
+2(Var [δu] + E[δu]2)
+
+≤
+
+2
+
+,
+
+E[ω]
+
+where the ﬁrst inequality uses the result of Lemma 1, and
+
+since
+
+ω
+
+=
+
+exp(−
+
+1 λ
+
+S(τ )),
+
+then
+
+we
+
+can
+
+obtain
+
+that
+
+ω
+
+∈
+
+(0,
+
+1).
+
+So we can conclude that var[ω] ≤ 1. Thus, Chebyshev’s
+
+inequality leads to:
+
+ˆ
+
+Γ
+
+P E2 − E2 ≥ ≤ ρ2 = 2 2 , (17)
+
+K2 2 E[ω]
+
+where Γ = 2(Var [δu] + E[δu]2). The expectation of the sample weights E[ω] is not easy to be calculated, but it can be derived from the previous result where |Eˆ1 − E[ω]| ≥ 1, so we have the following result:
+
+1
+
+1
+
+1
+
+(Eˆ1 +
+
+1)2
+
+≤ (E[ω])2
+
+≤ (Eˆ1 −
+
+. 1)2
+
+So the required sample size K2 is:
+
+Γ 12
+
+K2 = 2
+
+.
+
+(18)
+
+ρ2 2 Eˆ1 − 1
+
+From equation (16), we can conclude that the required sample size K1 is the same when the error bounds and risk probability are the same. Thus, the term Eˆ1 is independent of the choice of the mean of the control distribution E[δu]. From equation (18), we can ﬁnd out that term Γ = 2(Var [δu] + E[δu]2) decides the number of the required samples. A larger mean E[δu] means larger Γ value.
+The main Theorem 1 in this section shows the necessity of designing a time-varying mean value for the random control input distribution. From the previous discussion, we can conclude that a larger mean value results in more aggressive exploration behavior, and we need to sample more trajectories to approximate the optimal control input. On the contrary, a smaller mean value results in conservative exploration and cannot ﬁnish the task in the scheduled time. In a dynamic system, the mean value needs to be tuned as the environments change. Thus, we use an RRTbased mean value to guide the MPPI algorithm to provide a better performance in solving the optimal motion planning problems in dynamic environments.
+
+6
+
+V. SIMULATIONS
+
+A. Unicycle Dynamics
+
+We implement our algorithm on a two-dimensional unicy-
+
+cle dynamic system with:
+
+x˙ d cos θ
+
+y˙d sin θ
+
+ 
+
+˙
+
+ 
+
+=
+
+ 
+
+tan
+
+φ
+
+θ
+
+L
+
+φ˙
+
+0
+
+ 0 0 0 v + δv  ω + δω ,
+1
+
+where x, y are the coordinates, θ is the heading angle, and φ
+
+is the steering angle. v is the linear velocity control input, and
+
+ω is the angular velocity control input. L = 0.5 is the length of the wheelbase. δ = [δv, δω] ∼ N (¯0, I) is the random
+
+control input perturbation. The time step for the discrete-
+
+time simulation is ∆t = 0.05s. We use the following discrete
+
+dynamics in the MPPI algorithm:
+
+ d   d
+
+
+
+xt+1
+
+xt
+
+cos θt
+
+y  td+1  θ    = y  td θ    + ∆t sin θ  t tan φt
+
+t+1
+
+t
+
+L
+
+φt+1
+
+φt
+
+0
+
+ 0
+
+0 
+
+vt
+
++
+
+δv
+t
+
+0
+
+ωt
+
++
+
+δω
+t
+
+,
+
+1
+
+B. Simulation Setups
+The maximum sample size in the RRT algorithm is set to 20000, and the projection radius is set to γ = 0.5. We set the sample size for the MPPI algorithm to be K = 10000, the time horizon to be 20, and λ = 1.0. The cost function is deﬁned as:
+q(x) = x − xg 22 + 1000 ∗ 1x∈Xobs ,
+
+where x represents the current states, and xg represents the goal state. Xobs is the obstacle set over R2, and 1 is the indicator function. We test our algorithm in two
+different environments, a static environment, and a dynamic
+environment. In both simulations, the start states are xs = [2, 3, 0, 0]T , and the goal states are xg = [49, 24, 0, 0]T . We use a Lyapunov controller to design the velocity control input
+and a Proportional controller to design the angular velocity
+control input:
+
+(1 − exp(−α ed 2))
+
+uv = edvmax
+
+,
+
+ed
+
+(19)
+
+uω = kpeθ,
+
+where ed, eθ are the error between the desired target state and current states.
+
+C. Results
+We ﬁrst test our algorithm in a fully known static environment with the replanning conditions R = 6. Figure 3a shows the result of a unicycle robot navigating through the obstacles. The black rectangles represent the boundary of the environments, the grey circles and rectangles denote the obstacles, the blue square denotes the start state xs, and the blue cross denotes the goal state xg. The blue line in the ﬁgures is the result of the replanning RRT path, and the orange line in the ﬁgures is the resulting control output from the RRT-MPPI algorithm. Next, we implement
+
+our algorithm in dynamic environments where the radius of the circle obstacles increases by 2 and 4. We plot the environment changes by plotting the circles with dot lines as their boundaries. Figure 3b and Figure 3c show that our algorithm can handle dynamic environments. Note that in dynamic environments, the nominal path provided by the RRT path may violate safety. But, since the MPPI algorithm can explore freely, our algorithm is still able to ﬁnd the solution to the optimal motion planning problems. Besides, we want to implement the algorithm in real-time, so the RRT algorithm we adopt here is relatively inaccurate and can only guide the MPPI algorithm.
+We repeat the previous experiments for 10 times and change the value of the replanning condition from R = 2 to R = 8. In Figure 4, we plot the average time, the maximum and minimum running time of our algorithm, and the original MPPI algorithm with mean [1, 0]T in static and dynamic environments. The time of the ofﬂine RRT algorithm is in purple color. Note that even the ofﬂine RRT algorithm takes around 0.2 seconds, but it is still not fast enough to be implemented in real-time. The online RRTMPPI algorithm for the static environment is in blue color, and the dynamic environment is in yellow color. We also compare the computation time with the MPPI algorithm with a ﬁxed mean value [µv, µω]T = [1, 0]T , which is the grey color in the Figures. As the radius decreases, the RRT-MPPI algorithm can provide a more accurate nominal controller. But the times of the replanning procedure increase as well, and as a result, the total time to complete the task becomes longer. We can see that when the radius R = 6, the algorithm takes the least time to ﬁnish the motion planning task. All experiments are done on a Macbook Air laptop with an M1 chip in real-time.
+To calculate the required sample size, we set the desired bound 1 = 0.02, 2 = 0.1, and set the allowable risk of failure ρ1 = 0.05, ρ2 = 0.1. We calculate the numbers of samples K1 and K2 based on the equations (16) and (18) at time T ∗ ∆t = 50 ∗ 0.05s = 2.5s. Table I shows that the required sample size of our algorithm is smaller than the original MPPI algorithm with a ﬁxed mean value of 1.
+
+TABLE I: Required Sample Size for RRT-MPPI and MPPI algorithm.
+
+Algorithm
+
+Time K1 K2 running time
+
+MPPI with ﬁxed mean 1 2.5s 9222 11413
+
+RRT-MPPI
+
+2.5s 9222 6122
+
+21.81s 14.56s
+
+VI. CONCLUSION
+This paper presents a real-time RRT-MPPI algorithm to solve the motion planning problem in different environments. The proposed algorithm advances the RRT algorithm in terms of dynamic environment navigation and optimality and reduces the need to ﬁne-tune the mean value of the MPPI algorithm. In particular, we use the RRT algorithm to provide the suitable nominal control mean value for the random distribution in the MPPI algorithm, which helps us to
+
+7
+
+(a) Static Environment
+
+(b) 1st Dynamic Environment
+
+(c) 2nd Dynamic Environment
+
+Fig. 3: Results with RRT-MPPI algorithm in static or dynamic environments. The blue dash-dot lines are the path provided by the RRT algorithm, and the orange line is the result of our proposed method.
+
+Fig. 4: Running time of RRT-MPPI algorithm with different replanning conditions and MPPI algorithms with the ﬁxed mean value.
+avoid ﬁne-tuning the mean value and balance the optimality and exploration. Finally, in the simulations, we use a unicycle robot to implement the algorithm in real-time in static and dynamic environments. We compare the running time and required sample size of our RRT-MPPI algorithm with the ﬁxed value MPPI algorithm in the experiments, showing that our algorithm is faster and requires a smaller sample size.
+REFERENCES
+[1] F. Gao, L. Wang, B. Zhou, X. Zhou, J. Pan, and S. Shen, “Teachrepeat-replan: A complete and robust system for aggressive ﬂight in complex environments,” IEEE Transactions on Robotics, vol. 36, no. 5, pp. 1526–1545, 2020.
+[2] B. Zhou, J. Pan, F. Gao, and S. Shen, “Raptor: Robust and perceptionaware trajectory replanning for quadrotor fast ﬂight,” IEEE Transactions on Robotics, vol. 37, no. 6, pp. 1992–2009, 2021.
+[3] Q. Nguyen, X. Da, J. Grizzle, and K. Sreenath, “Dynamic walking on stepping stones with gait library and control barrier functions,” in Algorithmic Foundations of Robotics XII, pp. 384–399, Springer, 2020.
+[4] Q. Nguyen, A. Agrawal, W. Martin, H. Geyer, and K. Sreenath, “Dynamic bipedal locomotion over stochastic discrete terrain,” The International Journal of Robotics Research, vol. 37, no. 13-14, pp. 1537– 1553, 2018.
+[5] S. Choudhury, K. Solovey, M. J. Kochenderfer, and M. Pavone, “Efﬁcient large-scale multi-drone delivery using transit networks,” Journal of Artiﬁcial Intelligence Research, vol. 70, pp. 757–788, 2021.
+[6] L. E. Kavraki, P. Svestka, J.-C. Latombe, and M. H. Overmars, “Probabilistic roadmaps for path planning in high-dimensional conﬁguration spaces,” IEEE transactions on Robotics and Automation, vol. 12, no. 4, pp. 566–580, 1996.
+[7] S. M. LaValle and J. J. Kuffner Jr, “Randomized kinodynamic planning,” The international journal of robotics research, vol. 20, no. 5, pp. 378–400, 2001.
+
+[8] S. M. LaValle et al., “Rapidly-exploring random trees: A new tool for path planning,” 1998.
+[9] S. Karaman and E. Frazzoli, “Sampling-based algorithms for optimal motion planning,” The international journal of robotics research, vol. 30, no. 7, pp. 846–894, 2011.
+[10] D. Ferguson, N. Kalra, and A. Stentz, “Replanning with rrts,” in Proceedings 2006 IEEE International Conference on Robotics and Automation, 2006. ICRA 2006., pp. 1243–1248, IEEE, 2006.
+[11] M. Zucker, J. Kuffner, and M. Branicky, “Multipartite rrts for rapid replanning in dynamic environments,” in Proceedings 2007 IEEE International Conference on Robotics and Automation, pp. 1603–1609, IEEE, 2007.
+[12] G. Williams, A. Aldrich, and E. Theodorou, “Model predictive path integral control using covariance variable importance sampling,” arXiv preprint arXiv:1509.01149, 2015.
+[13] G. Williams, P. Drews, B. Goldfain, J. M. Rehg, and E. A. Theodorou, “Aggressive driving with model predictive path integral control,” in 2016 IEEE International Conference on Robotics and Automation (ICRA), pp. 1433–1440, IEEE, 2016.
+[14] G. Williams, N. Wagener, B. Goldfain, P. Drews, J. M. Rehg, B. Boots, and E. A. Theodorou, “Information theoretic mpc for model-based reinforcement learning,” in 2017 IEEE International Conference on Robotics and Automation (ICRA), pp. 1714–1721, IEEE, 2017.
+[15] G. Williams, P. Drews, B. Goldfain, J. M. Rehg, and E. A. Theodorou, “Information-theoretic model predictive control: Theory and applications to autonomous driving,” IEEE Transactions on Robotics, vol. 34, no. 6, pp. 1603–1622, 2018.
+[16] M. Otte and E. Frazzoli, “Rrtx: Asymptotically optimal single-query sampling-based motion planning with quick replanning,” The International Journal of Robotics Research, vol. 35, no. 7, pp. 797–822, 2016.
+[17] N. Hatch and B. Boots, “The value of planning for inﬁnite-horizon model predictive control,” in 2021 IEEE International Conference on Robotics and Automation (ICRA), pp. 7372–7378, IEEE, 2021.
+[18] J. Yin, Z. Zhang, E. Theodorou, and P. Tsiotras, “Trajectory distribution control for model predictive path integral control using covariance steering,” in 2022 International Conference on Robotics and Automation (ICRA), pp. 1478–1484, IEEE, 2022.
+[19] R. F. Stengel, Optimal control and estimation. Courier Corporation, 1994.
+[20] W. H. Fleming and H. M. Soner, Controlled Markov processes and viscosity solutions, vol. 25. Springer Science & Business Media, 2006.
+[21] H. J. Kappen, “Path integrals and symmetry breaking for optimal control theory,” Journal of statistical mechanics: theory and experiment, vol. 2005, no. 11, p. P11011, 2005.
+[22] E. Theodorou, J. Buchli, and S. Schaal, “A generalized path integral control approach to reinforcement learning,” The Journal of Machine Learning Research, vol. 11, pp. 3137–3181, 2010.
+[23] E. Platen and N. Bruti-Liberati, Numerical solution of stochastic differential equations with jumps in ﬁnance, vol. 64. Springer Science & Business Media, 2010.
+[24] H.-J. Yoon, C. Tao, H. Kim, N. Hovakimyan, and P. Voulgaris, “Sampling complexity of path integral methods for trajectory optimization,” arXiv preprint arXiv:2203.10067, 2022.
+[25] C. Tao, H.-J. Yoon, H. Kim, N. Hovakimyan, and P. Voulgaris, “Path integral methods with stochastic control barrier functions,” arXiv preprint arXiv:2206.11985, 2022.
+
+8
+
+

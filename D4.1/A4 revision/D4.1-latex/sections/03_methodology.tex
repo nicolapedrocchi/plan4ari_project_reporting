@@ -1,0 +1,10 @@
+\section{Review methodology and comparison criteria}\label{sec:method}
+
+\subsection{Sources and process}
+The review was organised as a version-controlled knowledge base (``LLM wiki''): every source is stored with its full text, a structured summary (method, evidence with table/figure references, relevance, critical assessment) and links to cross-cutting concept pages; bibliographic data are verified on Crossref. Searches covered arXiv (MPPI and sampling-based MPC for manipulators and mobile robots, safety and constraints, multimodality, path-wise redundancy resolution, base placement), IEEE Xplore and Elsevier (welding, redundancy, look-ahead, path following, base placement, multi-robot), SAGE, and the ROS-Industrial documentation of Descartes. Internal project documents (Project Description, D4.1 outline) provided the requirements. At the time of writing the knowledge base contains 119 sources.
+
+\subsection{Inclusion criteria}
+In scope: MPPI and path-integral control; sampling-based MPC compared with MPPI; path-wise redundancy resolution and tolerance-aware Cartesian planning; base and task placement; sampling-based planning for manipulators; applications to industrial and collaborative arms, mobile manipulators, AMR/AGV and human-shared spaces; safety and constraint handling; CPU/GPU/embedded implementations. Background (classical MPC, DDP, trajectory optimisation, DWA/TEB) is summarised briefly.
+
+\subsection{Comparison criteria}
+Success rate; initial-solution time and convergence; path cost; replanning latency; memory and CPU load; scalability with degrees of freedom; smoothness (jerk); constraint satisfaction (joint limits, speed band, task tolerances); number of reconfigurations and stations; safety-induced idle time; reproducibility, open-source maturity, licence and industrial support. Dynamic-scene and multi-agent categories are evaluated separately.

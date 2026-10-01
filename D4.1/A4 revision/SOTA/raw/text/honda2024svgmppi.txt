@@ -1,0 +1,604 @@
+Stein Variational Guided Model Predictive Path Integral Control: Proposal and Experiments with Fast Maneuvering Vehicles
+Kohei Honda1, Naoki Akai1, Kosuke Suzuki1, Mizuho Aoki1, Hirotaka Hosogaya1, Hiroyuki Okuda1, and Tatsuya Suzuki1
+
+arXiv:2309.11040v3 [cs.RO] 1 Mar 2024 Probabilistic density
+
+Abstract— This paper presents a novel Stochastic Optimal Control (SOC) method based on Model Predictive Path Integral control (MPPI), named Stein Variational Guided MPPI (SVG-MPPI), designed to handle rapidly shifting multimodal optimal action distributions. While MPPI can find a Gaussianapproximated optimal action distribution in closed form, i.e., without iterative solution updates, it struggles with the multimodality of the optimal distributions. This is due to the less representative nature of the Gaussian. To overcome this limitation, our method aims to identify a target mode of the optimal distribution and guide the solution to converge to fit it. In the proposed method, the target mode is roughly estimated using a modified Stein Variational Gradient Descent (SVGD) method and embedded into the MPPI algorithm to find a closedform “mode-seeking” solution that covers only the target mode, thus preserving the fast convergence property of MPPI. Our simulation and real-world experimental results demonstrate that SVG-MPPI outperforms both the original MPPI and other state-of-the-art sampling-based SOC algorithms in terms of path-tracking and obstacle-avoidance capabilities. https://github.com/kohonda/proj-svg_mppi
+I. INTRODUCTION
+Path tracking and obstacle avoidance are essential capabilities required for autonomous mobile robots. These tasks become especially challenging for fast maneuvering vehicles because the optimal action distribution may be multimodal and rapidly shifting. To solve these tasks, samplingbased Model Predictive Control (MPC) [1], [2] is a widely adopted approach that can handle the non-linearity and nondifferentiability of the environment, such as system dynamics and cost maps, in contrast to gradient-based methods [3]–[6].
+Among various sampling-based MPCs, sampling-based Stochastic Optimal Control (SOC) is a relatively sampleefficient approach that approximates the optimal action distribution as the solution, based on a given prior action distribution [7]–[9]. In particular, Model Predictive Path Integral control (MPPI) [9] stands out as a promising framework because it can estimate a Gaussian-approximated optimal action distribution by analytically minimizing the Kullback-Leibler (KL) divergence. That is, it can find the optimal solution in closed form (i.e., without iterative solution updates, similar to gradient descent) when given a sufficient number of samples.
+MPPI, however, has limitations in capturing complex optimal distributions due to its less representative of the Gaussian. For instance, as illustrated in Fig. 1, an MPPI-based
+*This work was supported by Tateishi Science and Technology Foundation Research Grants (C) and JSPS KAKENHI Grant Number JP23KJ1067.
+1The Department of Mechanical Systems Engineering, Graduate School of Engineering, Nagoya University, Furo-cho, Chikusa-ku, Nagoya, Aichi, Japan, honda.kohei.b0@s.mail.nagoya-u.ac.jp
+
+Optimal action distribution Estimated action distribution
+
+Optimized Trajectory
+
+Random samples
+
+Optimized Trajectory
+
+Random samples
+
+Covariance matrix
+sequence
+
+Minimize Forward KL divergence → can cover the multiple modes of
+
+Fig. 1. An open issue of MPPI. The MPPI algorithm minimizes the
+Forward KL divergence instead of the original stochastic optimal control
+problem. As a result, the estimated action distribution Q may cover the multiple modes of the optimal action distribution Q∗, and it may lead to finding the collision trajectory as the optimized one.
+
+14 m
+
+High path-tracking performance
+
+7 m
+
+5 m/s
+
+MPPI SVG-MPPI (Ours) 2 m/s Reference Waypoints
+
+0.3 m
+
+Start!
+
+0.65 m
+
+(a) Path tracking scenario
+
+Avoid obstacles
+
+Collision!
+
+High obstacle avoidance performance
+
+4 m/s
+
+0.35 m
+0.7 m
+Obstacles MPPI SVG-MPPI (Ours) 2 m/s Reference Waypoints
+
+Start!
+
+(b) Obstacle avoidance scenario
+
+Fig. 2. Vehicle trajectories in the real-world experiment. Our proposed method, named SVG-MPPI, shows smaller curve overshoots than the original MPPI (Fig. 2a) and robustly avoids obstacles where vanilla MPPI collides (Fig. 2b). These results can be found at: https://www.youtube.com/watch?v=ML aOYQIDL0
+motion planner may produce a collision trajectory as its optimized trajectory because the Gaussian-approximated action distribution encompasses the multimodal optimal distribution (see Section III-B for details). To address these shortcomings, several studies have proposed advanced techniques that capture the multimodality using more representative prior distributions [10]–[14] or find mode-seeking solutions by leveraging the asymmetry of the KL divergence [15]. However, unlike MPPI, these methods cannot find the so-
+
+lution in closed form. In other words, they require iterative solution updates with sampling and evaluation to converge the solution. The iterative updates degrade the convergence of the solution compared to MPPI because the solution is suboptimal and the sequential iteration process restricts the parallelism and the number of samples per iteration.
+In this paper, we propose Stein Variational Guided MPPI (SVG-MPPI), a sampling-based SOC method based on MPPI to address rapidly shifting multimodal optimal action distributions. Contrary to the existing methods that capture the complex multimodal distribution, our approach aims to narrow down a single target mode within the multimodal distribution and approximate it with a Gaussian distribution by the MPPI algorithm. As a result, our method can obtain a mode-seeking action distribution in closed form, i.e., preserving the fast solution convergence property of MPPI.
+Specifically, our proposed method first roughly identifies the target mode by utilizing a small set of samples (hereafter referred to as guide particles) and a modified Stein Variational Gradient Descent (SVGD) method [16]. The SVGD method transports the guide particles to near the peak of the target mode within the optimal distribution using its surrogate gradients. Based on the insight that the transport trajectory leading to the peak represents a part of the shape of the target mode, we estimate the rough variance of the target mode using the Gaussian fitting method. Our method then incorporates the peak and variance of the target mode into the MPPI algorithm to converge the solution to cover only the target mode.
+In summary, the main contribution of this work is as follows. We propose an MPPI-based SOC method capable of efficiently capturing a single mode of the optimal action distribution. The mode-seeking solution is achieved in closed form by guiding it using a modified SVGD algorithm. Our method has been validated through simulation and realworld experiments, focusing on path tracking and obstacle avoidance tasks for a 1/10th scale vehicle1. Empirical results demonstrate that SVG-MPPI outperforms standard MPPI [9] and other state-of-the-art SOC algorithms [10], [15] regarding the path-tracking and obstacle-avoidance performances.
+II. RELATED WORK
+To address the rapidly shifting complex optimal action distribution in the sampling-based SOC framework, existing approaches can be broadly categorized into the following three types:
+1) Increasing Effective Samples: One strategy for improving the MPPI algorithm involves increasing the number of low-state-cost and feasible samples to find better solutions. Besides learning task-specific prior distributions offline [17], [18], the practical approach involves the online adaptation of random samples from a fixed prior distribution, e.g., using auxiliary controllers [19]–[21], gradient descent techniques [22], [23], or adaptive importance sampling [24].
+1Our system was deployed in a public competition called F1TENTH (https://f1tenth.org/) held at IEEE ICRA 2023, London, where we placed 4th out of 22 teams.
+
+However, most methods are limited to differentiable optimal control problems. In contrast, SV-MPC [10] can transport samples online even in non-differentiable cases by using surrogate gradients. This method, though, leads to a significant increase in computational cost per sample, which limits the number of samples. Instead of transporting all samples, our approach updates a small number of samples (guide particles) and incorporates them into the MPPI algorithm. This approach allows for the exploration of good solutions while suppressing the increase in computational cost. Note that our method is also applicable to non-differentiable problems.
+2) Approximating Multimodal Distribution: The second approach is to approximate the complex optimal action distribution with a more representative model, such as Gaussian mixture models, through variational inference methods [10]– [14]. Although these approaches excel at capturing multimodality, they cannot find the solution in closed form and necessitate iterative solution updates, unlike MPPI. Moreover, practical control problems require a deterministic solution for the system input rather than a probabilistic multimodal solution. Extracting a smoothly shifting single deterministic solution from the obtained multimodal solution is far from trivial. Therefore, a mode-seeking solution is necessary for practical application to control problems.
+3) Finding a Mode-Seeking Solution: The third approach aims to identify one of the modes of the optimal distribution as the target for convergence, leveraging the asymmetry of the KL divergence [15]. The KL divergence exhibits an asymmetric property when its arguments are reversed. This approach can obtain a mode-seeking solution by directly minimizing KL divergence reversed from the ones used in the original MPPI. However, minimizing the reverse KL divergence cannot be solved in closed form. Our approach can obtain a mode-seeking solution without sacrificing the closed-form optimality inherent in MPPI by guiding the solution with the reverse KL divergence.
+III. REVIEW OF MPPI
+Our aim is to find a mode-seeking action distribution by improving the MPPI algorithm because MPPI struggles with multimodal optimal distributions due to its inherent nature. In this section, we first review the MPPI theory described in the original literature [9] and then derive the open issue of MPPI to be addressed in this work. Finally, we provide a key property of the KL divergence to address this issue.
+A. Review of the MPPI Theory
+1) Problem Formulation: The MPPI theory models the control target system as a general discrete time dynamical system xτ+1 = F(xτ , vτ ), τ ∈ {0, . . . , T − 1}, where xτ ∈ Rn is the predictive state vector at time τ, vτ ∈ Rm is the input vector at time τ, T is the prediction horizon length, and F denotes the general non-linear and non-differentiable state transition function. The input vector vτ is injected with Gaussian noise: vτ ∼ N(uτ , Στ ), as a prior action distribution, where uτ ∈ Rm is the actual input vector and Στ =
+
+diag{στ0, . . . , στm−1} ∈ Rm×m is a given covariance matrix of the Gaussian noise.
+MPPI aims to estimate a Gaussian action distribution Q from randomly generated K input sample sequences, V = {Vk}K−1 k=0 ∈ RK×T ×m, where Vk = {vτ }T −1 τ=0 ∈ RT ×m. The Probability Density Function (PDF) q(Vk | Ut , Σ) corresponding to Q is analytically expressed as:
+1 T −1
+q(Vk | ·) = Z−1 exp − ∑ (vτ − uτ )⊤Σ−τ 1(vτ − uτ ) ,
+2 τ=0 (1)
+
+where Z = (2π)mT |Σ| is the normalization term, Ut = {uτ }T−1 τ=0 ∈ RT×m is the actual control input sequence, and Σ = diag{Στ }T −1 τ=0 ∈ RmT ×mT is a given covariance matrix sequence. To find an optimal control input sequence Ut∗, MPPI solves the following SOC problem:
+
+T −1
+
+U∗t = argmin EVk∼Q φ (xT ) + ∑ L(xτ , uτ ) , (2)
+
+Ut ∈U
+
+τ =0
+
+where U is the admissible control set [25], x0 = xt is the
+
+observed state at time t, φ is the terminal cost function,
+
+and L is the stage cost function. Note that the MPPI theory
+
+assumes that the stage cost can be divided into state and
+
+input
+
+costs
+
+as,
+
+L(xτ , uτ )
+
+=
+
+c(xτ )
+
++
+
+λ 2
+
+u⊤τ Σ−τ 1uτ + βt⊤uτ
+
+,
+
+where βτ is a given parameter independent of uτ . In the
+
+following, the kth sequence state cost is defined as, S(Vk) = φ (xT ) + ∑τ=0 T −1 c(xτ ).
+Since (2) is difficult to solve directly, MPPI instead
+minimizes the Forward KL (FKL) divergence DKL(Q∗ ∥ Q) that the action distribution Q covers the optimal action distribution Q∗, as follows:
+
+U∗t ≃ argmin {DKL(Q∗ ∥ Q)} .
+
+(3)
+
+Ut ∈U
+
+2) Analytical PDF of the Optimal Action Distribution: To
+
+minimize the FKL divergence in (3), the optimal PDF q∗(Vk)
+
+of the Q∗ is derived in the following. First, the Free-energy of
+
+the system is defined as, F(Vk) = log
+
+EP
+
+exp
+
+−
+
+1 λ
+
+S
+
+(V
+
+k
+
+)
+
+,
+
+where λ is a given temperature parameter and P is a base
+
+distribution, which is roughly analogous to a Bayesian prior.
+
+The PDF of the P is q(Vk | U˜ , Σ), where U˜ = {u˜ τ }T−1 τ=0 ∈ RT×m represents a given nominal control input sequence
+
+(hereafter referred to as nominal sequence). The Free-energy
+
+is then expanded by Jensen’s inequality, the definition of FKL
+
+divergence, and (1) as,
+
+T −1
+− λ F(Vk) ≤ EVk∼Q φ (xT ) + ∑ L(xτ , uτ ) . (4)
+τ =0
+Because the right hand side of (4) is equivalent to the cost function in (2), −λ F(Vk) represents the lower bound of the original SOC problem. Thus, the optimal PDF q∗(Vk) is derived from the equality condition of (4) as,
+
+q∗(Vk | U˜ , Σ) = η−1 exp
+
+1 − S(Vk)
+
+q(Vk | U˜ , Σ),
+
+(5)
+
+λ
+
+where η =
+
+RT×m p(Vk | λ ) exp
+
+−
+
+1 λ
+
+S
+
+(V
+
+k
+
+)
+
+dVk is the normal-
+
+ization term.
+
+Estimated action distributions Optimal action distribution
+
+argmin
+
+argmin
+
+Reverse KL divergence
+
+Forward KL divergence
+
+Fig. 3. Asymmetry properties of the KL divergence [15]. When minimizing
+the Forward KL (FKL) divergence, it results in covering multiple modes
+within the optimal action distribution. This is because FKL divergence imposes a significant penalty when q∗ > 0 and q ≈ 0. In contrast, minimizing
+the Reverse KL (RKL) divergence converges to a single mode in the optimal
+distribution, a property known as mode-seeking. This happens because RKL divergence takes on a larger value when q > 0 and q∗ ≈ 0.
+
+3) Forward KL Divergence Mimimization: As mentioned in section III-A.1, the approach of MPPI is minimizing the FKL divergence in (3), which can be transformed by the definition of the FKL divergence and (1) into the following closed-form expression:
+
+U∗t = argmin EVk∼Q∗
+Ut ∈U
+
+1 T −1
+∑ (vτ − uτ )⊤Σ−τ 1(vτ − uτ )
+2 τ=0
+
+= EVk∼Q∗ [Vk].
+
+(6)
+
+Thus,
+
+the
+
+optimal
+
+control
+
+input
+
+sequence
+
+U∗
+t
+
+is
+
+obtained
+
+by
+
+sampling Vk from the optimal action distribution Q∗ and
+
+taking its expected value, as in (6). However, since sampling
+
+directly from Q∗ is not possible, importance sampling [26] is used with the q∗(Vk | U˜ , Σ) in (5), as follows:
+
+∗
+
+q∗(Vk | U˜ , Σ)
+
+K−1
+
+Ut = EVk∼Q
+
+Vk ≃ ∑ w(Vk)Vk,
+
+(7)
+
+q(Vk | Uˆ , Σ)
+
+k=0
+
+1
+
+T −1
+
+w(Vk) = η−1 exp − S(Vk) − ∑ (uˆ τ − u˜ τ )⊤Σ−τ 1vτ ,
+
+λ
+
+τ =0
+
+(8)
+
+where Uˆ = {uˆ τ }T−1 τ=0 is the initial estimated control input sequence, often using the previous optimal solution. Importantly, based on the law of large numbers, the MPPI algorithm can obtain a globally optimal solution in the sense of minimizing the FKL divergence in closed form, i.e., the optimal solution can be obtained by sampling sufficiently large K samples once and taking their weighted average, without iterative solution updates.
+
+B. An Open Issue of MPPI
+The MPPI algorithm can estimate the Gaussianapproximated optimal distribution by analytically minimizing the FKL divergence in closed form. However, the Gaussian approximation causes an open issue that the estimated action distribution may cover the multiple modes of the optimal distribution, as illustrated in Fig. 3. In the context of an obstacle avoidance task, this issue may lead MPPI to identify the collision trajectory as the optimal solution, as shown in Fig.1. This occurs because the two branching paths for avoiding obstacles correspond to the peaks of the two modes, and the estimated action distribution covers both
+
+modes. To solve this problem, we need to find a modeseeking action distribution that covers a single target mode of the multimodal distribution.
+
+C. Asymmetry Property of KL divergence
+One key to finding the mode-seeking solution is to utilize the asymmetry property of the KL divergence. The standard MPPI algorithm minimizes Forward KL (FKL) divergence, denoted as DKL(Q∗ ∥ Q), where Q may cover the entire Q∗. In contrast, when the input arguments are reversed, the Reverse KL (RKL) divergence DKL(Q ∥ Q∗) exhibits a different characteristic, where Q converges to a single mode of the optimal distribution Q∗, as shown in Fig. 3.
+
+IV. STEIN VARIATIONAL GUIDED MPPI
+Although some existing methods [10], [15] can find the mode-seeking solution by directly minimizing the RKL divergence described in Section III-C, the solution cannot be obtained in closed form, resulting in a degradation of convergence. To overcome the limitation, our approach guides the MPPI solution to converge to a single target mode roughly identified using a modified SVGD method [16].
+As an overview of our method illustrated in Fig. 4, we first spread a small set of samples (guide particles) and transport them by the modified SVGD method. Because the SVGD method iteratively reduces the RKL divergence based on the surrogate gradients of the optimal action distribution Q∗, one of the guide particles is transported to near the peak of the target mode. We then roughly estimate the variance of the target mode by fitting the transport trajectory leading to the peak as Gaussian. Finally, we incorporate the peak and variance of the target mode (as the nominal sequence and covariance matrix sequence) into the MPPI algorithm to converge the solution to cover only the target mode.
+
+A. Transport Guide Particles by the Modified SVGD method
+
+Our proposed method first spreads Kg guide particles {Vkg}k=0 Kg−1 ∈ RKg×T ×m in addition to the K samples used in the standard MPPI algorithm. Note that Kg ≪ K, in particular, we use Kg = 1 in our experiments in section V. The guide particles are transported to make the RKL divergence smaller
+by applying the following gradient descent update with L
+iterations per control cycle given a small step size ε,
+
+Vˆgk ← Vkg − ε∇Vg DKL(Q ∥ Q∗), ∀k ∈ {0, . . . , Kg − 1}. (9)
+k
+The RKL divergence DKL (Q ∥ Q∗) is expanded from its definition and Jensen’s inequality as,
+
+DKL (Q ∥ Q∗) = −EVgk∼Q log qq = −EVgk∼Q ∗ ≤ − log EVgk∼Q w(Vgk ) ,
+
+log w(Vkg) (10)
+
+where w(·) is the weight function in (8). Now, we can reduce the RKL divergence of the guide particles by assigning the gradient of (10) into (9) since the right hand side of (10) is the upper bound of the RKL divergence. However, the weight function w(·) has the sequence state cost S(Vkg), which is generally assumed to be non-differentiable with
+
+Vkg. Therefore, we estimate the stochastic surrogate gradient described in [10]:
+
+∇Vgk DKL(Q ∥ Q∗) = −∇Vgk log EVgk∼Q w(Vgk )
+
+EVgk ∼Q w Vgk ∇Vgk log q
+
+=−
+
+EVg∼Q w(Vkg)
+
+k
+
+∑i=0 N−1 ≃−
+
+w Vkg[i] ∇Vg log q
+k
+∑i=0 N−1 w Vkg[i]
+
+Vkg[i] ,
+(11)
+
+where Vkg[i] is a sample for the Monte Carlo estimation, i.e., Vkg[i] ∼ q Vkg[i] | Vkg, Σg , given a constant covariance matrix Σg. The update equation in (9) converges to a simplified version of the update equation using the SVGD method in [10], with the kernel function and log-prior terms removed. These removed terms penalize particle cohesion and preserve the diversity of the samples. However, for our approach, the penalty terms are arbitrarily removed because we expect the guide particles to aggregate to some of the peaks of the optimal distribution. Note that the computational complexity for the L times transport in (9) is O(LKgN) and relatively tiny compared to the MPPI’s one (i.e., O(T Km)) when Kg ≪ K.
+
+B. FKL divergence Minimization with the Nominal Sequence and Adaptive Covariance Matrix Sequence
+
+We now obtain Kg transport trajectories for each guide sample as, τkg = Vgk [l] L−1 l=0 ∈ RL×T ×m, k ∈ {0, . . . , Kg − 1}, where L is the number of iterations for (9). We then roughly identify the peak and variance of the target mode using the transport trajectories and incorporate them as the nominal sequence U˜ and covariance matrix sequence Σ in the MPPI algorithm described in Section III-A.
+1) Picking a Target Mode: The guide particles transported in sufficiently large iterations L are expected to be close to some of the peaks. Since the convergence goal of a gradient descent depends on the initial value, the guide particles can be transported to different peaks within the optimal distribution after the iterations. The strategy for determining the peak of the target mode is simply to pick up a transported guide particle that has the lowest sequence state cost. Therefore, the peak, as the nominal sequence U˜ of the MPPI algorithm, is determined, as follows:
+
+˜g
+
+∗
+
+g
+
+Kg −1
+
+U = Vk∗ , where k = argmin S(Vk[L − 1]) k=0 . (12)
+
+k
+
+The nominal sequence U˜ is used in the weight function (8), which penalizes the deviation of the nominal sequence (the peak of the target mode) and the mean of the action distribution, which corresponds to determining the coverage target mode within the optimal action distribution.
+2) Estimation of the Adaptive Covariance Matrix Sequence: To converge the action distribution to cover only the target mode, we should set an appropriate covariance matrix sequence Σ, which is used in the prior action distribution of
+
+Probabilistic density
+
+Optimal action distribution
+Guide particles (a) Transport guide particles by minimizing Reverse KL divergence with the modified SVGD method
+
+Transport trajectory
+
+Gaussian fitting
+
+Nominal sequence
+(b) Pick up a convergence target mode as a nominal sequence
+
+Covariance matrix
+(c) Estimate covariance matrix sequence by Gaussian fitting
+
+Estimated action distribution
+Optimized trajectory
+Random samples Nominal sequence
+(d) Minimize Forward KL divergence by MPPI
+
+Optimized Trajectory
+Nominal sequence
+Covariance matrix
+sequence
+
+Random samples
+
+Fig. 4. Overview of the proposed method. (a) SVG-MPPI first transports guide particles by minimizing the RKL divergence using the modified SVGD method. These transport trajectories of the guide particles are employed to roughly estimate a convergent target mode. (b) We then identify the peak of the target mode by simply taking the lowest sequence cost guide particle as a nominal sequence. (c) The variances are also roughly estimated by the Gaussian fitting algorithm with the transport trajectory. (d) Finally, SVG-MPPI minimizes the FKL divergence, incorporating the nominal sequence and adaptive covariance matrices in the process. The SVG-MPPI can efficiently find a mode-seeking action distribution compared to the original MPPI (Fig. 1).
+
+random samples and weight function in (8) for the MPPI algorithm. Our method utilizes the entire k∗th transport trajectory τk∗g to estimate the rough variance of the target mode because the transport trajectory leading to the peak is expected
+
+to represent a part of the shape of the target mode. Specifi-
+
+cally, we use a Gaussian fitting algorithm known as fast and
+
+rough [27]. For all predictive times and control inputs ∀τ ∈
+
+[0, . . . , T − 1] and ∀i ∈ [0, . . . , m − 1], let the input vector be
+
+a = Vk∗ g [0, τ, i], . . . , Vk∗ g [L − 1, τ, i] ∈ RL and the correspond-
+
+ing q∗ in (5) be b = q∗ Vk∗ g [0] , . . . , q∗ Vk∗ g [L − 1] ∈ RL,
+
+and
+
+the
+
+variance
+
+Στ
+
+[i]
+
+=
+
+σi
+τ
+
+for
+
+each
+
+control
+
+input
+
+can
+
+be
+
+estimated by solving the first-order equation:
+
+στi = −1 , where  ∑ b2 ∑ ab2 2z2  ∑ ab2 ∑ a2b2
+∑ a2b2 ∑ a3b2
+
+∑ a2b2 ∑ a3b2 ∑ a4b2
+
+ z0
+  z1 z2
+
+(13)
+  ∑ b2 log b   =  ∑ ab2 log b  .
+∑ a2b2 log b
+
+As a result, when the change of the q∗ due to the transport is small, the variance is estimated to be small, as shown in Fig. 4. In this case, the sequence state cost of the guide particle is largely shifted by the transport. In the opposite case, the variance is kept to be large.
+
+V. EXPERIMENTS
+A. Experiment Setup
+We implemented our method for a path-tracking and obstacle-avoidance motion planner of a 1/10th-scale vehicle. The motion planner controls the vehicle’s steering angle based on given reference waypoints (path and speed profile), the vehicle’s position and velocity, and a cost map [28] constructed from onboard 2D LiDAR scans for obstacles and course detection.
+1) MPC Formulation: The implemented vehicle dynamics predictive model F was the kinematic bicycle model [29] considering the dead time and first-order delays with the steering angle input, which have nonlineality. The non-differentiable sequence state cost was S(Vk) = ∑τ=0 T =15 ∆dr(τ)2 + 0.01∆θr(τ)2 + 1000 1collide(xτ ) , where ∆dr and ∆θr were position and yaw angle deviations from the reference waypoints, and 1collide is a binary indicator function for collision, provided by the cost map. The step width of the prediction horizon ∆τ is 0.05 s. Please refer to the source code2 for the detailed algorithm and settings.
+
+2https://github.com/kohonda/proj-svg_mppi
+
+2) Validation Scenarios: To validate the performance of the proposed method, we conducted tests under two types of driving scenarios, both in simulation and in the real world:
+• Path Tracking (PT): The vehicle completed Npt laps of the course without encountering unforeseen obstacles.
+• Obstacle Avoidance (OA): The vehicle drove Noa laps of the course, encountering five unforeseen static obstacles. These obstacles were randomly repositioned around reference waypoints on each lap.
+3) Evaluation Metrics: To evaluate the path-tracking and obstacle-avoidance capabilities, we employ the following two evaluation metrics:
+• Mean Sequence state cost S(Ut ) per lap, denoted as MS: A lower value of this metric indicates better performance in path tracking and obstacle avoidance. In scenario PT, this metric is primarily focused on evaluating path-tracking performance. Conversely, scenario OA, mainly evaluates the obstacle-avoidance performance.
+• Collision Rate (CR): This represents the rate of collisions with obstacles or the course, relative to the total number of obstacles encountered in scenario OA.
+4) Baseline Methods: We implemented the vanilla MPPI [9], Reverse-MPPI with sample rejection [15], and SV-MPC [10] to compare their performance to our proposed method, SVG-MPPI. Reverse-MPPI minimizes the RKL divergence based on mirror descent algorithm [30], and SVMPC also directly minimizes RKL divergence with variational inference approach, i.e., using SVGD method [16]. Unlike the MPPI that minimizes the FKL divergence, they cannot be solved in closed form, and the number of random samples for the iterative updates must be set smaller than the MPPI and SVG-MPPI to keep real-time processing.
+All algorithms, including SVG-MPPI, were developed in ROS and C++ and employed CPU multi-threading via OpenMP [31]. The same MPC formulation and common parameters were used across all algorithms, except the number of random samples. To keep a calculation time of approximately 20 ms on a desktop PC equipped with an Intel Core i9-10850K CPU, in the simulation, we set the number of random samples for MPPI, Reverse-MPPI, SV-MPC, and SVG-MPPI at 10k, 200, 500, and 8k, respectively. Similarly, in the real-world experiment, 5k and 2k random samples are used for MPPI and SVG-MPPI, respectively.
+
+B. Simulation Results
+We executed each method for 100 laps in both the PT and OA scenarios to provide a comprehensive comparison (Npt = Noa = 100). For the simulation environment, we customized the F1TENTH Gym environment [32] to include unforeseen five obstacles that were randomly replaced around reference waypoints (within 0.1 m) on each lap.
+1) Comparison with Baseline Methods: Figure 5 shows the evaluation results for the MS metrics in both PT and OA scenarios, and Table I lists the CRs for each method in the OA scenario. In the case of vanilla MPPI, a lower covariance of the control input correlates with lower MSs and CRs in the OA scenario; however, it negatively impacts MSs in PT. These findings suggest that vanilla MPPI faces a trade-off between PT and OA capability depending on the fixed covariance parameter. This is attributable to the fact that a small covariance prevents the solution from covering the entire optimal action distribution in the OA, but is not suitable for PT, which requires covering the entire singlemode distribution to track sharp curves rapidly.
+Unlike vanilla MPPI, both Reverse-MPPI and SV-MPC aim to minimize RKL divergence directly. As shown in Fig. 5, Reverse-MPPI outperforms vanilla MPPI in PT, while SV-MPC outperforms in the OA scenario. However, each method underperforms in the other scenario; ReverseMPPI in OA and SV-MPC in PT. In particular, SV-MPC is similar to our method. It transports all samples and takes a weighted average of them, resulting in them being evenly separated, which can degrade the performance of OA, or the performance of PT can be degraded due to the samples being over-compressed.
+On the other hand, our proposed method, SVG-MPPI, demonstrates superior performance in both scenarios, with average MS values of 0.20 and 5.71 for PT and OA, respectively as shown in Fig. 5. These results confirm that SVG-MPPI excels in both PT and OA tasks, avoiding the trade-offs observed in all baseline methods. Furthermore, SVG-MPPI records the lowest CR of 4.0 % across all trials in the OA scenario in Table I. In the rare cases where collisions occurred, SVG-MPPI did not find a mode-seeking solution due to its inability to guarantee one.
+We also measured the computation time for each method. The average/maximum time to find a solution for each method was 12.1 ms / 34.2 ms for MPPI, 26.0 ms / 55.9 ms for Reverse MPPI, 29.1 ms / 55.9 ms for SV-MPC, and 11.0 ms / 39.7 ms for SVG-MPPI. MPPI and SVG-MPPI can find solutions through closed-form expressions, so even with a large number of samples, the computation time is kept relatively low thanks to the benefits of parallelization. On the other hand, Reverse MPPI and SV-MPC need to update their solutions iteratively, which tends to increase the computational load relative to the number of samples compared to the others.
+2) Ablation Study: SVG-MPPI is an extension of vanilla MPPI that incorporates both a Nominal Sequence (NS) and Adaptive Covariance matrix sequence estimation (AC). To
+
+Mean sequence state cost per lap (PT) Mean sequence state cost per lap (OA)
+
+6 5.73
+
+5
+
+4
+
+3 18.16
+2
+
+21.54
+
+1.36
+
+1
+
+0 MPPI (cov:0.025)
+
+MPPI (cov:0.075)
+
+PT 50 OA
+40
+
+27.80
+
+30
+
+24.50
+
+2.99
+
+16.35
+
+20
+
+0.94
+MPPI (cov:0.1)
+
+0.42 Reverse-MPPI
+
+SV-MPC
+
+5.71 10 0.20 SVG-MPPI 0
+(Ours)
+
+Fig. 5. Comparison of the MSs with baseline methods in the simulation.
+
+TABLE I COLLISION RATE (CR) FOR EACH METHOD IN THE SIMULATION
+
+Method
+
+MPPI
+
+Reverse SV SVG-MPPI
+
+Cov. [rad] 0.025 0.075 0.1 MPPI MPC
+
+(Ours)
+
+CR [%] ↓ 13.6 21.0 24.4 24.8 12.4
+
+4.0
+
+demonstrate the complementary nature of these two extensions, we conducted an ablation study for the PT and OA scenarios in the simulation. The results are presented in Table II. Both MPPI and MPPI+NS employed a fixed steering covariance of 0.75 rad. As indicated in Table II, MPPI+NS outperforms vanilla MPPI in both PT and OA scenarios. Moreover, MPPI+AC exhibits even better performance in OA compared to MPPI+NS, although its performance in PT is significantly diminished. When both enhancements (MPPI+NS+AC) are incorporated, SVG-MPPI delivers the best performance in OA and ranks second-best in PT. Overall, these results confirm that the NS and AC functions are complementary and contribute to the enhanced path-tracking and obstacle-avoidance performance. However, as the results for SVG-MPPI and MPPI+NS show, AC slightly hinders PT performance. This is because the proposed AC method, prioritizing computational efficiency, is a rough estimation prone to errors. This is a future work to be addressed.
+C. Real-world Experiment Results
+We also conducted real-world experiments using a 1/10thscale vehicle equipped with a 2D LiDAR (HOKUYO UTM30-LX) and a compact computer (Intel NUC with a Core i7-1360P Processor). To estimate the vehicle’s pose on the pre-built map, we employed an advanced Monte Carlo localization method [33].
+Figure 2 shows the trajectories of both vanilla MPPI (steering covariance: 0.075 rad) and SVG-MPPI in PT and OA scenarios with a fixed obstacle layout. The figure reveals that SVG-MPPI exhibits smaller overshoots on curves compared to vanilla MPPI, as further illustrated in Fig. 2a. Additionally, Fig.2b indicates that SVG-MPPI successfully avoids obstacles where vanilla MPPI encounters collisions.
+For more evaluation, we completed 10 laps in scenario PT (Npt = 10) and 3 laps for each of six different static obstacle layouts in scenario OA (Npt = 18). In scenario PT, the mean MS values were recorded at 5.83 and 2.03 for vanilla MPPI and SVG-MPPI, respectively. Turning our attention to scenario OA, the mean MS and CR values were (62.73, 55.6 %) for vanilla MPPI and (27.82, 15.4 %) for SVG-MPPI.
+
+TABLE II ABLATION STUDY: AVERAGE OF MSS FOR 100 TRIALS
+
+method
+
+Scenario PT Scenario OA
+
+MPPI (baseline) MPPI + nominal sequence (NS) MPPI + adaptive covariance (AC) MPPI + NS + AC (SVG-MPPI)
+
+1.36 0.18 18.18 0.20
+
+21.54 11.03 7.08 5.71
+
+Overall, SVG-MPPI demonstrated superior path-tracking and obstacle-avoidance capabilities compared to the vanilla MPPI method in real-world testing.
+VI. CONCLUSION AND POTENTIAL LIMITATION
+This paper presents a novel MPPI-based SOC method to address rapidly shifting multimodal optimal action distributions. Our method is capable of finding a mode-seeking solution in closed form by guiding the convergence target of the MPPI solution using the SVGD method. While our experiments do not show any performance degradation of the proposed method, a potential limitation of our method arises in cases where the gradients of the optimal distribution are zero outside the peaks of the modes. This limitation is due to the fact that the SVGD method primarily tracks gradients, and the solution may become trapped at such terrace-like places within the optimal distribution. Furthermore, since the proposed method is not theoretically tailored for path tracking and obstacle avoidance, it is expected to be applicable to a wider range of robotic challenges.
+REFERENCES
+[1] D. Fox, W. Burgard, and S. Thrun, “The dynamic window approach to collision avoidance,” IEEE Robotics & Automation Magazine, vol. 4, no. 1, pp. 23–33, 1997.
+[2] T. M. Howard, C. J. Green, A. Kelly, and D. Ferguson, “State space sampling of feasible motions for high-performance mobile robot navigation in complex environments,” Journal of Field Robotics, vol. 25, no. 6-7, pp. 325–345, 2008.
+[3] M. Diehl and S. Gros, “Numerical optimal control,” Optimization in Engineering Center, 2011.
+[4] J. A. Andersson, J. Gillis, G. Horn, J. B. Rawlings, and M. Diehl, “CasADi: a software framework for nonlinear optimization and optimal control,” Mathematical Programming Computation, vol. 11, pp. 1–36, 2019.
+[5] T. Ohtsuka, “A continuation/GMRES method for fast computation of nonlinear receding horizon control,” Automatica, vol. 40, no. 4, pp. 563–574, 2004.
+[6] K. Honda, H. Okuda, T. Suzuki, and A. Ito, “MPC Builder for autonomous drive: Automatic generation of MPCs for motion planning and control,” in Intelligent Vehicles Symposium. IEEE, 2023, pp. 1–8.
+[7] N. Hansen, S. D. Mu¨ller, and P. Koumoutsakos, “Reducing the time complexity of the derandomized evolution strategy with covariance matrix adaptation (CMA-ES),” Evolutionary computation, vol. 11, no. 1, pp. 1–18, 2003.
+[8] Z. I. Botev, D. P. Kroese, R. Y. Rubinstein, and P. L’Ecuyer, “The cross-entropy method for optimization,” in Handbook of statistics. Elsevier, 2013, vol. 31, pp. 35–59.
+[9] G. Williams, P. Drews, B. Goldfain, J. M. Rehg, and E. A. Theodorou, “Information-theoretic model predictive control: Theory and applications to autonomous driving,” IEEE Transactions on Robotics, vol. 34, no. 6, pp. 1603–1622, 2018.
+[10] A. Lambert, F. Ramos, B. Boots, D. Fox, and A. Fishman, “Stein variational model predictive control,” in Conference on Robot Learning. PMLR, 2021, pp. 1278–1297.
+
+[11] T. Osa, “Multimodal trajectory optimization for motion planning,” The International Journal of Robotics Research, vol. 39, no. 8, pp. 983– 1001, 2020.
+[12] M. Okada and T. Taniguchi, “Variational inference MPC for Bayesian model-based reinforcement learning,” in Conference on robot learning. PMLR, 2020, pp. 258–272.
+[13] Z. Wang, O. So, J. Gibson, B. Vlahov, M. S. Gandhi, G.-H. Liu, and E. A. Theodorou, “Variational inference MPC using tsallis divergence,” in Robotics: Science and Systems, 2021.
+[14] L. Barcelos, A. Lambert, R. Oliveira, P. Borges, B. Boots, and F. Ramos, “Dual online Stein variational inference for control and dynamics,” in Robotics: Science and Systems, 2021.
+[15] T. Kobayashi and K. Fukumoto, “Real-time sampling-based model predictive control based on reverse kullback-leibler divergence and its adaptive acceleration,” arXiv preprint arXiv:2212.04298, 2022.
+[16] Q. Liu and D. Wang, “Stein variational gradient descent: A general purpose bayesian inference algorithm,” Advances in Neural Information Processing Systems, vol. 29, 2016.
+[17] T. Power and D. Berenson, “Variational inference mpc using normalizing flows and out-of-distribution projection,” in Robotics science and systems, 2023.
+[18] J. Sacks and B. Boots, “Learning sampling distributions for model predictive control,” in Conference on Robot Learning. PMLR, 2023, pp. 1733–1742.
+[19] M. S. Gandhi, B. Vlahov, J. Gibson, G. Williams, and E. A. Theodorou, “Robust model predictive path integral control: Analysis and performance guarantees,” IEEE Robotics and Automation Letters, vol. 6, no. 2, pp. 1423–1430, 2021.
+[20] J. Yin, Z. Zhang, E. Theodorou, and P. Tsiotras, “Trajectory distribution control for model predictive path integral control using covariance steering,” in International Conference on Robotics and Automation. IEEE, 2022, pp. 1478–1484.
+[21] F. Rastgar, H. Masnavi, B. Sharma, A. Aabloo, J. Swevers, and A. K. Singh, “PRIEST: Projection guided sampling-based optimization for autonomous navigation,” IEEE Robotics and Automation Letters, 2024 (in print).
+[22] H. Bharadhwaj, K. Xie, and F. Shkurti, “Model-predictive control via cross-entropy and gradient-based optimization,” in Learning for Dynamics and Control. PMLR, 2020, pp. 277–286.
+[23] F. Heetmeyer, M. Paluch, D. Bolliger, F. Bolli, X. Deng, E. Filicicchia, and T. Delbruck, “RPGD: A small-batch parallel gradient descent optimizer with explorative resampling for nonlinear model predictive control,” in International Conference on Robotics and Automation. IEEE, 2023, pp. 3218–3224.
+[24] D. M. Asmar, R. Senanayake, S. Manuel, and M. J. Kochenderfer, “Model predictive optimized path integral strategies,” in International Conference on Robotics and Automation. IEEE, 2023, pp. 3182–3188.
+[25] E. C. Kerrigan, “Robust constraint satisfaction: Invariant sets and predictive control,” Ph.D. dissertation, University of Cambridge UK, 2001.
+[26] T. Kloek and H. K. Van Dijk, “Bayesian estimates of equation system parameters: an application of integration by monte carlo,” Econometrica: Journal of the Econometric Society, pp. 1–19, 1978.
+[27] H. Guo, “A simple algorithm for fitting a gaussian function,” IEEE Signal Processing Magazine, vol. 28, no. 5, pp. 134–137, 2011.
+[28] P. Fankhauser and M. Hutter, “A universal grid map library: Implementation and use case for rough terrain navigation,” Robot Operating System (ROS) The Complete Reference (Volume 1), pp. 99–120, 2016.
+[29] R. Rajamani, Vehicle dynamics and control. Springer Science & Business Media, 2011.
+[30] A. Beck and M. Teboulle, “Mirror descent and nonlinear projected subgradient methods for convex optimization,” Operations Research Letters, vol. 31, no. 3, pp. 167–175, 2003.
+[31] R. Chandra, Parallel programming in OpenMP. Morgan kaufmann, 2001.
+[32] M. O’Kelly, H. Zheng, D. Karthik, and R. Mangharam, “F1TENTH: An open-source evaluation environment for continuous control and reinforcement learning,” Proceedings of Machine Learning Research, vol. 123, 2020.
+[33] N. Akai, “Reliable monte carlo localization for mobile robots,” Journal of Field Robotics, vol. 40, no. 3, pp. 595–613, 2023.
+
+

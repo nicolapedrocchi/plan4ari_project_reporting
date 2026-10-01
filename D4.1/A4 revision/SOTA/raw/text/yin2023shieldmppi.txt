@@ -1,0 +1,537 @@
+Shield Model Predictive Path Integral: A Computationally Efﬁcient Robust MPC Approach Using Control Barrier Functions
+Ji Yin1, Charles Dawson2, Chuchu Fan2 and Panagiotis Tsiotras1
+
+arXiv:2302.11719v1 [cs.RO] 23 Feb 2023
+
+Abstract— Model Predictive Path Integral (MPPI) control is a type of sampling-based model predictive control that simulates thousands of trajectories and uses these trajectories to synthesize optimal controls on-the-ﬂy. In practice, however, MPPI encounters problems limiting its application. For instance, it has been observed that MPPI tends to make poor decisions if unmodeled dynamics or environmental disturbances exist, preventing its use in safety-critical applications. Moreover, the multi-threaded simulations used by MPPI require signiﬁcant onboard computational resources, making the algorithm inaccessible to robots without modern GPUs. To alleviate these issues, we propose a novel (Shield-MPPI) algorithm that provides robustness against unpredicted disturbances and achieves real-time planning using a much smaller number of parallel simulations on regular CPUs. The novel Shield-MPPI algorithm is tested on an aggressive autonomous racing platform both in simulation and using experiments. The results show that the proposed controller greatly reduces the number of constraint violations compared to state-of-the-art robust MPPI variants and stochastic MPC methods.
+I. INTRODUCTION
+As robotics technologies develop, autonomous robots are expected to carry out more challenging tasks reliably. To accomplish these tasks in the presence of complex underlying dynamics and unknown environmental conditions, control methods are required to take into account the dynamics along with other user-speciﬁed safety constraints. Receding horizon control, also known as Model Predictive Control (MPC), is a control method that has been applied to generate optimal controls for constrained robotic systems [8]. Unlike more traditional PID or LQR controllers, MPC considers the future evolution of the system’s behavior given the current observation of the states, thus achieving more robust planning [9], [10]. We refer the interested reader to [3] for a brief review of various categories of MPC algorithms.
+Model Predictive Path Integral (MPPI) control is a sampling-based MPC method that relies on forward simulation of randomly sampled trajectories to synthesize an optimal control [11]. Compared with other MPC approaches, MPPI allows for more general forms of cost functions, including non-convex and even non-smooth costs. Typically, MPPI samples a large number of trajectories using a GPU, utilizing the GPU’s parallel-computing ability to plan in real time with a sufﬁciently high control update frequency. Despite its attractive properties (e.g., simplicity and support for general nonlinear dynamics and cost functions), MPPI
+1D. Guggenheim School of Aerospace Engineering, Georgia Institute of Technology, GA. E-mail: {jyin81,tsiotras}@gatech.edu
+2Department of Aeronautics and Astronautics, Massachusetts Institute of Technology, MA. E-mail: {cbd,chuchu}@mit.edu
+
+encounters several practical issues when deployed on actual hardware.
+First, there exists a gap between the theory of MPPI and its practical implementation. Theoretically, given unlimited computational resources, MPPI will ﬁnd the globally optimal control sequence, i.e., the algorithm is globally optimal if its planning horizon and trajectory sample budget are inﬁnite. In practice, however, the available computational power is always limited. In the past, this problem has been mitigated with the use of GPUs using multi-threaded sampling. However, the majority of existing robots still do not have onboard GPUs due to their large size, high cost, and increased power consumption compared to CPUs.
+Second, a limited computational budget means that MPPI becomes essentially a local search method. As a result, it requires good-quality samples in order to achieve satisfactory performance. Sampling trajectories close to the optimal solutions will signiﬁcantly improve the performance of the baseline MPPI, just as the quality of initialization affects the performance of any local optimization method. A bad set of simulated trajectories with no feasible solutions can cause MPPI to make erroneous control decisions, leading to safety violations. In most cases, unexpected dynamical and environmental disturbances cause unsatisfactory behavior, as demonstrated in Fig. 1(a) and 1(b). In Fig. 1(a), the autonomous vehicle has a desirable sampling distribution inside the track, but the vehicle ends up in a state far from the simulated next state due to unexpected disturbances, which may lead to divergence as shown in Fig. 1(b).
+Third, the baseline MPPI does not consider uncertainty in the environment or the dynamics, and thus neglects potential risks. Speciﬁcally, the original MPPI algorithm assumes deterministic dynamics in its trajectory sampling process and imposes a penalty in the cost function as a soft constraint rather than enforcing hard constraints. This use of cost penalties causes two implementation issues. First, the cost function has to be carefully tuned and weighted between rewards and penalties, creating the possibility that the algorithm can exploit loopholes in the cost design to make undesirable decisions (so-called “reward hacking” [12]). Secondly, MPPI has no ﬁrm guarantees of safety, which can be problematic for many time- and safety-critical applications, such as autonomous driving.
+A. Related Work
+Many variants of MPPI have been proposed to address the previous practical limitations. These variants fall into three general categories. The ﬁrst category includes methods designed to address potential planning risks by adding an
+
+Fig. 1: Comparison of different MPPI variants in the presence of unexpected disturbances. (a)-(b) Environmental disturbances may cause the baseline MPPI to diverge; (c) Some MPPI variants [1], [2] penalize trajectories that enter uncertain regions, but provide no guarantees of feasibility; (d) Others variants [3], [4], [5] tune the sampling distribution to avoid infeasible states, but these methods can be sub-optimal due to limited exploration or can be biased due to insufﬁcient training data; (e) Variants like [6], [7] pair MPPI with a robust tracking controller, which provides good performance when environmental uncertainty is small but do not formally guarantee safety; (f) The proposed Shield-MPPI guarantees safety even when all trajectory samples deviate from the safe regions, generating feasible solutions shown by the yellow trajectory.
+
+extra penalty to the sampled trajectories that come close to areas of high uncertainties or risk, pushing the resulting optimal trajectory to high conﬁdence, safer regions, as demonstrated in Fig. 1(c). For example, [1] uses a datadriven approach to identify uncertainties and avoid potential dangers. The authors of [2] propose a method to generate risk-averse controls by evaluating the risk in real time and accounting for systematic uncertainties. The major drawback of this category of algorithms is that they may still generate infeasible solutions if none of the sampled trajectories is feasible.
+The second category of MPPI variants achieves robust planning by adjusting the distribution of the simulated trajectories to improve sampling efﬁciency, as described in Fig. 1(d). Reference [3] utilizes covariance steering theory to accomplish ﬂexible trajectory distribution control for MPPI, introducing the ﬁnal state covariance as a hyper-parameter to adjust the sampling distribution. Other similar methods include [5], which uses a control barrier function to create trust regions for reliable samples, and [4], which uses a normalizing ﬂow to produce efﬁcient sampling distributions. The limitation of these controllers is that their distribution generation method may be biased due to insufﬁcient training data, leading to poor performance. In addition, the constraints on the sampling distribution may limit exploration and lead to sub-optimal plans.
+The third category of MPPI extensions addresses systematic uncertainties by closing the gap between MPPI simulations and the actual system [6], [7] using an additional complimentary controller, such as iLQG, to track the MPPI optimal trajectory, as demonstrated in Fig. 1(e). These approaches perform well when the sim-to-real gap is small; however, they do not explicitly address risk and they provide no guarantees of safety when the environment changes. Such cases are common in autonomous car and drone racing.
+B. Contributions
+In this work, we combine control barrier functions with MPPI to develop a safe control approach for general nonlinear systems. Barrier functions are a commonly used veriﬁcation approach for safety-critical systems that have
+
+gained popularity in recent years due to their ability to ensure safety for a wide variety of dynamical systems with safety constraints [13], [14], [15].
+We integrate the discrete-time control barrier functions (DCBF [16]) with the MPPI algorithm. The resulting ShieldMPPI controller uses a DCBF as a shield to guarantee safety, by ﬁltering the control actions chosen by MPPI to ensure that safety constraints are not violated. Our approach is inspired from the use of similar safety shields in reinforcement learning [17], as demonstrated by Fig. 1(f). The proposed ShieldMPPI possesses two properties that ensure robust planning. First, the control actions generated by the Shield-MPPI controller render the speciﬁed safe sets forward-invariant, i.e., a Shield-MPPI agent starting inside the safe set will always remain safe. Second, if the agent exits the safe set (for example, due to unexpectedly large disturbances), its state will converge back to the safe set, recovering safety as will be discussed in Section III. We will discuss these properties in more detail in Sections III and IV before providing an experimental characterization of our system in Section VI. In our experiments, the proposed Shield-MPPI controller reduced the chances of a potential car crash to almost zero, while achieving approximately 10−15% speed improvement with less than 0.5% of the trajectory samples used by MPPI.
+
+II. MODEL PREDICTIVE PATH INTEGRAL CONTROL Consider a general, discrete nonlinear system,
+
+xk+1 = f (xk, uk),
+
+(1)
+
+where xk ∈ D ⊆ Rnx is the system state and uk ∈ Rnu is the control input at time step k = 0, . . . , K − 1. It is assumed that, given some mean control vk ∈ Rnu and covariance matrix Σ ∈ Rn×n, the actual control follows a Gaussian distribution according to uk ∼ N (vk, Σ ). Consequently, the
+control sequence u = (u0, . . . , uK−1) has distribution Q with density function,
+
+K−1
+
+q(u) = ((2π)nu |Σ |)− 21
+
+e− 21 (uk−vk) Σ−1(uk−vk). (2)
+
+k=0
+
+Deﬁne the objective function
+
+J (v) = EQ
+
+K −1
+φ(xK ) +
+k=0
+
+q(xk) + λ vk Σ−1vk 2
+
+, (3)
+
+where q(xk) and φ(xK ) are the state-dependent step cost
+and terminal cost, respectively. As shown in [11], the optimal distribution Q∗ that achieves the minimal value of (3) has a density function given by
+
+q∗(u) = 1 e− λ1 (φ(xK )+ K k=−01 q(xk)) p(u), (4) µ
+
+where p(u) is the density function of an (uncontrolled) base
+distribution P resulting from a zero-mean control sequence (v = 0), and,
+
+µ = e− λ1 (φ(xK )+ K k=−01 q(xk)) p(u) du. (5)
+
+Consequently, the problem of optimizing (3) is converted
+
+to minimizing the KL divergence between (4) and (2). Ap-
+
+plying importance sampling, the resulting optimal controls vk+ can be evaluated using the distribution Q as,
+
+vk+ = EQ[ukw(u)],
+
+(6)
+
+where, w(u) = 1 e− λ1 S(u). (7) η
+
+and the trajectory cost S(u) is given by
+
+K −1
+
+K −1
+
+S(u) = φ(xK ) + q(xk) + λ vk Σ−1uk. (8)
+
+k=0
+
+k=0
+
+The denominator η in (7) is
+
+η = e− λ1 S(u) du.
+
+(9)
+
+In practice, (6) can be calculated using Monte-Carlo sam-
+
+pling as follows. Let uk = vk +
+
+m k , where
+
+m k
+
+∼
+
+N (0, Σ
+
+)
+
+is the sampled control noise for the mth simulated trajectory
+
+at the kth time step. The control update law (6) can then be
+
+converted to,
+
+M
+
+M
+
+vk+ = EQ[(vk + k)w(u)] ≈ vk + ωk k m m/ ωkm, (10)
+
+m=1
+
+m=1
+
+where ωm k is the weight for
+
+m k
+
+given
+
+by
+
+(7),
+
+which
+
+can
+
+be
+
+evaluated as,
+
+ωm = exp − 1 Sm − min Sm , (11)
+
+λ
+
+m=1,...,M
+
+where the hyper-parameter λ can be used to determine how
+selective the MPPI algorithm is for the sampled trajectories. For simplicity, in (11) we use Sm in place of S(um) to denote the cost of the mth simulated trajectory, and the term minm=1,...,M Sm is introduced to ensure numerical stability
+without changing the solution. It follows from (8) that the cost of the mth trajectory sample is evaluated as,
+
+K −1
+Sm = φ(xm K ) + q(xm k ) + λ (vkm)
+k=0
+
+Σ−1(vm k +
+
+m k ). (12)
+
+III. DISCRETE-TIME CONTROL BARRIER FUNCTION
+
+Let a Lipschitz continuous function h : Rn → R, and deﬁne a safe set S ⊆ D ⊂ Rn, such that,
+
+S := {x ∈ D|h(x) ≥ 0}.
+
+(13)
+
+Let U denote the set of feasible controls. The function h is a DCBF for system (1) if, for all x ∈ D, there exists a control v ∈ U, such that,
+
+h(f (x, v)) − h(x) ≥ −p(h(x)),
+
+(14)
+
+for a class-κ function p : R → R. In this work, we use the speciﬁc form of class-κ function as follows
+
+p(r) = β r, β ∈ (0, 1).
+
+(15)
+
+Property 3.1: Given an initial condition x0 ∈ S and a control sequence {vk}∞ k=0 such that all (xk, vk) pairs satisfy (14), then xk ∈ S for all k ∈ Z≥0.
+Proof: Condition (14) implies that h(xk) ≥ (Id −
+β) ◦ h(xk−1), where ◦ denotes function composition and Id
+denotes the identity function [16]. Since h(x1) ≥ (Id − β) ◦
+h(x0), it follows that,
+
+h(xk) ≥ (Id − β)k ◦ h(x0).
+
+(16)
+
+Since (Id − β) is a class-κ function for β ∈ (0, 1), it follows
+from h(x0) ≥ 0 that h(xk) ≥ 0. Hence, the set S is forward
+invariant.
+Property 3.2: Let x0 ∈ D \ S and let a control sequence {vk}∞ k=0 such that, for all k ∈ Z≥0, the pair (xk, vk) satisﬁes (14). Then, the state xk converges to the safe set S asymptotically.
+Proof: Note that, as k → ∞, (Id − β)k ◦ h(x0) → 0. Hence, (16) yields h(xk) ≥ 0.
+
+IV. DOUBLE-LAYER SAFETY SHIELD USING A DCBF
+Integrating safety constraints into an MPPI controller is non-trivial. Since the transition from safe to unsafe states can be abrupt, the controller must consider a sufﬁciently long planning horizon in order to ensure that the system remains safe far into the future. Unfortunately, the need to consider a long planning horizon increases the computation required to evaluate the controller, particularly when the MPPI controller also needs to consider a large number of these long trajectories in order to ﬁnd near-optimal actions.
+To reduce the computational burden required to implement a version of safe MPPI, we make two key modiﬁcations to the baseline MPPI controller. First, to allow the controller to preserve safety while using a shorter planning horizon, we integrate a control barrier function term into our cost function; this CBF enables the controller to determine whether an action is safe or not, while only considering a handful of steps into the future. However, even including a CBF term in the cost may not be enough to ensure safety if the MPPI controller does not consider a large enough sample of trajectories (as this can result in sub-optimal behavior and violation of the CBF’s safety guarantee). To mitigate this issue and allow the controller to maintain safety even when considering only a small population of trajectories, we combine the CBF-augmented MPPI controller with a local repair step, as shown in Fig. 2.
+
+Fig. 2: Shield-MPPI control architecture
+
+A. Safe Shielding by Modiﬁed Trajectory Costs
+The ﬁrst component of the proposed control architecture is a standard MPPI sampling process with a state-dependent barrier function term included in the costs of the sampled trajectories. To this end, let α = 1 − β ∈ (0, 1), we deﬁne a DCBF constraint violation penalty cost,
+
+Ccbf(xk, xk−1) = C max{−h(xk) + αh(xk−1), 0}, (17)
+
+where C is a parameter that determines how much penalty
+cost should be applied in proportion to the amount of
+constraint violation. In order to augment the CBF constraint
+into the MPPI cost, we introduce, for each k = 1, . . . , K the augmented state zk = (zk(1), zk(2)) = (xk, xk−1) ∈ R2nx and the corresponding augmented state system
+
+zk+1 (1)
+
+xk+1
+
+(1)
+f (zk , uk) ˜
+
+zk+1 = (2) =
+
+=
+
+(1)
+
+= f (zk, uk).
+
+z x k+1 k zk
+
+(18)
+
+In the new coordinates, equation (17) takes the form
+
+Ccbf(zk) = C max{−h(zk(1)) + αh(zk(2)), 0}. (19)
+
+The new terminal and running costs corresponding to the augmented system (18) are then deﬁned as φ˜(zK) = φ(zK(1)) + Ccbf(zK ) and q˜k(zk) = q(zk(1)) + Ccbf(zk), respectively. Using the augmented system, the cost of the mth
+simulated trajectory Sm in (12) is modiﬁed as,
+
+K
+
+S˜m = Sm + Ccbf(zkm),
+
+(20)
+
+k=0
+
+where for simplicity, we assume that z0(2) = x−1 = x0. If the barrier function constraint (14) is satisﬁed it follows that −h(xk) + αh(xk−1) ≤ 0 and the cost term (19) becomes zero, and hence the system will remain safe. Otherwise, the augmented cost q˜k penalizes the simulated trajectories that violate condition (14), so that they are weighted less during the synthesis of the MPPI control sequence.
+In short, in this step, the MPPI algorithm is applied to system (18) with cost
+
+min J(v) =
+v
+K −1
+E φ˜(zK ) +
+k=0
+
+q˜(zk) + λ vk Σ−1vk 2
+
+, (21)
+
+to yield a sequence of “near-optimal” nominal controls v+ =
+
+(v
+
++ 0
+
+,
+
+v1+
+
+,
+
+.
+
+.
+
+.
+
+,
+
+v
+
++ K
+
+−
+
+1
+
+)
+
+.
+
+B. Control Shielding Using Gradient-based Optimization
+The MPPI optimization process is not guaranteed to ﬁnd a solution with zero CBF violation with limited trajectory samples. To guard against this case, we add a “local repair” step where we seek to locally optimize the output control sequence v+ and minimize its violation of the CBF condition, solving the optimization problem,
+N
+v0:N safe = argmax min{h(xk+1) − αh(xk), 0}, (22)
+v0:N + k=0
+subject to (1), where x0 is the current state and N is the planning horizon for the local repair (typically smaller than the MPPI control horizon K). If the CBF condition h(xk+1) − αh(xk) ≥ 0 is satisﬁed for k = 0, 1, . . . , N , then the objective of this problem will be 0, and it will be negative when the CBF condition is not satisﬁed. We solve this nonlinear problem locally using the Broyden–Fletcher–Goldfarb–Shanno (BFGS) algorithm [18]. The BFGS is a ﬁrst-order, gradientbased optimizer with a time complexity of O(n2), which is signiﬁcantly faster compared to Newton’s method which is of order O(n3). Due to the real-time constraints on the controller, we do not run this optimization until convergence but instead run it for a ﬁxed number of steps, thus sacriﬁcing any guarantees of local optimality but providing an effective heuristic to ensure safety. This approach is illustrated in Algorithm 1.
+
+Algorithm 1: Safety Shield
+Given: Model f , repair steps ns, MPPI horizon K,
+repair horizon N < K, step size δ; Input : Current state x0, control sequence v+; Output: Safe control vsafe 0:N 1 vsafe 0:N ← v+0:N ; 2 for ns steps do 3 vsafe 0:N ← vsafe 0:N +
+δ∇v+ { k=0 N min(h(f (xk, vk+)) − αh(xk), 0)}
+0:N
+4 end
+
+V. SHIELD-MPPI ALGORITHM
+The proposed Shield-MPPI is described in Algorithm 2. Line 2 computes the estimate of the current system state x0. Lines 3 to 13 describe the trajectory sampling and cost evaluation process, where Line 4 sets the initial conditions, Line 5 samples the mth control noise sequence m, Line 7 sums the mean control vk and sampled control noise and Line 8 uses the resulting input um k to propagate system state. Lines 10 and 12 evaluate the modiﬁed trajectory cost S˜m with the DCBF constraint violation penalty (19) following (12) and (20). Line 14 calculates the optimal control v+ using the update law (10). To guarantee safety, Line 15 solves the nonlinear optimization problem (22) from Algorithm 1 and obtains the safe control sequence vsafe. Finally, Line 16 executes the safe controls and Line 17 sets v+ as the mean control sequence for “warm starting” the next control iteration.
+
+Algorithm 2: Shield-MPPI Algorithm
+
+Given: Shield-MPPI costs q(·), φ(·), parameters γ, Σ ;
+
+Input : Initial control sequence v
+
+1 while task not complete do
+
+2 x0 ← GetStateEstimate();
+
+3 for m ← 0 to M − 1 in parallel do
+
+4
+
+xm
+0
+
+←
+
+x0,
+
+zm
+0
+
+← [x0 , x0 ]
+
+,
+
+S˜m ← 0;
+
+5
+
+Sample
+
+m←{
+
+m 0
+
+,
+
+.
+
+.
+
+.
+
+,
+
+m K−1};
+
+6
+
+for k ← 0 to K − 1 do
+
+7
+
+um k ← vk + m k ;
+
+8
+
+xm k+1 ← f (xm k , um k ),
+
+9
+
+zm k+1 ← [(xm k+1)
+
+,
+
+(
+
+x
+
+m k
+
+)
+
+]
+
+10
+
+S˜m ←
+
+S˜m + q(xm k ) + γvk Σ−1um k + Ccbf(zkm);
+
+11
+
+end
+
+12
+
+S˜m ← S˜m + φ(xm K ) + Ccbf(zKm);
+
+13 end
+
+14 v+ ← OptimalControl({S˜m}M m=−01, {um}M−1 m=0 ); 15 vsafe ← SafetyShield(x0, v+); 16 ExecuteCommand(v0safe); 17 v ← v+;
+
+18 end
+
+VI. SIMULATION AND EXPERIMENTS
+In this section, we present simulation and experimental results obtained from running the proposed Shield-MPPI controller on an autonomous racing platform. Speciﬁcally, we discuss the choice of the DCBF function h(x) along with its corresponding safe set S, and the underlying dynamical system used in these experiments.
+A. AutoRally Racing Platform
+We use the AutoRally racing platform [19] for simulation as well as experiments. The AutoRally is an electric autonomous robot 1/5 the size of an actual vehicle, which is approximately 1 m in length, 0.4 m in width, and weighs about 22 kg [19]. We model the dynamics of the AutoRally
+
+vehicle using a discrete-time system as in (1), based on the single-track bicycle model described in [20], where system state is x = [vx, vy, ψ˙, ωF , ωR, eψ, ey, s] , and the state variables represent the longitudinal velocity, lateral velocity, yaw rate, front wheel speed, rear-wheel speed, yaw angle error, lateral deviation, and distance progress made along track centerline, respectively. The control input is u = [δ, T ] , where δ is the steering angle input and T is throttle.
+
+B. Safe Set
+
+Assuming that the racing track has constant track width 2wT, it is desirable that the vehicle’s lateral deviation ey from the track centerline is bounded by |ey| ≤ wT, such that the vehicle avoids collision with the track boundaries. To this end, we deﬁne the function,
+
+h(x) = wT2 − e2y,
+
+(23)
+
+that fulﬁlls the DCBF constraint (14), that is, h(x) ≥ 0 if and only if the vehicle is inside the track boundaries. It follows from (13) that the safe set S consists of all states inside the racing track, and Property 3.1 indicates that any control policy satisfying (14) renders S forward-invariant. In addition, Property 3.2 guarantees asymptotic convergence to S in the case when system state is not in S.
+
+C. Controller Cost Design
+
+In the trajectory cost (12), the state-dependent running cost q(xm k ) can be arbitrary. In our simulations and experiments, we used the following state-dependent cost,
+
+q(xm k ) = (xm k − xg) Q(xm k − xg) + 1(xm k ),
+
+(24)
+
+where Q = diag(qvx , qvy , qψ˙ , qωF , qωR , qeψ , qey , qs) are cost weights, xg = diag(vg, 0, . . . , 0) sets the target velocity, and,
+
+1(xm 0, if xm k ) = k is within the track, (25) Cobs, otherwise.
+
+is the collision penalty cost.
+
+D. Cost Sensitivity Comparison
+A common problem among optimization algorithms is that the cost functions need to be carefully tuned for speciﬁc tasks. This is also the case for most MPC controllers, including MPPI. In this section, we investigate the proposed Shield-MPPI’s ability to guard against false control decisions made by MPPI by running both controllers using M = 104 sample trajectories multi-threaded using GPUs. Normally, the cost weights in (24) need to be carefully designed empirically, such that the original MPPI controller achieves satisfying performance. For the vehicle system (1), the cost for a lateral deviation qey in (24) has a signiﬁcant impact on the autonomous vehicle’s maneuvers. While small qey values allow the vehicle to perform aggressive and more time-efﬁcient maneuvers such as cutting corners, a large qey makes the system stay close to the track centerline, reducing the chances of a collision against the track boundaries, but at the cost of less efﬁcient trajectories. To this end, we tested the original MPPI controller together with the proposed
+
+Fig. 3: Cost sensitivity comparison between Shield-MPPI and MPPI. Each column is obtained by running the controllers using a different target velocity vg. The blue curves show the performance of the standard MPPI controller, while the orange curves indicate the proposed Shield-MPPI controller. The curves represent average performance with the shaded tubes showing the 95% conﬁdence intervals.
+
+Shield-MPPI controller in simulation, and compared their performance using a wide range of qey values.
+We deﬁne a crash to be the situation where the vehicle deviates far from the track centerline and comes to a complete stop after hitting the track boundaries, and a collision to be the case where the vehicle slightly scrapes the track boundaries but does not halt. The ﬁrst row of plots in Fig. 3 shows the crash rates within one lap, and the second row of plots shows the number of collisions. The third row illustrates the lap time, which is the time until a crash occurs or the time spent ﬁnishing one lap without a crash. The fourth row illustrates the average velocity achieved by the vehicle. For a cost interval qey ∈ [0, 50], as shown in Fig. 3, the original MPPI’s crash rate and the number of collisions increase as the target velocity increases, while the proposed Shield-MPPI controller always maintains zero crash rate and collisions. Consequently, the plots in the third row of Fig. 3 indicate that MPPI tends to encounter crashes and experience failures earlier than the Shield-MPPI. Another observation is that the proposed Shield-MPPI achieves safety with higher velocities than the original MPPI, implying that the proposed approach generates more efﬁcient maneuvers. We visualize trajectories produced by both controllers at qey = 30 with target velocity vg = 7m/s in Fig. 4. A portion of blue trajectories stops abruptly at the track boundaries, implying crashes caused by MPPI. Some other MPPI trajectories slightly cross the track boundaries and cause minor collisions. The trajectories generated by the proposed Shield-MPPI exhibit safe and more efﬁcient driving maneuvers, including cutting corners to avoid losing speed and saving the distance traveled by the vehicle without any collisions.
+E. Simulations with Limited Computational Resources
+As discussed in Section I, the quality of trajectory samples plays an important role in the optimal control generation for all MPPI-type algorithms. Typically, MPPI and its variants rely on the parallel computing abilities offered by modern GPUs to sample as many simulated trajectories as possible to ﬁnd optimal solutions for successful motion generation. However, most robots are not equipped with GPUs due
+
+Fig. 4: Shield-MPPI and MPPI trajectory visualization.
+to their large size and high cost, and power requirements. For this reason, application of MPPI controllers is restricted to relatively expensive, large-scale robotic systems, while robots designed for affordability and having limited power and size lack the onboard computational resources required to sample a sufﬁcient amount of trajectories in real-time.
+Fig. 5: Comparison of MPPI and Shield-MPPI using CPU implementation.
+To study the proposed algorithm’s performance under limited computational resources, we run the original MPPI controller and the proposed Shield-MPPI controller in simulation using as few simulated trajectories as possible with short control horizons on a CPU. From the simulation results
+
+illustrated in Fig. 5, it is shown that all controllers achieve lower collision rates by increasing the number of trajectory samples and the control horizon. The blue curve in the ﬁgure indicates that the standard MPPI has the highest collision rate. The MPPI using only the DCBF cost modiﬁcation as described by the orange module in Fig. 2 achieves lower collision rates compared to the standard MPPI, while the proposed two-layer Shield-MPPI, shown in green, results in the minimum number of collisions throughout the entire parameter interval studied.
+
+from the MPPI, regardless of any disturbances. The PT-MPPI assumes perfect trajectory tracking with zero tracking error. It is therefore an ideal controller that gives an estimate of the performance upper bound of the tracking-based robust MPPI variants demonstrated in Fig. 1(e), including the TubeMPPI [6] and Robust-MPPI [7], etc. To thoroughly test the robustness of the controllers, we use a poor cost design that tends to cause more collisions, and all controllers share the same objective function and control horizon. All MPPI variants sample 104 trajectories at each optimization iteration to ensure a fair comparison. Table I summarizes the simulation results, which show that the Shield-MPPI controller achieves the lowest crash rate and number of collisions at relatively high velocities.
+TABLE I: Performance Comparison with other Stochastic MPC Approaches
+
+Controller Shield-MPPI CS-SMPC
+RA-MPPI PT-MPPI
+MPPI
+
+Crash Rate 0.02 0.08 0.15 0.31 0.46
+
+Collisions(/lap) 0.13 0.14 0.38 0.74 1.02
+
+Avg. Speed (m/s) 5.039 4.724 5.130 4.942 4.899
+
+Fig. 6: Collision rate reduction and absolute collision rate of Shield-MPPI controller. Each grid shows the average collision rate reduction or the absolute collision rate over 100 simulations.
+
+To further investigate the inﬂuence of the second layer safety shield described by Algorithm 1 used in Shield-MPPI, we created a heat map, as shown in Fig. 6(a), to demonstrate the amount of crash rate reduction as a result of Algorithm 1, using the same data as in Fig. 5. The negative numbers in the ﬁgure indicate collision rate reduction, where a darker color means more improvement owing to the safety shield. It can be observed that the safety shield in Algorithm 1 tends to provide more protection against potential crashes when the control horizon K and the number of trajectory samples M are small, with darker cells appearing in the top-left triangle and lighter ones at the bottom-right corner. Fig. 6(b) shows the absolute collision rates resulting by the proposed Shield-MPPI controller, indicating that the proposed approach achieves zero collisions with merely 50 samples and about 1.5 s control horizon.
+
+F. Comparison with other Robust MPC Methods
+To validate the robustness of the proposed Shield-MPPI controller, we compared it with other state-of-the-art controllers that take uncertainties into account during planning. In simulations, we model external disturbances by adding some Gaussian noise wk to the nominal system (1). It follows that the disturbed system is given by,
+
+xk+1 = f (xk, uk) + wk.
+
+(26)
+
+We ran simulations using the Risk-aware MPPI (RA-MPPI) in [2] and the Covariance Steering Stochastic MPC (CSSMPC) described in [8] to compare with our proposed approach. In addition, we also used a hypothetical Perfect Tracking MPPI (PT-MPPI) that ensures that the actual next state of the agent is the same as the predicted next state
+
+Another important observation from Table I is that while the tracking-based MPPI variants can alleviate the impact of unmodelled disturbances, they are not robust using poorly designed costs due to their lack of risk consideration.
+G. AutoRally Experiment
+We also investigated the robustness of the proposed ShieldMPPI controller by running it on the real AutoRally vehicle [19] in the presence of unmodelled external disturbances. In our experiments, we tested the controllers on a track subject to disturbances as shown in Fig. 7(b), using a dynamical system (1) calibrated with the original disturbance-free track as shown in Fig. 7(a). Please refer to the video1 for the experimental demonstration. The results are summarized in Table II, where the controller MPPI(a) and the ShieldMPPI(a) use GPU to sample 104 simulated trajectories at a frequency of approximately 150 Hz and 55 Hz, respectively, while the MPPI(b) as well as the Shield-MPPI(b) sample 20 trajectories at about 235 Hz and 220 Hz on a CPU. The AutoRally vehicle is equipped with the Intel Skylake Quadcore i7 CPU, and an Nvidia GTX 1080ti GPU.
+TABLE II: AutoRally Experiment Results
+
+Controller MPPI(a)
+Shield-MPPI(a) MPPI(b)
+Shield-MPPI(b)
+
+Samples 104 104
+20
+20
+
+Max. Speed (m/s) 6.31 7.21 4.50 6.99
+
+Avg. Speed (m/s) 4.30 4.78 2.60 4.61
+
+From Table II, we see that the proposed Shield-MPPI controller can achieve a 10.78% speed improvement with merely 0.2% the number of trajectory samples compared to the standard MPPI controller, with no collisions observed during the experiments.
+1https://youtu.be/aKMwEO9wfJ4
+
+Fig. 7: AutoRally experiment.
+VII. CONCLUSIONS AND FUTURE WORK
+In this paper, we proposed the novel Shield-MPPI controller that uses a control barrier function as a shield to prevent unfavorable control performance and guarantee safety. In our simulations and experiments, the proposed algorithm signiﬁcantly reduced the number of safety constraint violations as compared to other state-of-the-art robust MPPI variants and stochastic MPC methods. In addition, the ShieldMPPI offers comparable, and even better performance than the baseline MPPI using CPUs instead of expensive GPUs, which has always been a major limitation of applications for MPPI-based algorithms.
+In the future, we propose to improve the Shield-MPPI controller using learned certiﬁcates as described in [13], to develop safety shields in more ﬂexible forms, and deploy the resulting algorithms to more complicated control scenarios, such as multi-agent planning [21]. The proposed safety shield in Shield-MPPI can also be integrated with existing MPC methods, such as MPPI variants [2], [3] or robust MPCs [22], to further improve their performance and ensure safety.
+VIII. ACKNOWLEDGEMENT
+The authors thank Jacob Knaup for his assistance with the AutoRally platform simulations and experiments. This work was funded by NSF under awards CNS-2219755 and CCF-2238030 and by ONR under award N00014-18-1-2828. C. Dawson acknowledges support by the NSF Graduate Research Felllowsing Program under grant 1745302.
+REFERENCES
+[1] E. Arruda, M. J. Mathew, M. Kopicki, M. Mistry, M. Azad, and J. L. Wyatt, “Uncertainty averse pushing with model predictive path integral control,” in IEEE-RAS 17th International Conference on Humanoid Robotics (Humanoids), Birmingham, UK, Nov 2017, pp. 497–502.
+
+[2] J. Yin, Z. Zhang, and P. Tsiotras, “Risk-aware model predictive path integral control using conditional value-at-risk,” 2022. [Online]. Available: https://arxiv.org/abs/2209.12842
+[3] J. Yin, Z. Zhang, E. Theodorou, and P. Tsiotras, “Trajectory distribution control for model predictive path integral control using covariance steering,” in International Conference on Robotics and Automation (ICRA), Philadelphia, PA, May 2022, pp. 1478–1484.
+[4] T. Power and D. Berenson, “Variational inference MPC using normalizing ﬂows and out-of-distribution projection,” 2022. [Online]. Available: https://arxiv.org/abs/2205.04667
+[5] C. Tao, H. Kim, H. Yoon, N. Hovakimyan, and P. Voulgaris, “Control barrier function augmentation in sampling-based control algorithm for sample efﬁciency,” in American Control Conference (ACC), Atlanta, GA, June 2022, pp. 3488–3493.
+[6] G. Williams, B. Goldfain, P. Drews, K. Saigol, J. M. Rehg, and E. A. Theodorou, “Robust sampling based model predictive control with sparse objective information.” in Robotics: Science and Systems, vol. 14, Pittsburgh, PA, June 2018.
+[7] M. S. Gandhi, B. Vlahov, J. Gibson, G. Williams, and E. A. Theodorou, “Robust model predictive path integral control: Analysis and performance guarantees,” IEEE Robotics and Automation Letters, vol. 6, no. 2, pp. 1423–1430, 2021.
+[8] K. Okamoto and P. Tsiotras, “Stochastic model predictive control for constrained linear systems using optimal covariance steering,” 2019. [Online]. Available: https://arxiv.org/abs/1905.13296
+[9] Y. Tassa, T. Erez, and E. Todorov, “Synthesis and stabilization of complex behaviors through online trajectory optimization,” in IEEE/RSJ International Conference on Intelligent Robots and Systems, Vilamoura-Algarve, Portugal, Oct 2012, pp. 4906–4913.
+[10] E. Hannigan, B. Song, G. Khandate, M. Haas-Heger, J. Yin, and M. Ciocarlie, “Automatic snake gait generation using model predictive control,” in IEEE International Conference on Robotics and Automation (ICRA), Paris, France, May 2020, pp. 5101–5107.
+[11] G. Williams, P. Drews, B. Goldfain, J. M. Rehg, and E. A. Theodorou, “Information-theoretic model predictive control: Theory and applications to autonomous driving,” IEEE Transactions on Robotics, vol. 34, no. 6, pp. 1603–1622, 2018.
+[12] J. Clark and D. Amodei, “Faulty reward functions in the wild,” Mar 2019. [Online]. Available: https://openai.com/blog/ faulty-reward-functions/
+[13] C. Dawson, S. Gao, and C. Fan, “Safe control with learned certiﬁcates: A survey of neural lyapunov, barrier, and contraction methods for robotics and control,” IEEE Transactions on Robotics, pp. 1–19, 2023.
+[14] A. D. Ames, S. Coogan, M. Egerstedt, G. Notomista, K. Sreenath, and P. Tabuada, “Control barrier functions: Theory and applications,” in 18th European Control Conference (ECC), Naples, Italy, June 2019, pp. 3420–3431.
+[15] A. D. Ames, J. W. Grizzle, and P. Tabuada, “Control barrier function based quadratic programs with application to adaptive cruise control,” in 53rd IEEE Conference on Decision and Control, Los Angeles, CA, Dec 2014, pp. 6271–6278.
+[16] M. Ahmadi, A. Singletary, J. W. Burdick, and A. D. Ames, “Safe policy synthesis in multi-agent POMDPs via discrete-time barrier functions,” in IEEE 58th Conference on Decision and Control (CDC), Nice, France, Dec 2019, pp. 4797–4803.
+[17] M. Alshiekh, R. Bloem, R. Ehlers, B. Ko¨nighofer, S. Niekum, and U. Topcu, “Safe reinforcement learning via shielding,” in AAAI, 2018, pp. 2669–2678. [Online]. Available: https://www.aaai.org/ocs/ index.php/AAAI/AAAI18/paper/view/17211
+[18] R. Fletcher, Practical Methods of Optimization. New York, NY: John Wiley & Sons, 1987.
+[19] B. Goldfain, P. Drews, C. You, M. Barulic, O. Velev, P. Tsiotras, and J. M. Rehg, “AutoRally: An open platform for aggressive autonomous driving,” IEEE Control Systems Magazine, vol. 39, no. 1, pp. 26–55, 2019.
+[20] E. Velenis, E. Frazzoli, and P. Tsiotras, “Steady-state cornering equilibria and stabilisation for a vehicle during extreme operating conditions,” International Journal of Vehicle Autonomous Systems, vol. 8, no. 2-4, pp. 217–241, 2010.
+[21] Z. Qin, K. Zhang, Y. Chen, J. Chen, and C. Fan, “Learning safe multiagent control with decentralized neural barrier certiﬁcates,” arXiv preprint arXiv:2101.05436, 2021.
+[22] A. A. Jalali and V. Nadimi, “A survey on robust model predictive control from 1999-2006,” in International Conference on Computational Inteligence for Modelling Control and Automation, Nov 2006, pp. 207–207.
+
+

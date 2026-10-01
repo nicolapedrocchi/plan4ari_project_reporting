@@ -1,0 +1,2064 @@
+IEEE ROBOTICS AND AUTOMATION LETTERS. PREPRINT VERSION. ACCEPTED JANUARY, 2021
+
+1
+
+Robust Model Predictive Path Integral Control: Analysis and Performance Guarantees
+Manan S. Gandhi1, Bogdan Vlahov1, Jason Gibson1, Grady Williams1,2, Evangelos A. Theodorou1
+
+arXiv:2102.09027v1 [eess.SY] 17 Feb 2021
+
+Abstract—In this paper we propose a novel decision making architecture for Robust Model-Predictive Path Integral Control (RMPPI) and investigate its performance guarantees and applicability to off-road navigation. Key building blocks of the proposed architecture are an augmented state space representation of the system consisting of nominal and actual dynamics, a placeholder for different types of tracking controllers, a safety logic for nominal state propagation, and an importance sampling scheme that takes into account the capabilities of the underlying tracking control. Using these ingredients, we derive a bound on the free energy growth of the dynamical system which is a function of task constraint satisfaction level, the performance of the underlying tracking controller, and the sampling error of the stochastic optimization used within RMPPI. To validate the bound on free energy growth, we perform experiments in simulation using two types of tracking controllers, namely the iterative Linear Quadratic Gaussian and Contraction-Metric based control. We further demonstrate the applicability of RMPPI in real hardware using the GT AutoRally vehicle. Our experiments demonstrate that RMPPI outperforms MPPI and Tube-MPPI by alleviating issues of the aforementioned model predictive controllers related to either lack of robustness or excessive conservatism. RMPPI provides the best of the two worlds in terms of agility and robustness to disturbances.
+Index Terms—Optimization and Optimal Control, Field Robots, Model Predictive Control, Stochastic Optimization
+I. INTRODUCTION
+R EAL world problems that require aggressive control solutions in uncertain environments require fast trajectory planning, control, and tracking. Some examples include off-road ground vehicle racing [1], aerial acrobatics [2], and drone racing [3]. Historically, sampling-based ModelPredictive Control (MPC), such as Model-Predictive Path Integral Control (MPPI) can be a solution to these types of
+Manuscript received: October, 16, 2020; December, 28, 2020; Accepted January, 18, 2021.
+This paper was recommended for publication by Editor Lucia Pallottino upon evaluation of the Associate Editor and Reviewers’ comments. This work was supported by Sandia National Laboratories, a multimission laboratory managed and operated by National Technology and Engineering Solutions of Sandia, LLC., a wholly owned subsidiary of Honeywell International, Inc., for the U.S. Department of Energy’s National Nuclear Security Administration under contract DE-NA-0003525. Additionally, this work is supported by NASA LaRC.
+1The Authors are with the Autonomous Control and Decision Systems Lab, Georgia Institute of Technology, Atlanta GA 30313 USA (Corresponding author: Manan Gandhi) mgandhi3@gatech.edu; bvlahov3@gatech.edu; jgibson37@gatech.edu; evangelos.theodorou@gatech.edu)
+2The Fourth Author is also with Embark Trucks, San Francisco CA 94107 Grady@embarktrucks.com
+This paper has a supplementary video available to view at https://youtu.be/wQa3adL3AXU
+Digital Object Identiﬁer (DOI): see top of this page.
+
+tasks [4]. However, the performance of the controller is often hinged on the control sequence around which we are sampling, also known as the Importance Sampling (IS) trajectory. A severe disturbance can change the initial state of the system into a region where the importance sampler is no longer valid. Tube Model-Predictive Path Integral Control (Tube-MPPI) [5] offers a potential solution by incorporating a nominal state solution that is immune from catastrophic disturbances, however there is no theoretical guarantee of performance and in practice, the nominal state can diverge. Robust Model-Predictive Path Integral Control (RMPPI) explores the concept of robustness from an information theoretic perspective through IS and nominal state propagation. The contributions of our work are summarized below. 1.) We derive and empirically validate the bound on free energy growth for RMPPI. This free energy bound measures the “dynamic limit” of the system, i.e. how close the system is operating with respect to task failure. We show this performance guarantee both in simulation and in reality on the AutoRally platform. 2.) We present a novel extension of IS that utilizes Control Contraction Metrics (CCM) to validate the exponential tracking guarantee. In simulation, we demonstrate how the performance of a nonlinear tracking controller impacts the free energy of the system. 3.) We provide a systematic comparison of MPPI, Tube-MPPI, and Robust-MPPI, highlighting how each algorithm handles disturbances. The failure cases of each algorithm is explored in detail.
+The rest of the paper is organized as follows: Section II reviews related work in Robust MPC, and Section III provides a background on information theoretic sampling based control, and motivates the need for RMPPI. Section IV provides theoretical results related to the derivation of RMPPI, and proves the numerical bound on the free energy growth. Section V discusses the experimental results in both simulation and hardware.
+II. RELATED WORKS
+Robust MPC methods historically focus on linear MPC methods, [6], [7] and may not generalize well to nonlinear systems. Some extensions of MPC methods utilize an ancillary controller to guarantee robustness to external disturbances [8], but determining the tube size is difﬁcult. Other non-MPC methods can leverage alternative controllers and adaptation to maintain robustness [9], but these controllers are typically conservative. The trade-off between robustness and fast tracking relies on tuning the adaptation rate and ﬁlter frequency,
+
+2
+
+IEEE ROBOTICS AND AUTOMATION LETTERS. PREPRINT VERSION. ACCEPTED JANUARY, 2021
+
+but ultimately these controllers are not predictive, and thus may be ill suited for aggressive control problems. Sampling based motion planners, such as [10], even for off-road driving tasks [11], generate motion plans that ignore nonlinearities in the dynamics, and rely on a tracking controller to execute the motion plan. Other methods utilize a library of motion primitives [12], but again there is a tradeoff between dynamic feasibility, pre-computed maneuvers, and computational resources. Sampling based control schemes lean on IS [13] to maintain tractability of the control problem, but are victim to both stochastic disturbances and errors in the dynamics model. The evolution of Path Integral Control has been towards increased performance when dealing with unmodeled disturbances and hazardous environments [14], [15].
+
+III. MATHEMATICAL BACKGROUND
+
+Consider a general nonlinear system with discrete dynamics:
+
+xt+1 = xt + F(xt, ut + t)∆t + wt,
+
+(1)
+
+L(x, u) = q(x) + λuTΣ−1u,
+
+(2)
+
+T −1
+
+S(U, x0) = φ(xT ) + q(xt),
+
+(3)
+
+t=0
+
+where x ∈ Rnx is the state, u ∈ Rnu is the control, ∈ N (0, Σ) is the noise in the control channels, and w ∈ Rnx
+is an external disturbance. State disturbances w are unknown but assumed to be bounded. The function L(x, u) is the
+running cost function, with state cost q(x) and quadratic
+control cost parameterized by inverse temperature λ > 0 and positive deﬁnite control cost penalty matrix Σ−1. The function
+S(U, x0) is the state-to-path cost function, which takes in an initial condition x0, set of inputs U := {u0, ..., uT −1} and maps them to a cost value. φ(x) is the terminal cost. Next we
+
+deﬁne the free energy as follows:
+
+1 F (S, P, x0, λ) = −λ log EP exp − S(V, x0) , (4)
+λ
+
+where V := {u0 + 0, ..., uT −1 + T −1} is the set of perturbed inputs. The expectation is taken with respect to P, the probability distribution from which the controls of the system are sampled. In this case, the mean of the distribution is 0, representing the “uncontrolled” dynamics. Free energy is a metric for control performance in MPPI. This expectation can be estimated via IS [16].
+Information-Theoretic MPPI: MPPI can be derived from the relation between the free energy and the relative entropy of two control systems. The two systems have their controls sampled from two distinct control distributions. One distribution is the “controlled” system Q deﬁned by density function:
+
+T −1
+q(V ) = Z−1 exp
+t=0
+
+− 1 (vt − ut)T Σ−1(vt − ut) 2
+
+, (5)
+
+where Z = ((2π)m|Σ|) 2 .1 The other distribution is the base-
+line distribution P with density function p(V ) that typically represents the “uncontrolled” distribution with mean ut = 0.
+
+Through IS and Jensen’s inequality, we rewrite the free energy to be with respect to the controlled distribution:
+
+F (S, P, x0, λ) ≤ EQ[S(V, x0)] + λKL (Q P) .
+We deﬁne the optimal distribution Q∗ that achieves the lower bound on cost in expectation with density deﬁned as:
+
+q∗(V ) = 1 exp − 1 S(V, x0) p(V ).
+
+η
+
+λ
+
+It is impossible to sample from this optimal control distribution directly, but the KL-divergence between the two control distributions Q∗ and Q can be utilized as an information theoretic objective to “move” the controlled distribution close to the optimal distribution [14]. The problem becomes minimizing the KL divergence between the controlled distribution and the optimal controlled distribution:
+
+U ∗ = argmin KL (Q∗ Q) .
+
+(6)
+
+U
+
+In [14], the authors show that the solution to Eq. (6) is equivalent to:
+
+ut∗ = q∗(V )vtdV.
+
+Using IS to instead draw samples from our controlled distribution Q provides the following:
+ut∗ = EQ[w(V )vt],
+q∗(V ) p(V )
+where w(V ) = p(V ) q(V ) is the IS weight. It can be shown that this weight is equivalent to:
+
+1
+
+1
+
+T −1
+
+1 T −1
+
+w(V ) = η exp − λ S(V, x0) + (vt + 2 ut) Σ ut .
+
+t=0
+
+MPPI has a key failure case that is addressed in Tube-MPPI. The IS trajectory is parameterized by an open loop control sequence, therefore a large disturbance can push the sampling into undesirable regions of the state space. The implicit assumption made in IS is that the new state is close to the previous state, which breaks down in practical applications of the algorithm. Tube-MPPI: An alternative setup is to keep the importance sampler focused around a nominal system that rejects disturbances. We consider two dynamical systems, one that represents the real system from Eq. (1) that experiences disturbances w, and another that represents the nominal system x∗ in Eq. (7) that is immune from disturbances. Let u∗ be the nominal control for:
+
+xt+1 ∗ = xt∗ + F(x∗t , ut∗ + t)∆t.
+
+(7)
+
+If state divergence is encountered, a feedback controller is applied to track the nominal system. The nominal state x∗ is reset to the real state x if the difference between the free energy calculated at the nominal state and the real state is less than α. In this case α > 0 represents a free energy threshold. The importance sampler of the nominal state is always used when calculating rollouts from both the nominal and the real state, but it is reset to the real system control trajectory when the nominal state is reset.
+
+GANDHI et al.: ROBUST MODEL PREDICTIVE PATH INTEGRAL CONTROL
+
+3
+
+There are two main shortcomings of Tube-MPPI. The ﬁrst is that the nominal state is chosen independently of the real state, therefore they can easily diverge. State divergence is the primary failure case of Tube-MPPI [5]. The second shortcoming is that the importance sampler is ignorant of the ancillary feedback controller. The IS trajectories do not reﬂect actual system behavior, thus providing a biased estimate of the optimal control. This shortcoming limits the performance of Tube-MPPI; with small disturbances, it will perform just as MPPI by electing to reset the nominal state. A large disturbance will result in the nominal state continuing independently and relying entirely on the tracking controller to bring the real system back to the nominal. Robust-MPPI Architecture: RMPPI extends the idea behind Tube-MPPI to create a new controller framework with four pieces.
+1) Augmented State Space: Samples are drawn from two systems, the nominal system Eq. (7) and the real system Eq. (8):
+
+xt+1 = xt + F(xt, ut + k(xt, x∗t ) + t)∆t + wt, (8) ||xt+1 − x∗t+1|| ≤ γt||x0 − x∗0||, 0 < γ < 1 ∀t. (9)
+
+Eq. (8) incorporates feedback control into the forward propa-
+
+gated dynamics. To generate the bound on free energy growth, the feedback controller, k(x, x∗), is assumed to drive the two
+systems together with a contraction rate, γ, seen in Eq. (9).
+
+2) Importance Sampling: For the augmented state space,
+
+samples are generated by simulating the combined system
+
+forward using Eqs. (7) and (8). A noise proﬁle, , is used
+
+when propagating the augmented state space. The importance
+
+sampler deﬁnes the control sequence for both systems and
+
+is taken from the nominal system. From the augmented state
+
+space, only the real system trajectories are utilized to ensure
+
+an unbiased estimate of the optimal control. The interaction
+
+between the nominal and real systems motivates the need for
+
+a
+
+mixed
+
+cost,
+
+S˜
+
+(U,
+
+x
+
+0
+
+,
+
+x
+
+∗ 0
+
+),
+
+further
+
+discussed
+
+in
+
+Lemma
+
+1.
+
+This lemma will prove the equivalence of this new cost to
+
+the original cost of the nominal state. Next, Lemma 2 derives
+
+the IS weights for the augmented dynamical system. These
+
+weights are used for computing the unbiased estimate of
+
+the optimal control. The combination of this work results in
+
+Algorithm 1.
+
+3) Nominal System Propagation: Unlike Tube-MPPI,
+
+RMPPI performs an optimization in order to ﬁnd the best
+
+location for the nominal state. The goal of the nominal state
+
+is to remain as close to the actual state without resulting in a
+
+large increase in the free energy. Therefore we deﬁne a search
+
+around the current state and the previous nominal state (in a domain D) such that the estimated free energy of the next nominal state is below our free energy threshold α in the
+
+following:
+
+x∗ = argmin pi − x ,
+
+(10)
+
+pi, i∈{0,1,...R}
+
+s.t FMC (S, P, pi, λ) ≤ α ∀i ∈ {0, 1, . . . R}. (11)
+
+α is a hyperparameter that can have a physical meaning, usually the cost of crashing. R is the number of candidates
+
+Algorithm 1: Augmented Importance Sampler (AIS)
+
+Given: F, k: System dynamics and feedback controller;
+q, φ, Σ, T , N : Cost function and sampling parameters;
+λ, α: Temperature and cost threshold Input : x0, x∗0, U , K: Real/nominal state, IS sequence, feedback;
+
+for n ← 1 to N do
+
+x ← x0;
+
+x∗ ← x∗0;
+
+Sn
+
+,
+
+Sˆn
+
+,
+
+S real
+n
+
+←
+
+0;
+
+Sample En =
+
+n0 . . . nT −1
+
+,
+
+n t
+
+∈
+
+N (0,
+
+Σ);
+
+for t ← 0 to T − 1 do
+
+kfb ← Kt(x, x∗);
+
+x←F
+
+x, ut +
+
+n t
+
++
+
+kf b
+
+;
+
+x∗ ← F (x∗, ut + nt );
+
+ˆ
+
+λ(1−β) T −1
+
+Sn += q(x) + 2 kfbΣ kfb;
+
+Sn += q(x∗) ;
+
+Sreal +=
+n
+q(x) + 2 λ(1−β) u + kfb T Σ−1 u + 2
+
++ kfb
+
+Sˆn+
+
+=
+
+φ(x),
+
+Sn+
+
+=
+
+φ(x∗),
+
+S real +
+n
+
+=
+
+φ(x);
+
+Snnom = 12 Sn + 12 max min Sˆn, α , Sn ;
+
+for t ← 0 to T − 1 do
+
+Snom += λ
+
+n
+
+2
+
+T −1 uTΣ−1ut + 2uTΣ−1 n ;
+
+t=0
+
+t
+
+return Snom, Sreal, E;
+
+in D. We approximate the free energy at each candidate by running an iteration of MPPI with a reduced number of samples from all R locations. For computational reasons, we use a line search between the previous nominal state (x∗t−1), propagated nominal state (x∗t ) and, the real system state (xt). This search is summarized by Algorithm 2.
+As a result of the exponential tracking assumption between the real and nominal states and the solution of the nominal system propagation optimization problem, we are able to derive a bound on the growth of the free energy of the real system, shown in Lemma 3. This bound can be used to determine how close the system is to task failure.
+
+Algorithm 2: Nominal State Propagation
+
+Given: F, λ, α: System dynamics, temperature, cost threshold;
+q, φ, Σ, T , N , β: Cost function and sampling parameters; Input : x0, x∗0, U : Real/nominal state, IS sequence;
+{p0, . . . pR} ← Candidates(x0, x∗0, F, U ); for i ← 0 to R do
+p∗ ← pi; if i > 0 then
+for t ← 1 to T − 1 do uit−1 = ut ; uiT −1 = 0; else U i = U ;
+for n ← 1 to N do
+
+Sample En =
+
+n0 . . . nT −1
+
+,
+
+n t
+
+∈
+
+N (0,
+
+Σ);
+
+for t ← 0 to T − 1 do
+
+p∗
+
+=
+
+p∗
+
++
+
+F(p∗,
+
+ui
+t
+
++
+
+nt )∆t;
+
+Sn += q(p∗) + λ(1−β) uTΣ−1ut + 2uTΣ−1 t
+
+2
+
+t
+
+t
+
+Sn+ = φ(p∗)
+
+for n ← 1 to N do η += exp − 1λ Sn ; Fi = −λ log (η);
+
+a = argmini ( pi − x ) , s.t Fi ≤ α ; if a = NULL then a = 0 ; return pa, U a ;
+
+4) Tracking Controllers: The role of the tracking controller inside RMPPI is to guide the importance sampler of the
+
+4
+
+IEEE ROBOTICS AND AUTOMATION LETTERS. PREPRINT VERSION. ACCEPTED JANUARY, 2021
+
+real system (which is subject to disturbances) to the nom-
+
+inal system (which is immune from disturbances). Ideally,
+
+this tracking controller will satisfy Eq. (9), however this
+
+property is difﬁcult to achieve. Previously in [17], locally
+
+linear approximations of the dynamics were utilized along the
+
+nominal trajectory to then compute LQR gains for tracking by
+
+implementing a iterative Linear Quadratic Gaussian (iLQG)
+
+controller [18]. However, this form of feedback does not
+
+provide the same guarantee for nonlinear systems outside of a
+
+small domain. This leads to the investigation of CCMs as an
+
+alternative feedback controller.
+
+CCMs were introduced by [19] and are an example of
+
+a feedback controller that can guarantee exponential conver-
+
+gence for nonlinear systems, provided certain conditions are
+
+met. It is an extension of the contraction theory shown in
+
+[20]. The CCM is designed for systems that are control and
+
+disturbance afﬁne.
+
+The two contracting trajectories in this work are
+
+the real and nominal trajectories: {x0, x1, ..., xT −1} and
+
+{x
+
+∗ 0
+
+,
+
+x
+
+∗ 1
+
+,
+
+...,
+
+x
+
+∗ T
+
+−
+
+1
+
+}
+
+,
+
+that
+
+are
+
+separated
+
+by
+
+δx
+
+which
+
+belongs
+
+to the tangent space T of the dynamical system at state x.
+
+In short, contraction theory designs a differential Lyapunov
+
+function
+
+candidate
+
+of
+
+the
+
+form:
+
+V
+
+(x,
+
+δx)
+
+=
+
+δT
+x
+
+M
+
+(x)δx,
+
+where
+
+M (x) is a mapping from Rnx to symmetric positive deﬁnite
+
+n × n matrices. For contracting systems with contraction
+
+rate λ, the following expression is satisﬁed: V˙ (x, δx) ≤
+
+−2λV (x, δx), ∀x ∈ Rnx , ∀δx ∈ T . To reiterate, utilizing
+
+the CCM controller allows us to validate the assumption on
+
+exponential tracking, and tighten the bound on free energy
+
+growth, which will be shown in Lemma 3.
+
+Real Time Performance: To ensure real time performance of
+
+the RMPPI controller, the sampling required for estimates of
+
+the free energy is done on a GPU. The same set of feedback
+
+gains is reused in the case of iLQG for every sample to
+
+save computation; ideally each nominal trajectory would have
+
+its own optimal set of gains. Additionally, with the current
+
+form of the CCM feedback controllers, it is not possible to
+
+implement the optimization within each thread of a GPU. As
+
+such, experiments for the CCM feedback are limited to CPU
+
+only and are not real time.
+
+IV. THEORETICAL BOUND FOR ROBUST MPPI
+
+Next we prove three lemmas for the construction of RMPPI and the bound on the real system free energy. Mixed Cost for the Nominal System: The purpose of the mixed cost, Eq. (12), is to penalize trajectories sampled from the nominal system which require large control effort from the feedback controller. Since the cost of the nominal system is subject to the upper bound α, this mixed cost must also satisfy this bound.
+
+Lemma 1. Deﬁne the following augmented state-to-path cost function S˜(V, x0, x∗0) as in the following:
+
+S˜
+
+(
+
+V
+
+,
+
+x
+
+0
+
+,
+
+x
+
+∗ 0
+
+)
+
+=
+
+1 S(V, x0∗)
+
+2
+
+1 + max min
+2
+
+Sˆ
+
+(V
+
+,
+
+x
+
+0
+
+,
+
+x
+
+∗ 0
+
+),
+
+α
+
+(12)
+
+,
+
+S
+
+(
+
+V
+
+,
+
+x
+
+∗ 0
+
+)
+
+,
+
+where Sˆ is deﬁned by
+
+Sˆ(V, x0, x∗0) = S(V, x0)
+
+(13)
+
+λ(1 − β) ∗ T −1 ∗ T −1
+
++
+
+k(x0, x0) Σ k(x0, x0).
+
+2
+
+t=0
+
+Here λ > 0 is the inverse cost temperature, β ∈ (0, 1) is the control cost smoothing parameter, and α is the free energy
+threshold. The augmented state-to-path cost function satisﬁes S˜(V, x0, x∗0) ≤ α if and only if the state-to-path cost function for the nominal state satisﬁes S(V, x∗0) ≤ α.
+
+Proof.
+
+S
+
+(
+
+V
+
+,
+
+x
+
+∗ 0
+
+)
+
+<
+
+α
+
+by
+
+construction.
+
+From
+
+Eq.
+
+(13),
+
+both
+
+terms on the RHS are positive, thus min
+
+Sˆ
+
+(V
+
+,
+
+x
+
+0
+
+,
+
+x
+
+∗ 0
+
+),
+
+α
+
+≤
+
+α for any V, x0, and x∗0. This implies:
+
+˜
+
+∗1
+
+∗1
+
+∗
+
+S(V, x0, x0) ≤ S(V, x0) + max (α, S(V, x0)) .
+
+(14)
+
+2
+
+2
+
+Using
+
+that
+
+S
+
+(V
+
+,
+
+x
+
+∗ 0
+
+)
+
+≤
+
+α,
+
+we
+
+can
+
+see
+
+that
+
+Eq.
+
+(14)
+
+becomes
+
+S˜
+
+(V
+
+,
+
+x
+
+0
+
+,
+
+x
+
+∗ 0
+
+)
+
+≤
+
+1 2
+
+S
+
+(V
+
+,
+
+x∗
+0
+
+)
+
++
+
+12 α
+
+≤
+
+α. This proves the
+
+statement is true in one direction.
+
+Now suppose that S˜(V, x0, x∗0) ≤ α. We have two cases to
+
+consider, with the ﬁrst being when min
+
+Sˆ
+
+(V
+
+,
+
+x0
+
+,
+
+x∗
+0
+
+)
+
+,
+
+α
+
+>
+
+S(V, x∗0). That case gives us the following equation:
+
+S˜(V, x0, x∗0) − 1 min
+
+Sˆ
+
+(V
+
+,
+
+x
+
+0
+
+,
+
+x
+
+∗ 0
+
+),
+
+α
+
+= 1 S(V, x0∗).
+
+2
+
+2
+
+Since
+
+1 2
+
+min
+
+Sˆ
+
+(V
+
+,
+
+x
+
+0
+
+,
+
+x
+
+∗ 0
+
+),
+
+α
+
+>
+
+1 2
+
+S
+
+(V
+
+,
+
+x
+
+∗ 0
+
+),
+
+we
+
+have:
+
+S˜(V, x0, x∗0) − 1 min
+
+Sˆ
+
+(V
+
+,
+
+x
+
+0
+
+,
+
+x
+
+∗ 0
+
+),
+
+α
+
+≤
+
+1
+
+S˜
+
+(V
+
+,
+
+x
+
+0
+
+,
+
+x
+
+∗ 0
+
+),
+
+2
+
+2
+
+=
+
+1 2
+
+S
+
+(
+
+V
+
+,
+
+x
+
+∗ 0
+
+)
+
+and
+
+removing
+
+the
+
+1 2
+
+from
+
+both
+
+sides
+
+gives
+
+S
+
+(
+
+V
+
+,
+
+x
+
+∗ 0
+
+)
+
+≤
+
+α.
+
+The other case is when S(V, x∗0) > min
+
+Sˆ
+
+(
+
+V
+
+,
+
+x0
+
+,
+
+x∗
+0
+
+)
+
+,
+
+α
+
+.
+
+In that case, we have:
+
+max
+
+min
+
+Sˆ
+
+(V
+
+,
+
+x
+
+0
+
+,
+
+x
+
+∗ 0
+
+),
+
+α
+
+, S(V, x0∗)
+
+= S(V, x∗0),
+
+(15)
+
+which
+
+implies
+
+that
+
+21 S(V, x∗0) +
+
+1 2
+
+S
+
+(V
+
+,
+
+x
+
+∗ 0
+
+)
+
+=
+
+S
+
+(V
+
+,
+
+x
+
+∗ 0
+
+)
+
+=
+
+S˜(V, x0, x∗0) ≤ α which proves the result.
+
+Importance Sampling Weights: Next we derive the IS weights for the augmented dynamical system, Eq. (8), which take into account the action of the feedback controller.
+
+Lemma 2. Let QA denote the probability distribution deﬁned by sampling from the augmented system dynamics, and let P be the distribution deﬁned by the uncontrolled system. Then
+the IS weight (Radon-Nikodym derivative) takes the form:
+
+dP = exp dQA
+
+1 T −1
+
+∗ T −1
+
+− 2 (ut + k(xt, xt )) Σ
+
+t=0
+
+(ut + k(xt, xt∗) + 2 t) .
+
+GANDHI et al.: ROBUST MODEL PREDICTIVE PATH INTEGRAL CONTROL
+
+5
+
+Proof. Probability distribution QA is deﬁned as:
+
+T −1
+qA(V ) = ((2π)m|Σ|)− 21 exp
+t=0
+
+− 1 (vt − ut + k(xt, xt∗))T 2
+
+Σ−1(vt − ut + k(xt, x∗t )) .
+
+The ratio of the two distributions is equal to:
+1 T −1 T −1
+dQA exp − 2 t=0 αt Σ αt dP = exp − 12 vtTΣ−1vt ,
+=
+where αt = vt − (ut + k(xt, xt∗)) Combining exponential terms, expanding multiplication, and cancelling like terms can simplify the equation:
+
+Eq. (3) can be reformulated to utilize the nominal state as follows:
+
+T −1
+S(V, x0) = φ(x∗T + eT ) + q(x∗t + et),
+
+t=0
+
+where
+
+et
+
+=
+
+xt
+
+−
+
+x∗
+t
+
+.
+
+Using
+
+Lipshitz
+
+constants
+
+Lφ
+
+and
+
+Lq
+
+we
+
+have:
+
+T −1
+
+S(V ) = φ(x∗T + eT ) + q(x∗t + et)
+
+t=0
+
+T −1
+
+T −1
+
+≤ φ(x∗T ) + q(x∗t ) + Lφ eT + Lq et .
+
+t=0
+
+t=0
+
+For the rest of the analysis, we will use θ = [Lq, Lφ, γ]. From the sum of a geometric series, we can bound the above to get:
+
+= exp
+
+T −1
+
+1
+
+∗ T −1
+
+∗
+
+− 2 ut + k(xt, xt ) Σ ut + k(xt, xt ) )
+
+t=0
+
+− 2 ut + k(xt, xt∗) T Σ−1vt .
+
+Rewriting vt in terms of zero-mean noise t, gives us vt = ut + k(xt, x∗t ) + t and the following simpliﬁcation:
+
+= exp
+
+T −1
+
+1
+
+∗ T −1
+
+∗
+
+2 ut + k(xt, xt ) Σ ut + k(xt, xt ) + 2 t
+
+t=
+
+For un-biasing the expectation estimated with samples from QA, we need the inverse of this derivative dQA dP , which can be found by simply adding a negative to the exponential term.
+This completes the proof.
+
+∗
+
+T
+
+1 − γT
+
+S(V, x0) ≤ S(V, x0) + Lφγ + Lq
+
+1−γ
+
+x0 − x0∗ .
+
+Both the exponential and logarithm functions are monotonically increasing. Thus, utilizing Eq. (17) allows us to upper bound the free energy of the real system:
+
+F ≤ −λ log EQA exp − 1 S(V, x0∗) − 1 δ1(0; θ)
+
+λ
+
+λ
+
+.where the term δ1(t; θ) is speciﬁed in:
+
+dP , dQA
+
+δ1(t; θ) = LφγT + L 1 − γT q 1−γ
+
+xt − xt∗ .
+
+Pull the constant terms outside of the expectation to give:
+
+F ≤ −λ log EQA exp − 1 S(V, x0∗) dP + δ1(0; θ).
+
+λ
+
+dQA
+
+Bounding Free Energy Growth: The ﬁnal lemma describes the bound on the growth in free energy for the real system. This bound provides a measure of how close the system is to task failure.
+
+This implies the following relationship between the freeenergy of the nominal and real system:
+F (S, P, x0, λ) ≤ F (S, P, x∗0, λ) + δ1(0; θ). (18)
+
+Lemma 3. Let FMC (S, P, x0, λ) be the estimate of the free
+
+energy
+
+of
+
+the
+
+real
+
+system,
+
+FM
+
+C
+
+(
+
+S
+
+,
+
+P,
+
+x
+
+∗ 0
+
+,
+
+λ)
+
+be
+
+the
+
+estimate
+
+of the free energy of the nominal system, EVM be the upper
+
+bound on the uncertainty of the free energy estimates, Lq be
+
+the Lipshitz constant of the state cost function q(x), Lφ be the
+
+Lipshitz constant of the terminal cost function φ(x), γ be the
+
+convergence rate of the controller, and denote F(x0, u) −
+
+x0
+
++
+
+x∗
+0
+
+−
+
+x0
+
+as
+
+DF
+
+(
+
+x0
+
+,
+
+x∗
+0
+
+,
+
+u)
+
+.
+
+Then
+
+the
+
+growth
+
+of
+
+the
+
+free energy of the real system is bounded by:
+
+∆FMC (S, P,x0, λ) ≤ (α − FMC (S, P, x∗0, λ)) + 2EM V
+
++ LφγT + L 1 − γT q 1−γ
+
+D
+
+F
+
+(
+
+x0
+
+,
+
+x
+
+∗ 0
+
+,
+
+u).
+
+(16)
+
+Proof. Assume we have the dynamics from Eqs. (7) to (9). Via
+
+IS, we can sample from Eq. (4) with the controlled distribution QA:
+
+F (S, P, x0, λ) = −λ log EQA exp
+
+− 1 S(V, x0) λ
+
+dP . dQA
+(17)
+
+The real system free energy is bounded from above by the
+
+nominal system free energy plus a term depending on the
+
+slope of the cost function, state divergence, and the tracking
+
+controller convergence rate.
+
+We can only compute estimates of the free energy, in this
+
+case, via Monte Carlo sampling. Let us deﬁne three terms:
+
+eBM ,
+
+∗V M ,
+
+V M
+
+∈
+
+R.
+
+eBM
+
+represents
+
+the
+
+bias
+
+in
+
+the
+
+estimate,
+
+while
+
+V M
+
+and
+
+∗V M
+
+are random variables sampled from the
+
+same distribution representing the variation in our estimators.
+
+We will assume that the bias eBM is deterministic and constant,
+
+and that the variances
+
+V M
+
+and
+
+∗V M
+
+are small and can be
+
+bounded with a deterministic positive constant EVM ∈ R, i.e
+
+| ∗V M | < EVM and | VM | < EM V . We can deﬁne the following
+
+relationship between the true free energy, and the Monte Carlo
+
+estimate of the free energy value for both the nominal and real
+
+systems respectively:
+
+F (S, P, x∗0, λ) = FMC (S, P, x∗0, λ) + eM B + M ∗V , (19) F (S, P, x0, λ) = FMC (S, P, x0, λ) + eM B + M V . (20)
+
+Since we compute the free energy of the nominal state and the real state with the same noise samples, the bias of the
+
+6
+
+IEEE ROBOTICS AND AUTOMATION LETTERS. PREPRINT VERSION. ACCEPTED JANUARY, 2021
+
+free energy estimates will be the same; however the actual
+means will be different since these are two different states.
+Additionally, the variance of the two estimates will also differ.
+If we have a Monte Carlo estimate below the free energy threshold for the current nominal state, FMC (S, P, x∗0, λ) < α, we can show the following:
+
+FMC (S, P, x∗0, λ) + eM B +
+
+V M
+
+=
+
+F
+
+(S
+
+,
+
+P,
+
+x
+
+∗ 0
+
+,
+
+λ),
+
+=⇒ F (S, P, x∗0, λ) < α + eM B + EM V . (21)
+
+We see that above the true free energy is bounded above by
+
+the free energy threshold α, the bias eBM and the variance of
+
+the estimate
+
+V M
+
+.
+
+Substituting
+
+Eqs.
+
+(20)
+
+and
+
+(21)
+
+into
+
+Eq.
+
+(18)
+
+provides the following:
+
+FMC (S, P, x0, λ) + eM B +
+
+V M
+
+<
+
+α
+
++ eM B
+
++ EM V
+
++ δ1(0; θ),
+
+FMC (S, P, x0, λ) < α + 2EM V + δ1(0; θ).
+
+(22)
+
+This gives an upper bound on the estimate of the free-energy from the current real system state. Using | VM | < EM V , we see that a 2EM V appears on the right hand side. Now, given the current estimate of the free-energies at the nominal and real states (denoted x0 and x∗0), we would like to provide a bound for what the free-energy estimate at the next real state will be
+(denoted as x1). Using Eq. (22), we know that:
+
+FMC (S, P, x1, λ) < α + δ1(1; θ) + 2EM V . (23)
+
+Inside
+
+δ1(1, θ),
+
+the
+
+worst
+
+case
+
+of
+
+propagation
+
+implies
+
+x∗
+1
+
+equals x∗0:
+
+x1 − x1∗ ≤ x1 − x0∗ ,
+
+The real system propagates with the disturbances, x1 = F(x0, u) + w, where w incorporates both the control dependent and any additional state-dependent noise. We assume that there is an upper bound for w ≤ D:
+
+x1 − x0 ≤ F(x0, u) + D.
+
+We have that
+
+x1
+
+−
+
+x∗
+0
+
+=
+
+x1 − x0 − (x∗0 − x0) , and using
+
+the triangle inequality gives the following:
+
+x1 − x0 − (x∗0 − x0) ≤ x1 − x0 + x1∗ − x0 = F(x0, u) − x0 + x0∗ − x0 + D.
+
+Denoting
+
+F(x0, u) − x0
+
++
+
+x∗
+0
+
+−
+
+x0
+
+as DF(x0, x∗0, u), we
+
+then have:
+
+FMC (S, P, x1, λ) < α + 2EM V + LφγT + L 1 − γT q 1−γ
+
+D
+
+F
+
+(x
+
+0
+
+,
+
+x
+
+∗ 0
+
+,
+
+u).
+
+Lastly, subtract FMC (S, P, x0, λ) from both sides to complete the proof.
+
+The maximum increase in the estimate of the free energy is determined by three terms. Term one involves the user deﬁned free energy threshold, which indicates the “distance” from constraint violation. Term two depends on the cost function slope, stiffness of the dynamics, and tracking controller convergence rate. The ﬁnal term estimates the Monte Carlo sampling error. The RMPPI algorithm can be summarized in Algorithm 3.
+
+Algorithm 3: RMPPI with iLQG
+
+Given: F, N , λ: System dynamics, samples, temperature; Input : Uinit: initial control sequence
+
+U ← Uinit; x∗, x ← StateEstimator();
+
+while alive do
+{K0, K1, . . . KT −1} ← iLQR(x, x∗, U ); Snom, Sreal, E ← AIS(x, x∗, U, K);
+
+∗ N exp − 1λ Sreal n n 0
+
+uopt ← U0 + K0(x − x ) + n=1 N exp(− 1 Sreal)
+
+n=1
+(− 1λ Snom n )En
+
+λn
+
+U ←U+
+
+N n=1
+
+exp
+N exp(− 1 Snom)
+
+n=1
+
+λn
+
+S endC ontrol(uopt );
+
+x ← StateEstimator(); x∗, U ← N ominalStateP ropagation(x, x∗, U );
+
+V. RESULTS
+iLQG vs. CCM Tracking: To compare the tracking controllers, we ran RMPPI on both a linear double integrator system and a nonlinear system given in Section VI of [19]. For the linear problem, the true noise in the control channel is 100 times that of what RMPPI expects. For the nonlinear problem, the true noise in the control channel has a variance of 150 times that of what RMPPI expects. The goal is to test the robustness of each controller to large, unknown disturbances.
+
+Delta Free Energy
+
+60 40 20
+2.5 0.0 −2.5
+0
+1200 600
+40 0 −40
+0
+
+150 100 50
+
+2.5
+
+0.0
+
+−2.5
+
+5
+
+10
+
+0
+
+(a)
+
+16000 8000
+
+40
+
+0
+
+−40
+
+25
+
+50
+
+0
+
+(c)
+
+Time (s)
+
+5
+
+10
+
+(b)
+
+25
+
+50
+
+(d)
+
+Fig. 1. Blue: Free Energy Growth in RMPPI. Red: Theoretical Bounds of Free Energy Growth for RMPPI. (a) uses CCM as the tracking controller on the nonlinear dynamics, (b) shows the nonlinear dynamics using iLQG, (c) shows the CCM controller’s performance on the double integrator system, and (d) uses iLQG on the double integrator. In both systems, the free energy growth bounds for the CCM controller are tighter than that of the iLQG controller due to the guaranteed convergence of the tracking controller in the task domain.
+We can see the free energy growth of the iLQG system and the CCM system in Fig. 1. Without a theoretical guarantee for exponential tracking, the worst case free energy growth bound from iLQG is not very useful, as the magnitude of the upper bound is far higher than the actual free energy growth of the real system. Given the fact that the CCM guarantees exponential tracking of the nominal state, we are able to compute useful free energy bounds. These bounds provide a notion of how close the system is to the crash constraints. For aggressive maneuvering, it can be desirable
+
+GANDHI et al.: ROBUST MODEL PREDICTIVE PATH INTEGRAL CONTROL
+
+7
+
+TABLE I CONTROLLER RESULTS IN AUTORALLY, EACH CONTROLLER RAN FOR APPROXIMATELY 15 LAPS.
+
+Controller
+MPPI Sim Tube Sim RMPPI Sim MPPI Real Tube Real RMPPI Real
+
+Mean Lap Time (s)
+30.16 ± 0.40 30.48 ± 0.37 29.05 ± 0.96 30.67 ± 0.53 31.21 ± 0.43 31.07 ± 0.33
+
+Mean Speed (m/s)
+5.74 ± 0.92 5.65 ± 0.88 5.97 ± 1.49 5.77 ± 1.63 5.68 ± 1.62 5.83 ± 1.88
+
+Fastest Lap
+29.50 30.09 27.88 29.93 30.62 30.74
+
+Top / Target Speed
+6.83 / 7 6.82 / 7 8.84 / 9 9.84 / 9 9.56 / 9 10.31 / 9
+
+Max slip (rad)
+0.24 0.24 0.65 0.63 0.65 0.84
+
+Mean Lap Dist. (m)
+173.35 ± 0.42 173.01 ± 0.60 173.51 ± 2.20 181.97 ± 1.13 183.07 ± 0.94 186.28 ± 0.85
+
+to be able to recover from states and control trajectories
+
+that are near the free energy threshold. In both the linear
+
+and nonlinear dynamical systems, the magnitude of the free
+
+energy spikes is based on the aggressiveness of the underlying
+
+tracking controller. Controllers that are tuned similarly for
+
+disturbance rejection can show almost identical free energy
+
+handling properties, seen in Fig. 1a and Fig. 1b, with differing
+
+bounds. A controller tuned to minimize control effort may
+
+result in larger free energy spikes, as we see in the double
+
+integrator system for the CCM in Fig. 1c.
+
+AutoRally: The AutoRally vehicle is an open source 1/5th
+
+scale autonomous racing platform [21]. We test our controller
+
+using both a physical platform and a simulated analog in
+
+Gazebo. All computation is run on board in real time. For the
+
+dynamics model of both the actual and simulated AutoRally
+
+platform, a feedforward Neural Network is used like in [22].
+
+We use a standard and robust cost function described in [23].
+
+The robust cost function has similar terms to the standard cost
+
+function but instead of a constant gradient it has constraint-
+
+like penalties with high slope. This formulation is piece-wise
+
+continuous and retains the Lipschitz continuity assumption on
+
+the cost function used in the theoretical bound. The main
+
+components of both AutoRally cost functions include a penalty
+
+for deviation from the center of the track, a slip penalty where
+
+the
+
+slip
+
+angle
+
+is
+
+arctan(
+
+vx |vy |
+
+),
+
+and
+
+a
+
+penalty
+
+for
+
+deviation
+
+from
+
+the target speed. We use iLQG as the feedback controller on
+
+all iterations of MPPI on the AutoRally platform.
+
+Fig. 2. Nominal State Selection of RMPPI and Tube-MPPI in the AutoRally
+
+simulator. For Tube-MPPI, the nominal state is pink and the real state is light
+
+blue. For RMPPI, State 0 is x∗t−1 or the previous nominal state, State 4 is
+
+x∗
+t
+
+or
+
+the
+
+propagated
+
+nominal
+
+state,
+
+and
+
+State
+
+8
+
+is
+
+xt
+
+or
+
+the
+
+real
+
+state.
+
+The
+
+other states are the line search interpolations between them.
+
+1) AutoRally Simulation Experiments: The Neural Network dynamics model poorly represents the actual dynamics of the
+
+simulator. We ran each controller on the same simulated track
+
+with ground truth state and the same robust cost function.
+
+Each controller was set to the highest speed it could handle
+
+without consistently rolling over. The target speed of MPPI
+
+and Tube-MPPI were 7 m/s while RMPPI was set to 9 m/s.
+
+The maximum slip angle for all controllers was set to 0.5 rad.
+
+Fig. 2 shows the impact of the coupled nominal and real
+
+system in RMPPI compared to Tube-MPPI. Tube-MPPI fails
+
+because as the real system begins to slide off of the track,
+
+the nominal system rejects the disturbance and continues to
+
+drive straight. At this set of pink points seen on the graph,
+
+the real system is sampling around a trajectory optimized for
+
+a different region of the state space and is entirely reliant
+
+on the external-to-MPPI application of feedback in order to
+
+correct back to the track. The optimization from the real state
+
+will not recover, while in the case of RMPPI, the real system
+
+has feedback applied in the sampling and can sample around a
+
+trajectory that corrects for the disturbance. Since it is sampling
+
+the actual closed loop system, it intelligently corrects back
+
+to the track, rather than jumping the track boundary. This
+
+is seen with the yellow and green state selections in Fig. 2.
+
+MPPI performs similarly to Tube-MPPI but with slightly more
+
+erratic controls as it crosses the boundary. The reason that
+
+Tube-MPPI is unable to reject the disturbance is due to the
+
+real system trajectory achieving a low enough cost by crossing
+
+the boundary and getting onto a different segment of the track
+
+which in turn causes the nominal state to be reset to that real
+
+state. The feedback controller does not steer the real state back
+
+to the nominal sufﬁciently fast enough to prevent this.
+
+An important note on the selection of an nominal state is
+
+that on average the real state is chosen, making RMPPI and
+
+Tube-MPPI behave similarly to MPPI. Only when there is a
+
+large disturbance is a different nominal state chosen and the
+
+additional beneﬁts of Tube-MPPI and RMPPI realized. Notice
+
+that different nominal states are chosen along curves, when
+
+the vehicle is likely to encounter a disturbance. RMPPI never
+
+chooses
+
+a
+
+nominal
+
+state
+
+in
+
+the
+
+0-3
+
+range
+
+(line
+
+search
+
+from
+
+x∗
+0
+
+to x∗1), which would indicate a loss of recursive feasibility.
+
+2) AutoRally Hardware Experiments: For state estimation,
+
+we are using a particle ﬁlter as described in [24]. Tube-MPPI
+
+and MPPI were both run with the standard cost function, and
+
+RMPPI is using the robust cost function. The desired speed
+
+for all three controllers was set to 9 m/s, as this is the highest
+
+speed where MPPI was able to reliably navigate the course.
+
+The maximum slip angle was set to 0.9 rad for all experiments.
+
+RMPPI has a lower cost for slip angle that results in
+
+more aggressive behavior around turns. However, even though
+
+8
+
+IEEE ROBOTICS AND AUTOMATION LETTERS. PREPRINT VERSION. ACCEPTED JANUARY, 2021
+
+RMPPI had the capability to perform more aggressive maneuvers at lower costs than MPPI and Tube-MPPI, we do not see this result in faster lap times on the hardware. RMPPI takes a longer racing line that results in a slower lap time even with a higher speed as shown in Table I. Overall, we see that RMPPI achieves more aggressive behavior without violating the theoretical bound on a real system.
+As seen in Fig. 3a, the estimated free energy of the nominal state is typically less than that from the actual state, unless there is a large sampling bias . The large spikes in free energy of the actual system when running RMPPI represent possible failure cases of Tube-MPPI and MPPI. A disturbance could push the sampling of MPPI into a region of high cost or could result in a state divergence that is not recoverable in the case of Tube-MPPI. Both of these were observed during tuning of the controllers. Theoretically, unless Tube-MPPI or RMPPI chooses a different nominal state to use, we are effectively running MPPI. This is validated in Fig. 3b where most of the time, MPPI has similar free energy dynamics to Tube-MPPI.
+
+Free Energy Normalized Free Energy
+
+105
+
+0.20
+
+Nominal Free Energy 104 Real Free Energy 0.15
+
+103
+
+0.10
+
+Tube-MPPI MPPI
+
+102
+
+0.05
+
+101 120
+
+130
+
+140
+
+t (s)
+
+(a)
+
+0.00
+
+150
+
+310
+
+320
+
+330
+
+340
+
+t (s)
+
+(b)
+
+Fig. 3. (a) Comparison of AutoRally Hardware Free Energy between RMPPI’s real and nominal systems. The real free energy, on average, spikes higher than the nominal free energy since the nominal free energy is upper bounded by α. (b) MPPI and Tube-MPPI real systems free energy spike similarly. In practice, we see that on the AutoRally platform, MPPI and Tube-MPPI perform similarly with the same cost function.
+
+VI. CONCLUSIONS
+In this work, we propose a novel decision making architecture for Robust Model-Predictive Path Integral Control. RMPPI is characterized by its importance sampler and nominal state propagation that allows the system to gracefully recover from unknown disturbances, while simultaneously allowing the system to be controlled at its dynamic limits. We have validated the free energy bounds of RMPPI in both simulation and hardware, extended the underlying tracking controller to include recent developments in nonlinear contraction theory, and created a side-by-side comparison between RMPPI and the other forms of Model-Predictive Path Integral Control. RMPPI has been shown to better control free energy and better handle large, unknown disturbances in the dynamics.
+REFERENCES
+[1] G. Williams, B. Goldfain, P. Drews, J. M. Rehg, and E. A. Theodorou, “Best response model predictive control for agile interactions between autonomous ground vehicles,” in 2018 IEEE International Conference on Robotics and Automation (ICRA). IEEE, 2018, pp. 2403–2410.
+[2] P. Abbeel, A. Coates, and A. Y. Ng, “Autonomous helicopter aerobatics through apprenticeship learning,” The International Journal of Robotics Research, 2010.
+
+[3] P. Foehn, D. Brescianini, E. Kaufmann, T. Cieslewski, M. Gehrig, M. Muglikar, and D. Scaramuzza, “Alphapilot: Autonomous drone racing,” in Robotics Science and Systems (RSS), 2020.
+[4] G. Williams, N. Wagener, B. Goldfain, P. Drews, J. M. Rehg, B. Boots, and E. A. Theodorou, “Information theoretic mpc for model-based reinforcement learning,” in International Conference on Robotics and Automation (ICRA). IEEE, 2017, pp. 1714–1721.
+[5] G. Williams, B. Goldfain, P. Drews, K. Saigol, J. Rehg, and E. A. Theodorou, “Robust sampling based model predictive control with sparse objective information,” in Robotics Science and Systems (RSS), 2018.
+[6] A. Richards and J. How, “Robust model predictive control with imperfect information,” in Proceedings of the 2005, American Control Conference, 2005. IEEE, 2005, pp. 268–273.
+[7] J. Oravec and M. Bakosˇova´, “Alternative lmi-based robust mpc design approaches,” IFAC-PapersOnLine, vol. 48, no. 14, pp. 180–185, 2015.
+[8] D. Q. Mayne, E. C. Kerrigan, and P. Falugi, “Robust model predictive control: advantages and disadvantages of tube-based methods,” IFAC Proceedings Volumes, vol. 44, no. 1, pp. 191–196, 2011.
+[9] A. Lakshmanan, A. Gahlawat, and N. Hovakimyan, “Safe feedback motion planning: A contraction theory and l1-adaptive control based approach.” CoRR, 2020.
+[10] B. D. Luders, S. Karaman, and J. P. How, “Robust sampling-based motion planning with asymptotic optimality guarantees,” in AIAA Guidance, Navigation, and Control (GNC) Conference, 2013, p. 5097.
+[11] S. U. Lee, R. Gonzalez, and K. Iagnemma, “Robust sampling-based motion planning for autonomous tracked vehicles in deformable high slip terrain,” in 2016 IEEE International Conference on Robotics and Automation (ICRA). IEEE, 2016, pp. 2569–2574.
+[12] B. Sakcak, L. Bascetta, G. Ferretti, and M. Prandini, “Sampling-based optimal kinodynamic planning with motion primitives,” Autonomous Robots, vol. 43, no. 7, pp. 1715–1732, 2019.
+[13] W. Zhang, H. Wang, C. Hartmann, M. Weber, and C. Schutte, “Applications of the cross-entropy method to importance sampling and optimal control of diffusions,” SIAM Journal on Scientiﬁc Computing, vol. 36, no. 6, pp. A2654–A2672, 2014.
+[14] G. Williams, P. Drews, B. Goldfain, J. M. Rehg, and E. A. Theodorou, “Information-theoretic model predictive control: Theory and applications to autonomous driving,” IEEE Transactions on Robotics, vol. 34, no. 6, pp. 1603–1622, 2018. [Online]. Available: https://ieeexplore.ieee.org/document/8558663
+[15] E. Arruda, M. J. Mathew, M. Kopicki, M. Mistry, M. Azad, and J. L. Wyatt, “Uncertainty averse pushing with model predictive path integral control,” in 2017 IEEE-RAS 17th International Conference on Humanoid Robotics (Humanoids). IEEE, 2017, pp. 497–502.
+[16] A. Doucet, N. De Freitas, and N. Gordon, “An introduction to sequential monte carlo methods,” in Sequential Monte Carlo methods in practice. Springer, 2001, pp. 3–14.
+[17] G. R. Williams, “Model predictive path integral control: Theoretical foundations and applications to autonomous driving,” Ph.D. dissertation, Georgia Institute of Technology, 2019.
+[18] E. Todorov and W. Li, “A generalized iterative lqg method for locallyoptimal feedback control of constrained nonlinear stochastic systems,” in Proceedings of the 2005, American Control Conference, 2005. IEEE, 2005, pp. 300–306.
+[19] I. R. Manchester and J.-J. E. Slotine, “Control contraction metrics: Convex and intrinsic criteria for nonlinear feedback design,” IEEE Transactions on Automatic Control, vol. 62, no. 6, pp. 3046–3053, 2017.
+[20] W. Lohmiller and J.-J. E. Slotine, “On contraction analysis for non-linear systems,” Automatica, vol. 34, no. 6, pp. 683–696, 1998.
+[21] B. Goldfain, P. Drews, C. You, M. Barulic, O. Velev, P. Tsiotras, and J. M. Rehg, “Autorally: An open platform for aggressive autonomous driving,” IEEE Control Systems Magazine, vol. 39, no. 1, pp. 26–55, 2019.
+[22] G. Williams, A. Aldrich, and E. A. Theodorou, “Model predictive path integral control: From theory to parallel computation,” Journal of Guidance, Control, and Dynamics, vol. 40, no. 2, pp. 344–357, 2017.
+[23] G. Williams, B. Goldfain, J. Rehg, and E. A. Theodorou, “Locally weighted regression pseudo-rehearsal for online learning of vehicle dynamics,” in Robotics Science and Systems (RSS), 2019, currently Under Review.
+[24] P. Drews, G. Williams, B. Goldfain, E. A. Theodorou, and J. M. Rehg, “Vision-Based High-Speed Driving With a Deep Dynamic Observer,” IEEE Robotics and Automation Letters, vol. 4, no. 2, pp. 1564–1571, April 2019.
+
+

@@ -1,0 +1,398 @@
+Proceedings of the 2024 IEEE International Conference on Robotics and Biomimetics
+December 10-14, 2024, Bangkok, Thailand
+
+2024 IEEE International Conference on Robotics and Biomimetics (ROBIO) | 979-8-3315-0964-4/24/$31.00 ©2024 IEEE | DOI: 10.1109/ROBIO64047.2024.10907580
+
+Online Predictive Motion Control of Redundant Robots via Model Predictive Control and Full Null Space Parameterization
+Haoxiang Sun, Hanwen Song
+
+Abstract— This paper presents an online control method for redundant robots, designed to predictively prevent future violations of additional objectives while maintaining precise end-effector tracking. In this paper, we propose to use full null space parametrization (FNSP) to determine the optimal linear combination of null space basis vectors and use model predictive control (MPC) to optimize future control sequences for generating joint commands with foresight. Another critical aspect of this work is the online implementation. Analytical gradients of the formulated nonlinear programming (NLP) problem are derived to improve computational speed, and a retained rolling scheme is introduced within the MPC framework to reduce optimization dimensions. The proposed method is validated through tests on a 4-DOF planar manipulator and a 7-DOF Franka Panda robot, with numerical results demonstrating its efﬁciency.
+I. INTRODUCTION
+Leveraging the advancements in collaborative industry and control systems, redundant robots, which possess more degrees of freedom than the minimal required for the task space, offer enhanced capabilities, enabling the simultaneous handling of primary tracking tasks and safety-related additional tasks, such as collision avoidance, joint limits enforcement, and singularity avoidance. Therefore, effectively handling redundancy in real time is crucial. Nevertheless, global redundancy exploitation across the self-motion manifold is typically computationally intensive and lacks the responsiveness needed for safety-critical scenarios. Online control of redundant robots generally relies on the inversion of task kinematics, using local redundancy resolution to select the joint command within the null space of the task Jacobian.
+One of the commonly used redundancy resolutions is the Gradient Projection Method (GPM) [1], where the endeffector velocity command is mapped into a minimal-norm joint command using the Moore–Penrose pseudoinverse of the task Jacobian [2]. The gradient of an objective function is projected into the null space of Jacobian, allowing for the optimization of the objective without compromising the primary task during motion execution. Similarly, many current state-of-the-art online approaches typically yield locally optimal solutions. They drive the robot conﬁguration toward the descent objective with minimal motion effort, making them seemingly appropriate for each step. However, from a long-sighted horizon of continuous execution, reacting solely
+This work was supported by National Natural Science Foundation of China under Grant 12272266.
+The authors are with the School of Aerospace Engineering and Applied Mechanics, Tongji University, Shanghai 200092, China.
+∗Corresponding author: Hanwen Song (e-mail: hwsong@tongji.edu.cn)
+
+through an instantaneous state can lead to global failures. For instance, the robot reaches the limit only to discover that the conﬁguration satisfying the constraints is signiﬁcantly misaligned with the current. Consequently, it is necessary to adopt predictable control strategies, enabling robots to balance immediate performance with longer-term rewards.
+Considerable work has been invested in developing predictable control algorithms for robots [3]–[5]. [6] proposes a predictive inverse kinematics (IK) approach formulated as the quadratic programming (QP), which optimizes higher-order differential information by predicting future joint trajectories using Jacobian estimation. The problem of incorporating future information into the control scheme can be effectively addressed using Model Predictive Control (MPC) [7]. MPC solves a sequence of control variables over current and future time steps of a constrained optimization problem at each update. [8] proposes a predictive IK approach for redundant and underactuated robotic systems using MPC, utilizing a discrete linear double integrator for prediction and incorporating tracking error into the objective function, simplifying the problem into a QP. However, this simpliﬁcation leads to a lack of strict enforcement of tasks. [9] uses a nonlinear model predictive control (NMPC) strategy to avoid emerging obstacles with task consistency. However, the computational cost associated with solving nonlinear MPC remains non-negligible. For real-time applications, [10] proposes to reduce Cartesian tasks to linear constraints and solve redundancy online using MPC. [11] further develop the NMPC with a projection-based redundancy resolution. By deriving analytical gradients for numerical optimization and implementing a multi-threaded execution scheme, realtime performance is enhanced.
+This paper presents the Predictive Motion Control (PMC) for redundant robots, which facilitates locally optimal control strategies to generate trajectories for long-lasting guaranteed additional objectives predictively. The ﬁrst contribution of this paper is to propose a more robust framework for predictive control. We use the Full Null Space Parametrization (FNSP) within an MPC framework to solve an optimization problem for the foresighted selection of null space motion. Though the GPM is relatively straightforward, it cannot guarantee motion constraints, and numerical problems may arise from the global incompatibility related to projection as pointed out in [12]. In contrast, FNSP exploits a full set of base vectors spanning the null space to provide a versatile and intuitive formulation [13], which will be shown in this paper. Additionally, the real-time performance of the method is considered. Analytical gradients of the
+
+979-8-3315-0964-4/24/$31.00 © 2024 IEEE
+
+1501
+
+Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:16:43 UTC from IEEE Xplore. Restrictions apply.
+
+nonlinear programming problem are derived using the direct shooting method, which signiﬁcantly improves the speed of optimization solving. Furthermore, a retained rolling scheme is proposed to reduce optimization dimensions within MPC. The presented NMPC framework applies to general nonlinear objectives and can be implemented with a high control frequency for real-time computation. The effectiveness of the proposed method is thoroughly validated through simulations, including a limit avoidance test with a 4-DOF planar manipulator and a collision avoidance test with a 7-DOF Franka Emika Panda robot.
+
+II. REDUNDANCY RESOLUTION
+Consider an n-DOF robot with joint coordinates q ∈ Rn, x ∈ Rm the vector of variables describing a m-dimensional task. Joint velocity command using the GPM by Liegeois [1] can be generated as:
+
+q˙ = J †x˙ − α(I − J †J )( ∂h(q) ) (1) ∂q
+
+where J † is the Moore–Penrose pseudoinverse of the task Jacobian J (q) ∈ Rm×n, it calculates a minimal-norm mapped joint command w.r.t. desired velocity x˙ of the endeffector. GPM utilizes redundancy to prefer additional task by projecting the gradient of the objective function h(q) into the null space of Jacobian through a m×m projection matrix N = I − J †J . α is a positive gain factor.
+Although GPM is a relatively straightforward method, it is difﬁcult to provide a rigorous and versatile framework for optimization. Since the gradients used as control variables are projected via a projection matrix, the selection of base vectors in the null space is omitted. This results in the projected one-dimensional subspace lacking a clear representation, and thus the optimal combination of null space vectors is not guaranteed. Another drawback is that the numerical stability problem may arise as described in [14], since the projected vector does not actually represent the gradient of the potentials.
+We present the better redundant resolution alternative FNSP in the proposed method, as introduced in [13]. The self-motion is formulated as the linear combination of the null-space base vectors:
+
+q˙ = J †x˙ + Gu
+
+(2)
+
+where u ∈ Rn−m is the control variables, gi ∈ ker(J ), i = 1, · · · , n − m are the null space base vectors. G can be
+calculated from the SVD performed on J :
+
+J = U ΣV T
+
+(3)
+
+G = V null
+
+(4)
+
+where V null consists of the columns of V associated with zero singular values in the SVD.
+Compared to GPM, which has been shown in [13], the gradient projection is an evenly weighted preference for all null space components w.r.t. an objectives-related quadratic criterion. In contrast, the search region of the FNSP is generalized to span the entire local solution space, which
+
+provides a feasible framework for predictive motion control [15].
+
+III. PREDICTIVE MOTION CONTROL
+
+A. MPC Model with FNSP
+
+The proposed PMC, based on MPC, solves an optimal control problem that includes the states of future sequences within a predictive horizon time Tph from the current time t0, and computes the control variables at the current update step. By setting the control variables directly as the null space command u in (2), the implementation of MPC is formulated as the following discrete nonlinear program (DNP).
+
+np −1
+
+u1:np = arg minu
+
+Lk(qk, u˜k)
+
+k=1
+
+s.t. ∀k ∈ [1, · · · , np]
+
+q˙ k = f (qk, x˙ k, uk)
+
+qk+1 = qk + q˙ ktps uk ∈ U tol; qk ∈ Qsafe; q˙ k ∈ Q˙ safe; q¨k ∈ Q¨ safe
+(5)
+
+where horizon of MPC is discreted into np prediction steps of time size tps. u˜k = [u1, · · · , uk−1]T is the control variables
+set containing from k-th step and earlier. f (qk, x˙ k, uk) derives qk+1 following (2). U tol is the tolerance range of allowed inputs. PMC calculates the control variables u1:np distributed within Tph , and use u1 ∈ Rn−m as the control
+input of current update.
+
+The formulated NLP includes nonlinear constraints and a
+cost function Lk(qk, u˜k) that supports both general linear and nonlinear objective functions h(q). Note that the objec-
+
+tives should allow for the calculation of their gradients to
+
+facilitate online execution. The detailed implementation is
+
+presented in Sec. IV.
+
+B. Cost Function with Constraint Penalty
+The essential goal of predictable kinematic control is to foresee and avoid any violation of the additional task. However, almost all safety-related objectives, mainly such as obstacle avoidance, are transformed into optimizing the distance to the tolerant boundary. Lack of hard constraints to handle the potential objective failure, especially in MPC, we want the optimization sequence to have the “attention”that is, the emerging boundary breach predicted in the future can affect the selection of prior conﬁguration and initiate a necessary transition.
+To this end, we introduce a simple penalty term into the cost function
+L˜k = hk(qk, u˜k) (6) +γ exp(max(0, max(lk − lmax), min(lmin − lk )))
+where lk(qk, u˜k) is the possible vector representation w.r.t. the hard limits of scalar objective hk, if the boundary cannot be simpliﬁed to a scalar form. γ is a large positive gain to reinforce the penalty.
+
+1502
+Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:16:43 UTC from IEEE Xplore. Restrictions apply.
+
+C. Shaped Velocity Constraints
+
+The control variables of the PMC are velocity-based, thus the joint angle and acceleration constraints are shaped into the joint velocity constraints using ﬁnite difference methods. The acceleration is approximated with a backward difference scheme, and the joint position and velocity formulations for t ∈ [tk, tk+1] are:
+
+q˙ (t) = q˙ k + q˙ k − q˙ k−1 Δt (t − tk) (7) q(t) = qk + q˙ k(t − tk) + q˙ k − q˙ k−1 2Δt (t − tk)2 (8)
+where Δt is the sampling time duration. Then the joint range limits, velocity, and acceleration bounds are derived similarly to [16], the constrained on qk can be shaped as follows (for the sake of brevity, only the maximum bound is shown):
+
+˙
+
+2(Qmax − qk) q˙ k−1
+
+Qmax = min
+
++
+
+, V max,
+
+3Δt
+
+3
+
+(9)
+
+AmaxΔt + q˙ k−1, 2Amax(Qmax − qk)
+
+where the last term is the additional viability constraint that guarantees the joint position bound without exceeding the maximum acceleration [17].
+
+IV. ONLINE IMPLEMENTATION
+
+A. Analytical Gradients for Optimization Solver
+
+The nonlinear model predictive control (NMPC) in PMC uses an interior-point nonlinear optimization solver. The analytical gradients of cost function and constraints are needed for fast implementation. The state-of-the-art numerical optimal control approaches have been benchmarked in [11]. In this subsection, we refer to the derivation for the preferred direct shooting method in [11] and present the analytical gradients for FNSP.
+With the deﬁnition of the complete sequence of predictive horizon qˆ, uˆ and the k-th step control history u˜k
+
+qˆ = [q1, · · · , qnp ]T , uˆ = [u1, · · · , unp ]T u˜k = [u1, · · · , uk−1]T .
+
+(10a) (10b)
+
+The analytical gradient of the cost function satisﬁes the following derivation:
+
+˜ np−1 ∂L(qˆ)
+∂uˆ =
+k=1
+
+∂L˜k(qk,u˜k)∂uk + ∂L˜k(qk,u˜k)∂qk
+
+∂uk ∂uˆ
+
+∂qk ∂uˆ
+
+∂L˜k(qk, u˜k) ∂uk = 0 ∂uk ∂uˆ
+
+(11a) (11b)
+
+where hk(qk, u˜k) and lk(qk, u˜k) in L˜ are both admit analytical derivatives w.r.t. qk. To calculate the latter term in (11a), the sensitivity differential equations (SDEs) are used
+according to [18]. Let qS,k be the sensitivity w.r.t. to qk, the
+
+DW KƉƚŝŵŝƐĞƌ
+
+ƵĨĨĞƌ ZŽďŽƚ
+
+WƌĞĚŝĐƚŝǀĞ ŵŽĚĞů
+
+Fig. 1. Retained rolling implementation in MPC.
+
+following recurrence relation is obtained:
+
+qS,k+1 = ∂qk+1 ∂uˆ = tps ∂q˙ k ∂uˆ + qS,k ∂q˙ k = ∂q˙ k ∂uk ∂uˆ ∂uk ∂uˆ
+
+= ∂f (qk, uk) ∂uk + ∂f (qk, uk) qS,k
+
+∂uk ∂uˆ
+
+∂qk
+
+(12a) (12b)
+
+where qS,1
+
+=
+
+∂q1 ∂uˆ
+
+is 0,
+
+∂uk ∂uˆ
+
+= [0, · · · , In−m , · · · , 0]T .
+
+Next, the partial derivatives w.r.t. f (qk, uk) holds:
+
+∂f (qk, uk) ∂uk
+∂f (qk, uk) ∂qk
+∂J †(qk) = ∂qk,j
+
+= G(qk)
+
+= ∂J †(qk) x˙ + ∂G(qk) uk
+
+∂qk
+
+∂qk
+
+∂Jk ∂qk,j
+
+T
+(J kJ kT )−1 −J kT [
+
+(J kJ kT )−1
+
+∂Jk T
+
+∂Jk T
+
+Jk +Jk
+
+∂qk,j
+
+∂qk,j
+
+(J kJ kT )−1
+
+∂V (qk) = (I − V V T ) ∂qk,j
+
+∂Jk ∂qk,j
+
+T
+U Σ+
+
+∂G(qk) = ∂qk,j
+
+∂V (qk) ∂qk,j null
+
+(13a) (13b)
+(13c)
+(13d) (13e)
+
+where
+
+the
+
+subscript
+
+j
+
+denotes
+
+the
+
+joint
+
+number,
+
+and
+
+∂J (qk) ∂q
+
+k,j
+
+can be calculated on the geometric analysis of the kinematic
+
+chain of robots. In addition, the analytical gradients of
+
+nonlinear constraints are straightforward using the derivatives
+
+derived above.
+
+B. Retained Rolling MPC
+In online implementations, a high computation burden of NMPC can limit the control frequency. Although using analytical gradients has improved the optimization speed, the increased optimization dimensions required to support a sufﬁciently long predictive horizon cannot be overlooked [19]. To address this, we introduce sequential retention and receding horizon implementation within the MPC framework to reduce the optimization dimensions effectively.
+
+1503
+Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:16:43 UTC from IEEE Xplore. Restrictions apply.
+
+In standard MPC, a sequence of control variables over
+a future time horizon is computed. However, only the ﬁrst term un,1 from uˆn = [un,1, · · · , un,np ] is applied to the robot at the current update tn. The overlapping sequences in the receding horizon are recalculated at each time step. Here, n in un,k denotes the execution step and k denotes the prediction step. We approximate the current predictive control sequence uˆn as a prediction of the future state at the next control update. During updating, the calculated control sequences uˆn are stored in a buffer, with un,1 being inputted to the robotic system and output the new state qn+1. At each rolling horizon in the MPC, only need to update the ﬁrst control variable un+1,1 and the last term un+1,np within the prediction interval, while the intermediate control variables
+are retrieved directly from the buffer. The retained sequences
+will be aligned over the time series to ensure consistency
+between the predictive model and the system dynamics. The
+rolling scheme can be formulated as follows:
+
+u¯ n+1 = [un+1,1, un,2, · · · , un,np−1, un+1,np ] (14)
+np −1
+
+un+1,{1,np} = arg minu
+
+Ln+1,k(qn+1,k, u¯ n+1) (15)
+
+k=1
+
+where u¯n+1 represents the control sequences at the update time tn+1. The rolling horizon control structure is shown in Fig. 1. This implementation allows for an extended prediction horizon, with the initial control steps serving as a warm-up that is precomputed ofﬂine. However, the trade-off between the length of the prediction horizon and the accuracy of predicted states should be considered, as biases caused by the approximation of the predictive model may arise when the horizon extends too far.
+
+V. RESULTS
+To evaluate the performance of our method, we conducted two tests: one on a 4-DOF planar manipulator and another on a 7-DOF manipulator, each with different additional objectives. The proposed method was compared with commonly used local control approaches, demonstrating its computational efﬁciency and feasibility.
+
+A. Planar Manipulator Joint Limit Avoidance
+In this test, we ran a simulation of a 4-DOF planar manipulator. Each segment of the manipulator has a length of 0.1 m, with the base ﬁxed at the origin and all joints rotational. The manipulator is executed to move along a straight line following joint range limits
+Qmax = −Qmin = [ π π π π 2 2 2 2 ]T (rad)
+The manipulator moves from the initial conﬁguration q0 = [−0.85, 1.25, 0.85, 0.73]T (rad) w.r.t. the initial position of end-effector x0 = [0.15, 0.15]T (m), and stops at xend = [−0.07, 0.07]T (m). The objective function is deﬁned as the distance from the center of the joint range limits, given by h(qk) = 12 qT q and l(qk) = q. The upper and lower punishment boundaries deﬁned as lmax = Qmax, lmin = Qmin.
+
+y (m) y (m)
+
+Ϭ͘Ϯ
+
+Ϭ͘Ϯ
+
+Ϭ͘ϭ
+
+Ϭ͘ϭ
+
+Ϭ
+
+Ϭ
+
+Ϭ
+
+Ϭ͘ϭ
+
+Ϭ͘Ϯ
+
+x (m)
+
+Ϭ
+
+Ϭ͘ϭ
+
+Ϭ͘Ϯ
+
+x (m)
+
+Fig. 2. Snapshots of the 4-DOF planar manipulator moving along a straight line. The pink presents the peak of joint motion. The left image using GPM results in a limit violation at the third joint; the Right image uses PMC.
+
+TABLE I COMPARISON OF IMPLEMENTATION TIME
+
+NMPC NMPC with AG PMC
+
+Nodes of path 236 236 236
+
+Implementation time (s) 588.39 ± 10.01 20.43 ± 1.05 8.95 ± 0.58
+
+The NLP problem of the proposed scheme is solved using the interior-point solver of MATLAB R2020a on a 64-bit AMD Ryzen7 6800H (3.2GHz) CPU with 16GB of RAM. The predictive horizon is set np = 20 with each time step tps = 0.1 s.
+To demonstrate the performance of the proposed method, we evaluate the comparisons against commonly used local control approaches, speciﬁcally the Gradient Projection Method (GPM) and Pseudo-Inverse Control (PIC), in which the latter does not account for any additional objectives. The same objective function is applied in GPM for a fair comparison.
+The simulation results for the end-effector trajectories and joint commands are shown in Fig. 2-5. It can be observed that each step in PIC is executed with minimal joint velocity. Notably, the second joint, closest to the boundary, consistently tends to move towards violating the limits. This aligns with our expectations, as PIC does not make any efforts to handle joint limits. The comparison of GPM with the proposed method is noteworthy. Despite the fact that the same objective has been added to the GPM, the joint range limits are still not guaranteed. It can be concluded that while GPM optimizes the motion of the second joint, its lack of predictive capability becomes evident when the joints approach the boundary of limits, making an effective transition difﬁcult. In contrast, the proposed method is aware of the future risks and takes an effective transition in advance.
+Table I shows the comparison of average implementation times for NMPC using different stages of techniques with ten runs. Where NMPC stands for instead of using the analytical gradients, the interior-point solver uses an automatic ﬁnite difference method. PMC is the published version with analytical gradients (AG) and the retained rolling mechanism. The result shows that PMC reduces computational time by
+
+1504
+Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:16:43 UTC from IEEE Xplore. Restrictions apply.
+
+Fig. 3. Joint angle, velocity, acceleration results of the planar manipulator using PIC.
+
+Fig. 4. Joint angle, velocity, acceleration results of the planar manipulator using GPM.
+
+Fig. 5. Joint angle, velocity, acceleration results of the planar manipulator using PMC.
+
+98.48% compared to the original NMPC, demonstrating the efﬁciency of fast implementation.
+B. 7-DOF Manipulator Collision Avoidance
+In this test, we deploy the proposed algorithm on a Franka Emika Panda manipulator. The optimization problem in the proposed PMC is solved using the NLopt nonlinear optimization library [20] in C++. The online control is implemented through the Robot Operating System (ROS) interface provided by the Franka Control Interface (FCI), and Gazebo is used as the virtual robotic validation environment. Note that the required control sampling time in libfranka is 1 ms. When the algorithm cannot be executed at the required frequency, a null joint command is passed to allow the necessary wait time.
+The task in this section is end-effector of the manipulator is executed to track a spiral line which is given as:
+⎧ ⎨ x˙ e = 0.4 cos(πt − π/2) ⎩ y˙e = 0.8 sin(πt − π/2) (16) z˙e = 0.02
+
+The manipulator tracks position but not orientation, thus the redundancy degree is 4. As shown in Fig. 6, it operates under a table, with the fourth joint positioned dangerously close to the surface. Selecting appropriate null space commands is critical to avoid a potential “head knocks.” The objective function for null space tasks, used across all comparison methods, is deﬁned as the negative of the collision distance. This distance during execution is calculated using the Cartesian coordinates of the fourth joint, derived through forward kinematics. The manipulator begins from the initial conﬁguration q0 = [0, 1.09, 0, −2.53, 0, 0.79, 0]T (rad), corresponding to the end-effector’s initial position x0 = [0.13, 0, 0]T (m). For the PMC implementation, the predictive horizon is set to np = 20, with a step size of tps = 0.1 s.
+Fig. 7 shows a comparison of the collision distances using the three methods. During the interval [1, 1.5](s), both GPM and PIC violate the safety collision limit. In contrast, PMC is able to react before 1 s, and effectively adjusts the collision distance in the opposite direction.
+Additionally, we evaluated the control frequency achievable with the PMC. For a system with four degrees of redun-
+
+1505
+Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:16:43 UTC from IEEE Xplore. Restrictions apply.
+
+Fig. 6. Illustration of collision avoidance during tracking under a table, with a focus on the fourth joint to measure the most critical distance.
+Fig. 7. Comparison of collision distances of joint trajectories generated by the three methods.
+dancy, PMC successfully generates joint commands in realtime under general nonlinear objectives at a frequency of up to 100 Hz. When the redundancy is reduced to two degrees, the control frequency can be increased to a maximum of 300 Hz. In conclusion, using analytical gradients and the retained rolling implementation in the NMPC framework, as presented in this paper, enhances computational efﬁciency. These optimizations enable the potential application of NMPC in real-time scenarios, though the achievable performance will depend on the system’s complexity and the available computational resources.
+VI. CONCLUSION
+This paper presents an online control method for redundant robots that, while inherently local, enables joint motion generation with foresight, effectively avoiding potential violations of additional tasks without interfering the endeffector tracking. This is achieved by predictive motion control, i.e., using MPC to simultaneously optimize current and future motion in the null space. This paper used FNSP to handle redundancy, providing a versatile framework for effective optimization. Additionally, the online capabilities of the proposed method are enhanced by using the derived analytical gradients of objective function and constraints within the formulated NLP. A retained rolling scheme within the MPC framework is also introduced to reduce optimization dimensions. Case studies have demonstrated that the proposed method can preemptively avoid emerging violations of additional tasks, while maintaining a considerable control frequency for general nonlinear objectives.
+
+REFERENCES
+[1] A. Liegeois, “Automatic Supervisory Control of the Conﬁguration and Behavior of Multibody Mechanisms,” IEEE Transactions on Systems, Man, and Cybernetics, vol. 7, no. 12, pp. 868–871, 1977.
+[2] V. K. Rohatgi, A. Ben-Israel, and T. N. E. Greville, “Generalized Inverses: Theory and Applications,” International Statistical Review / Revue Internationale de Statistique, vol. 44, no. 2, p. 301, Aug. 1976.
+[3] C. Schuetz, T. Buschmann, J. Baur, J. Pfaff, and H. Ulbrich, “Predictive online inverse kinematics for redundant manipulators,” in 2014 IEEE International Conference on Robotics and Automation (ICRA). Hong Kong, China: IEEE, May 2014, pp. 5056–5061.
+[4] G. Huber and D. Wollherr, “Globally Optimal Online Redundancy Resolution for Serial 7-DOF Kinematics Along SE(3) Trajectories,” in 2021 IEEE International Conference on Robotics and Automation (ICRA), May 2021, pp. 7570–7576.
+[5] M. Faroni, M. Beschi, N. Pedrocchi, and A. Visioli, “Predictive Inverse Kinematics for Redundant Manipulators With Task Scaling and Kinematic Constraints,” IEEE Transactions on Robotics, vol. 35, no. 1, pp. 278–285, Feb. 2019.
+[6] K. Ayusawa, W. Suleiman, and E. Yoshida, “Predictive Inverse Kinematics: Optimizing Future Trajectory through Implicit Time Integration and Future Jacobian Estimation,” in 2019 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), Nov. 2019, pp. 566–573.
+[7] K. Haninger, C. Hegeler, and L. Peternel, “Model Predictive Control with Gaussian Processes for Flexible Multi-Modal Physical Human Robot Interaction,” in 2022 International Conference on Robotics and Automation (ICRA). Philadelphia, PA, USA: IEEE, May 2022, pp. 6948–6955.
+[8] H. Cao and S. Zhao, “Predictive Damped Inverse Kinematics for Redundant and Underactuated Robotic Systems,” in 2020 IEEE 16th International Conference on Control & Automation (ICCA). Singapore: IEEE, Oct. 2020, pp. 348–353.
+[9] A. Zube, “Cartesian nonlinear model predictive control of redundant manipulators considering obstacles,” in 2015 IEEE International Conference on Industrial Technology (ICIT). Seville, Spain: IEEE, Mar. 2015, pp. 137–142.
+[10] M. Faroni, M. Beschi, L. M. Tosatti, and A. Visioli, “A Predictive Approach to Redundancy Resolution for Robot Manipulators,” IFACPapersOnLine, vol. 50, no. 1, pp. 8975–8980, Jul. 2017.
+[11] J. Wittmann, A. Kist, and D. J. Rixen, “Real-Time Predictive Kinematics Control of Redundancy: A Benchmark of Optimal Control Approaches,” in 2022 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS). Kyoto, Japan: IEEE, Oct. 2022, pp. 11 759–11 766.
+[12] A. Albu-Scha¨ffer and A. Sachtler, “Redundancy Resolution at Position Level,” IEEE Transactions on Robotics, vol. 39, no. 6, pp. 4240–4261, Dec. 2023.
+[13] Z. Kemeny, “Redundancy resolution in robots using parameterization through null space,” IEEE Transactions on Industrial Electronics, vol. 50, no. 4, pp. 777–783, Aug. 2003.
+[14] G. Oriolo, “Stabilization of self-motions in redundant robots,” in Proceedings of the 1994 IEEE International Conference on Robotics and Automation. San Diego, CA, USA: IEEE Comput. Soc. Press, 1994, pp. 704–709.
+[15] E. Monari, Y. Chen, and R. Vertechy, “On Locally Optimal Redundancy Resolution using the Basis of the Null Space,” in 2023 IEEE International Conference on Robotics and Automation (ICRA). London, United Kingdom: IEEE, May 2023, pp. 9665–9671.
+[16] F. Flacco, A. De Luca, and O. Khatib, “Control of Redundant Robots Under Hard Joint Constraints: Saturation in the Null Space,” IEEE Transactions on Robotics, vol. 31, no. 3, pp. 637–654, Jun. 2015.
+[17] A. D. Prete, “Joint Position and Velocity Bounds in Discrete-Time Acceleration/Torque Control of Robot Manipulators,” IEEE Robotics and Automation Letters, vol. 3, no. 1, pp. 281–288, Jan. 2018.
+[18] M. Gerdts, Optimal Control of ODEs and DAEs. De Gruyter Oldenbourg, Nov. 2023.
+[19] Y. Su, K. K. Tan, and T. H. Lee, “Computation delay compensation for real time implementation of robust model predictive control,” in IEEE 10th International Conference on Industrial Informatics, Jul. 2012, pp. 242–247.
+[20] S. G. Johnson, “The NLopt nonlinear-optimization package,” https: //github.com/stevengj/nlopt, 2007.
+
+1506
+Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:16:43 UTC from IEEE Xplore. Restrictions apply.
+
+

@@ -1,0 +1,679 @@
+Robust Sampling Based Model Predictive Control with Sparse Objective Information
+Grady Williams, Brian Goldfain, Paul Drews, Kamil Saigol, James M. Rehg, and Evangelos A. Theodorou Institute for Robotics and Intelligent Machines Georgia Institute of Technology
+
+Abstract—We present an algorithmic framework for stochastic model predictive control that is able to optimize non-linear systems with cost functions that have sparse, discontinuous gradient information. The proposed framework combines the beneﬁts of sampling-based model predictive control with linearization-based trajectory optimization methods. The resulting algorithm consists of a novel utilization of Tube-based model predictive control. We demonstrate robust algorithmic performance on a variety of simulated tasks, and on a real-world fast autonomous driving task.
+I. INTRODUCTION
+Autonomous robots are increasingly being asked to solve safety critical tasks in highly dynamic and non-linear environments. In order to competently operate in such environments, a robot needs to be able to plan and execute trajectories utilizing the full range of its dynamic capabilities, while ensuring that it achieves any relevant task objectives. Theoretically, the generation of ﬂexible, safe, and high performance behaviors for non-linear systems can be achieved through an optimal control or stochastic optimal control framework. In optimal control, a high level cost function is speciﬁed, and then the generation of a trajectory and control plan is achieved by minimizing the cost with respect to the system dynamics. When a dynamics model is unknown a-priori, this approach is referred to as model-based reinforcement learning. This optimization based approach can be especially effective in a model predictive control (MPC) framework, where planning and execution are continuously interleaved.
+Although optimal control theory provides an elegant mathematical framework for controlling robotic systems, and has many practical successes, speciﬁcation of a cost or reward function is a non-trivial and time consuming problem [20]. This is because the solutions to optimal control problems are heavily constrained by the system dynamics, and are therefore very difﬁcult to obtain. The result is that cost and constraint function speciﬁcations often become more about creating smooth cost functions with few local minima, as opposed to creating an easy to interpret encoding of a high-level behavior. For simple tasks, this is merely frustrating. However, in actual deployments of autonomous robots in complex environments, it could be crippling. In autonomous driving, for instance, it is impossible to test how a certain cost function would work in all of the scenarios an autonomous vehicle could encounter. Therefore, engineers designing robotic systems must have conﬁdence that the representation of the robot’s objective will
+
+lead to the desired behavior in all circumstances, without extensive tuning.
+One possible solution to this challenging problem is to use gradient-free, sampling based optimal control methods, such as cross-entropy or path integral control [8, 21, 10]. Recently, these frameworks have been applied in MPC settings [25, 6, 4], where they have demonstrated the ability to control high-dimensional, non-linear systems. Since these methods do not require a gradient, they can theoretically utilize very simple encodings of tasks descriptions with sparse gradient information. For example, in this paper we consider cost functions encoded with weighted indicator functions:
+
+N
+
+wi1Ci (x).
+
+(1)
+
+i=1
+
+These types of functions have the advantage of clearly encoding whatever task is speciﬁed, and it is possible to compose many of them together since there are no gradients that can interfere with each other. However, the fact that the gradient of these functions is zero wherever it is deﬁned, makes it difﬁcult to use these cost functions with any type of gradient-based optimization.
+In contrast to gradient-based optimization methods, sampling-based MPC can, in theory, handle cost functions of the form of Equation 1. In practice, unfortunately, when using cost functions with such sparse objective information, sampling based MPC methods are brittle and prone to failure in the face of unexpected disturbances and non-linear dynamics. The fundamental problem is that sampling based methods, while gradient free, are still iterative local search methods. This is simply because it is intractable to fully sample high
+
+(a)
+
+(b)
+
+(c)
+
+Fig. 1: Effect of disturbances on sampling based MPC. In (a), an autonomous vehicle has a good sampling distribution. In (b) the vehicle executes the control, but hits a disturbance, resulting in (c) the sampling distribution leads to high cost.
+
+dimensional state spaces, and as a result such methods require a good initialization in order produce reliably good results. In an MPC setting, the initialization takes the form of a warm start, where if (u0, u1, . . . uT −1) is the current control solution, then (u1, u2, . . . ) will be used to initialize the next iteration. Implicit in this procedure is the assumption that the actual next state is close to the predicted next state. In the presence of disturbances, that assumption may fail. Figure 1 gives an example. Without a consistent gradient signal to lead the sampling distribution back to the low cost region, the sampling procedure may get stuck in a bad local minimum or diverge entirely.
+In this paper, we develop a novel solution to the robustness problem that is inherent in sampling based MPC. Our key contribution is to augment a sampling based MPC method with an ancillary controller for disturbance rejection by utilizing Tube-MPC [16, 15]. Tube-MPC was originally developed as a way to guarantee robustness for constrained linear systems in the presence of disturbances, and was later extended to nonlinear systems. The original version of non-linear Tube-MPC, which we utilize in this work, consists of two model predictive controllers. The ﬁrst controller, termed the nominal controller, attempts to solve the primary optimal control problem for an idealized nominal state, and the second controller, called the ancillary controller, has the goal of rejecting disturbances in order to keep the actual system state close to the nominal state.
+II. RELATED WORK
+Sampling-based approaches to motion planning and control have a long history in robotics. RRTs and variants thereof [12, 9] have emerged as the dominant frameworks for motion planning, and the winning robot in the 2005 DARPA Grand Challenge [22] used an on-line path planning method based on trajectory sampling. Motion planning methods sample in state or path space, and typically only produce kinematically feasible plans, which have to be executed with a low level controller. This can be a problematic paradigm when operating noisy systems near their dynamic limits, since failure may occur if a planned path is not feasible or if disturbances push the trajectory off the initially planned path. Within the motion planning literature, our work is most closely related to [14], which also endeavors to control a system state by keeping it within a tube. However, this method restricts behavior to a ﬁnite library of pre-generated maneuvers, and requires both the initial library generation and a stabilizing feedback controller to be pre-speciﬁed. In our method, we only need to be given a dynamics model and cost function.
+Outside of motion planning, sampling based control algorithms can be directly derived from stochastic optimal control theory. For example, a number of sampling based methods have been derived using a bayesian approximate inference approach to stochastic optimal control [19, 13], path integral control theory [21, 8, 5, 25], and the cross-entropy method [4, 24, 10, 11]. Despite all of the success in these areas, on-line sampling of trajectories with un-stable, non-linear dynamics
+
+in the presence of disturbances remains a key problem, and is usually addressed via ad-hoc cost function tuning.
+In this work, we make use of non-linear Tube-MPC to prevent the divergence of the importance sampling distribution in sampling-based MPC. In addition to [15], which used a second MPC as an ancillary controller, there have been several non-linear variants of Tube-MPC which utilize alternative methods to devise a non-linear ancillary controller [18, 7, 3]. In [17], the advantages and disadvantages of Tube-MPC are discussed, and several modiﬁcations to the original scheme are suggested, which we also utilize in our approach.
+The purpose of these earlier works is fundamentally different than our goal in this paper. Previous Tube-MPC approaches aimed to improve performance or provide guarantees for traditional MPC methods (e.g methods that utilize gradient based optimization in order to stabilize a system or track a trajectory). This work is the ﬁrst usage of Tube-MPC for solving general optimal control problems, with a sampling based nominal controller. Our goal with combining these methods is not to simply improve performance, but to enable the solution of entirely new classes of stochastic optimal control problems.
+
+III. PRELIMINARIES
+
+We consider general discrete time non-linear systems of the
+
+form:
+
+xt+1 = F(xt, ut + t) + wt,
+
+(2)
+
+where x ∈ RN is the state, and u ∈ RM is the control input. The term ∈ N (0, Σ) is a disturbance directly on the control input which is a reasonable assumption for robotic systems where an outputted control signal is used as a set-point for a lower level controller. The term w is an external disturbance, which exists due to a combination of modeling error and purely stochastic or unobserved environmental effects. In this paper our goal is to optimize systems with running costs of the following form:
+
+L(x, u) = C(x) + λuTΣ−1u,
+
+(3)
+
+N
+
+C(x) = k(x)TQk(x) + wi1Ci (x).
+
+(4)
+
+i=1
+
+Our assumption is that the control cost is inversely proportional to that control channels variance, so that very noisy inputs are cheap to control and vice versa. For the state dependent portion of the cost, the term k(x) is a (preferably simple) state feature, Q is a positive deﬁnite weight matrix,
+wi is a cost weighting, and 1C is the indicator function for
+the set C, which is 1 if x ∈ C and 0 otherwise. The goal of the ﬁrst portion of the cost is to encode some
+overarching directive to the robot (e.g. go a certain speed), and the second portion of the cost acts to encode constraint like objectives into the system, and has a zero (or undeﬁned) gradient. Using this type of cost function has a variety of beneﬁts: these costs are readily interpretable and easy to encode, even though they are technically soft constraints they act like hard constraints in the sense that all of the penalty is
+
+obtained immediately upon crossing the constraint boundary. However, unlike hard constraints, they have the additional beneﬁt that the importance of different constraints can be delineated by setting different weights.
+
+IV. ROBUST SAMPLING BASED MPC
+In this section we describe our robust sampling based MPC method, which is based on Tube-MPC. The linear version of Tube-MPC utilizes a nominal controller, a nominal state, an ancillary controller, and the actual system state. The nominal controller is able to select the initial nominal state (subject to it being nearby the actual system state) and the nominal solution, both of which are readily computable via the solution of a quadratic program. The ancillary controller then takes the form of a simple linear feedback gain, which maintains the actual state of the system in a tube around the nominal state solution.
+In non-linear Tube-MPC, which is the basis for our approach, much of the convenience of the solution for the linear case is lost. However, the algorithmic structure and the end result remain the same. We consider the two systems:
+
+x¯t+1 = F(x¯, u¯),
+
+(5)
+
+xt+1 = F(x, u + ) + w.
+
+(6)
+
+These systems are identical, except that one is disturbed via noise, and the other is disturbance free. The nominal controller then takes the form of a non-linear model predictive controller, which can consider general costs and constraints, and it computes a solution {(x¯0, x¯1, . . . x¯T −1, x¯T ) , (u¯0, u¯1, . . . u¯T −1)}. The nominal system is allowed to ignore system disturbances, so we can have x¯0 = x0, where x0 is the actual state of the system. The role of the ancillary controller is to then track the nominal system state. We implement the ancillary controller as a gradient based MPC method which solves a standard tracking problem.
+Unlike the linear Tube-MPC case, the nominal controller does not consider the initial nominal state as an input variable, however in certain instances, the nominal state can be reset back to the actual state. As in the linear case, it can be shown that the actual system state stays within a tube centered about the idealized nominal state. However, the bound on the size of the tube is difﬁcult to compute in practice, and in this study we are more concerned with demonstrating the practical ability of Tube-MPC to prevent the divergence of sampling based controllers. Therefore we do not concern ourselves with computing this bound. There are then 3 components of the Tube-MPC algorithm that we need: (1) a nominal controller, (2) a method for setting the nominal state, and (3) an ancillary controller. We use an information theoretic interpretation of model predictive path integral control (MPPI) [26], so we will hereon refer to our method as Tube-MPPI.
+
+A. Nominal Controller - Model Predictive Path Integral
+The nominal controller is required to be a sampling based method so that it can handle the types of sparse cost functions that we are interested in. We use an information theoretic
+
+interpretation of path integral control implemented in an MPC setting (MPPI). In MPPI, we consider stochastic trajectory optimization problems of the form:
+
+T −1
+
+U ∗ = argmin EQ φ(xT ) + L(xt, ut) ,
+
+(7)
+
+U
+
+t=0
+
+Where φ is a terminal cost, and L a running cost in the form of (3). The term Q is the distribution corresponding to the dynamics: F(x, u + ). These dynamics consider sources of noise directly acting on the control input, but not sources due to modeling error or environmental disturbances. Note that we are actually optimizing with the assumption that there is some noise in the system, even though the nominal system is noise free. We do this because the assumption of noisy inputs is necessary in order to utilize sampling based methods derived from stochastic optimal control theory, and we do not consider it to be detrimental: since noise is present in the actual system it does not hurt to plan for it even if the theory does not explicitly require it.
+In the information theoretic approach to MPPI, the trajectory optimization problem is transformed into a probability matching problem. Suppose that U = {u0, u1, . . . uT −1} is a sequence of commanded inputs, and then let V be the resulting sequence of perturbed inputs such that:
+
+V = U + E, E = { 0, 1, . . . T }
+
+(8)
+
+With each t ∼ N (0, Σ). Then, by using an information theoretic lower bound, it is possible to show that there exists an “optimal” distribution over controls, in the sense that trajectories sampled from that distribution have a lower expected cost than any other distribution. It can be shown [26] that this takes the form:
+
+q∗(V ) ∝ exp − 1 S(V ) p(V ), λ
+
+p(V ) =
+
+T −1
+
+1
+
+T −1
+
+T −1 exp
+
+vt Σ v ,
+
+2π Σ
+
+t=0
+
+T −1
+
+N
+
+S(V ) = φ(xT ) +
+
+k(x)TQk(x) + wi1Ci (x) .
+
+t=0
+
+i=1
+
+The goal is to then minimize the KL-Divergence between the controlled and optimal distribution, which results in the formula:
+
+U ∗ = q∗(V )V dV,
+
+(9)
+
+where the optimal controls take the form of an expectation with respect to the optimal distribution q∗(V ). This equation
+is impossible to compute directly, but it can be approximated using an iterative importance sampling method where the k+1
+
+iterate is related to the kth iterate via:
+
+N
+
+Uk+1 = Uk + w(Ei)Ei,
+
+(10)
+
+i=1
+
+1
+
+1
+
+T −1 T −1
+
+w(E) = η exp − λ S(Uk + Ei) + λ u Σ t .
+
+t=0
+
+(11)
+
+where Ei is the disturbance sequence that generates the ith trajectory sample out of a total of N samples. Notice how the negative exponentiation in the importance sampling weight enables the algorithm to remove trajectories with signiﬁcantly higher cost than other samples from the solution. This is important for the kinds of cost functions that we are considering, since trajectories that do not trigger the indicator cost terms will be weighted much less than trajectories that do. Using a GPU, it is possible to parallelize the sampling,
+
+the next time-step. This enables the method to run on-line, but also makes it vulnerable to catastrophic failures if there are large disturbances coupled with sparse cost information. This is because the planned control sequence, (u1, u2, . . . uT ), is assumed to be near optimal for initial conditions drawn from xˆ ∼ F(x0, u0 + ), but the actual next state is drawn from x ∼ F(x0, u0 + ) + w. Even in linear systems, a small change in the initial condition can lead to a large change in resulting behavior. This means that if w pushes x into a region where the distribution induced by F(x, u+ ) has small or zero probability mass, then the planned control sequence may result in a much different state sequence than anticipated. If there is a consistent gradient signal to follow back to low cost regions, then the algorithm can recover. But in our case, this gradient signal does not exist, and the algorithm can easily become stuck in local minima or diverge. Secton V-A demonstrates how this can happen even for a simple linear system.
+
+Algorithm 1: Nominal Controller (MPPI)
+
+Parameters: F: Transition Model;
+
+K, T : Number of samples, timesteps;
+
+Σ, φ, C: Cost functions/parameters;
+
+while not done do
+
+x¯0 ← SetNominalState();
+
+for k ← 0 to K − 1 do
+
+x ← x0;
+
+Sample Ek =
+
+k 0
+
+.
+
+.
+
+.
+
+k T −1
+
+,
+
+for t ← 1 to T do
+
+k t
+
+∈
+
+N (0,
+
+Σ);
+
+x¯ ← F(x¯, g(u¯t−1 + kt−1));
+
+Sk
+
++= C(xt) + λu¯t−1Σ−1
+
+k;
+t−1
+
+Sk += φ(x);
+
+ρ ← mink [Sk];
+
+for k ← 1 to K do
+
+w˜k ← exp
+
+−
+
+1 λ
+
+(Sk
+
+−
+
+ρ)
+
+;
+
+η += w˜k;
+
+for t ← 0 to T − 1 do U¯ ← U¯ + 1η k=1 K w˜kE k;
+X¯ ← Simulate(g(U¯ )); PublishSolution(g(U¯ ), X¯ );
+for t ← 1 to T − 1 do u¯t−1 ← u¯t;
+
+which makes it possible to run MPPI with expensive nonlinear dynamics. Algorithm 1 describes in psuedo-code the MPPI algorithm. Control constraints are handled by augmenting the dynamics with an element-wise clamping function g(u) = max(min(umax, u), umin). Note that this procedure only changes the system dynamics, and therefore does not affect the convergence of the MPPI algorithm.
+One of the keys to MPPI, as well as other sampling based methods, is re-using the left-over portion of the previously optimized control sequence to warm-start the optimization at
+
+B. Setting the Nominal State
+The nominal controller controls the state of the idealized noise free nominal system, termed the nominal state. In the original description of non-linear Tube-MPC, the nominal state is initially set equal to the actual state, and then it is simulated forward without ever receiving feedback from the actual system. This scheme has two primary drawbacks, the ﬁrst being that the algorithm is completely reliant on the tracking ability of the ancillary controller. In cases where the ancillary controller fails, the nominal state and actual state will diverge resulting in a failure of the overall control scheme. The second issue is that most disturbances are not catastrophic to the nominal controller, and in those cases it is preferable to let feedback enter the nominal controller in order to re-plan from the actual system state. In some cases, disturbances can even be beneﬁcial. If the fortunate situation occurs where a disturbance improves the state, it should be taken advantage of, not rejected.
+In [17] a modiﬁcation to Tube-MPC is suggested whereby two copies of the nominal controller are run, one from the nominal state and one from the actual system state. If the nominal controller ﬁnds a better solution using the actual state of the system, then the superior solution is used and the nominal state is reset back to the actual system state before moving onto the next time-step. We propose a similar, albeit more relaxed version of this mechanism, where we accept the solution from the nominal controller using the actual system state as long as the cost is less than the nominal state solution plus some threshold. The threshold is set as follows: let {Ci0 , Ci1 , . . . CiM } denote the sets of constraints that are considered safety critical, then the minimum of {wi0 , wi1 . . . wiM } is set as the threshold. This mechanism ensures that a disturbance can never push the solution of the nominal controller into a constraint region. The procedure of accepting or rejecting the solution and setting the nominal state is shown in Alg. 2.
+
+Algorithm 2: Nominal State Selection
+Input: x¯: Current nominal state; x: Current (actual) state; K: Threshold for accepting solution from actual state; U¯ , X¯ ← MPPI(x¯); U, X ← MPPI(x); if S(U ) ≤ S(U¯ ) + K then
+x¯ ← x ; U¯ , X¯ ← U, X; return x¯, U¯ , X¯ ;
+C. Ancillary Controller - iLQG
+The last component of the Tube-MPPI controller is an ancillary controller which solves a tracking problem in order to keep the actual system state within a tube centered about the nominal state. This is a standard tracking problem, where there is a small initial error and a quadratic cost, and there are numerous effective solutions. We elected to used iterative linear quadratic gaussian control iLQG (as in [23]) as the ancillary controller, and found that it provided good performance at a relatively small computational cost.
+D. Implementation Details and CPU/GPU Utilization
+In our real-time implementation, which we used for the autonomous vehicle system, the two MPPI iterations run together in a single loop where the bulk of the computation is off-loaded to a GPU. Each instantiation of MPPI samples 1200 2 second long trajectories with a control frequency of 50 Hz, which requires over 100,000 queries of the non-linear system dynamics per control cycle. The nominal controller publishes solutions at a rate of 50 Hz. The ancillary controller runs asynchronously on a separate CPU thread, and performs optimization for the latest solution published by the nominal controller. The ancillary controller optimizes for a shorter time horizon (1 second), but runs at a faster frequency (100Hz).
+V. EXPERIMENTAL RESULTS
+We tested the Tube-MPPI algorithm on: a simulated linear point mass system, a simulated helicopter landing task, and both a simulated and real-world autonomous racing task. Through-out these experiments we refer to 3 different experimental conditions for MPPI:
+i) Baseline-MPPI refers to MPPI operating on a system where there is no additional disturbance beyond the control dependent noise assumed in the MPPI framework.
+ii) Disturbance-MPPI refers to the normal MPPI algorithm operating on a system with additional disturbances besides the what has been assumed by the MPPI algorithm. Depending on the system, this additional noise takes the form of extra noisy control inputs or noncontrol dependent noise.
+iii) Tube-MPPI refers to the algorithm described in Sec. IV operating on the same extra-noisy system as disturbance MPPI.
+
+Note that the Baseline-MPPI method is impossible to implement in reality, since it requires a perfect description of the systems dynamics and noise distribution. We include it in the experiments in order to highlight the fundamental role that un-anticipated disturbances have on sampling based MPC.
+
+A. Illustrative Example: Point Mass System
+This illustrative example visually demonstrates the advantage of Tube-MPPI in terms of stabilizing the optimization for the nominal controller. Consider the simple 2-D double integrator system:
+
+xt+1 = I2 I2∆t xt + 0 (ut + t) . (12)
+
+0 I2
+
+I2∆t
+
+The goal is to move this system at a constant velocity while staying within a ring centered about the origin, this can be interpreted mathematically as:
+2
+C(xt) = vx2 + vy2 − vdes + 1000 (1C (x)) , (13)
+
+C = {x | 1.875 < x2 + y2 < 2.125}.
+
+(14)
+
+The level of noise that MPPI assumes present is ∈ N (0, Σ) with Σ = I. For Disturbance-MPPI and Tube-MPPI the
+actual noise present in the system is set ten times higher at Σ˜ = 10I. Fig. 2 shows the accumulation of the warm-start
+
+3 Baseline-MPPI Importance Sampler
+Tube-MPPI, Importance Sampler
+2
+
+Disturbance-MPPI Importance Sampler Tube-MPPI, Ancillary Solution
+
+1
+
+0
+
+−1
+
+−2
+
+−3 3
+
+2
+
+1
+
+0
+
+−1
+
+−2
+
+−3 −3 −2 −1 0 1 2 3 −3 −2 −1 0 1 2 3
+
+Fig. 2: Point mass system results of for Baseline-MPPI (top-left), Disturbance-MPPI (top-right), Tube-MPPI’s nominal controller’s importance sampling (bottom left) (c), and ancillary control plan (bottom right).
+
+trajectories for each condition. These trajectories are obtained by simulating the control sequence used to warm-start MPPI at each iteration from the new initial state of the system. This trajectory deﬁnes the mean of the sampling distribution (in the linear case), so it is essential that it lies in a good region of the state-space.
+Baseline-MPPI performs perfectly, and the system state is always kept within C. With Disturbance-MPPI the increased
+
+noise in the system results in the state leaving C, and eventually diverging. The reason for this failure is that the system disturbances push the warm-start trajectories into poor regions of the state space, since sampling takes place locally around the warm-start trajectory, it becomes likely that no trajectory that stays within C is sampled. With Tube-MPPI, the nominal control plan is prevented from leaving the constraint set due to the condition for selecting the nominal state, this results in the importance sampling behaving similarly to the Baseline-MPPI condition, even with the increased system noise.
+B. Simulated Helicopter Landing
+In this simulated example we demonstrate the advantage of using weighted indicator costs as atomic elements for building objectives with a complex cost structure. We consider the task of landing a helicopter on a circular pad subject to Gaussian disturbances. For helicopter dynamics we use the non-linear model described in [2]. The state space for this helicopter is position (x, y, z), orientation (φ, θ, ψ), body frame velocity (vx, vy, vz), and body frame angular velocity (p, q, r). The control inputs are collective thrust uτ , roll rate up, pitch rate uq, and yaw rate ur. The cost function for the landing task then takes the form:
+8
+C(x) = xTQx + wi1Ci ,
+i=1
+C1 = {x | (|φ| > .15 ∨ |θ| > .1) ∧ z < −9.5}, C2 = {x | ( (vx, vy, vz) > 5 ∨ vz > 2.5) ∧ z > −8}, C3 = {x | (x, y) > 1.0 ∧ z > −8}, C4 = {x | x < −1.0}, C5 = { (vx, vy, vz > 12}, C6 = {x | z > max(−.5 (x, y) − 7.5, −50) ∧ (x, y > 1}, C7 = {x | |φ| + |θ| > .33}, C8 = {x | z > −7.5 ∧ x ∈/ C1 ∧ x ∈/ C2 ∧ x ∈/ C3},
+w1 = w2 = w3 = w4 = 10000, w5 = w6 = 1000 w7 = 100, w8 = −10000.
+The ﬁrst three terms direct the helicopter to land in the proper area with limits on the orientation and speed. The fourth term disallows the helicopter from over-shooting the landing area, the ﬁfth and sixth terms prevent the helicopter from going too fast or using too aggressive of a combined roll and pitch angle, the seventh term directs the vehicle to stay above a certain glide-path, and the last term is a reward for successfully meeting all the landing criteria. The constraints are tightened to allow for some error in the ﬁnal landing criteria, since we expect Tube-MPPI to keep the actual system close to the nominal state, but with a small amount of error.
+Note that creating a cost function with a smooth gradient for this task, with either soft or hard constraints, would be extremely challenging! Many of the conditions have nondifferentiable components (e.g. the max and norm operators) and composing a cost with eight different non-linear terms could easily result in local minima being created. In this case, specifying the cost function is easy and intuitive, and results in predictable behavior.
+
+(a)
+
+(b)
+
+(c)
+
+Fig. 3: Results of helicopter landing experiment for ((a)) Baseline-MPPI, ((b)) Disturbance-MPPI (worst trial by pitch magnitude), ((c)) Tube-MPPI (worst trial by pitch magnitude).
+
+Y - Position (m) Pitch Magnitude (rad)
+
+2 1 0 −1 −2 −2
+
+Baseline-MPPI
+
+−1 0
+
+1
+
+X - Position (m)
+
+Disturbance-MPPI
+0.2
+
+Tube-MPPI
+
+0.1
+
+0.0
+
+−0.1
+
+−0.2
+
+−0.3
+
+2
+
+−0.3 −0.2 −0.1 0.0 0.1 0.2
+
+Roll Magnitude (rad)
+
+Fig. 4: Helicopter landing positions (left) and orientations (right) for 100 random trials of Baseline-MPPI, DisturbanceMPPI, and Tube-MPPI with large noise. Dashed lines are speciﬁed landing area, colored line indicate 3-sigma bounds for a Gaussian distribution ﬁtted to the 100 trials.
+
+MPPI assumes that there is noise in the control inputs with Σu = Diag(0.75, 0.125, 0.125, 0.125), and for DisturbanceMPPI and Tube-MPPI we inject additional noise into the system by increasing Σu and adding the additional disturbances for the velocities and orientation:
+Σu = (1.25)I4, Σvx,vy,vz = (1.25)I3, Σφ,θ,ψ = (0.0125)I3
+Figure 4 shows the results over 100 randomized trials for Baseline, Disturbance, and Tube-MPPI. Baseline-MPPI performs perfectly, and never violates any constraints while landing the helicopter. Disturbance-MPPI ends most trials with a satisfying landing. However, there are several large outliers that signiﬁcantly miss the target region, this would be catastrophic on an actual helicopter system. The distribution for Tube-MPPI closely mirrors that for Baseline-MPPI, but with a higher covariance. With Tube-MPPI there are not any outliers which miss the landing conditions by a signiﬁcant amount.
+Figure 3 shows the resulting orientations for the trials with the highest pitch magnitude, in the case of Tube-MPPI the worst case pitch is still within an acceptable landing envelope, whereas with Disturbance-MPPI the result would be the tail contacting the platform before the wheels touched down. Table I shows the mean, standard deviation, and worst case over the 100 trials for total distance from origin, roll angle, and pitch angle at touch-down.
+C. Simulated Autonomous Racing
+In this simulation experiment, we used a Gazebo simulation of 1/5 scale autonomous vehicles operating on a roughly
+
+TABLE I: Helicopter Landing Statistics
+
+MPPI - Small Noise MPPI - Large Noise
+Tube - MPPI
+
+Distance 0.66 +/- 0.025 0.77 +/- 0.25 0.69 +/- 0.15
+
+Roll 0.02 +/- 0.03 0.0 +/- 0.08 0.02 +/- 0.05
+
+Pitch -0.09 +/- 0.00 -0.04 +/- 0.05 -0.07 +/- 0.02
+
+TABLE II: Racing Simulation Statistics
+
+Disturbance -MPPI Tuned - MPPI Tube - MPPI
+
+Avg. Lap Time 11.87 +/- .47 8.33 +/- 1.05 9.39 +/- 0.76
+
+Max Speed 5.22 +/- 0.06 7.53 +/- 0.04 7.51 +/- 0.18
+
+Max Slip 0.04 +/- 0.04 0.09 +/- 0.15 0.12 +/- 0.10
+
+elliptical track [1], Fig. 5. In this simulation environment, we do not have access to the underlying model, so we ﬁt one using a hybrid physics-neural networks approach. The state space of the vehicle is x = (x, y, θ, r, vx, vy, θ˙), and the model has the form: F(x, u) = xt + W Tφ(x, u) + N (x, u; θ) ∆t where W is a linear weight matrix, and N (x, u; θ) represents a neural network. This model is ﬁt via a combination of linear regression and stochastic gradient descent, and there is a signiﬁcant error between the learned model and the actual system dynamics. This error is the source of disturbances in this experiment.
+Learning a model means that we cannot apply the BaselineMPPI condition (since we cannot remove the extra disturbances), so instead we compare our novel controller to a version of MPPI that has been extensively tuned with a cost function for this track. We refer to this as Tuned-MPPI. This is an important comparison, as it quantiﬁes our ability to use an intuitive indicator function-based cost structure to approach a level of performance only achievable previously through extensive hand-tuning. The cost function for Tube-MPPI was:
+
+C(x) = vx − vxdes 2 + w11Ctrack (x) + w21Cslip (x) (15)
+
+Cslip = x arctan−1 vy < 1.25 (16) |vx|
+
+w1 = w2 = 10000
+
+(17)
+
+Ctrack is the set of points that lie inside the track boundaries. The ﬁrst component of the cost tells the vehicle to try and achieve a desired velocity, the second component tells the vehicle to stay on the track, and the last term tells the vehicle to keep the slip angle below 1.25 radians (70 degrees). In the case of Tuned-MPPI the cost function takes the form:
+
+des 2
+
+−1 vy 2
+
+C = w1M (x,y) + w2 vx − vx + w3 tan
+
+(18)
+
+vx
+
++ βt w41Ctrack (x) + w51Cslip (x)
+
+(19)
+
+w1 = 100, w2 = 4.25, w3 = 250, w4 = 10000
+
+(20)
+
+w5 = 10000, β = 0.9
+
+(21)
+
+The ﬁrst term M (x, y) is a signed distance function for the set Ctrack. This term helps push the sampling distribution back towards the track if large disturbances are found. Note that
+
+Fig. 5: Gazebo simulation environment
+
+even with this term it is still necessary to add a time decay on the hard-cost weighted indicator terms, which prioritizes avoiding trajectories that immediately violate constraints.
+For each experimental condition, the target speed was gradually increased from 5 m/s until the algorithm could no longer consistently complete 100 laps while staying on the track. For Tuned-MPPI the maximum target speed was 8 m/s, and for Tube-MPPI this was 9 m/s. For Disturbance-MPPI there was a massive performance drop-off, with the maximum target speed only reaching 5 m/s. The performance statistics for each of the three trial conditions is shown in Table III. Both Tube-MPPI and Tuned-MPPI achieve top velocities slightly over 7.5m/s, and sub 10 second lap times. However, since Tube-MPPI optimizes with slightly tightened boundaries it takes a longer overall path around the track, which results in longer lap times.
+D. 1/5 Scale Autonomous Racing Experiment
+In order to validate the performance of the Tube-MPPI controller in the real-world, we tested the algorithm on the task of aggressive driving using the AutoRally 1/5 scale autonomous vehicle platform. This platform is approximately 1 meter long, weighs over 20 kilograms, and has a top speed over 20 m/s. Previous works have demonstrated that the MPPI controller (with tuned soft cost terms) is capable of navigating this type of vehicle around a simple elliptical track [25, 26], which we did our best to match in our simulation experiments. Our real-world experiments use the same type of vehicle as these prior works, but in a more challenging environment (Fig. 8). This track features a variety of different radius turns, and a long straight-away. An important detail of this track is that there are several areas where the boundaries for different segments of the track either touch or are very close to each other. This makes designing a smooth cost or constraint function based on a signed distance function difﬁcult, since such a function would have local minima that would encourage the vehicle to drive over the track boundaries. However, using only weighted sums of indicator functions we obtain a very simple cost design based on a grid of binary values that represent the set of points on the track. The cost function for this task is the same as for the Gazebo simulation environment, where there’s a term for speed, a term for staying on the track, and a term for avoiding excessive slip angle. The desired speed was set to 9 m/s, and we collected 12 laps around the test track, which is approximately 2 kilometers worth of driving data.
+Figure 6 depicts the trajectory traces of the 12 trial laps around the track. This ﬁgure identiﬁes one of the main beneﬁts of using sparse indicator cost functions: since the vehicle is only penalized for leaving the track, it is free to use the entire track surface in order to achieve its primary goal of going fast. As a result, the position of the vehicle on the
+
+0
+
+Under 5.5 m/s
+
+5.5 - 7.0 m/s
+
+−5
+
+Over 7.0 m/s
+
+−10
+
+−15
+
+Y-Position (m)
+
+−20
+
+−25
+
+−30
+
+Fig. 8: Test track for 1/5 scale vehicle.
+
+−35
+
+−40
+
+−45
+
+−20
+
+−10
+
+0
+
+10
+
+20
+
+30
+
+40
+
+X-Position (m)
+
+Fig. 6: Trajectory traces of test run with Tube-MPPI
+
+0
+Actual State
+Nominal State
+−5 State Divergence
+
+−10
+
+−15
+
+Y-Position (m)
+
+−20
+
+−25
+
+−30
+
+−35
+
+−40
+
+−10
+
+0
+
+10
+
+20
+
+30
+
+X-Position (m)
+
+Fig. 7: Magnitude of the state divergence over a test lap.
+
+track does not follow the center line, but signiﬁcantly varies depending on the upcoming track geometry (note that the overall direction of travel is clockwise). A key component of the Tube-MPPI algorithm is the tracking performance of the ancillary controller. Figure 7 shows the magnitude of the state divergence as the vehicle navigates the track over the course of one lap. Overall, the magnitude of the positional state divergence stays relatively small compared to the overall track width. The mean state divergence for the lap shown is 14 centimeters, and the maximum is 47 centimeters over the trial. Footage from the trials is available in the video supplement.
+
+TABLE III: Racing Experiment Statistics
+
+Tube - MPPI
+
+Avg. Lap Time 32.02 +/- 7.27
+
+Max Speed 8.52 +/- -0.26
+
+Max Slip 0.88 +/- 0.48
+
+VI. CONCLUSION
+We have proposed a novel robust sampling-based MPC framework based on a combination of model predictive path integral control and nonlinear Tube-MPC. The beneﬁt of combining these methods is that the Tube-MPC procedure stabilizes the importance sampling distribution, which means that a gradient signal is not necessary to help the sampling distribution recover from large disturbances. This enables the use of very simple cost terms, such as weighted sums of indicator functions, in formulating the optimal control problem. Our method also takes advantage of the different hardware (CPU/GPU) requirements of the nominal and ancillary controllers. We carried out a variety of simulation experiments which demonstrate the advantage of our method in terms of solving the underlying problem of stabilizing the importance sampling distribution, thereby enabling the use of simple cost functions that are easy to compose into complex performance criteria.
+The focus of this paper was on the practical ability of TubeMPPI to optimize with simple, easily composed cost functions, and we therefore did not focus on the theoretical aspects of Tube-MPC. However, the theoretical guarantees of Tube-MPC are an important component of making the proposed approach a complete system. For instance, in the helicopter example we would like to be able to estimate the size of the tube in order to tighten the landing area constraints enough to ensure that the helicopter never misses a landing. Future work will focus on how to guarantee that a bound for the tube exists, and on how to incorporate the bound into the optimal control problem solved by the nominal controller.
+Stochastic optimal control provides the most general and elegant mathematical framework for generating behaviors for autonomous systems, but generating cost functions that both describe the task at a high level and are easy to optimize with remains a key challenge. This paper is a step forward in easily specifying and solving general classes of stochastic optimal control problems.
+ACKNOWLEDGEMENTS
+This work was made possible by the ARO award W911NF12-1-0377, the Georgia Tech Vertical Lift Center of Excellence (VLCROE), and the Qualcomm Innovation Fellowship.
+
+REFERENCES
+
+[1] Autorally software package.
+
+https://github.com/
+
+AutoRally/autorally. Accessed: 2018-05-25.
+
+[2] Pieter Abbeel, Varun Ganapathi, and Andrew Y Ng.
+
+Learning vehicular dynamics, with application to mod-
+
+eling helicopters. In Advances in Neural Information
+
+Processing Systems, pages 1–8, 2006.
+
+[3] Vishnu Desaraju, Alexander Spitzer, and Nathan
+
+Michael. Experience-driven predictive control with
+
+robust constraint satisfaction under time-varying state
+
+uncertainty. In Proceedings of Robotics: Science and
+
+Systems, Cambridge, Massachusetts, July 2017. doi:
+
+10.15607/RSS.2017.XIII.067.
+
+[4] Chelsea Finn and Sergey Levine. Deep visual foresight
+
+for planning robot motion. In Robotics and Automation
+
+(ICRA), 2017 IEEE International Conference on, pages
+
+2786–2793. IEEE, 2017.
+
+[5] Vicenc¸ Go´mez, Hilbert J Kappen, Jan Peters, and Ger-
+
+hard Neumann. Policy search for path integral control.
+
+In Joint European Conference on Machine Learning
+
+and Knowledge Discovery in Databases, pages 482–497.
+
+Springer, 2014.
+
+[6] Vicenc¸ Go´mez, Sep Thijssen, Andrew Symington,
+
+Stephen Hailes, and Hilbert J Kappen. Real-time stochas-
+
+tic optimal control for multi-agent quadrotor systems.
+
+2016.
+
+[7] Sumeet Singh Marco Pavone Jean-Jacques and E Slotine.
+
+Tube-based mpc: a contraction theory approach.
+
+[8] Hilbert J Kappen. Path integrals and symmetry breaking
+
+for optimal control theory. Journal of statistical mechan-
+
+ics: theory and experiment, 2005(11):P11011, 2005.
+
+[9] Sertac Karaman and Emilio Frazzoli. Sampling-based al-
+
+gorithms for optimal motion planning. The international
+
+journal of robotics research, 30(7):846–894, 2011.
+
+[10] Marin Kobilarov. Cross-entropy motion planning. The
+
+International Journal of Robotics Research, 31(7):855–
+
+871, 2012.
+
+[11] Marin Kobilarov and Sergio Pellegrino. Trajectory plan-
+
+ning for cubesat short-time-scale proximity operations.
+
+Journal of Guidance, Control, and Dynamics, 37(2):566–
+
+579, 2014.
+
+[12] Steven M LaValle. Rapidly-exploring random trees: A
+
+new tool for path planning. 1998.
+
+[13] Rudolf Lioutikov, Alexandros Paraschos, Jan Peters, and
+
+Gerhard Neumann. Sample-based informationl-theoretic
+
+stochastic optimal control. In Robotics and Automation
+
+(ICRA), 2014 IEEE International Conference on, pages
+
+3896–3902. IEEE, 2014.
+
+[14] Anirudha Majumdar and Russ Tedrake. Funnel libraries
+
+for real-time robust feedback motion planning. The
+
+International Journal of Robotics Research, 36(8):947–
+
+982, 2017.
+
+[15] David Q Mayne and Eric C Kerrigan. Tube-based robust
+
+nonlinear model predictive control1. IFAC Proceedings
+
+Volumes, 40(12):36–41, 2007.
+
+[16] David Q Mayne, Mar´ıa M Seron, and SV Rakovic´. Robust model predictive control of constrained linear systems with bounded disturbances. Automatica, 41(2): 219–224, 2005.
+[17] David Q Mayne, Eric C Kerrigan, and Paola Falugi. Robust model predictive control: advantages and disadvantages of tube-based methods. IFAC Proceedings Volumes, 44(1):191–196, 2011.
+[18] Sasˇa V Rakovic, Basil Kouvaritakis, Mark Cannon, Christos Panos, and Rolf Findeisen. Parameterized tube model predictive control. IEEE Transactions on Automatic Control, 57(11):2746–2761, 2012.
+[19] Konrad Rawlik, Marc Toussaint, and Sethu Vijayakumar. On stochastic optimal control and reinforcement learning by approximate inference.
+[20] Stefan Schaal and Christopher G Atkeson. Learning control in robotics. IEEE Robotics & Automation Magazine, 17(2):20–29, 2010.
+[21] Evangelos Theodorou, Jonas Buchli, and Stefan Schaal. A generalized path integral control approach to reinforcement learning. Journal of Machine Learning Research, 11(Nov):3137–3181, 2010.
+[22] Sebastian Thrun, Mike Montemerlo, Hendrik Dahlkamp, David Stavens, Andrei Aron, James Diebel, Philip Fong, John Gale, Morgan Halpenny, Gabriel Hoffmann, et al. Stanley: The robot that won the darpa grand challenge. Journal of ﬁeld Robotics, 23(9):661–692, 2006.
+[23] Emanuel Todorov and Weiwei Li. A generalized iterative lqg method for locally-optimal feedback control of constrained nonlinear stochastic systems. In American Control Conference, 2005. Proceedings of the 2005, pages 300–306. IEEE, 2005.
+[24] Ari Weinstein and Michael L Littman. Open-loop planning in large-scale stochastic domains. In AAAI, 2013.
+[25] Grady Williams, Paul Drews, Brian Goldfain, James M Rehg, and Evangelos A Theodorou. Aggressive driving with model predictive path integral control. In Robotics and Automation (ICRA), 2016 IEEE International Conference on, pages 1433–1440. IEEE, 2016.
+[26] Grady Williams, Nolan Wagener, Brian Goldfain, Paul Drews, James M Rehg, Byron Boots, and Evangelos A Theodorou. Information theoretic mpc for model-based reinforcement learning. In Robotics and Automation (ICRA), 2017 IEEE International Conference on, pages 1714–1721. IEEE, 2017.
+
+

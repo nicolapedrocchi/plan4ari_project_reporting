@@ -1,0 +1,1607 @@
+Precision Engineering 91 (2024) 462–475 Contents lists available at ScienceDirect
+Precision Engineering
+journal homepage: www.elsevier.com/locate/precision
+
+An effective path planning approach for robot welding considering redundant kinematics
+Guangxi Li a, Zhizhen Ren a, Wei Yue b,c,*, Haitao Liu b
+a School of Mechanical Engineering, Dongguan University of Technology, Dongguan, 523808, China b Key Laboratory of Modern Mechanisms and Equipment Design of the State Ministry of Education, Tianjin University, Tianjin, 300350, China c Institute of Ordnance Industry Navigation and Control Technology, Beijing, 100089, China
+
+ARTICLE INFO
+Handling Editor: S Ludwick
+Keywords: Robot welding Path planning Redundant axis Friction stir welding
+
+ABSTRACT
+Robot welding with redundant kinematics demands precise coordination of the welding path and redundant axis motion for stable operation. This paper introduces an effective G3 continuous path planning approach for a 6DOF friction stir welding robot, integrating redundant axis motion to enhance welding stability and quality. The method encompasses a two-pronged strategy: a five-axis path corner smoothing technique and a motion synchronization strategy. Initially, a robust toolpath preprocessing algorithm is presented to mitigate curvature extremities of the inserted smoothing curves within predefined error limits. Subsequently, leveraging G3 continuity criteria, a B-spline-based smoothing method is advanced for refining tool position and orientation paths, with an analytical determination of spline control points facilitated by an explicit smoothing error expression. An effective motion synchronization technique is then proposed, which formulates the tool position, tool orientation, and redundant axis path as explicit functions of the position path arc length. The effectiveness of the proposed method is demonstrated through simulations and experiments on a robot welding platform, with the integration of a jerk-continuous feedrate profile for smooth motion execution. The findings indicate a significant improvement in robotic welding quality by integrating the proposed path planning method with existing workpiece posture optimization techniques.
+
+1. Introduction
+Friction stir welding (FSW) is a cutting-edge welding technique that employs a high-speed rotating tool plunged into the workpiece, generating frictional heat to soften the materials and form a solid-state weld joint [1]. Similar to milling machining [2–5], FSW has garnered widespread application in sectors such as aerospace, rail transit, shipbuilding, and automotive manufacturing due to its efficiency and superior welding quality [6]. The FSW process equipment endorsed by the industry is categorized into three types: machine tool-based, articulated robot-based, and parallel robot-based equipment, each with its unique advantages. Importantly, the versatility to produce various products on a single system is pivotal for manufacturing success, as noted in Ref. [7]. Especially noteworthy is the FSW equipment that integrates parallel/hybrid robots with a dedicated welding spindle. This setup offers superior accuracy, rigidity, workspace, and flexibility,
+
+making it ideal for complex spatial curve welding tasks on medium-thick plates [8]. Although the rigidity of parallel/hybrid robotic systems is 3–4 times greater than that of articulated robots, elastic deformation due to welding forces can still compromise the welding accuracy. To counteract this, a movable worktable with one degree of freedom (DOF) has been introduced [9]. Considering the decoupling nature of the welding robot and the worktable motion, the precise synchronization of the tool-tip, the tool axis, and the redundant axis motion, under the premise of known redundant axis variables, remains challenging.
+Trajectory planning is essential for the precision and efficiency of welding operations on the foundation of superior kinematic and dynamic characteristics of the equipment. Traditionally, the CNC programming of welding paths follows the ISO 6983 standard (i.e., G-code), which specifies both the tool position path (TPP) and tool orientation path (TOP) [10]. However, the potential discontinuities in tangency and curvature at junction points of the G-code path may disrupt the
+
+Abbreviations: FSW, Friction stir welding; DOF, degree of freedom; TPP, tool position path; TOP, tool orientation path; WCS, workpiece coordinate system; CL, cutter location.
+* Corresponding author. Institute of Ordnance Industry Navigation and Control Technology, Beijing, 100089, China. E-mail addresses: liguangxi@tju.edu.cn (G. Li), rzhizhen@163.com (Z. Ren), yuewei@tju.edu.cn (W. Yue), liuht@tju.edu.cn (H. Liu).
+https://doi.org/10.1016/j.precisioneng.2024.10.008 Received 27 August 2024; Received in revised form 7 October 2024; Accepted 14 October 2024 Available online 16 October 2024 0141-6359/© 2024 Elsevier Inc. All rights are reserved, including those for text and data mining, AI training, and similar technologies.
+
+G. Li et al.
+equipment’s motion smoothness. Hence, the generation of a higher-order continuous welding path through smoothing techniques is essential [11], which can be performed along the geometric toolpath (G continuity) and the trajectory profile (C continuity) [12]. Two predominant toolpath smoothing approaches have emerged: global smoothing and corner smoothing. Global smoothing, particularly adept for intricate machining with shorter path segments, focuses on path reconstruction through curve fitting or interpolation techniques [13, 14].
+Corner smoothing, which utilizes parametric curves to replace the corners of original path segments, offers the advantage of controllable smoothing errors, making it suitable for scenarios with longer path segments [15]. Extensive research indicates that the essence of corner smoothing lies in leveraging geometric path information and preset smoothing error tolerances to determine the smoothing curve control points. Commonly used smoothing curves include NURBS [16], B-splines [17], Bezier curves [18], PH curves [19], polynomial curves [20], and clothoid curves [21], each presenting distinct advantages in toolpath representation, smoothing error control, and parameter synchronization. In five-axis welding, the TPP and TOP are customarily smoothed within independent coordinate frameworks. Specifically, the TPP smoothing is primarily carried out in the Cartesian space, while the TOP smoothing usually occurs in the Euler angle space or on the Gaussian sphere space. Some typical methods have been summarized as follows.
+(1) In terms of TPP smoothing, existing techniques have achieved G2 [22], G3 [23], and G4 [24] continuity for linear paths. For position paths incorporating arc segments, existing methods, utilizing tools such as B-splines or clothoid curves, have achieved G2 [25] and G3 [26] continuity.
+(2) In terms of TOP smoothing, methods bifurcate into indirect smoothing [12,27] and direct smoothing [15,28]. Indirect smoothing initiates by delineating an equivalent path to symbolize the TOP, followed by processing akin to the TOP smoothing. For example, Sun [12] employs a non-coincident point with the tool-tip point on the tool axis direction as the equivalent path; Yang [27] regards the Euler angle path as the equivalent path. Direct smoothing commences by constructing an intermediary curve that fulfills the geometric continuity and smoothing error constraints, then projects this curve onto the Gaussian sphere to ensure the unity norm criteria of the tool axis vector. Typical of such work, Liu [28] analytically formulates control points of the quintic B-spline smoothing curve to achieve G3 continuity and then projects the resulting B-spline onto the Gaussian sphere surface.
+In multi-axis machining, the independent smoothing of the TPP and the TOP may lead to abrupt variations in the tool axis angular velocity at junction points [29]. Thus, synchronization of the TPP and TOP has become critical to ensure the smooth motion of the welding equipment [27,28]. Synchronization strategies are broadly categorized into coupling methods [15] and decoupling methods [30]. Coupling methods fine-tune the control points of the orientation smoothing spline to achieve high-order geometric continuity of the TOP and parameter synchronization simultaneously. Typical of such work, Altintas [15] employs a 7th-degree B-spline for the TOP smoothing and utilizes the Newton-Raphson method to determine its control points, thereby ensuring third-order derivative continuity of the TOP to the tool-tip displacement. Decoupling methods are subdivided into the adjustment approach [27,28] and the parameter mapping approach [10,29]. The adjustment method, following independent smoothing of the TPP and TOP, adjusts the length (or angle) of the remaining path segments or reparameterizes them for synchronization. For example, Yang [27] adjusts the remaining path segment lengths for the five-axis linear toolpath, and Liu [28] reparameterizes the remaining path segments into a
+
+Precision Engineering 91 (2024) 462–475
+specially designed 7th-degree B-spline. The parameter mapping technique employs specialized functions to depict the mathematical relationship between orientation and position parameters. In this regard, Beudaert [30] describes the toolpath with two B-splines and introduces a third to represent the mathematical relationship between the path parameters; Yuen [10] establishes an analytical expression relating the TOP parameter to the TPP parameter through polynomial fitting; Zhang [29] generates a C3 continuous synchronization curve by interpolating the arc-length pairs of the TPP and TOP at junction points.
+In 6-DOF machining equipment research, extraneous rotational or translational freedoms do not inherently alter the tool posture expressed in the workpiece coordinate system (WCS). However, they significantly influence the joint movements of the welding equipment through inverse kinematics. This distinction underscores that 6-DOF robot operations demand a more intricate path-planning approach than 5-DOF machinery, incorporating the need for redundant axis path smoothing and synchronization. Recently, Yang [31] developed a novel PH-based path corner smoothing technique for a 6R robot, with the TPP, TOP, and redundant axis effectively synchronized to the arc length parameter of the TPP. In Yang’s method, modifications to the redundant axis commands are isolated and do not interfere with the other joint variables of the 6R robot. In our previous work about FSW [32], an effective solution for the redundant axis position has been developed to improve the welding quality. For more about trajectory planning based on stiffness, please see Ref. [33]. However, the challenge of achieving synchronized motion for the TPP, the TOP, and the redundant axis remains an area ripe for exploration. To sum up, there is substantial potential for refining existing path smoothing and synchronization methods for 6-DOF equipment with redundant kinematics, i.e.
+(1) Existing methods primarily concentrate on limiting the extrema of smoothing errors, often neglecting their distributional characteristics, making it challenging for curvature optimization of the inserted smoothing curves.
+(2) In scenarios characterized by dense cutter location (CL) point distributions, existing methods tend to shorten the length of smoothing path segments to prevent curve overlap, which can escalate curvature extrema and reduce motion efficiency. Prioritizing high-order geometric continuity over parametric continuity during the independent smoothing of the TPP and TOP can improve the curvature characteristics of smoothing curves.
+(3) Existing parameter synchronization methods often employ shared curve parameters for both position and orientation splines. This strategy, aimed at achieving high-order parameter continuity at junction points, might excessively restrict the smoothing path length and cause potential oscillations in the tool axis and joint trajectories near these points.
+This paper develops an effective path-planning method for a 6-DOF robot welding equipment with redundant kinematics. The main innovations are summarized as follows.
+(1) An effective path smoothing method is developed for the 6-DOF welding equipment featuring a redundant axis, ensuring synchronized motion across tool position, orientation, and redundant axis paths.
+(2) A G3-continuous corner smoothing method considering the error constraints is proposed, enabling the control points for both position and orientation smoothing splines to be analytically constructed.
+(3) A B-spline-based synchronization method by interpolating the arc-length pairs is presented, which can effectively improve the smoothness of tool axis motion.
+(4) A method leveraging quintic polynomial interpolation is proposed to synchronize motion between the redundant axis and the
+
+463
+
+G. Li et al.
+
+Precision Engineering 91 (2024) 462–475
+
+TPP, effectively enhancing motion stability throughout the welding operation.
+
+The structure of this paper is organized as follows: Section 2 explores the kinematic analysis of the 6-DOF robot, detailing the impact of the redundant axis on welding operations. Section 3 advances G3-continuous corner smoothing of the TPP and TOP within independent frameworks. Section 4 explores motion synchronization for tool position, orientation, and redundant axis paths. Simulations and experimental validations are performed in Section 5, and conclusions are drawn in Section 6.
+
+2. Kinematics of the 6-DOF robot welding system
+
+Fig. 1 illustrates the robot welding system designed for heavy-duty
+
+FSW. This comprehensive setup encompasses a frame, a movable
+
+worktable, a hybrid robot named TriMule [25], a numerical control
+
+system, and a dedicated hydraulic pump station. As the core functional
+
+module, the TriMule robot is equipped with a welding spindle, which is
+
+specifically tailored for executing SFW operations. Additionally, the
+
+robot is installed on the frame in a vertical layout, which ingeniously
+
+leverages its weight to generate the necessary axial force. Constructed
+
+with a three-DOF parallel mechanism and a two-DOF A/C swing head,
+
+The TriMule robot can achieve specific tool posture. However, the
+
+designed equipment integrates a five-DOF hybrid robot and a one-DOF
+
+worktable. Thus, actuated joint variables of the robot, derived from its
+
+inverse kinematics, cannot be uniquely evaluated but vary with the
+
+worktable’s position (i.e., the redundant axis variable). This relationship
+
+opens up opportunities to optimize the robot configuration while
+
+keeping the welding path unchanged, thereby potentially increasing the
+
+stiffness in SFW. Such an enhancement in stiffness could significantly
+
+improve the welding quality.
+
+As depicted in Fig. 1, K w − xwywzw and K 0 − x0y0z0 denote the
+
+WCS and the base coordinate system of the 6-DOF welding equipment,
+
+respectively. The welding path is generated in the CAD/CAM system and
+
+expressed in K w. Here, wp ∈ R3×1 denotes the tool position vector and
+
+wo ∈ R3×1 denotes the tool axis vector. Then, a CL point can be expressed
+
+in K 0 with the following form:
+
+p = Rw d [ 0 ] [ 0 0 ][ wp , 0o = 0Rww ] o (1)
+
+1
+
+01×3 1 1
+
+where 0Rw denotes the rotation matrix from K 0 to K w, and 0d, which is expressed in K 0, denotes the position vector pointing from the original point of K 0 to that of K w. As depicted in Fig. 2, the redundant axis
+
+Fig. 1. TriMule-800 friction stir welding hybrid robotized equipment.
+
+position can significantly influence the welding quality by altering the robot configuration. In practical application, the redundant axis variable is determined considering the stiffness and kinematic singularity for any given CL point in real application [32].
+Mathematically, the relationship between the joint variable vector of the robot and the CL point can be expressed as: q = inv k( 0p − xr, 0o) (2)
+where q = [q1, q2, q2, θ4, θ5]T denote the actuated joint variable vector of the TriMule robot, xr denotes the redundant axis variable, and inv k denote the inverse kinematic function of the robot. Obviously, the actuated joint variables are contingent upon multiple factors, including the tool position vector, the tool axis vector, and the redundant axis variable. To optimize the configuration-dependent kinematic characteristics inherent to the robot welding equipment, addressing the following two issues stands as a critical challenge: the smoothing of the five-axis welding path and the effective synchronization of the redundant axis with the welding path.
+3. The G3 continuous path smoothing method
+In this section, a smoother welding path that exhibits a diminished curvature extreme is achieved through the integration of corner smoothing and path preprocessing techniques. Meanwhile, by taking position and orientation smoothing error tolerances as key input parameters, stringent control over path deviation can be achieved. For a five-axis welding path comprising m CL points, let Pi denotes the i − th tool-tip point with the related tool position vector pi, and let Oi be the endpoint of the i − th tool axis vector oi. In this section, G3 continuity of the TPP and TOP will be achieved by inserting specially designed quintic B-splines at corners [34].
+
+3.1. Corner smoothing of the TPP
+
+Fig. 3 illustrates the corner smoothing of TPP. Here, a quintic B{ }6
+spline Pi(u) with control points Pj,i j=0 and the basis function Nj,5 defined in the node vector u = (0, 0, 0, 0, 0, 0, 0.5, 1, 1, 1, 1, 1, 1)T is adopted as the smoothing curve:
+
+∑n
+
+pi(u) = Nj,5(u)pj,i, u ∈ [0, 1]
+
+(3)
+
+j=0
+
+Under those arrangements, Pi(u) will pass through the first and last
+
+control points (i.e., P0,i and P6,i). Here, P0,i, and P6,i+1 are located in the
+
+midpoints of lines Pi− 1Pi and Pi+1Pi+2, respectively; both P6,i and P0,i+1 are located at the midpoint of line PiPi+1. The G3 continuity conditions at the
+
+junction point can be expressed as:
+
+⃒
+
+⃒
+
+⃒
+
+⃒
+
+⃒
+
+dpi(u)⃒⃒ ⃒
+
+=dpi+1(u)⃒⃒⃒
+
+2
+
+⃒
+
+d pi(u)⃒
+
+, 2⃒
+
+2
+
+⃒
+
+d pi+1(u)⃒
+
+=
+
+2⃒
+
+3
+
+⃒
+
+d pi(u)⃒
+
+, 3⃒
+
+ds u=1
+
+ds u=0 ds ⃒
+
+ds ⃒ ds ⃒
+
+⃒ u=1
+
+u=0 u=1 (4)
+
+3
+
+⃒
+
+d pi+1(u)⃒
+
+=
+
+3⃒
+
+ds ⃒u=0
+
+dpi(u) ʹ du d2pi(u) ʹʹ (du)2 ʹ d2u
+
+= pi(u) , 2 = pi (u)
+
++ pi(u) 2
+
+ds
+
+ds ds
+
+ds
+
+ds
+
+d3pi(u) ʹʹʹ (du)3 ʹʹ du d2u ʹ d3u
+
+= pi (u)
+
++ 3pi (u)
+
+2 + pi(u) 3
+
+ds3
+
+ds
+
+ds ds
+
+ds
+
+where superscripts Λʹ, Λʹʹ and Λʹʹʹ denote the first-, second-, and third-
+
+order derivatives of Λ to u, respectively; s denote arc length of the
+
+⃦ ⃦
+
+ʹ
+
+⃦ ⃦
+
+TPP. Let f(u) = pi(u) , then the derivatives of u to s can be expressed
+
+as:
+
+464
+
+G. Li et al.
+
+Precision Engineering 91 (2024) 462–475
+
+Fig. 2. Different robot configurations corresponding to the same tool posture.
+
+Fig. 3. Corner smoothing of the TPP.
+
+du 1 d2u
+
+fʹ(u) d3u 3(fʹ(u))2 − f (u)fʹʹ(u)
+
+= , 2=−
+
+3, 3 =
+
+5
+
+(5)
+
+ds f(u) ds
+
+(f(u)) ds
+
+(f (u))
+
+fʹ(u) = pʹi(u)⋅pʹiʹ(u), fʹʹ(u)
+
+f (u)
+
+f
+
+3
+
+( (u)
+
+pʹiʹ(u)⋅pʹiʹ(u)
+
++
+
+pʹ
+i
+
+ʹʹʹ ) (u)⋅pi (u)
+
++
+
+(pʹi
+
+(u)⋅pʹʹi
+
+(u))2
+
+= f 3(u)
+
+Given that the last three control points of Pi(u) and the first three
+
+control points of Pi+1(u) all lie in PiPi+1, Eq. (4) can be rewritten as:
+
+⃒
+
+⃒
+
+⃒
+
+⃒
+
+2
+
+⃒
+
+2
+
+⃒
+
+dpi(u)⃒⃒
+
+dpi+1 (u)⃒⃒
+
+d pi(u)⃒
+
+d pi+1(u)⃒
+
+⃒=
+
+⃒ = mi+1, 2 ⃒ =
+
+2⃒
+
+ds u=1
+
+ds u=0
+
+ds ⃒
+
+ds ⃒
+
+⃒ ⃒ u=1 u=0 (6)
+
+3
+
+⃒
+
+3
+
+⃒
+
+d pi(u)⃒
+
+d pi(u)⃒
+
+= 0, 3 ⃒ = 3 ⃒ = 0
+
+ds ⃒
+
+ds ⃒
+
+u=1
+
+u=0
+
+where mi+1 denote the unit vector pointing from Pi to Pi+1. Substituting Eq. (4) and Eq. (5) into Eq. (6) results in:
+
+p3,i = pi, p4,i = p3,i + cplimi+1, p5,i = p3,i + limi+1, p6,i = (pi + pi+1)/2 p0,i+1 = (pi + pi+1)/2, p1,i+1 = p3,i+1 − li+1mi+1, p2,i+1 = p3,i+1
+
+− cpli+1mi+1, p3,i+1
+
+= pi+1
+
+(7)
+
+where li and li+1 denote the length of line P3,iP5,i and P1,i+1P3,i+1, respectively; cp ∈ [(0, 1)] is a predefined constant. To ensure that the maximum smoothing error occurs at the midpoint of Pi(u), the length of line P1,iP3,i is set to li as well. Then, the position smoothing error εpos,i can be expressed as:
+
+⃦
+
+⃦
+
+()
+
+ε ⃦ pos,i = ⃦⃦p1,i + 4p2,i − 10p3,i + 4p4,i + p5,i⃦⃦⃦ = 1 + 4cpl ϕ i cos i (8)
+
+16
+
+8
+
+2
+
+where ϕi denotes the corner angle formed by line Pi− 1Pi and PiPi+1. As points P0,i and P6,i exert no influence on εpos,i, they are positioned at the
+
+midpoints of lines Pi− 1Pi and Pi+1Pi+2, respectively, to eliminate the
+
+remaining path segments. Furthermore, the curvature extreme of Pi(u),
+
+denoted by κmax, can be expressed as:
+
+⃦
+
+⃦
+
+⃦⃦pʹi(u) × pʹiʹ(u)
+
+⃦ ⃦
+
+32 cos(ϕi/2)
+
+κmax = ⃦
+
+3
+
+|u=0.5⃦ = (
+
+)2
+
+2
+
+(9)
+
+⃦ f (u)
+
+⃦ 5 2cp + 1 li sin (ϕi/2)
+
+Combining Eq. (8) and Eq. (9), the relationship between κmax and cp can be expressed as:
+
+κmax =
+
+4 cos2(ϕi/2)
+2
+
+1 + 4cp
+
+(
+
+)2
+
+5εpos,i sin (ϕi/2) 2cp + 1
+
+(10)
+
+It is obvious that κmax decreases monotonically versus cp ∈ (0, 1).
+
+Since smaller curvature is often associated with higher motion effi-
+
+ciency, cp is set to 7/16 considering the uniqueness criterion of curvature
+
+extrema. Additionally, the key parameter li is evaluated considering: (1)
+
+the position error should be smaller than its error tolerance; (2)
+
+li ≤ min(Li /2, Li+1 /2) should be met to avoid self-intersections. Math-
+
+ematically, le,i can be expressed as:
+
+{
+
+}
+
+li = min Li, Li+1, (
+
+6εpos,max )
+
+2 2 1 + 4cp cos(ϕi/2)
+
+(11)
+
+where εpos,max denotes the position error tolerance, Li denotes the length of line Pi− 1Pi.
+
+Fig. 4. Illustration of the developed TPP preprocessing algorithm.
+
+465
+
+G. Li et al.
+
+Fig. 4 illustrates a TPP-preprocessing algorithm developed to mitigate curvature extrema of the smoothing B-spline. Here, superscript Λ* denotes the point or vector before preprocessing. The detailed steps are as follows.
+
+Step 1. Let i = 0 and set pi = p*i .
+
+Step 2. Let i = i + 1. If i = m −
+
+1,
+
+set
+
+pi
+
+=
+
+p*
+i
+
+and
+
+end
+
+the
+
+program.
+
+Otherwise, proceed to the next step.
+
+Step 3. Return to Step 2 after setting
+
+pi
+
+=
+
+*
+pi
+
+−
+
+εpos,max
+
+(*
+
+*)
+
+mi+1 − mi , i = 1, …, m − 2
+
+2 cos(ϕi/2)
+
+(12)
+
+3.2. Corner smoothing of the TOP
+
+As shown in Fig. 5, a G3 continuous TPP is generated considering the unity norm criteria and the smoothing error constraints. Any intermediate vector between Oi and Oi+1 can be evaluated as:
+
+o(w, oi, oi+1) = oi+1 sin(wθi+1) + oi sin(θi+1 − wθi+1), w ∈ [0, 1] sin(θi+1 )
+
+(13)
+
+⌢
+where θi+1 denotes the central angle of arc OiOi+1 , and w denotes the curve parameter. The TOP will be smoothed through two steps: (1),
+{ }6 construct a quintic B-spline Bi(w) with seven control points Bj,i j=0 building upon the derived G3 continuity conditions, and (2) generate the smoothing spline Oi(w) considering the unity norm criteria.
+
+Step 1. Evaluate spline control points. The G3 continuity conditions at
+
+B6,i can be expressed as [24]:
+
+⃒ dbi(w)⃒⃒⃒ = −
+dso u=1
+
+⃒
+
+2
+
+⃒
+
+o d bi(w)⃒
+
+me,i, 2 ⃒ = −
+
+dso ⃒u=1
+
+⃒
+
+3
+
+⃒
+
+d bi(w)⃒
+
+o
+
+b6,i ,
+
+3 ⃒ = me,i
+
+dso ⃒u=1
+
+(14)
+
+where
+
+so
+
+denote
+
+arc
+
+length
+
+of
+
+the
+
+TOP;
+
+mo
+e,i
+
+and
+
+mo
+s,i+1
+
+denotes
+
+the
+
+unit
+
+tangent vector at b6,i and b0,i+1 respectively with the following defini-
+
+tion:
+
+o b6,i × (oi × oi+1) o
+
+(oi × oi+1) × b0,i+1
+
+me,i =
+
+, ms,i+1 =
+
+sin(φi)
+
+sin(φi+1 )
+
+(15)
+
+⌢
+
+⌢
+
+where φi and φi+1 denote the central angle of B3,iO6,i and B0,i+1O3,i+1 ,
+
+respectively. Without considering the error constraints temporarily, the
+
+last four control points of Bi(w) can be expressed as:
+
+( 22
+
+)
+
+1 + 40c2o (φ )i o
+
+b3,i = oi, b4,i = 1 − 5co + 5co cos(φi) b6,i +
+
+sin me,i,
+
+10co
+
+2
+
+(φ )i o
+
+(
+
+)
+
+φi
+
+b5,i = b6,i + 2co sin me,i, b6,i = o
+
+, oi, oi+1
+
+2
+
+θi+1
+
+(16)
+
+where co ∈ (0, 1), which denotes the length ratio of line B5,iB6,i to line
+
+Precision Engineering 91 (2024) 462–475
+
+B3,iB6,i, is a predefined constant. Specifically, co is set to 0.16 for the term
+
+(
+
+2)
+
+1 +40co /10co to achieve its minimum value. Similarly, control points
+
+of Bi+1(w) can be analytically formulated with φi+1 being the smoothing
+
+angle.
+
+Step 2. Construct orientation smoothing spline. Based on the unity norm criteria, Oi(w) can be expressed as:
+
+oi(w) = bi(w) , w ∈ [0, 1] (17) ‖bi(w)‖
+
+The first and second-order derivatives of oi(w) versus w can be
+
+expressed as:
+
+ʹ
+
+(
+
+ʹ)
+
+ʹ
+
+(bi(w)⋅bi(w))bi(w) − bi(w)⋅bi(w) bi(w)
+
+oi(w) = ‖bi(w)‖3 (18)
+
+ʹʹ
+
+(
+
+ʹ )ʹ
+
+(
+
+ʹ )(
+
+ʹ)
+
+ʹʹ
+
+bi (w) 2 bi(w)⋅bi(w) bi(w) 3 bi(w)⋅bi(w) bi(w)⋅bi(w) bi(w)
+
+oi (w) = ‖bi(w)‖ −
+
+‖bi(w)‖3 +
+
+‖bi(w)‖5
+
+−M (19)
+
+(
+
+ʹʹ
+
+( ʹ ʹ ))
+
+bi(w)⋅bi (w) + bi(w)⋅bi(w) bi(w)
+
+M = ‖bi(w)‖3
+
+Here, the third-order derivative of oi(w) is not displayed for brevity.
+
+According to the preceding analysis, it is easy to prove that Oi(w) and O(w, Oi, Oi+1) are also G3 continuous at the junction point B0,i.
+
+To generate an error-limited smoothing B-spline, it is assumed the
+
+error extreme occurs at the midpoint of Oi(w), resulting in ∠B3,iWB5,i =
+
+∠B1,iWB3,i. Then, the orientation smoothing error εori,i can be expressed
+
+as:
+
+(
+
+)
+
+εori,i = cos− 1 bi(0.5)⋅b3,i
+
+‖bi(0.5)‖
+
+(20)
+
+where bi(0.5) = (b1 + 4b2 + 6b3 + 4b4 + b5) /16. As mentioned in Ref. [28], εori,i increases monotonically versus φi. Thus, φi can be evaluated using a one-dimensional searching algorithm after determining its upper bound. Similarly, Fig. 6 illustrates a TOP preprocessing algorithm. The detailed steps are presented as follows.
+
+Step 1. Let i = 0 and set oi = o*i .
+
+Step 2. Let i = i + 1. If i = m −
+
+1
+
+is
+
+met,
+
+set
+
+oi
+
+=
+
+o*
+i
+
+and
+
+end
+
+the
+
+al-
+
+gorithm. Otherwise, proceed to the next step.
+
+Step 3. Return to Step 2 after setting
+
+(
+
+)
+
+o*
+i
+
++
+
+tan
+
+εori,max
+
+ni
+
+o* × o*
+
+i− 1
+
+i
+
+o* × o*
+
+i
+
+i+1
+
+oi = √̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅(̅̅̅̅̅̅̅̅̅̅̅̅̅̅̅)̅̅, ni =
+
+*
+
+(
+
+/
+*
+
+)+
+
+*
+
+( /)
+*
+
+1 + tan2 εori,max
+
+2 sin θi cos αi 2 2 sin θi+1 cos αi 2
+
+(21)
+
+Fig. 5. Corner smoothing of the TOP: (a) illustration on the unit sphere surface; (b) illustration on the unfold plane. 466
+
+G. Li et al.
+
+Fig. 6. Illustration of the developed TOP preprocessing algorithm.
+
+⌢
+
+where
+
+α*
+i
+
+is
+
+the
+
+angle
+
+formed
+
+by
+
+Πi−
+
+1
+
+(the
+
+plane
+
+O*
+i−
+
+O*
+1i
+
+lies) and Πi (the
+
+⌢
+
+plane
+
+O* O*
+i i+1
+
+lies).
+
+4. Motion synchronization
+In this section, effective synchronization of the G3 continuous TPP, TOP, and the redundant axis is achieved through arc length parameterization, leveraging the discrete values of the redundant axis variables.
+
+4.1. Motion synchronization constraints
+
+(1) Constraints for the TOP and TPP. Firstly, the tool axis angular velocity, acceleration, and jerk can be expressed as:
+
+do(w)
+
+d2o(w) 2 do(w)
+
+ω=
+
+s˙, ωa = 2 s˙ +
+
+s¨, ωje
+
+ds
+
+ds
+
+ds
+
+d3oi(w) 3 d2oi(w) doi(w)…
+
+= 3 s˙ + 3 2 s˙s¨+
+
+s
+
+ds
+
+ds
+
+ds
+
+(22)
+
+do(w) = do(w) dso
+
+ds
+
+dso ds
+
+d2o(w) d2o(w)(dso)2 do(w) d2so
+
+ds2 = ds2
+o
+
+ds + dso ds2
+
+d3o(w) d3o(w)(dso)3 d2o(w) dso d2so do(w) d3so
+
+3= 3
+
++3 2
+
+2+
+
+3
+
+ds
+
+dso ds
+
+dso ds ds
+
+dso ds
+
+(23)
+
+Therefore, given a jerk-continuous feedrate profile, the synchronization constraints dictate that the derivatives of so from the first to the third order versus s must be continuous and so should exhibit monotonic increase to s. In Section 4.2, B-splines are employed as the synchronization curves benefitting from their convex hull property [34].
+
+(2) Constraints for the redundant axis and the TPP. Similarly, the redundant axis motion is synchronized with the arc length of the TPP. The synchronization constraints require that the derivatives, up to the third order, of the redundant axis variable versus the TPP arc length parameter must be continuous. In Section 4.3, polynomial curves are selected as synchronization curves, which offer the benefit of reduced computational expense.
+
+Precision Engineering 91 (2024) 462–475
+
+simultaneously, it becomes feasible to model a quintic B-spline that captures the nonlinear relationship between the TPP and TOP arc lengths. Let ci(uu) denotes a quintic B-spline with node vector
+{ }7 (0, 0, 0, 0, 0, 0, 0.5, 0.5, 1, 1, 1, 1, 1, 1)T and control points cj,i j=0, i.e.,
+
+∑n ci(uu) = Nj,k(uu)cj,i, uu = s − si− 1 ∈ [0, 1]
+
+j=0
+
+si − si− 1
+
+(24)
+
+where si and so,i denote the cumulative arc length of Pi(u) and Oi(w),
+
+respectively; ci(uu) is fitted on each interval (si− 1,si),i = 1,2,…,m − 1. As
+
+illustrated in Fig. 7, ci(uu) is extended to the 2D curve ci(uu) with control { }7
+
+points cj,i j=0 to visualize the synchronization process. Here, Sop.i de-
+
+(
+
+)
+
+notes the interpolation point si, so,i . The relationship between the
+
+spline parameter and its arc length can be accurately established using
+
+the Simpson-based method developed in Ref. [35].
+
+To determine the unknown control points, an optimization problem
+
+is formed with specific constraints. Initially, the control points are
+
+ensured to be all non-negative for the monotonicity condition, i.e.,
+
+⎡ 1 −1 0 0 0 0 0
+⎢⎢ 0 1 − 1 0 0 0 0 ⎢⎢ 0 0 1 − 1 0 0 0 ⎢⎢ 0 0 0 1 − 1 0 0 ⎢⎢ 0 0 0 0 1 − 1 0 ⎣0 0 0 0 0 1 − 1
+
+⎤ ⎡⎤
+
+0
+
+0
+
+0 ⎥ ⎢0⎥
+
+⎥ ⎢⎥
+
+0 ⎥ ⎢0⎥
+
+⎥ ⎢⎥
+
+0
+
+⎥⎥ci
+
+≤
+
+⎢ ⎢
+
+0
+
+⎥⎥,
+
+i
+
+=
+
+1,
+
+2,
+
+…,
+
+m
+
+−
+
+1
+
+0
+
+⎥ ⎥
+
+⎢0⎥ ⎢⎥
+
+0 ⎦ ⎣0⎦
+
+0 0 0 0 0 0 1 −1
+
+0
+
+(25)
+
+where ci = [c0,i, c1,i, c2,i, c3,i, c4,i, c5,i, c6,i, c7,i]T. Then, according to the geometric characteristics of the B-spline, the C0 continuity condition can
+
+be expressed as:
+
+[
+
+][ ]
+
+1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 ci = so,i− 1 s , o,i i = 1, 2, …, m − 1
+
+(26)
+
+Additionally, the C1, C2, and C3 continuity conditions can be expressed as:
+
+⎡ [0 0 0 0 0 0 − 1 1]
+
+⎢ ⎢
+
+si − si− 1
+
+⎢
+
+⎢ ⎢
+
+[0
+
+0
+
+0
+
+0
+
+0
+
+1
+
+−
+
+2
+
+1]
+
+⎢
+
+2
+
+⎢
+
+(si − si− 1)
+
+⎢
+
+⎢
+
+⎣[0 0 0 0 − 1 5 − 6 2]
+
+(si − si− 1)3
+
+[1 − 1 0 0 0 0 0 0] ⎤
+
+si+1 − si
+
+⎥
+
+⎥
+
+⎡⎤
+
+⎥ [ − 1 2 − 1 0 0 0 0 0 ] ⎥[ ] ⎥ c 0 i ⎢ ⎥
+
+2
+
+⎥
+
+=⎣0⎦
+
+(si+1 − si)
+
+⎥ ci+1
+
+⎥ ⎥
+
+0
+
+[2 − 6 5 − 1 0 0 0 0]⎦
+
+(si+1 − si)3
+
+(27)
+
+Here, i = 1, 3, …, m− 2. On this basis, a non-linear minimization
+
+4.2. Synchronization of the TPP and the TOP
+In this section, the arc length of the TOP will be interpolated as a function of that of the TPP. Since tool orientation does not affect the tool-tip displacement, there is no explicit relationship relating so to s. Assuming the tool arrives at (pi +pi+1)/2 and (oi +oi+1)/‖oi +oi+1‖
+467
+
+() Fig. 7. Quintic B-spline and its control points fitted to the si, so,i data.
+
+G. Li et al.
+
+Precision Engineering 91 (2024) 462–475
+
+problem is formulated to determine the synchronizing B-spline, which fulfills the requirements of monotonicity and continuity up to C3. The
+
+objective is set to minimization of the integral square of jerk of ci(uu)
+
+subject to constraints in Eqs. (25)–(27), i.e.,
+
+∑ m− 1 1 ∫ 1 (d3 ) c 2 i(uu) i=1 min Jsyn = (si − si− 1)6 0 duu3 duu
+
+(28)
+
+Since the derivatives up to the third order at
+
+mined by the first or last four control points, the
+
+selected as:
+
+⎧ ⎪⎪ c3,i − 3Δi = c2,i − 2Δi = c1,i − Δi = si− 1 ⎪⎪⎨
+c4,i + 3Δi = c5,i + 2Δi = c6,i + Δi = si
+
+⎪⎪⎪ ⎪⎩ Δi = (si −
+
+si− 1) min so,i − so,i− 1 1≤i≤m− 17(si − si− 1)
+
+endpoints are deterinitial values can be
+(29)
+
+The existence of feasible initial conditions substantiates that a solution to this minimization problem is always possible. With these initial values in hand, the minimization problem can be solved using any optimization techniques, such as the fmincon function in MATLAB. Consequently, the TPP and TOP are synchronized with the derived functions ui(s), wi(so) and ci(uu). Here, ui(s) denotes the formulated inverse length function for Pi(u) and wi(so) for Oi(w) [34].
+
+4.3. Synchronization of the TPP and the redundant axis
+
+Keep in mind that the selection of the redundant axis variable xr,i does not influence the geometric shape of the welding path after smoothing; it only affects the other actuated joint variables of the hybrid robot. The relationship between the joint motion trajectory of the hybrid robot and the feedrate can be expressed as:
+
+dq dq d2q d2q 2 dq d3q d3q 3 d2q dq… = s˙, 2 = 2 s˙ + s¨, 3 = 3 s˙ + 3 2 s˙s¨+ s
+
+(30)
+
+dt ds dt ds
+
+ds dt ds
+
+ds
+
+ds
+
+It can be observed that the joint motion trajectory depends directly on dq/ds, d2q/ds2, and d3q/ds3 for a given feedrate profile. Thus, due to the highly nonlinear kinematics and motion coupling characteristics of the hybrid robot, a smoother function q(s) is preferred in the synchronization process.
+Considering the single-variable nature of xr, the piecewise polynomial fitting technology is adopted to synchronize the TPP and the redundant axis, as shown in Fig. 8. Here, xr,i(s) denotes the inserted 5thdegree polynomial in the i − th segment (si− 1, si), satisfying:
+
+⎡
+
+⎤⎡
+
+⎢ xr ⎥ ,i(s) ⎢⎢ (s −
+
+⎢ ⎢
+
+dxr,i (s)
+
+⎥ ⎥
+
+⎢ (s −
+
+⎢⎢⎢ ds ⎥⎥ ⎢⎢ ⎥ ⎢ (s −
+
+⎢⎢ d2xr,i(s) ⎥⎥ = ⎢⎢
+
+⎢
+
+2
+
+⎥
+
+⎢ (s − ⎢
+
+⎢ ds ⎥ ⎢
+
+⎢ ⎣
+
+3
+
+⎥ ⎦
+
+⎢ (s −
+
+d xr,i(s) ⎣
+
+ds3
+
+si− 1)5 si− 1)4 si− 1)3 si− 1)2
+si− 1)
+1
+
+5(s − si− 1)4 4(s − si− 1)3 3(s − si− 1)2 2(s − si− 1)
+1 0
+
+20(s − si− 1)3 12(s − si− 1)2 6(s − si− 1)
+2 0 0
+
+⎤T
+
+60(s − si− 1)2 ⎥
+
+⎥
+
+24(s − si− 1) ⎥
+
+⎥
+
+⎥
+
+6
+
+⎥
+
+⎥ ⎥
+
+di
+
+0
+
+⎥
+
+⎥
+
+⎥
+
+0
+
+⎥
+
+⎦
+
+0
+
+(31)
+
+where di = [d0,i, d1,i, d2,i, d3,i, d4,i, d5,i]T denotes the unknown polynomial
+
+coefficients, which can be determined by solving an optimization
+
+problem. To improve the motion performance of the redundant axis, the
+
+objective function of the optimization problem with 6(m − 1) unknown
+
+variables can be expressed as:
+
+∫ (⃒
+
+⃒2 )
+
+∑ m− 1 si ⃒ 3
+
+⃒
+
+⃒d xr,i(s)⃒
+
+min Jsyn =min
+
+⃒ 3⃒
+
+i=1 si− 1 ⃒ ds ⃒
+
+∑ m− 1 ∫ si (
+
+= min
+
+20d0,i(s− si− 1)3 +12d0,1(s− si− 1)2 + 6d0,2(s −
+
+i=1 si− 1
+
+si− 1) + 2d0,3)2
+
+(32)
+
+The optimization problem can be effectively solved using the Matlab Optimization Toolbox given the constraints. Refer to Ref. [31] for the C0, C1, and C2 continuity constraints, and a total of 4m− 6 equations can be obtained. Additionally, The G3 continuity constraints can be expressed
+
+as:
+
+⎡ 60(si− 1 − si− 2)2 ⎤T
+
+⎡ 0 ⎤T
+
+⎢ ⎢
+
+24(si−
+
+1
+
+−
+
+si−
+
+2)
+
+⎥ ⎥
+
+⎢0⎥ ⎢⎥
+
+⎢
+
+6
+
+⎥
+
+⎢6⎥
+
+⎢ ⎢
+
+⎥ ⎥
+
+di−
+
+1
+
+=
+
+⎢ ⎢
+
+⎥ ⎥
+
+di, i = 2, 3, …, m −
+
+1
+
+⎢
+
+0
+
+⎥
+
+⎢0⎥
+
+⎣
+
+1
+
+⎦
+
+⎣1⎦
+
+0
+
+0
+
+(33)
+
+Here, a total of m − 2 equations are imposed considering the C3 continuity requirements. Consequently, the redundant axis and the TPP can be synchronized to the tool-tip displacements with functions ui(s) and xr,i(s).
+
+4.4. Implementation steps of the proposed method
+
+The flowchart of the proposed toolpath smoothing method is illustrated in Fig. 9. The detailed steps are as follows.
+
+Fig. 8. Synchronization of the TPP and the redundant axis.
+
+Step 1. Preprocess the TPP and the TOP considering the smoothing error limits. Step 2. Utilizing a quintic B-spline, smooth the TPP and the TOP in independent frameworks to satisfy the continuity requirements and error limits. Step 3. Initially express the smoothed toolpath in the base coordinate system of the welding system, and subsequently assess the joint variables of the redundant axis considering its kinematic and dynamic properties. Step 4. Initially evaluate the arc length of the position and orientation smoothing splines. Subsequently, synchronize the TOP and the TPP to the tool-tip displacements by solving the B-spline-based optimization problem. Step 5. Synchronize the redundant axis and the TPP by solving the polynomial-based optimization problem. Step 6. Schedule a jerk-continuous feedrate profile considering the kinematic and dynamic characteristics of the welding equipment. Initially, derive the first-, second-, and third-order derivatives of xr,i(s) to time t:
+
+468
+
+G. Li et al.
+
+Precision Engineering 91 (2024) 462–475
+
+Fig. 9. Flowchart of the proposed path planning method.
+
+dxr,i(s) = dxr,i(s) ds
+
+ds
+
+ds dt
+
+d2xr,i(s) d2xr,i(s)(ds)2 dxr,i(s) d2s
+
+ds2 = ds2 dt + ds dt2
+
+d3xr,i(s) d3xr,i(s)(ds)3 d2xr,i(s) ds d2s dxr,i(s) d3s ds3 = ds3 dt + 3 ds2 dt dt2 + ds dt3
+
+(34)
+
+Then, incorporating the velocity, acceleration, and higher-order derivatives of the redundant axis motion as constraints in the feedrate scheduling model.
+
+Step 7. Execute the planned welding trajectory.
+
+5. Simulations and experiments
+
+In this section, simulations and welding experiments are carried out on the 6-DOF robot welding platform to ascertain the effectiveness of the proposed path-planning method. The simulation programs are developed in MATLAB®, and the welding path is executed using the PVT command. The proposed method integrates a five-axis path smoothing approach with a redundant axis path planning technology. The validation framework includes: (1) showcasing the advantages of the developed path preprocessing algorithm; (2) conducting a comparative analysis with a widely used C3 continuity method for the five-axis linear path; (3) evaluating the method’s performance in addressing the spatial welding path; and (4) demonstrating the effectiveness of the proposed method through a welding experiment.
+
+preprocessing, while Method #2 is distinguished by the integration of the developed preprocessing algorithm. Fig. 10 illustrates the smoothed toolpath obtained by Method #2. Fig. 11(a) delineates a comparative evaluation of the position smoothing errors, revealing that the errors for both methods are well-contained within the prescribed tolerances. Method #2 demonstrates a more efficient utilization of the allowable smoothing errors, achieving an average smoothing error of 0.017 mm, 11.3 times that of Method #1. Fig. 11(b) illustrates a comparison of path curvatures using the two methods. The curvature extreme obtained by Method #2 is 0.135 mm− 1, reduced by 43 % compared to Method #1. Those findings underscore the significant improvement in the curvature characteristics of the smoothing curves after path preprocessing.
+5.2. Comparison with the typical C3 continuity method
+The efficacy of the proposed method in smoothing the WCS-defined welding path is verified in this section, with the kinematic configuration
+
+5.1. Advantages of the path preprocessing algorithm
+In this section, the C3 continuity method, previously developed in Ref. [28], is implemented using an S-shaped path as the test path. The position and orientation error tolerances are set to 0.02 mm and 0.004◦, respectively. Method #1 refers to the C3 continuity method without
+
+Fig. 10. The corner-smoothed S-shaped path by Method #2.
+
+469
+
+G. Li et al.
+
+Precision Engineering 91 (2024) 462–475
+
+Fig. 11. Comparison of the smoothing results: (a) position smoothing errors; (b) curvature of the TPP.
+
+of the welding equipment deliberately excluded from consideration. A comparative evaluation is undertaken against Liu’s method [28], a typical C3 continuous corner smoothing technique. The path defined in Ref. [15] is employed as the test path. The error tolerances for the TPP and TOP are set to 0.1 mm and 0.01◦, respectively. As a result, Fig. 12(a) illustrates the geometrically smoothed toolpath by the proposed method, and Fig. 12(b) shows the optimized synchronization spline for the TPP and TOP. The results indicate that the synchronization spline exhibits a monotonic increase versus the TPP arc length, thereby validating the efficacy of the proposed synchronization strategy.
+Fig. 13 offers a comparative analysis of the position and orientation smoothing errors between the two methods. By presupposing a linear relationship between the arc lengths of the TOP and TPP, the orientation error profile along the tool-tip displacement can be obtained. Both methods are observed to comply with the specified error tolerances. The results show that: (1) owing to the TPP preprocessing algorithm, the peak values of position errors by the proposed method do not occur at the midpoints of the smoothed splines; and (2) smoothing errors obtained by the proposed method more precisely approach the error limits, thereby demonstrating superior error control ability. Fig. 14 provides a comparative curvature analysis of the smoothed path. The results reveal that: (1) both methods generate curves with peak curvature occurring at the corners; (2) except at point P27, the peak values of the TPP curvature calculated by the proposed method are significantly reduced in comparison to Liu’s method, with a 31 % reduction from 0.531 mm− 1 to 0.366 mm− 1 observed at point P1 for example; (3) the maximum of the TOP curvature derived from the proposed method are markedly lower than those of Liu’s method, with a 41 % reduction from 228 to 134. These findings collectively affirm the efficacy of the proposed method in mitigating the peak curvatures within the smoothed toolpath.
+To further evaluate the capabilities of the two methods in optimizing
+
+the tool axis motion trajectory, the feedrate is set to a constant 20 mm/s, and the S-shaped ACC/DEC strategy is employed at the start and end points of the TPP. Fig. 15 displays the tool axis angular velocities, accelerations, and jerks obtained by the two methods. The results reveal that: (1) the angular velocity profile generated by Liu’s method features multiple pronounced peaks, in contrast to the smoother curve yielded by the proposed approach; (2) the proposed method significantly reduces the peak values of both the angular acceleration and jerk profiles. Specifically, the maximum angular acceleration is reduced from 2.43 mm/s2 to 0.38 mm/s2, and similarly, the maximum angular jerk decreases from 235.7 mm/s3 to 8.15 mm/s3. Therefore, the proposed method can effectively improve the smoothness of the tool axis motion relative to Liu’s method.
+5.3. Implementation of the method in a 6-DOF welding system
+Fig. 16(a) illustrates a test path for spatial welding, comprising 51 CL points. In the simulation, the position and orientation error tolerances are set to 0.1 mm and 0.001◦, respectively. The resulting smoothing errors, as shown in Fig. 16(b), are all confined within the error tolerances. Employing the synchronization strategy outlined in Section 4.2, Fig. 17(a) shows the variation of parameter so versus s, and Fig. 17(b)~ (d) display the first-, second-, and third-order derivative of so with respect to s. The results highlight two key observations: (1) the synchronization spline exhibits a monotonic increase to the tool-tip displacement, and (2) the derivatives of so up to the third-order with respect to s are continuous, thereby affirming the efficacy of the developed synchronization strategies for the TOP and TPP.
+To express the welding path in the base coordinate system of the robot, the homogeneous transformation matrix of the WCS with respect to the base coordinate system is set to:
+
+Fig. 12. Smoothing results of a five-axis path: (a) geometric path; (b) synchronization spline for the TPP and TOP. 470
+
+G. Li et al.
+
+Precision Engineering 91 (2024) 462–475
+
+Fig. 13. Smoothing error profiles obtained by Liu’s method and the proposed method. Fig. 14. Curvature profiles of the TPP and TOP.
+
+Fig. 15. Tool axis angular velocities, accelerations, and jerks generated by the two methods.
+
+⎡
+
+⎤
+
+⎡
+
+⎤
+
+10 0
+
+300
+
+0Rw = ⎣ 0 − 1 0 ⎦, 0d = ⎣ 60 ⎦ (mm)
+
+(35)
+
+0 0 −1
+
+2350
+
+Taking into account the stiffness and kinematic singularities of the hybrid robot, Fig. 18 shows the optimized redundant axis path. Subsequently, by applying the synchronization strategy outlined in Section 4.3, Fig. 19 shows the variation of the redundant axis variable versus the tool-tip displacement. The figures indicate that the first-, second-, and third-order derivatives of xr versus s are continuous and smooth, thus substantiating the efficacy of the proposed synchronization strategy for
+
+the redundant axis. Assuming a welding feedrate of 40 mm/min for the hybrid robot,
+with S-shaped velocity profiles for smooth acceleration and deceleration at the starting and ending points, Fig. 20 displays the motion trajectories of the tool axis, the robot’s actuated joints, and the redundant axis throughout the welding process. Here, the interpolation period is set to 10 ms. The results demonstrate that all these motion trajectories are continuous and smooth, thereby validating the effectiveness of the developed path-planning method. It merits emphasis that the integration of redundant axis motion into the hybrid robot’s kinematics allows
+
+471
+
+G. Li et al.
+
+Precision Engineering 91 (2024) 462–475
+
+Fig. 16. The spatial welding path: (a) geometric shape; (b) smoothing error profiles.
+
+Fig. 17. The relationship between so and s: (a) variations of so; (b) variations of dso/ds; (c) variations of d2so/ds2; (d) variations of d3so/ds3.
+
+Fig. 18. The optimized redundant axis variables along the test path.
+for the coordinated acceleration and deceleration of translational joints. To optimize welding efficiency, it is essential to implement a timeoptimal feedrate scheduling strategy, which will be the central focus of our forthcoming study.
+5.4. Welding experiment
+In this section, an experimental validation is performed on a 6-DOF
+
+robot welding platform, specifically designed for spatial curve welding. Fig. 21(a) shows the experiment setup, and the welding duration is approximately 750 s. The welding apparatus employs a tapered cylindrical pin tool, characterized by a shoulder diameter of 15 mm, and pin diameters of 6 mm at the top and 4 mm at the bottom. The pin’s height is 4.9 mm, and its material is H13 tool steel, a material renowned for its durability and heat resistance. The workpiece material is AA2024-T4 aluminum alloy with a thickness of 5.5 mm, a high-strength alloy commonly used in aerospace applications. The welding parameters are carefully selected as follows: the rotational speed of the welding tool is set to 1000 rpm, the plunge depth is precisely set to 0.3 mm, and the welding velocity is set to 40 mm/min. To highlight the advantages of the proposed method in the following comparative experiments, the plunge depth of the shoulder is set to 0.3 mm here instead of the traditional 0.2 mm.
+In the comparative experiment, the redundant axis remains immobile throughout the welding process, with the joint variable set to zero. In the verification experiment, the developed path planning technique is applied, and the worktable follows the path outlined in Fig. 18. To mitigate potential experimental discrepancies arising from the thickness of different workpieces, both welding operations are performed on the same aluminum alloy workpiece. The welding results are shown in Fig. 21(b). The weld obtained in the verification experiment exhibits a moderate degree of flash, contrasting with the nearly flash-free weld in the comparative experiment. This indicates that the reduction of plunge depth arising from the lower stiffness has been significantly improved in the verification experiment. As per the aforementioned experimental setup, the time-stamped images of the hybrid robot throughout the welding process are presented in Fig. 22 with a time interval of 90 s.
+Therefore, the integration of the developed path-planning method
+
+472
+
+G. Li et al.
+
+Precision Engineering 91 (2024) 462–475
+
+Fig. 19. The relationship between xr and the tool-tip displacement: (a) variations of xr; (b) variations of dxr/ds; (c) v Fig. 20. Motion trajectory of the tool axis, actuated joint of the robot, and redundant axis.ariations of d2xr/ds2; (d) variations of d3xr/ds3.
+
+Fig. 20. Motion trajectory of the tool axis, actuated joint of the robot, and redundant axis.
+Fig. 21. The welding experiment on the 6-DOF robot welding platform: (a) experiment setup; (b) experiment results. 473
+
+G. Li et al.
+
+Precision Engineering 91 (2024) 462–475
+
+Fig. 22. Time-stamped images of the welding equipment in the verification experiment.
+
+with existing workpiece posture optimization techniques is pivotal for enhancing weld quality in FSW, especially when utilizing robots with redundant axes.
+6. Conclusions
+This paper presents a G3 continuous path-planning method for a robot welding system with redundant kinematics, addressing both path corner smoothing and motion synchronization. The conclusions are as follows.
+(1) A path preprocessing algorithm is developed to optimize the curvature characteristics of the smoothing B-splines at path junctions while adhering to error constraints. Simulation results of an S-shaped path show that the algorithm outperforms existing smoothing methods in error control, and significantly reduces the curvature extremum by 43 %.
+(2) A B-spline-based corner smoothing and synchronization strategy for the five-axis welding path is introduced. Motion synchronization of the TOP and TPP is achieved by solving a B-spline-based optimization problem, targeting the minimization of squared curvature derivatives. Simulation results of a blade path demonstrate a 31 % reduction in the TPP curvature extremum and a 41 % reduction in that of the TOP compared to the existing method. Additionally, the arc lengths of the TOP and TPP met monotonic increasing and C3 continuity constraints, with an 84 % decrease in tool axis angular acceleration and over a 95 % reduction in angular jerk.
+(3) A polynomial-based motion synchronization strategy for the redundant axis is proposed to ensure the continuity of its third derivative versus the TPP arc length. Simulation results of a spatial welding path confirm the smoothness of the resultant motion trajectories.
+(4) Experiments conducted on the 6-DOF robot welding platform, juxtaposed against a static redundant axis setup, demonstrate that integrating existing workpiece posture optimization technology with the proposed path-planning method significantly improves welding quality.
+(5) The proposed method is not only applicable to welding equipment with redundant axes but also shows potential for extension to other multi-axis machining equipment.
+
+CRediT authorship contribution statement
+Guangxi Li: Writing – review & editing, Writing – original draft, Validation, Software, Methodology, Formal analysis, Conceptualization. Zhizhen Ren: Software, Data curation. Wei Yue: Validation, Methodology. Haitao Liu: Resources, Funding acquisition.
+Declaration of competing interest
+The authors declare that they have no known competing financial interests or personal relationships that could have appeared to influence the work reported in this paper.
+Acknowledgments
+This work is partially supported by National Natural Science Foundation of China (grants 52325501 and 91948301).
+References
+[1] Mohan DG, Wu CS. A review on friction stir welding of steels. Chin J Mech Eng 2021;34:137. https://doi.org/10.1186/s10033-021-00655-3.
+[2] Li GL, Du SC, Wang B, Lv J, Deng YF. High definition metrology-based quality improvement of surface texture in face milling of workpieces with discontinuous surfaces. J. Manuf. Sci. Eng.-Trans. ASME 2022;144(3):031001. https://doi.org/ 10.1115/1.4051883.
+[3] Wang K, Li GL, Du SC, Xi LF, Xia TB. State space modelling of variation propagation in multistage machining processes for variable stiffness structure workpieces. Int J Prod Res 2021;59(13):4033–52. https://doi.org/10.1080/ 00207543.2020.1757173.
+[4] Li GL, Du SC, Huang DL, Zhao C, Deng YF. Dynamics modeling-based optimization of process parameters in face milling of workpieces with discontinuous surfaces. J. Manuf. Sci. Eng.-Trans. ASME 2019;141(10):101009. https://doi.org/10.1115/ 1.4044421.
+[5] Huang DL, Du SC, Li GL, Wu ZQ. A systematic approach for online minimizing volume difference of multiple chambers in machining processes based on highdefinition metrology. J. Manuf. Sci. Eng.-Trans. ASME 2017;139(8):081003. https://doi.org/10.1115/1.4035897.
+[6] Threadgill PL, Leonard AJ, Shercliff HR, Withers PJ. Friction stir welding of aluminium alloys. Int Mater Rev 2009;54(2):49–93. https://doi.org/10.1179/ 174328009X411136.
+[7] Du SC, Xu R, Li L. Modeling and analysis of multiproduct multistage manufacturing system for quality improvement. IEEE Trans. Syst. Man Cybern. -Syst 2016;48(5): 801–20. https://doi.org/10.1109/TSMC.2016.2614766.
+[8] Mendes N, Neto P, Loureiro A, Moreira AP. Machines and control systems for friction stir welding: a review. Mater Des 2016;90:256–65. https://doi.org/ 10.1016/j.matdes.2015.10.124.
+
+474
+
+G. Li et al.
+[9] Yue W, Liu HT, Huang T. An approach for predicting stiffness of a 5-DOF hybrid robot for friction stir welding. Mech Mach Theor 2022;175:104941. https://doi. org/10.1016/j.mechmachtheory.2022.104941.
+[10] Yuen A, Zhang K, Altintas Y. Smooth trajectory generation for five-axis machine tools. Int J Mach Tool Manufact 2013;71:11–9. https://doi.org/10.1016/j. ijmachtools.2013.04.002.
+[11] Sun YW, Jia JJ, Xu JT, Chen MS, Niu JB. Path, feedrate and trajectory planning for free-form surface machining: a state-of-the-art review. Chin J Aeronaut 2022;35 (8):12–29. https://doi.org/10.1016/j.cja.2021.06.011.
+[12] Sun SJ, Altintas Y. A G3 continuous tool path smoothing method for 5-axis CNC machining. CIRP J. Manuf. Sci. Technol. 2021;32:529–49. https://doi.org/ 10.1016/j.cirpj.2020.11.002.
+[13] Wang S, Li B, Zhang H, Ye PQ. A global smoothing method with geometric continuity conditions of piecewise curve fitting for toolpath of massive micro-line segments in CNC. Int J Adv Manuf Technol 2024;133:2841–59. https://doi.org/ 10.1007/s00170-024-13899-9.
+[14] Du X, Huang J, Zhu LM, Ding H. An error-bounded B-spline curve approximation scheme using dominant points for CNC interpolation of micro-line toolpath. Robot Comput Integrated Manuf 2020;64:101930. https://doi.org/10.1016/j. rcim.2019.101930.
+[15] Tulsyan S, Altintas Y. Local toolpath smoothing for five-axis machine tools. Int J Mach Tool Manufact 2015;96:15–26. https://doi.org/10.1016/j. ijmachtools.2015.04.014.
+[16] Du X, Wang B. A C3-continuous NURBS transition scheme for the CNC machining of short linear segments. Precis. Eng.-J. Int. Soc. Precis. Eng. Nanotechnol. 2022; 73:1–10. https://doi.org/10.1016/j.precisioneng.2021.08.016.
+[17] Shi ZK, Zhang WJ, Ding Y. A local toolpath smoothing method for a five-axis hybrid machining robot. Sci China Technol Sci 2023;66(3):721–42. https://doi. org/10.1007/s11431-022-2315-7.
+[18] Bi QZ, Shi J, Wang YH, Zhu LM, Ding H. Analytical curvature-continuous dualBezier corner transition for five-axis linear tool path. Int J Mach Tool Manufact 2015;91:96–108. https://doi.org/10.1016/j.ijmachtools.2015.02.002.
+[19] Hu Q Q, Chen YP, Jin XL, Yang JX. A real-time C3 continuous tool path smoothing and interpolation algorithm for five-axis machine tools. J. Manuf. Sci. Eng.-Trans. ASME 2020;142(4):041002. https://doi.org/10.1115/1.4046091.
+[20] Essid M, Gassara B, Baili M, Hbaieb M, Dessein G, Sai WB. Analytical modeling of the CNC machine axis motion in high-speed milling with local smoothing. Int J Adv Manuf Technol 2019;105(1–4):457–70. https://doi.org/10.1007/s00170-01904157-4.
+[21] Shahzadeh A, Khosravi A, Robinette T, Nahavandi S. Smooth path planning using biclothoid fillets for high speed CNC machines. Int J Mach Tool Manufact 2018; 132:36–49. https://doi.org/10.1016/j.ijmachtools.2018.04.003.
+
+Precision Engineering 91 (2024) 462–475
+[22] Huang J, Du X, Zhu LM. Real-time local smoothing for five-axis linear toolpath considering smoothing error constraints. Int J Mach Tool Manufact 2017;124: 67–79. https://doi.org/10.1016/j.ijmachtools.2017.10.001.
+[23] Wan M, Qin XB, Xiao QB, Liu Y, Zhang WH. Asymmetrical pythagorean-hodograph (PH) spline-based C3 continuous corner smoothing algorithm for five-axis tool paths with short segments. J Manuf Process 2021;64:1387–411. https://doi.org/ 10.1016/j.jmapro.2021.02.059.
+[24] Zhang Y, Zhao MY, Ye PQ, Zhang H. A G(4) continuous B-spline transition algorithm for CNC machining with jerk-smooth feedrate scheduling along linear segments. Comput Aided Des 2019;115:231–43. https://doi.org/10.1016/j. cad.2019.04.004.
+[25] Li GX, Liu HT, Liu SJ, Xiao JL. A general C2 continuous toolpath corner smoothing method for a 5-DOF hybrid robot. Mech Mach Theor 2022;169:104640. https:// doi.org/10.1016/j.mechmachtheory.2021.104640.
+[26] Xiao QB, Wan M, Liu Y, Qin XB, Zhang WH. Space corner smoothing of CNC machine tools through developing 3D general clothoid. Robot Comput Integrated Manuf 2020;64:101949. https://doi.org/10.1016/j.rcim.2020.101949.
+[27] Yang JX, Yuen A. An analytical local corner smoothing algorithm for five-axis CNC machining. Int J Mach Tool Manufact 2017;123:22–35. https://doi.org/10.1016/j. ijmachtools.2017.07.007.
+[28] Liu HT, Li GX, Xiao JL. A C3 continuous toolpath corner smoothing method for a hybrid machining robot. J Manuf Process 2022;75:1072–88. https://doi.org/ 10.1016/j.jmapro.2021.12.057.
+[29] Zhang SQ, Shi ZK, Ding Y. Toolpath smoothing with reduced curvature and synchronized motion for hybrid robots. J Manuf Process 2024;109:181–97. https://doi.org/10.1016/j.jmapro.2023.12.002.
+[30] Beudaert X, Lavernhe S, Tournier C. 5-axis local corner rounding of linear tool path discontinuities. Int J Mach Tool Manufact 2013;73:9–16. https://doi.org/10.1016/ j.ijmachtools.2013.05.008.
+[31] Yang JX, Qi Q, Adili A, Ding H. An analytical tool path smoothing algorithm for robotic machining with the consideration of redundant kinematics. Robot Comput Integrated Manuf 2024;89:102768. https://doi.org/10.1016/j.rcim.2024.102768.
+[32] Yue W, Liu HT, Li GX. An approach for optimizing the posture of a friction stir welding robotized equipment. In: Liu X, editor. Advances in mechanism, machine science and engineering in China, CCMMS; 2022. https://doi.org/10.1007/978981-19-9398-5_98.
+[33] Zhao J, Duan YX, Xie BY, Zhang ZQ. FSW robot system dimensional optimization and trajectory planning based on soft stiffness indices. J Manuf Process 2021;63: 88–97. https://doi.org/10.1016/j.jmapro.2020.05.004.
+[34] Piegl L, Tiller W. The NURBS book. second ed. New York: Springer-Verlag; 1997. [35] Lei WT, Sung MP, Lin LY, Huang JJ. Fast real-time NURBS path interpolation for
+CNC machine tools. Int J Mach Tool Manufact 2007;47(10):1530–41. https://doi. org/10.1016/j.ijmachtools.2006.11.011.
+
+475
+
+

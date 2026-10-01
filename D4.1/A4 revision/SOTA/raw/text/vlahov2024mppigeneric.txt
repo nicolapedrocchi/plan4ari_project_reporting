@@ -1,0 +1,2599 @@
+MPPI-Generic: A CUDA Library for Stochastic Trajectory Optimization
+Bogdan Vlahov1, Jason Gibson1, Manan Gandhi1, Evangelos A. Theodorou1
+
+arXiv:2409.07563v4 [cs.MS] 24 Feb 2026
+
+Abstract—This paper introduces a new C++/CUDA library for GPU-accelerated stochastic trajectory optimization called MPPIGeneric. It provides implementations of Model Predictive Path Integral control, Tube-Model Predictive Path Integral Control, and Robust Model Predictive Path Integral Control, and allows for these algorithms to be used across many pre-existing dynamics models and cost functions. Furthermore, researchers can create their own dynamics models or cost functions following our API definitions without needing to change the actual Model Predictive Path Integral Control code. Finally, we compare computational performance to other popular implementations of Model Predictive Path Integral Control over a variety of GPUs to show the real-time capabilities our library can allow for. Our library can be found at: https://acdslab.github.io/mppi-generic-website/
+I. INTRODUCTION
+As robotics and autonomy continue to grow, the choice of algorithms and methods used to plan and control complex systems in these fields start to become more selective. These algorithms need to be able to handle the potentially intricate dynamics found in robotic systems and allow for complex cost function representations. They also must be responsive to new data as environments and systems change. Finally, the planning and control methods used should run in real-time so that the robot can continue to perform without unnecessary pauses. We can see these requirements show themselves in a self-driving car example. The dynamics need to be aware of changing road conditions while the cost function has to capture multiple goals such as avoiding other cars, following traffic laws, and getting to the destination. The planner has to be fast enough to react to other drivers stopping suddenly or debris on the road.
+The approaches to Model Predictive Control (MPC) optimization can be delineated into two types of methods: gradient-based and sampling-based. Gradient-based methods such as iterative Linear Quadratic Regulator (iLQR) [1], Differential Dynamic Programming (DDP) [2] and Sequential Quadratic Programming (SQP) [3] generally rely on restrictions to the dynamics and cost functions such as being continuously differentiable. But in exchange for those restrictions, they can produce controls that minimize the cost function in a computationally-efficient manner. Sampling-based methods, such as Model Predictive Path Integral (MPPI) [4] or CrossEntropy Method (CEM) [5], can relax these requirements and allow for arbitrary functions but come at the cost of requiring many samples to properly estimate the optimal control. These arbitrary functions remove the need for convexification or smoothing which can cause unnecessary conservatism. One
+1 Autonomous Control and Decision Systems Lab, Georgia Institute of Technology, Atlanta GA 30313 USA (Corresponding author: Bogdan Vlahov)
+
+way to address this computational expense is to push the computation out of the CPU and onto a GPU, where the parallelization of sampling can be better utilized. By taking advantage of the GPU, we make sampling-based methods usable in real-time and also provide enough samples to get optimal solutions.
+First introduced in [4], MPPI is a stochastic MPC algorithm derived using the information theoretic dualities between relative entropy and free energy. Experiments in [4] included offroad navigation using the GT-Autorally vehicle [6] and demonstrated for the first time utilization of GPU for samplingbased MPC on real hardware. Follow-up works included the derivation of MPPI for the case of non-affine dynamics [7], [8] and extensions to multi-layer control architectures that incorporate the benefits of iLQR to increase robustness to disturbances and model errors. These extensions include the Tube-based MPPI [9], Robust-MPPI (RMPPI) [10], [11] architectures which consists of two layers of control. Further discussion of extensions to MPPI is left to Section II-B.
+Besides the obvious use-case of MPC, alternative use-cases of MPPI can be found in the Model-Based Reinforcement Learning (MBRL) literature [12], [13], [14], [15], [16], [17]. In MBRL, MPPI is used to seek data from a simulation environment to learn the underlying value function and corresponding policy. Finally, while the majority of prior work on MPPI has direct applications to planning and control for systems in robotics and autonomy such as quad-rotors [18], [19], terrestrial [4], [20], [21], [22], [23], sea surface [24], [25] and underwater [26] vehicles, manipulators [27], and systems with multi-body dynamics [28], there are notable applications to other domains of science and engineering. These include control of HVAC systems [29], [30], chemical reactors [31], and pulse width modulation rectifiers [32].
+Given the far reaches of the MPPI algorithm, it is important to provide a solid and flexible computational framework from which researchers can make use of previous advancements to push their own work forwards. That framework needs to not only provide many built-in options to allow for testing on different platforms but also allow for researchers to develop new ideas on top of. Finally, that library needs to be able to support researchers all the way to hardware deployment with the ability to run in real-time even on older hardware platforms.
+With this inspiration in mind, we introduce our controls and planning optimization library, MPPI-Generic. It is written in C++/CUDA and contains multiple dynamics and cost functions to allow for researchers to begin using them in complex robotics scenarios. In addition, it also allows for
+
+1
+
+2
+
+researchers to create their own dynamics or cost functions that take advantage of the GPU-accelerated controllers. It provides implementations of MPPI[4], Tube-MPPI[9], and RMPPI [11] as well as an API for implementations of new sampling-based controller. Initial versions of this library have already been used in a variety of hardware and software experiments [20], [24], [11], [33], [34]. To the best of our knowledge, this is the first MPPI library implementation to provide GPU-acceleration with real-time performance, multiple existing dynamics and cost functions, replaceable sampling distributions and controller algorithms, and extensibility options for researchers to create new components.
+Our contributions are summarized as follows: • We provide a NVIDIA GPU-accelerated Library1 for
+MPPI. • We provide a C++/CUDA API that allows for arbitrary
+dynamics and cost function definitions while maintaining high computational performance. We show simple examples of extending various parts of the library to give researchers an idea of how they could customize this library for their own needs. • We show computational comparisons with other popular MPPI libraries across a variety of computational hardware.
+The rest of the paper is organized as follows: In Section II, we provide the general problem formulation of a stochastic trajectory optimization problem, introduce various extensions to MPPI, and discuss the building blocks of the MPPI-Generic Library. In Section III, we discuss implementation details of our library and performance parameters available to the user to tweak. In Section IV, we show how to use the library through coding examples. In Section V, we show computational comparisons of our library against other implementations of MPPI. Finally, we state our conclusions in Section VI.
+
+II. BACKGROUND ON STOCHASTIC TRAJECTORY OPTIMIZATION
+Consider a general nonlinear system with discrete dynamics and cost function of the following form:
+
+xt+1 = F (xt, ut + nt)
+
+(1)
+
+T −1
+
+J(X, U ) = ϕ(xT ) + ℓ (xt, ut) ,
+
+(2)
+
+t=0
+
+where x ∈ Rnx is the state, u ∈ Rnu is the control, n is assumed to be zero-mean Gaussian disturbances with
+
+variance Σ in the control channel, T is the time horizon, X
+
+is a state trajectory [x0, x1, ..., xT ], U is a control trajectory [u0, u1, ..., uT −1], ϕ is the terminal cost, and ℓ is the running cost. It is important to note that existing MPPI-Generic dynam-
+
+ics assume Euler integration by default but can be modified if
+
+desired by developing a custom dynamics class.
+
+A. The MPPI Algorithm While MPPI was originally derived from a path-integral
+approach, there have been other derivations that lead to slightly
+1Library code is located at https://github.com/ACDSLab/MPPI-Generic
+
+different update rules. We will briefly go over the informationtheoretic derivation [8] to underpin the specific update rule we use in MPPI-Generic. We also briefly discuss other variations of MPPI that are included in this library.
+1) Information Theoretic Derivation: We shall follow the information-theoretic derivation from [8] with some changes. In [8], the running cost definition was only based on the state trajectory and the authors showed how a control cost would emerge naturally from the importance sampling scheme. However, the derivation does not require this limited running cost definition, so we generalize our running cost to ℓ(xt, ut). We use the following shorthand to denote the cost for a control trajectory U applied to the starting state, x0,
+J (U ) := J(X, U ) (3)
+s.t. xt+1 = F (xt, ut)
+Our goal is to find a control trajectory, U ∗, that minimizes Eq. (2) through the use of sampling. We start by defining the free energy of our system as
+1 F (J , P, λ; x0) = −λ ln EV ∼P exp − λ J (V ) (4)
+where x0 is the initial state, λ ∈ R+ is the inverse temperature, and V is the control trajectory sampled from some base distribution P with Probability Density Function (PDF) p. The base distribution P can be any distribution, making it potentially computationally intractable. Introducing a new distribution Q that is absolutely continuous with P, we use importance sampling and Jensen’s Inequality to get the following,
+
+F (J , P, λ; x0) ≤ EV ∼Q [J (V )] + λKL (Q || P) (5)
+
+where KL (· || ·) is the Kullback Leibler (KL) divergence between Q and P. This introduces an upper bound on our free energy when we sample from Q instead of the original P; this upper bound becomes a strict equality if Q∗ has the following density:
+
+q∗(V ) = 1 exp − 1 J (V ) p(V ) (6)
+
+η
+
+λ
+
+η = EVˆ ∼P exp − 1λ J (Vˆ ) (7)
+
+While Q∗ is an optimal distribution that minimizes the free energy bound, the optimal PDF, q∗(V ), still relies on the PDF of the original distribution P, meaning it still might be computationally intractable. Thus, we introduce a third distribution Sθ that has controllable parameters θ and minimizes the KL divergence between Sθ and Q∗,
+
+θ∗ = arg min KL (Q∗ || Sθ)
+
+(8)
+
+θ∈Θ
+
+= arg max EV ∼Q∗ [ln (s (V |θ))] .
+
+(9)
+
+θ∈Θ
+
+Eq. (9) gives us an update rule for any probability distribution with parameters to match the optimal distribution. Leaving this aside for the moment, we show how to calculate the optimal control sequence by sampling from Sθ. From there, we will show how the update rule and the optimal control sequence can relate to each other depending on the choice of
+
+3
+
+distributional family, Sθ. For the optimal control to use at time t, we shall look to the mean of the optimal distribution Q∗,
+
+ut∗ = EV ∼Q∗ [vt]
+
+(10)
+
+=
+
+vtq∗ (V ) dV
+
+(11)
+
+V∼ U
+
+Using importance sampling to sample from Sθ as well as Eq. (6) gives the following,
+
+∗
+
+q∗ (V )
+
+ut =
+
+vt
+
+s (V |θ) dV
+
+(12)
+
+V ∼ U s (V |θ)
+
+= EV ∼Sθ [w(V )vt]
+
+(13)
+
+1
+
+1
+
+p (V )
+
+w(V ) = exp − J (V )
+
+(14)
+
+η
+
+λ
+
+s (V |θ)
+
+The only term in w(V ) that is unaccounted for is the impor-
+
+tance sampling weight of P and Sθ.
+
+In [8], the base and parameterized distributions were both
+
+assumed to be Gaussian distributions with constant variance
+
+across time, Σ. The mean trajectory of P was assumed to be
+
+0nu×T while the mean trajectory of Sθ was the parameter to
+
+optimize,
+
+i.e.
+
+θ
+
+=
+
+U∗
+
+=
+
+∗ T −1
+{ut }t=0 .
+
+This
+
+led
+
+to
+
+the
+
+specific
+
+form of
+
+1 w(V ) = exp
+η
+
+1 T −1 − J (V ) −
+λ t=0
+
+vt − 1 ut∗ 2
+
+⊤Σ−1ut∗ (15)
+
+and also meant that the solutions to Eqs. (9) and (13) were the same.
+
+B. Other MPPI Modifications
+Beyond the derivations of MPPI, there have been other modifications that address various limiations of MPPI. A Tubebased MPPI controller [9] was created in order to improve robustness to state disturbances. It made use of a tracking controller to track the real system back to a nominal system that ignored state disturbances resulting in large costs. The nominal system would use an initial state produced from the dynamics equation in Eq. (1) for a new iteration of MPPI instead of the real system’s state estimate. Both the real and the nominal trajectories are calculated using MPPI while the tracking controller was iLQR. In this setup, the tracking controller would always be the one sending controls to the system and as MPPI was not aware of the tracking controller, it could end up fighting against the tracking controller. In order to address that, RMPPI was developed in [10], [11], which applied the tracking controller feedback within the samples MPPI used. RMPPI also chose the initial state for the nominal system using a constrained optimization problem that tried to keep the nominal state as close to the real state without causing the resulting trajectory to have a cost larger than a given cost threshold α. Choosing the nominal state in this way ensured there was an upper bound on how quickly the optimal trajectory’s cost could grow due to disturbance. However, this improved robustness to state disturbances can struggle when the cost function itself changes over time due to new information. Our library contains implementations of these
+
+algorithmic improvements to MPPI as different controllers are the best choice in different scenarios.
+Since this first wave of publications on MPPI, there has been a plethora of extensions and improvements. These include sampling efficiency improvements such as Covariance Control MPPI [35], Colored MPPI [20], Residual MPPI [36], Biased-MPPI [37], Spline-Interpolated Model Predictive MPPI [19], Stein Variational Guided MPPI [38], log-MPPI [21], CoVO-MPC [39], U-MPPI [40], o-MPPI [41], and Smooth MPPI [42]; there have also been robustness improvements such as Tsallis-MPPI[43], Constrained Covariance Steering MPPI [44], Multi-Modal MPPI [45], and Risk-Aware MPPI [46]. Some of the sampling efficiency methods have also been implemented, shown in Section IV-C3, but the rapid development of the community makes it nearly impossible to keep up.
+
+C. MPPI-Generic’s MPPI Implementation
+
+In practice, MPPI-Generic uses the update rule, Eq. (13), with Monte-Carlo sampling to find the optimal control sequence. The algorithm starts by sampling control trajectories, running each trajectory through the dynamics in Eq. (1) to create a corresponding state trajectory, and evaluating each state and control trajectory through the cost function. We provide the option to calculate an importance sampling ratio calculated for the specific sampling distribution like in Eq. (14) or to disable it,
+
+p (V )
+
+I (V ) = β ln
+
+(16)
+
+s (V |θ)
+
+where β ∈ {0, 1}. The option to disable the importance sampling weight comes from experimentation, such as on the AutoRally platform [6], where we have seen better control trajectories without it. Finally, a weighted average of the trajectories is conducted to produce the optimal control trajectory. The update law for Ut∗, the optimal control at time t, ends up looking like
+
+∗
+
+M
+
+exp
+
+− 1λ (J (V m) − λI (V m) − ρ)
+
+vm
+t
+
+Ut =
+
+M
+
+1
+
+(17)
+
+m=1 j=1 exp − λ (J (V m) − λI (V m) − ρ)
+
+ρ = min (J (V m) − λI (V m))
+
+(18)
+
+m∈[1,M ]
+
+where
+
+Vm
+
+is
+
+the
+
+m-th
+
+sampled
+
+control
+
+trajectory,
+
+vm
+t
+
+is
+
+the
+
+control from the m-th sampled trajectory at time t, and ρ is the
+
+minimum sampled cost. When using a Gaussian distribution,
+
+the
+
+sampled
+
+control
+
+vm
+t
+
+=
+
+ut
+
++
+
+ϵm
+t
+
+is
+
+centered
+
+around
+
+the
+
+previous
+
+optimal
+
+control
+
+ut
+
+and
+
+has
+
+noise
+
+ϵm
+t
+
+∼
+
+N (0, Σ);
+
+other distributions would have different ways to draw samples
+
+and alternative I (V ) equations. We use ρ as in [8] to shift
+
+the range of the exponentiated costs to limit numerical sta-
+
+bility issues. Sampling in the control space ensures that the
+
+trajectories are dynamically feasible and allows us to use non-
+
+differentiable dynamics and cost functions. Pseudo-code for
+
+the algorithm is shown in Algorithm 1.
+
+D. Library Description This library is made up of 6 major types of classes:
+
+4
+
+Algorithm 1: MPPI
+Given: F (·, ·), G (·, ·) ℓ (·, ·), ϕ (·), I (·), M , I, T , λ, Σ: System dynamics, system observation, running cost, terminal cost, importance sampling ratio, num. samples, num. iterations, time horizon, temperature, covariance;
+Input : x0, U: initial state, mean control sequence; Output: U: optimal control sequence
+
+// Begin Cost sampling
+
+1 for i ← 1 to I do
+
+2
+
+for m ← 1 to M do
+
+3
+
+Jm ← 0;
+
+4
+
+x ← x0;
+
+5
+
+for t ← 0 to T − 1 do
+
+6
+
+vt
+
+← ut + ϵm t ,
+
+ϵm
+t
+
+∼ N (0, Σ);
+
+7
+
+x ← F (x, vt);
+
+8
+
+y ← G (x, vt);
+
+9
+
+Jm += ℓ (y, vt) − λI (vt);
+
+10
+
+Jm += ϕ (y)
+
+// Compute trajectory weights
+
+11
+
+ρ ← min J1, J2, ..., JM ;
+
+12
+
+η ← m=1 M exp − 1λ (J m − ρ) ;
+
+13
+
+for m ← 1 to M do
+
+14 wm ← 1η exp − 1λ (J m − ρ) ;
+
+// Control update
+
+15
+
+for t ← 0 to T − 1 do
+
+16
+
+Ut ← ut +
+
+M wmϵm;
+
+m=1
+
+t
+
+• Dynamics • Cost Functions • Controllers
+
+• Sampling Distributions • Feedback Controllers • Plants
+
+The Dynamics and Cost Function classes are self-evident and are classes describing the F, G, ℓ, and ϕ functions from Eqs. (1), (19) and (20). The Controller class finds the optimal control sequence U∗ that minimizes the cost in Eq. (20) using algorithms such as MPPI. The Sampling Distributions are used by the Controller class to generate the control samples used for determining the optimal control sequence. The Feedback Controller class determines what feedback controller if any, is used to help push the system back towards the desired trajectory computed by the Controller. This is required for the Tube-MPPI and RMPPI implementations but can even be used with the MPPI controller as it provides feedback in between MPC iterations. Unless otherwise specified, the Feedback Controllers in code examples are instantiated but turned off by default. Finally, Plants are a MPC wrapper around a given controller and are where the interface methods in and out of the controller are generally defined. For example, a common-use case of MPPI is on a robotics platform running Robot Operating System (ROS) [47]. The Plant is where you would implement your ROS subscribers to information such as state, ROS publishers of the control output, and the necessary methods to convert from ROS messages to MPPI-Generic equivalents. Each class type has their own parameter structures which encapsulate the adjustable parameters of each specific instantiation of the class.
+
+III. PERFORMANCE IMPLEMENTATION
+We shall now discuss some of the performance-specific implementation details we make use of in MPPI-Generic.
+
+First, we will give a brief introduction to GPU hardware and terminology followed by general GPU performance tricks useful for implementation in this library.
+A. GPU Parallelization Overview
+The GPU is a highly parallelizable hardware device that performs operations differently than a CPU. The lowest level of computation in CUDA is a warp, which consists of 32 threads doing the same operation at every clock step [48]. These warps are grouped together to produce thread blocks. While the threads in a warp are computed together, the individual warps in the thread block are not guaranteed to be at the same place in the code at any given time and sometimes it can actually be more efficient to allow them to differ. The threads in a thread block all have access a form of a local cache called shared memory. Like any memory shared between multiple threads on the CPU, proper mutual exclusion needs to be implemented to avoid race conditions. Threads in a block can be given indices in 3 axes, x, y, and z, which we use to denote different types of parallelization within the library. The conversion from a thread’s 3D index of (x, y, z) to its thread number in the block is given by (z * blockDim.y + y)* blockDim.x + x. Thread blocks can themselves be grouped into grids and are also organized into x, y, and z axes. This is useful for large parallel operations that cannot fit within a single thread block.The GPU code is compiled into kernels, which can be provided arbitrary grid and block dimensions at runtime.
+It is important to briefly understand the hierarchy of memory before discussing how to improve GPU performance. At the highest level, we have global memory which is generally measured in GBs and very slow to access data from. Next, we have an L2 cache in the size of MBs which can speed up access to frequently-used global data. Then we have the L1 cache, shared memory, and CUDA texture caches. The L1 cache and shared memory are actually the same memory on hardware and are generally several kBs in size; they are separated by programmers explicitly using shared memory and the GPU automatically filling the L1 cache. The CUDA texture cache is a fast read-only memory used for CUDA textures which are 2D or 3D representations of data such as a map.
+B. General GPU speedups
+When looking into writing more performant code, there are some general tricks that we leveraged throughout our code library. The first is the use of CUDA streams [49]. By default, every call to the GPU blocks the CPU code from moving ahead. CUDA streams allow for the asynchronous scheduling of tasks on the GPU while the CPU performs other work in the meantime. We use CUDA streams throughout in order to schedule memory transfers between the CPU and GPU as well as kernel calls and have different streams for controller optimal control and visualization computations.
+The next big tip is minimizing global memory accesses. Global memory reading or writing can be a large bottleneck in computation time and for our library, it can be slower than the actual computations we want to do on the GPU. The first
+
+5
+
+recommendation is to move commonly-accessed data from global memory to shared memory [50]. We also use Curiously Recurring Template Patterns (CRTPs) [51] as our choice of polymorphism on the GPU to avoid the need of constructing and reading from a virtual method table which would be stored in global memory.
+We utilize vectorized-memory [52] accessing where possible. Looking at the GPU instruction set, CUDA provides instructions to read and write in 32, 64, and 128 bit chunks, making it possible to load up to four 32-bit floats in a single instruction. Using these concepts, we greatly reduce the number of calls to global memory and consequently increase the speed at which our computations can run.
+We also make use of hardware-defined mathematical operators called intrinsics in some places as well to reduce computation time [53]. These instrinsics are approximations of various mathematical operations such as division, sin, etc. that are implemented at the hardware level, requiring many fewer clock cycles to compute. The trade-off is that they are approximations and can return incorrect evaluations depending on the inputs. As such, we limited our use of intrinsics to trigonometric functions like __cosf(), __sinf(), and __sincosf(). We found that other intrinsics such as __fdividef() or __expf() when used throughout the code base cause significantly different optimal control sequence calculations. However, there are plenty of specific locations in the code where more intrinsics can be introduced without negative effects on accuracy at a future point. In addition, we try to make use of float -specific methods when applicable such as expf() to prevent unnecessary conversions to and from double.
+C. Library-Specific Performance Optimizations
+So far, we discussed optimizations that can be done for any CUDA program. However, there are further optimizations to be had in choosing how to parallelize specific components of our library. In Fig. 1, we have the general steps taken every time we want to compute a new optimal control sequence in MPPI. These same steps are also taken in Tube-MPPI and RMPPI though they have to be done for both the nominal and real systems.
+One major performance consideration is how to parallelize the Dynamics and Cost Function calculations. We can either run the Dynamics and Cost Function in a combined kernel or run them in separate kernels. We describe each parallelization technique as well as the pros and cons below. First, we introduce a slight modification to the Dynamics and Cost Functions.
+1) Intermediate Calculation Passthrough: When creating Cost Functions for a given Dynamics, it might be required to redo calculations already done in the Dynamics. For example, putting a penalty on the location of the wheels of a vehicle inherently requires knowing where the wheels are located. The wheel locations can be calculated given the position and orientation of the center of mass of the vehicle and so are not considered part of the state. Depending on the Dynamics, the wheel locations might also be calculated as part of the state update. To reduce unnecessary recalculations, we provide a
+
+way to pass these extra values directly from the Dynamics to the Cost Function. We do this by slightly modifying Eq. (2) to use outputs, yt instead of xt,
+
+yt = G (xt, ut)
+
+(19)
+
+T −1
+
+J(Y, U ) = ϕ(yT ) + ℓ (yt, ut) ,
+
+(20)
+
+t=0
+
+where G (xt, ut) is calculated as part of the Dynamics. For the vast majority of systems, yt is the true state, i.e. yt = xt, but we have found in some cases that bringing additional calculations from the Dynamics to the Cost Function can be computationally faster than reproducing them.
+2) Split Kernel Description: We start by taking the initial state and control samples and run them through the Dynamics kernel. This kernel uses all three axes of thread parallelization for different components. First, the x dimension of the block and the grid are used to indicate which sample we are on as threadIdx.x + blockDim.x * blockIdx.x. As every sample will conduct the exact same computations, using the x axis allows us to ensure that each warp is aligned as long as the x block size is chosen appropriately. Next, the z axis is used to indicate which system is being run; for MPPI, there is only one system but Tube-MPPI and RMPPI use two systems, nominal and real. As dynamics generally have different derivative computations for different states, we use the y dimension, as shown in Lst. 1, to introduce additional parallelization within the dynamics, instead of sequential computation of each state derivative, which can lead to further performance improvements. When our thread block’s x dimension is a multiple of 32, the y threads are separated into different warps and Lst. 1 improves performance. However, when a switch/ if statement causes threads in the same warp to follow different computations, this is known as warp divergence, and the GPU runs the warp again to go through all code paths. Depending on the complexity of the branching, this can cause significant slowdowns. In the Dynamics kernel, we run a for loop over
+
+1 i n t tdy = threadIdx . y ;
+
+2 s w i t c h ( tdy ) {
+
+3
+
+c a s e S_INDEX ( X ) :
+
+4
+
+xdot [ tdy ] = u [ C_INDEX ( VEL ) ] * cos ( x [ S_INDEX ( YAW ) ] ) ;
+
+5
+
+break ;
+
+6
+
+c a s e S_INDEX ( Y ) :
+
+7
+
+xdot [ tdy ] = u [ C_INDEX ( VEL ) ] * sin ( x [ S_INDEX ( YAW ) ] ) ;
+
+8
+
+break ;
+
+9
+
+c a s e S_INDEX ( YAW ) :
+
+10
+
+xdot [ tdy ] = u [ C_INDEX ( YAW_DOT ) ] ;
+
+11
+
+break ;
+
+12 }
+
+Listing 1. GPU code for the Unicycle Dynamics. This code parallelizes using the thread y dimension to do each state derivative calculation in a different thread
+time for each sample in which we get the current control sample, run it through the Dynamic’s step() method, and save out the resulting output to global memory.
+Next, we look to the Cost Function ran inside its own kernel. The reason for that is that while the Dynamics must be sequential over time, the cost function does not need to be.
+
+6
+
+Generate Samples
+
+Roll out Dynamics
+
+Roll out Costs
+
+Compute Baseline
+
+Exponentiated Transform
+
+Weighted Sum for Optimal Control
+
+starting state
+
+control samples
+
+output samples
+
+cost samples
+
+baseline
+
+transformed cost samples and
+normalizer
+
+Optimal Control Sequence
+
+Fig. 1. Diagram of the execution flow of computeControl(). The blue ellipses indicate variables, the green rectangles are GPU methods, and the orange rectangles are CPU methods. The selection in purple is a single GPU kernel when using the combined kernel and separated out when using split kernels. Most of the code is run on the GPU but we found that some operations such as finding the baseline and calculating the normalizer, η, run faster on the CPU.
+
+To achieve parallelization across time, we move the sample index up to the grid level and use the block’s x axes for time instead. The Cost kernel gets the control and output corresponding to the current time in its computeRunningCost() or terminalCost() methods, adds the cost up across time for each sample, and saves out the resulting overall cost for each sample. A problem that arises is the limited number of timesteps we could optimize over due to the limit of 1024 threads in a single thread block; we address this by reusing threads to each compute multiple timesteps until we reach the desired time horizon. These choices brings the time to calculate the cost much closer to that of a single timestep instead of having to wait for sequential iterations of the cost if it was paired with the Dynamics kernel.
+3) Combined Kernel Description: The Combined Kernel runs the Dynamics and Cost Function methods together in a single kernel. This works by getting the initial state and control samples, applying the Dynamics’ step() to get the next state and output, and running that output through the Cost Functions’ computeCost() to get the cost at that time. This basic interaction is done in a for loop over the time horizon to get the the entire state trajectory as well as the cost of the entire sample. We parallelize this over three axes. First, the x and z dimensions of the block and grid are used to indicate which sample and system we are on as described above in the Split Kernel’s Dynamics section. Finally, the y dimension is used to parallelize within the Dynamics and Cost Functions’ methods.
+4) Choosing between the Split and Combined Kernels: There are some trade-offs between the two kernel options that can affect the overall computation time. By combining the Dynamics and Cost Function calculations together, we keep the intermediate outputs in shared memory and do not need to save them out to global memory. However, we are forced to run the Cost Function sequentially in time. Splitting the Dynamics and Cost Function into separate kernels allows them each to use more shared memory for their internal calculations with the requirement of global memory usage to save out the sampled output trajectories. The Combined Kernel uses less global memory but requires more shared memory usage in a single kernel as it must contain both the Dynamics and Cost Functions’ shared memory requirements. As the number of samples grow, the number of reads and writes of outputs to global memory also grows. This can eventually take more time than the savings we get from running the Cost Function
+
+in parallel across time, even when using vectorized-memory reads and writes.
+In order to address these trade-offs, we implemented both kernel approaches in our library and automatically choose the most appropriate kernel in the Controller constructor using chooseAppropriateKernel(). The automatic kernel selection is done by running both the combined and split kernels multiple times, measuring the computation time of each, and choosing the fastest option. As the combined kernel potentially uses more shared memory than the split kernel, we also check to see if the amount of shared memory used is below the GPU’s shared memory hardware limit; if it is not, we default to the split kernel approach. We also allow the user to overwrite the automatic kernel selection through the use of the setKernelChoice() method.
+5) Weight Transform and Update Rule Kernels: Once the costs of each sample trajectory is calculated, we bring these costs back to the CPU in order to find the baseline, ρ. The baseline is calculated by finding the minimum cost of all the sample trajectories; it is subtracted out during the exponentiation stage as it has empirically led to better optimization performance. When the number of samples is only in the thousands, we found that the copy to the CPU to do the baseline search is faster than doing so on the GPU. The costs are then exponentiated on the GPU and the normalizer, η, is calculated back on the CPU before doing the final optimal control calculation.
+D. Performance Recommendations
+The performance capabilities of the MPPI-Generic library is highly dependent on the choices of block sizes for the various kernels, Dynamics, and Cost Functions. There is no one choice to be made so instead, we provide some general rules of thumbs that we have seen work more often than not.
+• Set the thread block x dimension size of both the Dynamics and Cost kernels to be a multiple of 32. This allows all the threads in a warp to do the same operation. We have seen in some cases that lowering the thread block x dimension to 16 can provide some improvements but this has not been true for the majority of dynamics and cost functions.
+• Set the thread block y dimension for Dynamics equal to the state dimension and Cost Functions to 1. This depends on whether the Dynamics/Cost Function are utilizing the
+
+7
+
+1 # i n c l u d e <mppi / c o n t r o l l e r s / MPPI / m p p i _ c o n t r o l l e r . cuh >
+
+2 # include <mppi / c o s t _ f u n c t i o n s / c a r t p o l e / c a r t p o l e _ q u a d r a t i c _ c o s t . cuh>
+
+3 # include <mppi / dynamics / c a r t p o l e / cartpole_dynamics . cuh>
+
+4 # i n c l u d e <mppi / f e e d b a c k _ c o n t r o l l e r s / DDP / ddp . cuh >
+
+5
+
+6 c o n s t i n t NUM_TIMESTEPS = 1 0 0 ;
+
+7 c o n s t i n t NUM_ROLLOUTS = 2 0 4 8 ;
+
+8 u s i n g DYN_T = CartpoleDynamics ;
+
+9 u s i n g COST_T = CartpoleQuadraticCost ;
+
+10 u s i n g FB_T = DDPFeedback<DYN_T , NUM_TIMESTEPS > ;
+
+11 u s i n g SAMPLING_T = mppi : : sampling_distributions : : GaussianDistribution<DYN_T : : DYN_PARAMS_T > ;
+
+12 u s i n g CONTROLLER_T = VanillaMPPIController<DYN_T , COST_T , FB_T , NUM_TIMESTEPS , NUM_ROLLOUTS , SAMPLING_T > ;
+
+13 u s i n g CONTROLLER_PARAMS_T = CONTROLLER_T : : TEMPLATED_PARAMS ;
+
+14
+
+15 i n t main ( i n t argc , c h a r ** argv ) {
+
+16
+
+f l o a t dt = 0 . 0 2 ;
+
+17
+
+std : : shared_ptr<DYN_T> dynamics = std : : make_shared<DYN_T > ( ) ; / / s e t up d y n a m i c s
+
+18
+
+std : : shared_ptr<COST_T> cost = std : : make_shared<COST_T > ( ) ;
+
+/ / s e t up cost
+
+19
+
+/ / s e t up feedback c o n t r o l l e r
+
+20
+
+std : : shared_ptr<FB_T> fb_controller = std : : make_shared<FB_T > ( dynamics . get ( ) , dt ) ;
+
+21
+
+/ / s e t up sampling d i s t r i b u t i o n
+
+22
+
+SAMPLING_T : : SAMPLING_PARAMS_T sampler_params ;
+
+23
+
+std : : fill ( sampler_params . std_dev , sampler_params . std_dev + DYN_T : : CONTROL_DIM , 1 . 0 ) ;
+
+24
+
+std : : shared_ptr<SAMPLING_T> sampler = std : : make_shared<SAMPLING_T > ( sampler_params ) ;
+
+25
+
+/ / s e t up MPPI C o n t r o l l e r
+
+26
+
+CONTROLLER_PARAMS_T controller_params ;
+
+27
+
+controller_params . dt_ = dt ;
+
+28
+
+controller_params . lambda_ = 1 . 0 ;
+
+29
+
+controller_params . dynamics_rollout_dim_ = dim3 ( 6 4 , DYN_T : : STATE_DIM , 1 ) ;
+
+30
+
+controller_params . cost_rollout_dim_ = dim3 ( NUM_TIMESTEPS , 1 , 1 ) ;
+
+31
+
+std : : shared_ptr<CONTROLLER_T> controller = std : : make_shared<CONTROLLER_T > (
+
+32
+
+dynamics . get ( ) , cost . get ( ) , fb_controller . get ( ) , sampler . get ( ) , controller_params ) ;
+
+33
+
+34
+
+DYN_T : : state_array x = dynamics−>getZeroState ( ) ; / / s e t up i n i t i a l s t a t e
+
+35
+
+controller−>computeControl ( x , 1 ) ;
+
+// calculate control
+
+36
+
+a u t o control_sequence = controller−>getControlSeq ( ) ;
+
+37
+
+std : : cout << " C o n t r o l S e q u e n c e : \ n " << control_sequence << std : : endl ;
+
+38
+
+return 0;
+
+39 }
+
+Listing 2. Minimal Example to print out optimal control sequence for a cartpole system.
+
+multi-threading capability available to them but for most of the pre-defined Dynamics, they are using the y axis of the thread block to do dynamics updates. Meanwhile, most Cost Functions are not taking advantage of the parallelization as they return a single value, the cost. • Keep Dynamics and Cost Function kernels’ thread block sizes low. The limit to the size of a thread block is currently 1024 so it might be tempting to fill that. However, there are various synchronization points in these kernels to ensure that data has been loaded before being used. As the thread block size increases, more time is spent waiting at these synchronization points in the Dynamics and Cost Function kernels. • When developing your own Dynamics, it can be pertinent to make the output dimensions divisible by 2 or 4. This can done by adding extraneous values to the enum. This allows the code to use more efficient memoryloading GPU instructions discussed in Section III-B and reduce the number of memory calls by a factor of at least 2. One might be tempted to also ensure that the control dimension is divisible by 4. However, the control dimension is also used to generate samples so while there may be improvements to the efficiency of reading memory, it will also slow down generating samples. • Minimize the occurrence of warp divergence in your GPU code when possible. The most common way these occur
+
+is by using if statements based on values that might be different for individual threads in a warp. In some cases, converting the desired bool expression into a float will be faster while still providing the desired branching.
+IV. API STRUCTURE
+We describe the library API and its usage in three stages. At the beginner level, the desire is to use a provided Dynamics, Cost Function, and Controller to control a system. This requires the least amount of code writing on the part of the user as most of the code is already provided. The library user would only need to write a specific Plant class to properly interface with whatever system they are wanting to control and the executable which sets up and runs the controller itself. The intermediate level is where the user might want to implement a dynamics model or cost function that does not exist in the base library. Finally, at the advanced level, we show how to implement a custom Feedback Controller, Controller, or Sampling Distribution.
+A. Beginner
+We start by showing an example of just using a single iteration of MPPI to produce an optimal control sequence in Lst. 2. At the beginning of the example (Section III-D), we create aliases such DYN_T for CartpoleDynamics to keep the code fairly succinct. The Feedback Controller is not used for this
+
+8
+
+1 #pragma once
+
+2 # include <mppi / core / base_plant . hpp>
+
+3 # include <mppi / dynamics / c a r t p o l e / c a r t p o l e . cuh>
+
+4
+
+5 t e m p l a t e < c l a s s CONTROLLER_T> c l a s s SimpleCartpolePlant : p u b l i c c l a s s BasePlant<CONTROLLER_T> {
+
+6 public :
+
+7
+
+u s i n g control_array = t y p e n a m e CartpoleDynamics : : control_array ;
+
+8
+
+u s i n g state_array = t y p e n a m e CartpoleDynamics : : state_array ;
+
+9
+
+u s i n g output_array = t y p e n a m e CartpoleDynamics : : output_array ;
+
+10
+
+11
+
+SimpleCartpolePlant ( std : : shared_ptr<CONTROLLER_T> controller , i n t hz , i n t optimization_stride )
+
+12
+
+: BasePlant<CONTROLLER_T > ( controller , hz , optimization_stride ) {
+
+13
+
+system_dynamics_ = std : : make_shared<CartpoleDynamics > ( ) ;
+
+14
+
+}
+
+15
+
+16
+
+v o i d pubControl ( c o n s t control_array& u ) {
+
+17
+
+state_array state_derivative ;
+
+18
+
+output_array dynamics_output ;
+
+19
+
+state_array prev_state = current_state_ ;
+
+20
+
+f l o a t t = t h i s −>state_time_ ;
+
+21
+
+f l o a t dt = t h i s −>controller_−>getDt ( ) ;
+
+22
+
+system_dynamics_−>step ( prev_state , current_state_ , state_derivative , u , dynamics_output , t , dt ) ;
+
+23
+
+current_time_ += dt ;
+
+24
+
+}
+
+25
+
+26
+
+v o i d pubNominalState ( c o n s t state_array& s ) {}
+
+27
+
+v o i d pubFreeEnergyStatistics ( MPPIFreeEnergyStatistics& fe_stats ) {}
+
+28
+
+i n t checkStatus ( ) { r e t u r n 0 ; }
+
+29
+
+d o u b l e getCurrentTime ( ) { r e t u r n current_time_ ; }
+
+30
+
+d o u b l e getPoseTime ( ) { r e t u r n t h i s −>state_time_ ; }
+
+31
+
+32
+
+state_array current_state_ ;
+
+33 p r o t e c t e d :
+
+34
+
+std : : shared_ptr<CartpoleDynamics> system_dynamics_ ;
+
+35
+
+d o u b l e current_time_ = 0 . 0 ;
+
+36 }
+
+Listing 3. Basic Plant implementation that interacts with a virtual Cartpole dynamics system stored within the Plant.
+
+example but it is required to exist. The Sampling Distribution and Controller have parameters that need to be set; their use spans from algorithmic to performance – Section III-D respectively. The std_dev, dt_, and lambda_ are parameters affecting the MPPI update rule whereas the dynamics_rollout_dim_ and cost_rollout_dim_ parameters adjust how fast the MPPI algorithm is computed using recommendations from Section III-D. Once the components are initialized, we create an instance of the MPPI Controller, passing the Dynamics, Cost Function, Feedback Controller, Sampling Distribution, and controller parameters to the constructor. On Section III-D, we create an initial zero state for the dynamics using getZeroState() and compute an optimal control sequence with computeControl() on Section III-D. We return the control sequence as an Eigen::← Matrixf with nu rows and T columns using getControlSeq() to print out.
+When using MPPI in a MPC fashion, we need to use a Plant wrapper around our controller. The Plant houses methods to obtain new data such as state, calculate the optimal control sequence at a given rate using the latest information available, and provide the latest control to the external or ground truth system while providing the necessary tooling to ensure there are no race conditions. As this class provides the interaction between the algorithm and the actual system, it is a component that has to be modified for every use case. For Lst. 3, we implement a plant (SimpleCartpolePlant) inheriting from BasePlant that contains the ground truth system completely internal to the class. Specifically, our plant runs
+
+the external dynamics inside pubControl() in order to produce a new state. We then call updateState() at a different fixed rate from the controller re-planning rate to show that the capability of the code base. SimpleCartpolePlant instantiates a CartpoleDynamics object in its constructor, overwrites the required virtual methods from BasePlant, and sets up the dynamics update to occur within pubControl(). Looking at the constructor on Section IV-A, we pass a shared pointer to a Controller, an integer representing the controller replanning rate, and the minimum optimization stride, before creating our stand-in system dynamics. In a new MPC iteration, we shift the start of the mean control sequence we sample around to the maximum between the number of timesteps since the last optimization and the minimum optimization stride. For use in MPC, we recommend setting the minimum optimization stride to 1. pubControl() on Section IV-A is where we send the control to the system. In this case, we create necessary extra variables to pass the current state xt and control ut as prev_state and u respectively to the Dynamics’ step() method to get the next state, xt+1, in the variable current_state_. We also update the current time on Section IV-A to show the system has moved forward in time. Looking at this class, an issue arises as the Controller it is templated upon might not use CartpoleDynamics as its Dynamics class. This is easily remedied by replacing any reference to CarpoleDynamics with CONTROLLER_T::TEMPLATED_DYNAMICS to make this Plant work with the Dynamics used by the instantiated Controller.
+Now that we have written our specialized Plant class, we
+
+9
+
+can make some modifications to Lst. 2 to use the controller in a MPC fashion. For this example, we would run a simple for loop that calls the Plant’s runControlIteration() and updateState() methods to simulate a receiving a new state from the system and then calculating a new optimal control sequence from it, replacing Section III-D. The updateState() method calls pubControl() internally so the system state and the current time would update at each for loop iteration. For real-time scenarios, the runControlLoop() Plant method can be launched in a separate thread and calls runControlIteration() internally at the specified re-planning rate.
+B. Intermediate
+In the previous section, much of the underlying structure of the library was glossed over. As we get to implementing our own Dynamics or Cost Functions however, there are some basic principles to go over. This library is running code on two different devices, the CPU and the GPU. Some classes, such as Plants and Controllers, do not have methods that need to run on both whereas other classes like the Dynamics and Cost Functions do. The GPU can do many computations in parallel but in order to properly utilize it, that can require different code than what runs on the CPU. As such, when looking at implementing a new Dynamics or Cost Function, there are some methods that have to be implemented as two very similar functions, once for the CPU and once for the GPU.
+1) Custom Dynamics: The first thing that needs to be implemented for a new Dynamics class is a new parameter structure. We implemented a dictionary-like structure in the form of enum to define the state, control, and output vectors and these dictionaries are stored in the parameter. For example, in Lst. 4, we show a basic parameter structure implemented for a unicycle model.
+
+1 s t r u c t UnicycleParams : p u b l i c DynamicsParams {
+
+2
+
+enum c l a s s StateIndex : i n t {
+
+3
+
+X = 0,
+
+4
+
+Y,
+
+5
+
+YAW ,
+
+6
+
+NUM_STATES
+
+7
+
+};
+
+8
+
+9
+
+enum c l a s s ControlIndex : i n t {
+
+10
+
+VEL = 0 ,
+
+11
+
+YAW_DOT ,
+
+12
+
+NUM_CONTROLS
+
+13
+
+};
+
+14
+
+15
+
+enum c l a s s OutputIndex : i n t {
+
+16
+
+X = 0,
+
+17
+
+Y,
+
+18
+
+YAW ,
+
+19
+
+NUM_OUTPUTS
+
+20
+
+};
+
+21 } ;
+
+Listing 4. Simple parameter structure implementation for a unicycle model
+By implementing these enum, we can use these state names later on in the Dynamics and Cost Function to make it clear what state we are referring to. The ending values of NUM_STATES, NUM_CONTROLS, and NUM_OUTPUTS are also used to determine the size of each of the resulting dimensions
+
+for creating statically-sized Eigen::Matrixf data types such as state_array and control_array.
+
+1 c l a s s Unicycle : p u b l i c Dynamics<Unicycle , ←
+
+UnicycleParams> {
+
+2 public :
+
+3
+
+u s i n g PARENT_CLASS = Dynamics<Unicycle , ←
+
+UnicycleParams > ;
+
+4
+
+5
+
+std : : string getDynamicsModelName ( ) c o n s t override {
+
+6
+
+return "Unicycle" ;
+
+7
+
+}
+
+8
+
+9
+
+Unicycle ( cudaStream_t stream = nullptr )
+
+10
+
+: PARENT_CLASS ( stream ) {}
+
+11
+
+12
+
+v o i d computeStateDeriv (
+
+13
+
+c o n s t Eigen : : Ref< c o n s t state_array>& x ,
+
+14
+
+c o n s t Eigen : : Ref< c o n s t control_array>& u ,
+
+15
+
+Eigen : : Ref<state_array> x_dot ) ;
+
+16
+
+17
+
+__device__ i n l i n e v o i d computeStateDeriv (
+
+18
+
+float* x, float* u,
+
+19
+
+f l o a t * x_dot , f l o a t * theta_s ) ;
+
+20
+
+21
+
+state_array stateFromMap ( c o n s t std : : map<std : : string←
+
+, f l o a t >& map ) override ;
+
+22 } ;
+
+Listing 5. All the methods that need to overwritten in a custom Dynamics class
+
+Next, we implement the necessary overwritable methods. These methods are shown in Lst. 5 and start with getDynamcisModelName() which returns the name of the Dynamics model. Next are the CPU and GPU versions of computeStateDeriv() on Section IV-B1 respectively. The CPU and GPU versions are differentiated firstly by the __device__ keyword at the front of the GPU code to designate that method only runs on the GPU. Next, we also only use Eigen::Matrixf data-types on the CPU and raw float pointers on the GPU. The computeStateDeriv() both would implement the following dynamics,
+
+x˙ = u0 ∗ cos (ψ)
+
+(21)
+
+y˙ = u0 ∗ sin (ψ)
+
+(22)
+
+ψ˙ = u1,
+
+(23)
+
+as shown in Lst. 6. Note the use of the enum we created earlier with the S_INDEX() and C_INDEX() macros. This allows us to not need to know the order of the states or controls in the underlying data type and more importantly, these same enum can also be used in Cost classes to ensure that compatibility with multiple dynamics as long as the dynamics define the necessary enum values.
+
+1 xdot [ S_INDEX ( X ) ] = u [ C_INDEX ( VEL ) ] * cos ( x [ S_INDEX ( ← YAW ) ] ) ;
+2 xdot [ S_INDEX ( Y ) ] = u [ C_INDEX ( VEL ) ] * sin ( x [ S_INDEX ( ← YAW ) ] ) ;
+3 xdot [ S_INDEX ( YAW ) ] = u [ C_INDEX ( YAW_DOT ) ] ;
+Listing 6. computeStateDeriv() implementation for a Unicycle dynamics
+An important note is that there are separate instances of the class allocated on the CPU and GPU for dynamics and
+
+10
+
+cost functions. In order to update the GPU version, you must overwrite paramsToDevice() to copy from the CPU side class to the GPU side class. Parameter structures have a default implementation for this, but if helper classes are added, their corresponding copy methods will need to be called.
+Finally, the last method to be overwritten is stateFromMap() This method is used to translate std::map of state names and values into the Dynamics’ corresponding state vector. This method ends up being useful for the Plant, especially when different parts of the state can come in at different rates.
+The methods listed above are just the beginning of the Dynamics API customization to get started. More advanced customization includes changing the default choice of integration scheme from Euler integration to more accurate integration schemes such as Runge-Kutta or implicit integration if needed, adjusting what is considered the zero state and control for the Dynamics, and adjusting how to linearly interpolate between states.
+
+terminalCost() on both the CPU and GPU sides. It also creates a default constructor and name method getCostFunctionName← (). This basic implementation is shown in Lst. 7. Notice that we created an alias for our dynamics parameter’s struct on Section IV-B2. This is to allow us to use the enum defined there inside our cost function as well. Other things to note are that again, our cost is based on the output rather than the state in computeStateCost(). For our simple Unicycle Dynamics, the output is the same as the state.
+
+1
+
+f l o a t cost = 0 ;
+
+2
+
+f l o a t y_abs = abs ( y [ O_IND_CLASS ( DYN_P , Y ) ] ) ;
+
+3
+
+i f ( y_abs < t h i s −>params_ . width ) {
+
+4
+
+cost = y_abs ;
+
+5
+
+} else { // Quadratic cost outside the road width
+
+6
+
+cost = y_abs * y_abs ;
+
+7
+
+}
+
+8
+
+r e t u r n t h i s −>params_ . coeff * cost ;
+
+Listing 8. Basic State Cost Implementation for the Unicycle Dynamics
+
+1 s t r u c t UnicycleCostParams : p u b l i c CostParams<←
+
+Unicycle : : CONTROL_DIM>
+
+2 { f l o a t width = 1 . 0 ; f l o a t coeff = 1 0 . 0 ; } ;
+
+3
+
+4 c l a s s UnicycleCost : p u b l i c Cost<UnicycleCost , ←
+
+UnicycleCostParams , Unicycle : : DYN_PARAMS_T>
+
+5{
+
+6 public :
+
+7
+
+u s i n g PARENT_CLASS = Cost<UnicycleCost , ←
+
+UnicycleCostParams , Unicycle : : DYN_PARAMS_T > ;
+
+8
+
+u s i n g DYN_P = PARENT_CLASS : : TEMPLATED_DYN_PARAMS ;
+
+9
+
+10
+
+UnicycleCost ( cudaStream_t stream = nullptr ) ;
+
+11
+
+12
+
+std : : string getCostFunctionName ( )
+
+13
+
+{ return " Unicycle Cost" ; }
+
+14
+
+15
+
+f l o a t computeStateCost (
+
+16
+
+c o n s t Eigen : : Ref< c o n s t output_array> y ,
+
+17
+
+i n t t , i n t * crash_status ) ;
+
+18
+
+19
+
+f l o a t terminalCost (
+
+20
+
+c o n s t Eigen : : Ref< c o n s t output_array> y ) ;
+
+21
+
+22
+
+__device__ f l o a t computeStateCost ( f l o a t * y ,
+
+23
+
+i n t t , f l o a t * theta_c , i n t * crash_status ) ;
+
+24
+
+25
+
+__device__ f l o a t terminalCost ( f l o a t * y ,
+
+26
+
+f l o a t * theta_c ) ;
+
+27 } ;
+
+Listing 7. Basic Cost Function Parameter Structure and Class Implementation for the Unicycle Dynamics
+
+In Lst. 8, the cost function described previously is implemented. We can use enum macros such as O_IND_CLASS() when we are outside of the Dynamics class to still find the appropriate output value. This code can be implemented in both the CPU and GPU computeStateCost() methods and we choose terminalCost() to return 0.
+These new Dynamics and Cost are easily incorporated into our previous controller examples and that should be enough to get most people started on using this library. There are more options in the Cost and Dynamics classes to improve GPU performance but those are left to Section III.
+C. Advanced
+In this final subsection, we show off how to customize Controllers, Feedback Controllers, and Sampling Distributions. Customizing these allows users to create new samplingbased controllers or change the sampling distributions used in specific scenarios.
+1) Feedback Controllers: Feedback Controllers are useful even when using MPPI and become necessary for TubeMPPI and RMPPI. The only Feedback Controller currently implemented is iLQR but we show how to construct a simple PID controller for each state/control combination.
+
+2) Custom Cost Function: If we make a Dynamics class, we also generally need to make a corresponding Cost. While a default quadratic cost implementation that allows for use with any dynamics exists, we implement a quick Cost class to show what methods to overwrite. For this example, we choose to think of our unicycle on a road of some width pointing in the x direction. We want to keep the unicycle on the road so we penalize the absolute y position linearly up to the road width and penalize it quadratically if it goes outside the road.
+To do this, we first construct a parameter structure for the cost class. It inherits from the base CostParams class and needs to know the CONTROL_DIM and have a variable for the width of the road and coefficient for the cost. From there, we implement a basic Cost class that has to overwrite computeStateCost() and
+
+1 t e m p l a t e < c l a s s DYN_T>
+
+2 c l a s s PIDState : p u b l i c GPUState
+
+3{
+
+4
+
+u s i n g STATE_DIM = DYN_T : : STATE_DIM ;
+
+5
+
+u s i n g CONTROL_DIM = DYN_T : : CONTROL_DIM ;
+
+6
+
+f l o a t p [ STATE_DIM * CONTROL_DIM ] = { 0 . 0 } ;
+
+7
+
+f l o a t i [ STATE_DIM * CONTROL_DIM ] = { 0 . 0 } ;
+
+8
+
+f l o a t d [ STATE_DIM * CONTROL_DIM ] = { 0 . 0 } ;
+
+9
+
+f l o a t dt ;
+
+10 } ;
+
+Listing 9. PID Controller Parameter Structure containing the p, i, and d feedback matrices as well as the ∆t used for integral and derivative calculations.
+Before the example Feedback Controller, we need to go over the code structure for Feedback Controllers as this is
+
+11
+
+CPU Feedback Controller ComputeFeedback(x0, X*, U*)
+k_(x,x*)
+GPU Feedback Controller
+
+CPU Side GPU Side
+
+GPUState Params
+
+GPU Feedback Controller
+k(x,x*)
+Fig. 2. Feedback Controller API Diagram. We have a GPUState-based parameter structure that contains things like the feedback gains of iLQR. The GPU Feedback Controller class exists both on the GPU (shown in green) and CPU (shown in orange) and contains the GPUState as well as a method k(x, x∗) to calculate the feedback control on the GPU. The CPU Feedback Controller class (shown in yellow) is a wrapper around the GPU Feedback class that has a CPU method to calculate k(x, x∗) as well as a method, computeFeedback(), to recompute the feedback gains.
+
+1 t e m p l a t e < c l a s s DYN_T>
+
+2 c l a s s gpuPID : p u b l i c GPUFeedbackController<gpuPID<←
+
+DYN_T> , DYN_T , PIDState<DYN_T>> {
+
+3 public :
+
+4
+
+s t a t i c c o n s t i n t SHARED_MEM_REQUEST_BLK_BYTES = ←
+
+DYN_T : : STATE_DIM * 2 ; 5
+
+6
+
+__device__ v o i d k ( c o n s t f l o a t * x_act ,
+
+7
+
+c o n s t f l o a t * x_goal , c o n s t i n t t ,
+
+8
+
+f l o a t * theta , f l o a t * u_fb ) {
+
+9
+
+i n t tid = threadIdx . x + blockDim . x * threadIdx . z ;
+
+10
+
+f l o a t * e_int = theta [ ( tid * 2 + 0 ) * DYN_T : : STATE_DIM ] ;
+
+11
+
+f l o a t * pre_e = theta [ ( tid * 2 + 1 ) * DYN_T : : STATE_DIM ] ;
+
+12
+
+f l o a t e_der [ DYN_T : : STATE_DIM ] ;
+
+13
+
+f l o a t curr_e [ DYN_T : : STATE_DIM ] ;
+
+14
+
+f o r ( i n t i = 0 ; i < DYN_T : : STATE_DIM ; i++) {
+
+15
+
+curr_e [ i ] = ( x_act [ i ] − x_goal [ i ] ) ;
+
+16
+
+e_der [ i ] = ( curr_e [ i ] − pre_e [ i ] ) / t h i s −>state_ . ←
+
+dt ;
+
+17
+
+e_int [ i ] += curr_e [ i ] * t h i s −>state_ . dt ;
+
+18
+
+pre_e [ i ] = curr_e [ i ] ;
+
+19
+
+}
+
+20
+
+21
+
+// start calculating control
+
+22
+
+f o r ( i n t i = 0 ; i < DYN_T : : CONTROL_DIM ; i++) {
+
+23
+
+f o r ( i n t j = 0 ; j < DYN_T : : STATE_DIM ; j++) {
+
+24
+
+i n t fb_idx = i + j * DYN_T : : CONTROL_DIM ;
+
+25
+
+u_fb [ i ] = t h i s −>state_ . p [ fb_idx ] * curr_e [ j ] ;
+
+26
+
+u_fb [ i ] += t h i s −>state_ . i [ fb_idx ] * e_int [ j ] ;
+
+27
+
+u_fb [ i ] += t h i s −>state_ . d [ fb_idx ] * e_der [ j ] ;
+
+28
+
+}
+
+29
+
+}
+
+30 }
+
+31 } ;
+
+Listing 10. PID GPU Implementation showing how to implement k(x, x∗) and request shared memory for the integral and derivative of states.
+
+very different from the previous examples of Dynamics and Cost Functions. This is due to the fact that the feedback controller needs to be usable on the GPU but might have different memory requirements on the CPU side. Using iLQR as an example in Fig. 2, calculating the feedback on the GPU would just require the feedback gains to be sent but calculating the feedback gains requires access to the Dynamics and their Jacobians as well as a Cost Function and its Jacobian. To handle this discrepancy in computational workloads, each Feedback Controller is made up of two parts: a GPU feedback class which contains the bare necessities to calculate the feedback, and a CPU wrapper which can do things like recomputing the gains to a new desired trajectory.
+Now let us show how to utilize the Feedback Controller API to create a new PID controller. We start by constructing the parameter structure for the GPU Feedback class, shown in Lst. 9. Note that it is templated off of the Dynamics so that it can create the appropriately-sized arrays for each gain. Since this is a generic PID controller, we use the full feedback matrix representation for each type of gain. Next, we need to implement the GPU Feedback Controller for the PID in Lst. 10. The only method that is required to be overwritten is the k() feedback method on Section IV-C1 but as PIDs require some history to calculate the i and d portions, we request extra memory by setting the SHARED_MEM_REQUEST_BLK_BYTES variable on Section IV-C1. This variable allows for extra shared memory per trajectory sample which is necessary for keeping track of history on the GPU.
+
+After writing the GPU feedback class, we now just have to write the CPU feedback class, shown in Lst. 11. We have two methods to overwrite here in computeFeedback() and k_← (). computeFeedback() is used to calculate new feedback gains given a new trajectory. For our simple PID class, we stick to constant PID gains so this can be left empty. The k_() method on Section IV-C1 is just the CPU version of the feedback calculation. For the CPU version of the PID, we can now use member variables to hold the history required to calculate the i and d portions.
+2) Controller: We walk through how to create a new sampling-based Controller using CEM [5] as our desired algorithm. Succinctly put, the CEM method samples control trajectories from a Gaussian Distribution, and uses the best k samples, known as the elite set, to calculate new parameters for the Guassian distribution. For this example, we simplify it to have constant variance and the elite set is used to update the mean of the distribution. The major CEM parameter is the size of the elite set, so we create a new parameter struct in Lst. 12 capturing this as a percentage of the total number of samples. From there, the methods that must be overwritten from the base Controller API are getControllerName(), computeControl← (), and calculateSampledStateTrajectories(). Like in the other custom classes, getControllerName() returns the name of the new controller, i.e. CEM. Next, computeControl() is the main method of the Controller class. It takes the new initial state and calculates the new optimal control sequence from that starting position; an example is shown in Lst. 13. The basic steps are to move the shifted optimal control sequence and
+
+12
+
+1 t e m p l a t e < c l a s s DYN_T , i n t NUM_TIMESTEPS>
+
+2 c l a s s PIDFeedback : p u b l i c FeedbackController<gpuPID<DYN_T> , PIDParams , NUM_TIMESTEPS> {
+
+3 public :
+
+4
+
+u s i n g PARENT_CLASS = FeedbackController<gpuPID<DYN_T> , PIDParams , NUM_TIMESTEPS > ;
+
+5
+
+u s i n g control_array = t y p e n a m e PARENT_CLASS : : control_array ;
+
+6
+
+u s i n g state_array = t y p e n a m e PARENT_CLASS : : state_array ;
+
+7
+
+u s i n g state_trajectory = t y p e n a m e PARENT_CLASS : : state_trajectory ;
+
+8
+
+u s i n g control_trajectory = t y p e n a m e PARENT_CLASS : : control_trajectory ;
+
+9
+
+u s i n g INTERNAL_STATE_T = t y p e n a m e PARENT_CLASS : : TEMPLATED_FEEDBACK_STATE ;
+
+10
+
+u s i n g feedback_gain_matrix = t y p e n a m e DYN_T : : feedback_matrix ;
+
+11
+
+12
+
+13
+
+PIDFeedback ( f l o a t dt = 0 . 0 1 , i n t num_timesteps = NUM_TIMESTEPS , cudaStream_t stream = 0 )
+
+14
+
+: PARENT_CLASS ( dt , num_timesteps , stream ) {
+
+15
+
+t h i s −>gpu_controller_−>getFeedbackStatePointer ( ) −>dt = dt ;
+
+16
+
+}
+
+17
+
+18
+
+control_array k_ ( c o n s t Eigen : : Ref< c o n s t state_array>& x_act , c o n s t Eigen : : Ref< c o n s t state_array>& x_goal ,
+
+19
+
+i n t t , INTERNAL_STATE_T& fb_state ) {
+
+20
+
+Eigen : : Map<feedback_gain_matrix> P_gain(&fb_state . p ) ;
+
+21
+
+Eigen : : Map<feedback_gain_matrix> I_gain(&fb_state . i ) ;
+
+22
+
+Eigen : : Map<feedback_gain_matrix> D_gain(&fb_state . d ) ;
+
+23
+
+state_array curr_e = x_act − x_goal ;
+
+24
+
+state_array der_e = ( curr_e − prev_e ) / t h i s −>dt_ ;
+
+25
+
+e_int_ += ( curr_e ) * t h i s −>dt_ ;
+
+26
+
+prev_e_ = curr_e ;
+
+27
+
+control_array output = P_gain * curr_e + I_gain * e_int_ + D_gain * der_e ;
+
+28
+
+r e t u r n output ;
+
+29
+
+}
+
+30
+
+31
+
+v o i d computeFeedback ( c o n s t Eigen : : Ref< c o n s t state_array>& init_state ,
+
+32
+
+c o n s t Eigen : : Ref< c o n s t state_trajectory>& goal_traj ,
+
+33
+
+c o n s t Eigen : : Ref< c o n s t control_trajectory>& control_traj ) {}
+
+34
+
+35 p r o t e c t e d :
+
+36
+
+state_array e_int_ = state_array : : Zero ( ) ;
+
+37
+
+state_array prev_e_ = state_array : : Zero ( ) ;
+
+38 } ;
+
+Listing 11. PID CPU Implementation. It shows the necessary type aliases and how to compute the feedback control in k_().
+
+initial state to the GPU, generate control samples, run the samples through the Dynamics and Cost function, calculate the weights of each sample, use these weights to update the parameters of the sampling distribution, get the new optimal control sequence, and calculate the corresponding optimal state trajectory. In Section IV-C2, we add an additional method, calcualteEliteSet(), to find the elite set and zero out the weights of every other sample specifically for CEM. The final method to overwrite, calculateSampledStateTrajectories(), is a method used to return a subset of sampled trajectories from the latest optimization round from the GPU to the CPU. Users can set a percentage of the sampled trajectories they would like returned with setPercentageSampledControlTrajectoriesHelper()←
+and this method will generate state trajectories for those samples so that they can then be used for visualization in programs such as RViz. For this simple example, we have no visualization system to plug this data into so we leave this method empty for our CEM implementation.
+
+1 t e m p l a t e < i n t STATE_DIM , i n t CONTROL_DIM , i n t MAX_T>
+
+2 s t r u c t CEMParams : p u b l i c ControllerParams<STATE_DIM , ←
+
+CONTROL_DIM , MAX_T> {
+
+3
+
+f l o a t top_k_percentage = 0 . 1 0 f ;
+
+4 };
+
+Listing 12. CEM Controller Parameter Structure containing the percentage of elite samples.
+
+3) Sampling Distributions: The Sampling Distribution class is where the choice of how to sample the control distributions is conducted. Different sampling distributions can have significant impact to the controller performance and is still a large area of research being explored. The current sampling distributions implemented are Gaussian, Colored Noise [20], Normal log-Normal (NLN) noise [21], and Smooth-MPPI [42], but even in those implementations, there are further options and tweaks that we found to improve performance in the past. Some of these include having a percentage of samples sampled from a zero-mean distribution rather than the previous optimal control sequence, using the mean with no noise as a sample, allowing for time-varying standard deviations, and the ability to disable the importance sampling weight.
+The Sampling Distribution API leaves enough flexibility to allow for multi-hypothesis distributions such as Gaussian Mixture Model (GMM) distributions or Stein-Variational distributions [43], [54]. In addition, the readControlSample() method used to get the control sample for a particular sample, time, and system takes in the current output which allows for feedback-based sampling such as done in normalizing flow approaches [55], [56]. The essential methods to focus on when implementing a new Sampling Distribution are generateSamples() and readControlSample().
+
+13
+
+1 v o i d computeControl ( c o n s t Eigen : : Ref< c o n s t state_array>& state , i n t optimization_stride = 1 ) override {
+
+2
+
+/ / Send the i n i t i a l condition to the device
+
+3
+
+HANDLE_ERROR ( cudaMemcpyAsync ( t h i s −>initial_state_d_ , state . data ( ) , DYN_T : : STATE_DIM * s i z e o f ( f l o a t ) ,
+
+4
+
+cudaMemcpyHostToDevice , t h i s −>stream_ ) ) ;
+
+5
+
+f o r ( i n t opt_iter = 0 ; opt_iter < t h i s −>getNumIters ( ) ; opt_iter++) {
+
+6
+
+t h i s −>copyNominalControlToDevice ( f a l s e ) ; / / Send t h e o p t i m a l c o n t r o l s e q u e n c e t o t h e d e v i c e
+
+7
+
+t h i s −>sampler_−>generateSamples ( optimization_stride , opt_iter , t h i s −>gen_ , f a l s e ) ; / / G e n e r a t e n o i s e d a t a
+
+8
+
+9
+
+/ / Calculate s t a t e t r a j e c t o r i e s and costs from sampled control t r a j e c t o r i e s
+
+10
+
+mppi : : kernels : : launchSplitRolloutKernel<DYN_T , COST_T , SAMPLING_T > (
+
+11
+
+t h i s −>model_−>model_d_ , t h i s −>cost_−>cost_d_ , t h i s −>sampler_−>sampling_d_ , t h i s −>getDt ( ) ,
+
+12
+
+t h i s −>getNumTimesteps ( ) , NUM_SAMPLES , t h i s −>getLambda ( ) , t h i s −>getAlpha ( ) , t h i s −>initial_state_d_ ,
+
+13
+
+t h i s −>output_d_ , t h i s −>trajectory_costs_d_ , t h i s −>params_ . dynamics_rollout_dim_ ,
+
+14
+
+t h i s −>params_ . cost_rollout_dim_ , t h i s −>stream_ , f a l s e ) ;
+
+15
+
+/ / Copy the c o s t s back to the ho st
+
+16
+
+HANDLE_ERROR ( cudaMemcpyAsync ( t h i s −>trajectory_costs_ . data ( ) , t h i s −>trajectory_costs_d_ ,
+
+17
+
+NUM_SAMPLES * s i z e o f ( f l o a t ) , cudaMemcpyDeviceToHost , t h i s −>stream_ ) ) ;
+
+18
+
+HANDLE_ERROR ( cudaStreamSynchronize ( t h i s −>stream_ ) ) ;
+
+19
+
+20
+
+// Setup vector to hold top k weight indices
+
+21
+
+i n t top_k_to_keep = NUM_SAMPLES * t h i s −>params_ . top_k_percentage ;
+
+22
+
+calculateEliteSet ( t h i s −>trajectory_costs_ , NUM_SAMPLES , top_k_to_keep , top_k_indices_ ) ;
+
+23
+
+/ / keep weights of the e l i t e set
+
+24
+
+f l o a t min_elite_value = t h i s −>trajectory_costs_ [ top_k_indices_ . back ( ) ] ;
+
+25
+
+std : : replace_if (
+
+26
+
+t h i s −>trajectory_costs_ . data ( ) , t h i s −>trajectory_costs_ . data ( ) + NUM_SAMPLES ,
+
+27
+
+[ min_elite_value ] ( f l o a t cost ) { r e t u r n cost < min_elite_value ; } , 0 . 0 f ) ;
+
+28
+
+29
+
+/ / Copy weights back to device
+
+30
+
+HANDLE_ERROR ( cudaMemcpyAsync ( t h i s −>trajectory_costs_d_ , t h i s −>trajectory_costs_ . data ( ) ,
+
+31
+
+NUM_SAMPLES * s i z e o f ( f l o a t ) , cudaMemcpyHostToDevice , t h i s −>stream_ ) ) ;
+
+32
+
+/ / Compute the normalizer
+
+33
+
+t h i s −>setNormalizer ( mppi_common : : computeNormalizer ( t h i s −>trajectory_costs_ . data ( ) , NUM_SAMPLES ) ) ;
+
+34
+
+/ / C a l c u l a t e t h e new mean
+
+35
+
+t h i s −>sampler_−>updateDistributionParamsFromDevice ( t h i s −>trajectory_costs_d_ , t h i s −>getNormalizerCost ( ) ,
+
+36
+
+0, false ) ;
+
+37
+
+/ / T r a n s f e r t h e new c o n t r o l back t o t h e h o s t and s y n c h r o n i z e s t r e a m
+
+38
+
+t h i s −>sampler_−>setHostOptimalControlSequence ( t h i s −>control_ . data ( ) , 0 , t r u e ) ;
+
+39
+
+}
+
+40
+
+/ / Calculate optimal s t a t e and output t r a j e c t o r y from the current s t a t e and optimal control
+
+41
+
+t h i s −>computeOutputTrajectoryHelper ( t h i s −>output_ , t h i s −>state_ , state , t h i s −>control_ ) ;
+
+42 }
+
+Listing 13. Basic CEM computeControl() implementation. This method copies the initial state to the GPU, creates the control samples, calculates the state trajectories and costs of each sample, creates the elite set, updates the mean of the sampling distribution and copies that mean back as the optimal control sequence.
+
+V. BENCHMARKS
+In order to see the improvements our library can provide, we decided to compare against three other implementations of MPPI publicly available. The first comparison is with the MPPI implementation in AutoRally [57]. This implementation was the starting point of our new library, MPPIGeneric, and so we want to compare to see how well we can perform to our predecessor. The Autorally implementation is written in C++/CUDA, is compatible with ROS, features multiple dynamics models including linear basis functions, simple kinematics, and Neural Network (NN)-based models focused on the Autorally hardware platform. There is only one Cost Function available but it makes use of CUDA textures querying into an obstacle map. Additionally, it has been shown to run in real-time on hardware to great success [6], [4], [8]. However, the Autorally implementation is written for use on the Autorally platform and has no general Cost Function, Dynamics, or Sampling Distribution APIs to extend. In order to use it for different problems such as flying a quadrotor, the MPPI implementation would need significant modification.
+The next implementation we compare against is Nav2’s MPPI. As of ROS Humble, there is a CPU implementation of MPPI in the ROS navigation stack [58]; for our testing,
+
+we utilized the version packaged for ROS 2 Iron. This CPU implementation [59] is written in C++ and looks to make heavy use of AVX or other vectorized instructions to improve performance. There is a small selection of dynamics models (Differential Drive, Ackermann, and Omni-directional) and cost functions that are focused around wheeled robots navigating through obstacle-laden environments. It allows users to implement new cost functions as critics through a plugin system and new dynamics models based off its MotionModel base class. This implementation will only become more widespread as ROS2 adoption continues to grow over the coming years, making it an essential benchmark. Unfortunately, it does have some drawbacks as it has no implementation of Tube-MPPI or RMPPI, and is only available in ROS2 Humble or newer. This means that it might not be usable on existing hardware platforms that are unable to upgrade their systems.
+The last implementation of MPPI we compare against is in TorchRL [60]. TorchRL is an open-source Reinforcement Learning (RL) Python library written by Meta AI, the developers of PyTorch itself. As such, it is widely trusted and available to researchers who are already familiar with PyTorch and Python. The TorchRL implementation works on both CPUs and GPUs and allows for custom dynamics and
+
+14
+
+cost functions through the extension of base Environment class [61]. However, while it does have GPU support, it is limited to the functionality of PyTorch meaning that there is no option to use CUDA textures to improve map queries or any direct control of shared memory usage on the GPU. In addition, being written in Python makes it fairly legible and easy to extend but can come at the cost of performance when compared to C++ implementations.
+In order to compare our library against these three implementations, we recreated the same dynamics and cost function for each version of MPPI. We chose the Differential Drive dynamics model and some of the cost function components that already exist in the Nav2 impelemtation as the baseline. We used the goal position quadratic cost, goal angle quadratic cost, and the costmap-based obstacle cost components so that we could maintain a fairly simple cost function that allows us to show the capabilities of our library. We implemented these dynamics and cost functions in both CUDA and Python. The CUDA implementations were extensions of our base Dynamics and Cost Function APIs. We decided to use the same code in the Autorally implementation as well which required some minor rewriting to account for different method names and state dimensions. The Python implementation was an extension of the TorchRL base Environment class, and used PyTorch’s JIT compiler to speed up performance when used in the TorchRL implementation. We used the same parameters for sampling, dynamics, cost function tuning, and MPPI hyperparameters across all implementations, summarized in Table I.
+
+achieved. Our test was timing how long each implementation of MPPI would take to return an optimal control sequence when provided an initial state, x0. We ran each of the Autorally, MPPI-Generic, and Nav2 implementations 10, 000 times to produce optimal trajectories with 128, 256, 512, 1024, 2048, 4096, 6144, 8192, and 16,384 samples; the TorchRL implementation was only run 1000 times due to it being too slow to compute, even when using the GPU. The comparisons were run across a variety of hardware including a Jetson Nano to see what bottlenecks each implementation might have. The Jetson Nano was unfortunately only able to run the MPPI-Generic and Autorally MPPI implementations as the last supported PyTorch version and the lastest TorchRL libraries were incompatible, and the Nav2 implementation was unable to compile. GPUs tested ranged from a NVIDIA GTX 1050 Ti to a NVIDIA RTX 4090. Most tests were performed on an Intel 13900K which is one of the fastest available CPUs at the time of this writing in order to prevent the CPU being the bottleneck for the mostly GPU-based comparison; however, we also ran tests on an AMD Ryzen 5 5600x to see the difference in performance on a lower-end CPU. The MPPI optimization times across all hardware can be seen in Table III. The code used to do these comparisons is available at https://github.com/ACDSLab/MPPI Paper Example Code.
+A. Results
+
+TABLE I ALGORITHM PARAMETERS
+
+Parameter
+
+Value
+
+dt wheel radius wheel length max velocity min velocity min rotation max rotation
+
+0.02 s 1.0 m 1.0 m 0.5 m/s -0.35 m/s -0.5 rad/s 0.5 rad/s
+
+MPPI Parameters
+
+λ control standard deviation
+MPC Horizon
+
+1.0 0.2 100 timesteps
+
+Cost Parameters
+
+Dist. to goal coefficient Angular Dist. to goal coeff
+Obstacle Cost Map width Map Height
+Map Resolution
+
+5 5 20 11 m 11 m 0.1 m/cell
+
+Fig. 3. Optimization times for all MPPI implementations on a hardware system with a RTX 4090 and an Intel 13900K over a variety of number of samples. The Nav2 CPU implementation grows linearly as the number of samples increase while GPU implementations grow more slowly.
+While this results section focuses on the computational speed of our algorithm for fairly simple dynamics and cost functions, readers may be curious to know how this library performs in real-world applications. Adding those results to
+
+For both Autorally and MPPI-Generic, there are further performance-enhancing options available such as block size choice. We ended up using the same block sizes for both Autorally and MPPI-Generic across all tests, shown in Table II. As a result, the optimization times shown are not going to be the fastest possible performance that can be achieved on any given GPU but these tests should still serve as a useful benchmark to understand the average performance that can be
+
+TABLE II GPU PERFORMANCE CHOICES
+
+Parameter
+Dynamics thread block x dim. Dynamics thread block y dim.
+Cost thread block x dim. Cost thread block y dim.
+
+Value
+64 4 64 1
+
+15
+
+Optimization Times [ms]
+
+torchrl across Hardware
+
+AMD Ryzen 5600X, GeForce GTX 1050 Ti
+
+70
+
+AMD Ryzen 5600X, GeForce RTX 3080
+
+Intel i9-13900K, GeForce GTX 1050 Ti
+
+Intel i9-13900K, GeForce RTX 3080 60
+
+50
+
+40
+
+30
+
+103
+
+104
+
+Number of Samples
+
+Fig. 4. Optimization times for all MPPI implementations on a hardware system with a GTX 1050 Ti and an Intel 13900K over a variety of number of samples. MPPI-Generic and AutoRally on this older hardware eventually start to scale linearly with the number of samples but does so at a much lower rate with our library compared to Nav2 or TorchRL.
+
+Fig. 5. Optimization times for the TorchRL implementation across different CPUs and GPUs. TorchRL computation times are more dependent on the CPU as the RTX 3080 with an AMD 5600X ends up slower than a GTX 1050 Ti with an Intel 13900k.
+
+this paper would end up requiring too much space for this publication; instead, we point readers to other papers where this code base has been used in more complex scenarios [20], [24], [11], [33], [34].
+Going over all of the collected data would take too much room for this paper so we shall instead try to pull out interesting highlights to discuss. Full results can be seen in Table III. First, we look at the results on the most powerful system tested, using an Intel i9-13900K and an NVIDIA RTX 4090 in Fig. 3. As the number of samples increase, the CPUbound Nav2 method increases in optimization times in a linear fashion immediately. Every other method uses the GPU which can provide headroom to increase the number of samples as the GPU is not fully utilized at small sample sizes. As we hit 16, 384 samples, the AutoRally implementation starts to have lower optimization times than MPPI-Generic. We will see this trend continue in Fig. 4.
+When looking at older and lower-end NVIDIA hardware such as the GTX 1050 Ti, our library still performs well compared to other implementations as seen in Fig. 4. Only when the number of samples is at 128 does the Nav2 implementation on an Intel 13900k match the performance of the AutoRally implementation on this older GPU. However, we can see that Nav2 implementation again outperforms the TorchRL implementation until we hit 16,384 samples. MPPIGeneric is still more performant at these lower number of samples and eventually it scales linearly as we get to thousands of samples. The TorchRL implementation also finally starts to show some GPU bottle-necking as we start to see optimization times increasing as we reach over 6144 samples. There is also a moment where the MPPI-Generic library optimization time grows to be larger than the AutoRally implementation. That occurs when we switch from using the split kernels (Section III-C2) to the combined kernel (Section III-C3). The AutoRally implementation uses a combined kernel with fewer GPU synchronization points due to strictly requiring forward Euler integration for the dynamics. At the small hit to performance in the combined kernel, our library allows for many more features, such as multi-threaded cost functions, use
+
+of shared memory in the cost function, and implementation of more computationally-heavy integration methods such as Runge-Kutta or backward Euler integration. And while we see a hit to performance when using the combined kernel compared to AutoRally, we still see that the split kernel is faster for up to 2048 samples.
+The TorchRL implementation is notably performing quite poorly in Figs. 3 and 4 with runtimes being around 28ms no matter the number of samples. Looking at TorchRL-specific results in Fig. 5, the TorchRL implementation seems to be heavily CPU-bound. A low-end GPU (1050 Ti) combined with a high-end CPU (Intel 13900K) can achieve better optimization times than a low-end CPU (AMD 5600X) combined with a high-end GPU (RTX 3080).
+We also conducted tests on a 2019 Jetson Nano to show that even on relatively low-power and older systems, our library can still be used. As the latest version of CUDA supporting the Jetson Nano is 10.2 and the OS is Ubuntu 18.04, both the TorchRL and Nav2 MPPI implementations were not compatible. As such, we only have results comparing our MPPIGeneric implementation to the AutoRally implementation in Fig. 6. Here, the AutoRally implementation starts having faster compute times around 512 samples. Again, this is due to our library switching to the combined kernel which will be slower. However, our library on a Jetson Nano at 2048 samples has a roughly equivalent computation time to that of 2048 samples of the Nav2 implementation on the Intel 13900K process, showing that our GPU parallelization can allow for real-time optimization even on portable systems.
+In addition, we see the benefits of our library as we increase the computation time of the cost function. At this point, the TorchRL and Nav2 implementations have been shown to be slow in comparison to the other implementations and are thus dropped from this cost complexity comparison. We artificially inflate the computation time of the cost function with Lst. 14 to judge how well the implementations scale to more complex cost functions. In Fig. 7, we see how increasing the computation time of the cost function scales for both implementations over the same hardware and for the same number of samples.
+
+16
+
+Optimization Times [ms]
+Average Accumulated Cost Optimization Times [ms]
+
+CPU: ARMv8 Processor rev 1 (v8l), GPU: NVIDIA Tegra X1
+MPPI-Generic autorally
+101
+
+100
+
+103
+
+104
+
+Number of Samples
+
+Fig. 6. Optimization times for MPPI implementations on a Jetson Nano over a variety of number of samples. MPPI-Generic and AutoRally on this lowpower hardware can still achieve sub-10ms optimization times for even 2048 samples. The AutoRally implementation quickly surpasses our implementation in optimization times.
+
+1200 1000
+800 600 400
+0.5
+
+CPU: 13th Gen Intel(R) Core(TM) i9-13900K, GPU: NVIDIA GeForce GTX 1050 Ti
+1.0 0.8 0.6 0.4
+
+DMD-MPC 64 Samples DMD-MPC 128 Samples DMD-MPC 256 Samples DMD-MPC 512 Samples DMD-MPC 1024 Samples DMD-MPC 2048 Samples
+
+0.6 0.7 0.8 0.9 1.0 Step Size γt
+
+0.5 0.6 0.7 0.8 0.9 1.0 Step Size γt
+
+Fig. 8. Average Accumulated Costs (left) and Optimization Times (right) with error bars signifying one standard deviation for a variety of step sizes and number of samples for DMD-MPC. × indicates the step size that achieves the lowest cost for a given number of samples. When using a low number of samples, a lower DMD-MPC step size provides the lowest average cost. However, as the number of samples increase, the best step size choice becomes γt = 1.0 which is equivalent to the normal MPPI update law. With our library, increasing the number of samples to the point where the step size is no longer useful is still able to be run at over 800 Hz on the NVIDIA GTX 1050 Ti.
+
+1 f l o a t computeStateCost ( . . . ) {
+
+2
+
+f l o a t cost = 1 . 0 ;
+
+3
+
+f o r ( i n t i = 0 ; i < NUM_COSINES ; i++) {
+
+4
+
+cost = cos ( cost ) ;
+
+5
+
+}
+
+6
+
+cost *= 0 . 0 ;
+
+7
+
+// Continue to regular cost function
+
+8
+
+...
+
+9}
+
+Listing 14. Computation time inflation code added to the cost function. We add a configurable amount of calls to cos() as this is a computationally heavy function to run.
+
+B. Comparisons to sampling-efficient algorithms
+While we have shown that our implementation of MPPI can have faster computation times and a lot of flexibility in applications, there remains a question of how to balance between the number of samples and real-time performance. Our work decreases the computation time for sampling which in turn allows more samples in the same computation time, while other works have tried to reduce the amount of sam-
+
+CPU: 13th Gen Intel(R) Core(TM) i9-13900K, GPU: NVIDIA GeForce GTX 1050 Ti, 8192 Samples
+MPPI-Generic autorally
+10
+
+Optimization Times [ms]
+
+8
+
+6
+
+4 0
+
+20 40 60 80 100 120 140 Number of Cosines added
+
+Fig. 7. Optimization Times for MPPI-Generic and AutoRally implementations as the computation time of the cost function increases. Using an Intel 13900K, NVIDIA GTX 1050 Ti, and 8192 samples, our library implementation starts to outperform the AutoRally implementation when 20+ sequential cosine operations are added to the cost function.
+
+ples needed to evaluate the optimal control trajectory. Many authors [20], [21], [38], [42], [55], [56] have tried to do this by changing the sampling distribution; depending on the derivation of MPPI, different sampling distributions can be considered to have the same update rule. In [62], the authors introduce a new update rule through a generalization of MPC algorithms called Dynamic Mirror Descent Model Predictive Control (DMD-MPC) defined by the choice of shaping function, S(·), Sampling Distribution πθ, and Bregman Divergence DΨ(·, ·) which determines how close the new optimal control trajectory should remain to the previous. Using the exponential function, Gaussian sampling, and the KL Divergence, they derive a modification to the MPPI update law in Eq. (17) that introduces a step size parameter γt ≥ 0:
+
+k+1
+
+k
+
+EV ∼πθ exp − 1λ J (V ) vt
+
+ut = (1 − γt) ut + γt
+
+1
+
+, (24)
+
+EV ∼πθ exp − λ J (V )
+
+where vt is the control value at time t from the sampled control sequence V , and J is as we defined in Eq. (3). In their results, the addition of a step size can improve performance when using a low number of samples. However, once the number of samples increases beyond a certain point, the optimal step size ends up being 1.0 which is equivalent to the original MPPI update law. Having this option is useful in cases where you have a low computational budget. We show as long as you have a NVIDIA GPU from the last decade, you have enough computational budget to use more samples without needing to tune a step size.
+Looking at Fig. 8, we ran a 2D double integrator system with state [x, y, vx, vy] and control [ax, ay] with the cost shown in Eq. (25):
+
+J = 1000 1{(x2+y2)≤1.8752} + 1{(x2+y2)≥2.1252} + 2 2 − vx2 + vy2 + 2 |4 − (xvy − yvx)| .
+
+(25)
+
+This cost function heavily penalizes the system from leaving
+a circle of radius 2m with width 0.125m, has an L1 cost on speed to maintain 2m s−1, and has an L1 cost on the angular momentum being close to 4m2/s. This all combines to
+
+17
+
+encourage the system to move around the circle allowing some small deviation from the center line in a clockwise manner. This system was simulated for 1000 timesteps and the cost was accumulated over that period. This simulation was run 1000 times to ensure consistent cost evaluations. As the number of samples increase, the optimal step size (marked with a x) increases to 1.0. In addition, the computation time increase for using a number of samples where the step size is irrelevant is minimal (an increase of about 0.4ms). There is also headroom to increase the complexity of the dynamics and cost function and still run the controller at over 100Hz.
+VI. CONCLUSION
+In this paper, we introduce a new sampling-based optimization C++/CUDA library called MPPI-Generic. It contains implementations of MPPI, Tube-MPPI, and RMPPI controllers as well as an API that allows these controllers to be used with multiple dynamics and cost functions. We went through various ways that researchers could use this library, from using pre-defined dynamics and cost functions to implementing new sampling-based MPC controllers. We discussed the methods used to improve the computational performance and conducted performances comparisons against other widely-available implementations of MPPI over a variety of computer hardware to show the performance benefits our library can provide. Finally, we compared against a sample-efficient form of MPPI to show that with the speed improvements of our library, using more samples is a viable alternative with little hit to computation times. We plan to keep working on the library to add more capabilities and usage improvements such as a Python wrapper in the future.
+VII. ACKNOWLEDGEMENTS
+This research was funded in part by the Office of Naval Research under contract N00014-21-1-2074, Defense Advanced Research Projects Agency (DARPA), Jet Propulsion Laboratory (JPL), California Institute of Technology, under contract 80NM0018D0004 with the National Aeronautics and Space Administration, NASA LaRC, and Sandia National Laboratories, a multimission laboratory managed and operated by National Technology and Engineering Solutions of Sandia, LLC., a wholly owned subsidiary of Honeywell International, Inc., for the U.S. Department of Energy’s National Nuclear Security Administration under contract DE-NA-0003525. The views, opinions and/or findings expressed are those of the author and should not be interpreted as representing the official views or policies of the Department of Defense or the U.S. Government.
+REFERENCES
+[1] W. Li and E. Todorov, “Iterative Linear Quadratic Regulator Design for Nonlinear Biological Movement Systems,” in Proceedings of the First International Conference on Informatics in Control, Automation and Robotics - Volume 1: ICINCO,, INSTICC. SciTePress, 2004, pp. 222–229. 1
+[2] D. H. Jacobson and D. Q. Mayne, Differential dynamic programming, ser. Modern analytic and computational methods in science and mathematics. American Elsevier Pub. Co., 1970. 1
+[3] P. T. Boggs and J. W. Tolle, “Sequential Quadratic Programming,” Acta numerica, vol. 4, pp. 1–51, 1995. 1
+
+[4] G. Williams, P. Drews, B. Goldfain, J. M. Rehg, and E. A. Theodorou, “Aggressive Driving with Model Predictive Path Integral Control,” in 2016 IEEE International Conference on Robotics and Automation (ICRA). IEEE, 2016, pp. 1433–1440. 1, 2, 13
+[5] R. Rubinstein, “The cross-entropy method for combinatorial and continuous optimization,” Methodology and computing in applied probability, vol. 1, pp. 127–190, 1999. 1, 11
+[6] B. Goldfain, P. Drews, C. You, M. Barulic, O. Velev, P. Tsiotras, and J. M. Rehg, “AutoRally: An Open Platform for Aggressive Autonomous Driving,” IEEE Control Systems Magazine, vol. 39, no. 1, pp. 26–55, 2019. 1, 3, 13
+[7] G. Williams, N. Wagener, B. Goldfain, P. Drews, J. M. Rehg, B. Boots, and E. A. Theodorou, “Information Theoretic MPC for Model-Based Reinforcement Learning,” in 2017 IEEE international conference on robotics and automation (ICRA). IEEE, 2017, pp. 1714–1721. 1
+[8] G. Williams, P. Drews, B. Goldfain, J. M. Rehg, and E. A. Theodorou, “Information-Theoretic Model Predictive Control: Theory and Applications to Autonomous Driving,” IEEE Transactions on Robotics, vol. 34, no. 6, pp. 1603–1622, 2018. 1, 2, 3, 13
+[9] G. Williams, B. Goldfain, P. Drews, K. Saigol, J. Rehg, and E. Theodorou, “Robust Sampling Based Model Predictive Control with Sparse Objective Information,” in Robotics: Science and Systems XIV. Robotics: Science and Systems Foundation, Jun. 2018. 1, 2, 3
+[10] G. R. Williams, “Model Predictive Path Integral Control: Theoretical Foundations and Applications to Autonomous Driving,” Ph.D. dissertation, Georgia Institute of Technology, 2019. 1, 3
+[11] M. Gandhi, B. Vlahov, J. Gibson, G. Williams, and E. A. Theodorou, “Robust Model Predictive Path Integral Control: Analysis and Performance Guarantees,” IEEE Robotics and Automation Letters, vol. 6, no. 2, pp. 1423–1430, Feb. 2021. 1, 2, 3, 15
+[12] N. Hansen, H. Su, and X. Wang, “Temporal Difference Learning for Model Predictive Control,” in Proceedings of the 39th International Conference on Machine Learning, vol. 162. PMLR, 17–23 Jul 2022, pp. 8387–8406. 1
+[13] ——, “TD-MPC2: Scalable, robust world models for continuous control,” in The Twelfth International Conference on Learning Representations, 2024. 1
+[14] M. Bhardwaj, S. Choudhury, and B. Boots, “Blending MPC & Value Function Approximation for Efficient Reinforcement Learning,” in International Conference on Learning Representations, 2021. 1
+[15] N. Hansen, J. SV, V. Sobal, Y. LeCun, X. Wang, and H. Su, “Hierarchical World Models as Visual Whole-Body Humanoid Controllers,” ArXiv, vol. abs/2405.18418, 2024. 1
+[16] Y. Qu, H. Chu, S. Gao, J. Guan, H. Yan, L. Xiao, S. E. Li, and J. Duan, “RL-Driven MPPI: Accelerating Online Control Laws Calculation With Offline Policy,” IEEE Transactions on Intelligent Vehicles, vol. 9, no. 2, pp. 3605–3616, 2024. 1
+[17] J. Watson and J. Peters, “Inferring Smooth Control: Monte Carlo Posterior Policy Iteration with Gaussian Processes,” in Conference on Robot Learning. PMLR, 2023, pp. 67–79. 1
+[18] J. Pravitra, K. A. Ackerman, C. Cao, N. Hovakimyan, and E. A. Theodorou, “L1-Adaptive MPPI Architecture for Robust and Agile Control of Multirotors,” in 2020 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS). IEEE, 2020, pp. 7661–7666. 1
+[19] T. Miura, N. Akai, K. Honda, and S. Hara, “Spline-Interpolated Model Predictive Path Integral Control with Stein Variational Inference for Reactive Navigation,” ArXiv, vol. abs/2404.10395, 2024. 1, 3
+[20] B. Vlahov, J. Gibson, D. D. Fan, P. Spieler, A.-a. Agha-mohammadi, and E. A. Theodorou, “Low Frequency Sampling in Model Predictive Path Integral Control,” IEEE Robotics and Automation Letters, pp. 1–8, 2024. 1, 2, 3, 12, 15, 16
+[21] I. S. Mohamed, K. Yin, and L. Liu, “Autonomous Navigation of AGVs in Unknown Cluttered Environments: Log-MPPI Control Strategy,” IEEE Robotics and Automation Letters, vol. 7, no. 4, pp. 10 240–10 247, 2022. 1, 3, 12, 16
+[22] T. Han, A. Liu, A. Li, A. Spitzer, G. Shi, and B. Boots, “Model Predictive Control for Aggressive Driving over Uneven Terrain,” arXiv preprint arXiv:2311.12284, 2023. 1
+[23] H. Homburger, S. Wirtensohn, and J. Reuter, “Efficient Nonlinear Model Predictive Path Integral Control for Stochastic Systems considering Input Constraints,” in 2023 European Control Conference (ECC), 2023, pp. 1–6. 1
+[24] A. M. Patel, M. J. Bays, E. N. Evans, J. R. Eastridge, and E. A. Theodorou, “Model-Predictive Path-Integral Control of an Unmanned Surface Vessel with Wave Disturbance,” in OCEANS 2023 - MTS/IEEE U.S. Gulf Coast, Sep. 2023, pp. 1–7. 1, 2, 15
+
+18
+
+[25] E. Liu, D. Wang, Z. Peng, L. Liu, and N. Gu, “Data-driven Path Following of Unmanned Surface Vehicles based on Model-Based Reinforcement Learning and Model Predictive Path Integral Control,” in 2022 37th Youth Academic Annual Conference of Chinese Association of Automation (YAC), 2022, pp. 1045–1049. 1
+[26] P. Nicolay, Y. Petillot, M. Marfeychuk, S. Wang, and I. Carlucho, “Enhancing AUV Autonomy with Model Predictive Path Integral Control,” in OCEANS 2023 - MTS/IEEE U.S. Gulf Coast, 2023, pp. 1–10. 1
+[27] W. Wu, Z. Chen, and H. Zhao, “Model Predictive Path Integral Control based on Model Sampling,” in 2019 2nd International Conference of Intelligent Robotic and Control Engineering (IRCE), 2019, pp. 46–50. 1
+[28] C. Pan, Z. Peng, Y. Li, B. Han, and D. Wang, “Flocking of UnderActuated Unmanned Surface Vehicles via Deep Reinforcement Learning and Model Predictive Path Integral Control,” IEEE Transactions on Instrumentation and Measurement, vol. 73, pp. 1–11, 2024. 1
+[29] Z. An, X. Ding, A. Rathee, and W. Du, “Clue: Safe model-based rl hvac control using epistemic uncertainty estimation,” in Proceedings of the 10th ACM International Conference on Systems for Energy-Efficient Buildings, Cities, and Transportation, ser. BuildSys ’23. New York, NY, USA: Association for Computing Machinery, 2023, p. 149–158. 1
+[30] X. Ding, A. Cerpa, and W. Du, “Multi-Zone HVAC Control With Model-Based Deep Reinforcement Learning,” IEEE Transactions on Automation Science and Engineering, pp. 1–19, 2024. 1
+[31] L. Ai, Y. Chen, Y. Xu, X. Chen, and K. L. Teo, “Model Predictive Path Integral Control of a Temperature Profile in Tubular Chemical Reactor with Recycle,” in 2024 3rd Conference on Fully Actuated System Theory and Applications (FASTA), 2024, pp. 1271–1276. 1
+[32] J. Duan, D. Wang, Z. Wang, Z. Peng, L. Liu, and J. Chen, “Finite Set Model Predictive Path Integral Control of Three-Level PWM Rectifier Based on Neural Network Observer,” in 2023 8th Asia Conference on Power and Electrical Engineering (ACPEE), 2023, pp. 1942–1948. 1
+[33] M. Gandhi, H. Almubarak, Y. Aoyama, and E. Theodorou, “Safety in Augmented Importance Sampling: Performance Bounds for Robust MPPI,” Apr. 2022. 2, 15
+[34] J. Gibson, B. Vlahov, D. Fan, P. Spieler, D. Pastor, A.-a. Aghamohammadi, and E. A. Theodorou, “A Multi-step Dynamics Modeling Framework For Autonomous Driving In Multiple Environments,” in 2023 IEEE International Conference on Robotics and Automation (ICRA). IEEE, May 2023, pp. 7959–7965. 2, 15
+[35] J. Yin, Z. Zhang, E. Theodorou, and P. Tsiotras, “Trajectory Distribution Control for Model Predictive Path Integral Control using Covariance Steering,” in 2022 International Conference on Robotics and Automation (ICRA). IEEE, 2022, pp. 1478–1484. 3
+[36] P. Wang, C. Li, C. Weaver, K. Kawamoto, M. Tomizuka, C. Tang, and W. Zhan, “Residual-MPPI: Online Policy Customization for Continuous Control,” arXiv preprint arXiv:2407.00898, 2024. 3
+[37] E. Trevisan and J. Alonso-Mora, “Biased-MPPI: Informing SamplingBased Model Predictive Control by Fusing Ancillary Controllers,” IEEE Robotics and Automation Letters, vol. 9, no. 6, pp. 5871–5878, 2024. 3
+[38] K. Honda, N. Akai, K. Suzuki, M. Aoki, H. Hosogaya, H. Okuda, and T. Suzuki, “Stein Variational Guided Model Predictive Path Integral Control: Proposal and Experiments with Fast Maneuvering Vehicles,” in IEEE International Conference on Robotics and Automation. IEEE, 2024. 3, 16
+[39] Z. Yi, C. Pan, G. He, G. Qu, and G. Shi, “CoVO-MPC: Theoretical analysis of sampling-based MPC and optimal covariance design,” in Proceedings of the 6th Annual Learning for Dynamics & Control Conference, ser. Proceedings of Machine Learning Research, vol. 242. PMLR, 2024, pp. 1122–1135. 3
+[40] I. S. Mohamed, J. Xu, G. S. Sukhatme, and L. Liu, “Towards efficient mppi trajectory generation with unscented guidance: U-mppi control strategy,” IEEE Transactions on Robotics, 2025. 3
+[41] L. L. Yan and S. Devasia, “Output-Sampled Model Predictive Path Integral Control (o-MPPI) for Increased Efficiency,” in 2024 IEEE International Conference on Robotics and Automation (ICRA), 2024, pp. 14 279–14 285. 3
+[42] T. Kim, G. Park, K. Kwak, J. Bae, and W. Lee, “Smooth Model Predictive Path Integral Control Without Smoothing,” IEEE Robotics
+
+and Automation Letters, vol. 7, no. 4, pp. 10 406–10 413, 2021. 3, 12, 16 [43] Z. Wang, O. So, J. Gibson, B. Vlahov, M. S. Gandhi, G.-H. Liu, and E. A. Theodorou, “Variational Inference MPC using Tsallis Divergence,” in Robotics: Science and Systems XVII. Robotics: Science and Systems Foundation, Apr. 2021. 3, 12 [44] I. M. Balci, E. Bakolas, B. Vlahov, and E. A. Theodorou, “Constrained Covariance Steering Based Tube-MPPI,” in 2022 American Control Conference (ACC), 2022, pp. 4197–4202. 3 [45] Y. Zhang, C. Pezzato, E. Trevisan, C. Salmi, C. H. Corbato, and J. Alonso-Mora, “Multi-Modal MPPI and Active Inference for Reactive Task and Motion Planning,” IEEE Robotics and Automation Letters, vol. 9, no. 9, pp. 7461–7468, 2024. 3 [46] J. Yin, Z. Zhang, and P. Tsiotras, “Risk-Aware Model Predictive Path Integral Control Using Conditional Value-at-Risk,” in 2023 IEEE International Conference on Robotics and Automation (ICRA), 2023, pp. 7937–7943. 3 [47] S. Macenski, T. Foote, B. Gerkey, C. Lalancette, and W. Woodall, “Robot Operating System 2: Design, Architecture, and Uses in the Wild,” Science Robotics, vol. 7, no. 66, p. eabm6074, May 2022. 4 [48] NVIDIA, “CUDA C++ Programming Guide - Hardware Implementation,” 2024. [Online]. Available: https://docs.nvidia.com/ cuda/cuda-c-programming-guide/#hardware-implementation 4 [49] M. Harris, “How to Overlap Data Transfers in CUDA C/C++,” Dec. 2012. [Online]. Available: https://developer.nvidia.com/blog/ how-overlap-data-transfers-cuda-cc/ 4 [50] ——, “Using Shared Memory in CUDA C/C++,” Jan. 2013. [Online]. Available: https://developer.nvidia.com/blog/ using-shared-memory-cuda-cc/ 5 [51] J. O. Coplien, “Curiously Recurring Template Patterns,” C++ Report, vol. 7, no. 2, pp. 24–27, 1995. 5 [52] J. Luitjens, “CUDA Pro Tip: Increase Performance with Vectorized Memory Access,” Dec. 2013. [Online]. Available: https://developer.nvidia.com/blog/ cuda-pro-tip-increase-performance-with-vectorized-memory-access/ 5 [53] NVIDIA, “CUDA C++ Programming Guide - Intrinsic Functions,” 2024. [Online]. Available: https://docs.nvidia.com/cuda/ cuda-c-programming-guide/#intrinsic-functions 5 [54] A. Lambert, F. Ramos, B. Boots, D. Fox, and A. Fishman, “Stein Variational Model Predictive Control,” in Proceedings of the 2020 Conference on Robot Learning. PMLR, 2021, pp. 1278–1297. 12 [55] T. Power and D. Berenson, “Variational Inference MPC using Normalizing Flows and Out-of-Distribution Projection,” in Robotics: Science and Systems XVIII. Robotics: Science and Systems Foundation, Jun. 2022. 12, 16 [56] J. Sacks and B. Boots, “Learning Sampling Distributions for Model Predictive Control,” in Proceedings of The 6th Conference on Robot Learning. PMLR, Mar. 2023, pp. 1733–1742. 12, 16 [57] B. Goldfain, P. Drews, G. Williams, and J. Gibson, “AutoRally,” Georgia Tech AutoRally Organization, Version melodic-devel. [Online]. Available: https://github.com/AutoRally/autorally 13 [58] S. Macenski, T. Moore, D. Lu, A. Merzlyakov, and M. Ferguson, “From the Desks of ROS Maintainers: A Survey of Modern & Capable Mobile Robotics Algorithms in the Robot Operating System 2,” Robotics and Autonomous Systems, vol. 168, p. 104493, 2023. 13 [59] A. Budyakov and S. Macenski, “ROS2 Model Predictive Path Integral Controller,” Open Navigation, Version 1.2.4. [Online]. Available: https:// github.com/ros-planning/navigation2/tree/iron/nav2 mppi controller 13 [60] A. Bou, M. Bettini, S. Dittert, V. Kumar, S. Sodhani, X. Yang, G. D. Fabritiis, and V. Moens, “TorchRL: A data-driven decision-making library for PyTorch,” in The Twelfth International Conference on Learning Representations, Jan. 2024. 13 [61] torchrl contributors, “mppi.py · pytorch/rl,” Meta, 2023, Version 0.2.1. [Online]. Available: https://github.com/pytorch/rl/blob/main/ torchrl/modules/planners/mppi.py 14 [62] N. Wagener, C.-A. Cheng, J. Sacks, and B. Boots, “An Online Learning Approach to Model Predictive Control,” in Proceedings of Robotics: Science and Systems, Freiburg im Breisgau, Germany, Jun. 2019. 16
+
+19
+
+TABLE III MPPI METHOD OPTIMIZATION TIMES AT VARIOUS NUMBER OF SAMPLES ON VARIOUS HARDWARE
+
+CPU
+Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K
+
+GPU
+1060 6GB 1060 6GB 1060 6GB
+1060 6GB 1060 6GB 1060 6GB
+1060 6GB 1060 6GB 1060 6GB
+1060 6GB 1060 6GB 1060 6GB
+1060 6GB 1060 6GB 1060 6GB
+1060 6GB 1060 6GB 1060 6GB
+1060 6GB 1060 6GB 1060 6GB
+1060 6GB 1060 6GB 1060 6GB
+1060 6GB 1060 6GB 1060 6GB
+2080 2080 2080
+2080 2080 2080
+2080 2080 2080
+2080 2080 2080
+2080 2080 2080
+2080 2080 2080
+2080 2080 2080
+2080 2080 2080
+2080 2080 2080
+
+Samples
+128 128 128
+256 256 256
+512 512 512
+1024 1024 1024
+2048 2048 2048
+4096 4096 4096
+6144 6144 6144
+8192 8192 8192
+16384 16384 16384
+128 128 128
+256 256 256
+512 512 512
+1024 1024 1024
+2048 2048 2048
+4096 4096 4096
+6144 6144 6144
+8192 8192 8192
+16384 16384 16384
+
+Method
+MPPI-Generic autorally torchrl
+MPPI-Generic autorally torchrl
+MPPI-Generic autorally torchrl
+MPPI-Generic autorally torchrl
+MPPI-Generic autorally torchrl
+MPPI-Generic autorally torchrl
+autorally MPPI-Generic
+torchrl
+autorally MPPI-Generic
+torchrl
+autorally MPPI-Generic
+torchrl
+MPPI-Generic autorally torchrl
+MPPI-Generic autorally torchrl
+MPPI-Generic autorally torchrl
+MPPI-Generic autorally torchrl
+MPPI-Generic autorally torchrl
+MPPI-Generic autorally torchrl
+autorally MPPI-Generic
+torchrl
+autorally MPPI-Generic
+torchrl
+autorally MPPI-Generic
+torchrl
+
+Avg. Time [ms]
+0.180 ± 0.035 0.436 ± 0.054
+24.6 ± 1.6
+0.191 ± 0.031 0.432 ± 0.037
+28.4 ± 1.4
+0.226 ± 0.031 0.434 ± 0.039
+28.6 ± 1.6
+0.310 ± 0.035 0.467 ± 0.043
+28.4 ± 1.7
+0.479 ± 0.039 0.545 ± 0.067
+28.6 ± 1.5
+0.890 ± 0.054 0.986 ± 0.078
+29.3 ± 1.7
+1.143 ± 0.077 1.311 ± 0.063
+30.9 ± 1.7
+1.599 ± 0.071 1.755 ± 0.070
+31.7 ± 1.4
+3.05 ± 0.64 3.337 ± 0.099
+41.3 ± 1.6
+0.166 ± 0.023 0.29 ± 0.14 24.8 ± 1.6
+0.171 ± 0.024 0.292 ± 0.028
+28.6 ± 1.3
+0.180 ± 0.028 0.299 ± 0.032
+28.7 ± 1.5
+0.204 ± 0.028 0.302 ± 0.028
+28.8 ± 1.5
+0.261 ± 0.026 0.323 ± 0.033
+28.8 ± 1.3
+0.398 ± 0.034 0.403 ± 0.035
+29.1 ± 1.6
+0.518 ± 0.040 0.576 ± 0.042
+29.1 ± 1.6
+0.580 ± 0.044 0.705 ± 0.043
+29.4 ± 1.3
+1.192 ± 0.059 1.418 ± 0.061
+32.4 ± 1.5
+
+CPU
+Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K
+
+GPU
+1080 Ti 1080 Ti 1080 Ti
+1080 Ti 1080 Ti 1080 Ti
+1080 Ti 1080 Ti 1080 Ti
+1080 Ti 1080 Ti 1080 Ti
+1080 Ti 1080 Ti 1080 Ti
+1080 Ti 1080 Ti 1080 Ti
+1080 Ti 1080 Ti 1080 Ti
+1080 Ti 1080 Ti 1080 Ti
+1080 Ti 1080 Ti 1080 Ti
+4090 4090 4090
+4090 4090 4090
+4090 4090 4090
+4090 4090 4090
+4090 4090 4090
+4090 4090 4090
+4090 4090 4090
+4090 4090 4090
+4090 4090 4090
+
+Samples
+128 128 128
+256 256 256
+512 512 512
+1024 1024 1024
+2048 2048 2048
+4096 4096 4096
+6144 6144 6144
+8192 8192 8192
+16384 16384 16384
+128 128 128
+256 256 256
+512 512 512
+1024 1024 1024
+2048 2048 2048
+4096 4096 4096
+6144 6144 6144
+8192 8192 8192
+16384 16384 16384
+
+Method
+MPPI-Generic autorally torchrl
+MPPI-Generic autorally torchrl
+MPPI-Generic autorally torchrl
+MPPI-Generic autorally torchrl
+MPPI-Generic autorally torchrl
+MPPI-Generic autorally torchrl
+autorally MPPI-Generic
+torchrl
+autorally MPPI-Generic
+torchrl
+autorally MPPI-Generic
+torchrl
+MPPI-Generic autorally torchrl
+MPPI-Generic autorally torchrl
+MPPI-Generic autorally torchrl
+MPPI-Generic autorally torchrl
+MPPI-Generic autorally torchrl
+MPPI-Generic autorally torchrl
+MPPI-Generic autorally torchrl
+MPPI-Generic autorally torchrl
+autorally MPPI-Generic
+torchrl
+
+Avg. Time [ms]
+0.179 ± 0.029 0.44 ± 0.12 24.6 ± 1.8
+0.184 ± 0.029 0.439 ± 0.036
+28.4 ± 1.4
+0.201 ± 0.031 0.442 ± 0.038
+28.4 ± 1.6
+0.220 ± 0.030 0.448 ± 0.038
+28.5 ± 1.6
+0.298 ± 0.033 0.482 ± 0.041
+28.7 ± 1.4
+0.432 ± 0.040 0.549 ± 0.042
+28.9 ± 1.7
+0.619 ± 0.041 0.702 ± 0.046
+29.2 ± 1.7
+0.695 ± 0.047 1.109 ± 0.058
+29.7 ± 1.5
+1.334 ± 0.061 2.188 ± 0.078
+33.8 ± 1.6
+0.123 ± 0.032 0.198 ± 0.039
+24.5 ± 1.6
+0.122 ± 0.029 0.196 ± 0.029
+28.2 ± 1.3
+0.124 ± 0.026 0.197 ± 0.028
+28.2 ± 1.6
+0.131 ± 0.025 0.202 ± 0.025
+28.1 ± 1.6
+0.146 ± 0.036 0.214 ± 0.035
+28.2 ± 1.3
+0.170 ± 0.030 0.224 ± 0.028
+28.2 ± 1.6
+0.201 ± 0.028 0.233 ± 0.032
+28.4 ± 1.6
+0.232 ± 0.030 0.245 ± 0.027
+28.6 ± 1.5
+0.338 ± 0.033 0.389 ± 0.038
+28.6 ± 1.6
+
+20
+
+CPU
+AMD 5600X AMD 5600X AMD 5600X AMD 5600X
+AMD 5600X AMD 5600X AMD 5600X AMD 5600X
+AMD 5600X AMD 5600X AMD 5600X AMD 5600X
+AMD 5600X AMD 5600X AMD 5600X AMD 5600X
+AMD 5600X AMD 5600X AMD 5600X AMD 5600X
+AMD 5600X AMD 5600X AMD 5600X AMD 5600X
+AMD 5600X AMD 5600X AMD 5600X AMD 5600X
+AMD 5600X AMD 5600X AMD 5600X AMD 5600X
+AMD 5600X AMD 5600X AMD 5600X AMD 5600X
+
+GPU 3080 3080
+3080 3080 3080
+3080 3080 3080
+3080 3080 3080
+3080 3080 3080
+3080 3080 3080
+3080 3080 3080
+3080 3080 3080
+3080 3080 3080 3080
+
+Jetson Jetson Jetson Jetson Jetson Jetson Jetson Jetson Jetson
+
+Nano Nano Nano Nano Nano Nano Nano Nano Nano
+
+Tegra X1 Tegra X1 Tegra X1 Tegra X1 Tegra X1 Tegra X1 Tegra X1 Tegra X1 Tegra X1
+
+Jetson Orin Nano (8 GB) Jetson Orin Nano (8 GB) Jetson Orin Nano (8 GB) Jetson Orin Nano (8 GB)
+Jetson Orin Nano (8 GB) Jetson Orin Nano (8 GB) Jetson Orin Nano (8 GB) Jetson Orin Nano (8 GB)
+Jetson Orin Nano (8 GB) Jetson Orin Nano (8 GB) Jetson Orin Nano (8 GB) Jetson Orin Nano (8 GB)
+Jetson Orin Nano (8 GB) Jetson Orin Nano (8 GB) Jetson Orin Nano (8 GB) Jetson Orin Nano (8 GB)
+Jetson Orin Nano (8 GB) Jetson Orin Nano (8 GB) Jetson Orin Nano (8 GB) Jetson Orin Nano (8 GB)
+
+Samples
+128 128 128 128
+256 256 256 256
+512 512 512 512
+1024 1024 1024 1024
+2048 2048 2048 2048
+4096 4096 4096 4096
+6144 6144 6144 6144
+8192 8192 8192 8192
+16384 16384 16384 16384
+128 256 512 1024 2048 4096 6144 8192 16384
+128 128 128 128
+256 256 256 256
+512 512 512 512
+1024 1024 1024 1024
+2048 2048 2048 2048
+
+Method
+MPPI-Generic autorally nav2 torchrl
+MPPI-Generic autorally nav2 torchrl
+MPPI-Generic autorally nav2 torchrl
+MPPI-Generic autorally nav2 torchrl
+MPPI-Generic autorally nav2 torchrl
+MPPI-Generic autorally nav2 torchrl
+MPPI-Generic autorally nav2 torchrl
+autorally MPPI-Generic
+nav2 torchrl
+autorally MPPI-Generic
+torchrl nav2
+autorally autorally autorally autorally autorally autorally autorally autorally autorally
+MPPI-Generic autorally nav2 torchrl
+MPPI-Generic autorally nav2 torchrl
+MPPI-Generic autorally nav2 torchrl
+MPPI-Generic autorally nav2 torchrl
+autorally MPPI-Generic
+nav2 torchrl
+
+Avg. Time [ms]
+0.1554 ± 0.0156 0.2701 ± 0.0169 0.6153 ± 0.0319
+47.61 ± 1.58
+0.1536 ± 0.0336 0.2743 ± 0.0152 1.0804 ± 0.0427
+53.88 ± 2.02
+0.1528 ± 0.0115 0.2696 ± 0.0123 2.1011 ± 0.0962
+53.89 ± 2.02
+0.1704 ± 0.0155 0.2757 ± 0.0148
+4.752 ± 0.240 53.97 ± 1.80
+0.1973 ± 0.0138 0.2850 ± 0.0143
+9.500 ± 0.380 54.02 ± 2.00
+0.2562 ± 0.0377 0.2896 ± 0.0143 19.583 ± 0.789
+54.15 ± 2.08
+0.3145 ± 0.0194 0.3362 ± 0.0143 29.872 ± 0.864
+54.18 ± 1.79
+0.3664 ± 0.0167 0.3693 ± 0.0210
+40.64 ± 1.06 54.20 ± 2.09
+0.5121 ± 0.0183 0.5790 ± 0.0241
+54.68 ± 1.70 84.26 ± 1.65
+1.397 ± 0.613 1.506 ± 0.576 1.847 ± 0.575 3.245 ± 0.608 5.921 ± 0.578 11.159 ± 0.581 16.546 ± 0.605 21.767 ± 0.629 44.158 ± 0.947
+0.629 ± 0.130 0.947 ± 0.292 2.7074 ± 0.0213 244.52 ± 6.84
+0.6074 ± 0.0221 0.9038 ± 0.0667 5.1486 ± 0.0638
+272.14 ± 8.28
+0.7282 ± 0.0302 0.9095 ± 0.0332 10.0513 ± 0.0572
+272.30 ± 6.71
+1.0300 ± 0.0350 1.0316 ± 0.0308
+273.91 ± 8.26 21.488 ± 0.105
+1.4089 ± 0.0556 1.645 ± 0.109 43.796 ± 0.186 275.46 ± 8.24
+
+CPU
+Intel 13900K Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K Intel 13900K
+
+GPU 3080 3080
+3080 3080 3080
+3080 3080 3080
+3080 3080 3080
+3080 3080 3080
+3080 3080 3080
+3080 3080 3080
+3080 3080 3080 3080
+3080 3080 3080
+
+Jetson Jetson Jetson Jetson Jetson Jetson Jetson Jetson Jetson
+
+Nano Nano Nano Nano Nano Nano Nano Nano Nano
+
+Tegra X1 Tegra X1 Tegra X1 Tegra X1 Tegra X1 Tegra X1 Tegra X1 Tegra X1 Tegra X1
+
+Jetson Orin Nano (8 GB) Jetson Orin Nano (8 GB) Jetson Orin Nano (8 GB) Jetson Orin Nano (8 GB)
+Jetson Orin Nano (8 GB) Jetson Orin Nano (8 GB) Jetson Orin Nano (8 GB) Jetson Orin Nano (8 GB)
+Jetson Orin Nano (8 GB) Jetson Orin Nano (8 GB) Jetson Orin Nano (8 GB) Jetson Orin Nano (8 GB)
+Jetson Orin Nano (8 GB) Jetson Orin Nano (8 GB) Jetson Orin Nano (8 GB) Jetson Orin Nano (8 GB)
+
+Samples
+128 128 128 128
+256 256 256 256
+512 512 512 512
+1024 1024 1024 1024
+2048 2048 2048 2048
+4096 4096 4096 4096
+6144 6144 6144 6144
+8192 8192 8192 8192
+16384 16384 16384 16384
+128 256 512 1024 2048 4096 6144 8192 16384
+4096 4096 4096 4096
+6144 6144 6144 6144
+8192 8192 8192 8192
+16384 16384 16384 16384
+
+Method
+MPPI-Generic autorally nav2 torchrl
+MPPI-Generic autorally nav2 torchrl
+MPPI-Generic autorally nav2 torchrl
+MPPI-Generic autorally nav2 torchrl
+MPPI-Generic autorally nav2 torchrl
+MPPI-Generic autorally nav2 torchrl
+MPPI-Generic autorally nav2 torchrl
+MPPI-Generic autorally torchrl nav2
+autorally MPPI-Generic
+torchrl nav2
+MPPI-Generic MPPI-Generic MPPI-Generic MPPI-Generic MPPI-Generic MPPI-Generic MPPI-Generic MPPI-Generic MPPI-Generic
+autorally MPPI-Generic
+nav2 torchrl
+autorally MPPI-Generic
+nav2 torchrl
+autorally MPPI-Generic
+nav2 torchrl
+autorally MPPI-Generic
+torchrl nav2
+
+Avg. Time [ms]
+0.1475 ± 0.0316 0.245 ± 0.118
+0.3899 ± 0.0162 24.77 ± 1.73
+0.1526 ± 0.0271 0.2428 ± 0.0294 0.7290 ± 0.0101
+28.49 ± 1.45
+0.1536 ± 0.0345 0.2466 ± 0.0369 1.4186 ± 0.0445
+28.58 ± 1.65
+0.1634 ± 0.0271 0.2599 ± 0.0357 3.3559 ± 0.0350
+28.68 ± 1.75
+0.1918 ± 0.0331 0.2621 ± 0.0390 6.7212 ± 0.0651
+28.68 ± 1.46
+0.2489 ± 0.0388 0.2760 ± 0.0426 13.917 ± 0.152
+28.76 ± 1.63
+0.3064 ± 0.0391 0.3243 ± 0.0430 21.739 ± 0.189
+28.83 ± 1.65
+0.3590 ± 0.0371 0.3605 ± 0.0449
+28.98 ± 1.44 29.917 ± 0.239
+0.4991 ± 0.0497 0.6271 ± 0.0475
+29.98 ± 1.67 62.264 ± 0.990
+1.0244 ± 0.0914 1.3839 ± 0.0614
+2.123 ± 0.120 4.11 ± 1.20
+7.297 ± 0.399 14.124 ± 0.133 21.075 ± 0.229 28.022 ± 0.261 56.650 ± 0.351
+2.713 ± 0.124 3.0924 ± 0.0791 87.383 ± 0.260
+278.76 ± 6.94
+3.863 ± 0.100 4.545 ± 0.136 129.927 ± 0.348 283.60 ± 8.09
+5.255 ± 0.131 6.102 ± 0.154 170.249 ± 0.356 289.85 ± 6.66
+9.940 ± 0.197 12.070 ± 0.218 314.68 ± 8.52 334.911 ± 0.746
+
+21
+
+CPU
+AMD 5600X AMD 5600X AMD 5600X
+AMD 5600X AMD 5600X AMD 5600X
+AMD 5600X AMD 5600X AMD 5600X
+AMD 5600X AMD 5600X AMD 5600X
+AMD 5600X AMD 5600X AMD 5600X
+AMD 5600X AMD 5600X AMD 5600X
+AMD 5600X AMD 5600X AMD 5600X
+AMD 5600X AMD 5600X AMD 5600X
+AMD 5600X AMD 5600X AMD 5600X
+AMD 5600X AMD 5600X AMD 5600X
+AMD 5600X AMD 5600X AMD 5600X
+AMD 5600X AMD 5600X AMD 5600X
+AMD 5600X AMD 5600X AMD 5600X
+AMD 5600X AMD 5600X AMD 5600X
+AMD 5600X AMD 5600X AMD 5600X
+AMD 5600X AMD 5600X AMD 5600X
+AMD 5600X AMD 5600X AMD 5600X
+AMD 5600X AMD 5600X AMD 5600X
+
+GPU
+1050 Ti 1050 Ti 1050 Ti
+1050 Ti 1050 Ti 1050 Ti
+1050 Ti 1050 Ti 1050 Ti
+1050 Ti 1050 Ti 1050 Ti
+1050 Ti 1050 Ti 1050 Ti
+1050 Ti 1050 Ti 1050 Ti
+1050 Ti 1050 Ti 1050 Ti
+1050 Ti 1050 Ti 1050 Ti
+1050 Ti 1050 Ti 1050 Ti
+1650 1650 1650
+1650 1650 1650
+1650 1650 1650
+1650 1650 1650
+1650 1650 1650
+1650 1650 1650
+1650 1650 1650
+1650 1650 1650
+1650 1650 1650
+
+Samples
+MPPI-Generic autorally torchrl
+MPPI-Generic autorally torchrl
+MPPI-Generic autorally torchrl
+MPPI-Generic autorally torchrl
+autorally MPPI-Generic
+torchrl
+autorally MPPI-Generic
+torchrl
+autorally MPPI-Generic
+torchrl
+autorally MPPI-Generic
+torchrl
+autorally MPPI-Generic
+torchrl
+MPPI-Generic autorally torchrl
+MPPI-Generic autorally torchrl
+MPPI-Generic autorally torchrl
+MPPI-Generic autorally torchrl
+autorally MPPI-Generic
+torchrl
+autorally MPPI-Generic
+torchrl
+autorally MPPI-Generic
+torchrl
+autorally MPPI-Generic
+torchrl
+autorally MPPI-Generic
+torchrl
+
+Method
+128 128 128
+256 256 256
+512 512 512
+1024 1024 1024
+2048 2048 2048
+4096 4096 4096
+6144 6144 6144
+8192 8192 8192
+16384 16384 16384
+128 128 128
+256 256 256
+512 512 512
+1024 1024 1024
+2048 2048 2048
+4096 4096 4096
+6144 6144 6144
+8192 8192 8192
+16384 16384 16384
+
+Avg. Time [ms]
+0.2149±0.0478 0.4646±0.0337
+46.65±2.25
+0.2265±0.0433 0.4649±0.0338
+52.88±2.40
+0.3077±0.0525 0.4812±0.0375
+52.97±2.37
+0.4373±0.0548 0.5196±0.0397
+53.15±2.14
+0.6371±0.0433 0.8443±0.0614
+53.58±2.45
+1.2952±0.0569 1.4836±0.0616
+55.10±2.42
+1.4595±0.0618 2.1196±0.0727
+57.43±2.14
+2.0762±0.0739 2.9062±0.0841
+60.50±2.45
+4.108±0.113 5.665±0.126 73.40±1.93
+0.1459±0.0208 0.2555±0.0176
+46.52±1.96
+0.1530±0.0188 0.2564±0.0232
+52.69±2.31
+0.2015±0.0218 0.2649±0.0226
+52.20±2.12
+0.2848±0.0293 0.3260±0.0225
+52.33±1.78
+0.4247±0.0251 0.5046±0.0295
+52.58±2.11
+0.8065±0.0447 1.0046±0.0448
+53.69±2.08
+0.9841±0.0401 1.2299±0.0437
+55.53±1.80
+1.3870±0.0476 1.7740±0.0515
+57.84±2.05
+2.7039±0.0685 3.293±0.111 68.92±1.73
+
+CPU
+Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K
+Intel 13900K Intel 13900K Intel 13900K
+
+GPU
+1050 Ti 1050 Ti 1050 Ti
+1050 Ti 1050 Ti 1050 Ti
+1050 Ti 1050 Ti 1050 Ti
+1050 Ti 1050 Ti 1050 Ti
+1050 Ti 1050 Ti 1050 Ti
+1050 Ti 1050 Ti 1050 Ti
+1050 Ti 1050 Ti 1050 Ti
+1050 Ti 1050 Ti 1050 Ti
+1050 Ti 1050 Ti 1050 Ti
+1650 1650 1650
+1650 1650 1650
+1650 1650 1650
+1650 1650 1650
+1650 1650 1650
+1650 1650 1650
+1650 1650 1650
+1650 1650 1650
+1650 1650 1650
+
+Samples
+MPPI-Generic autorally torchrl
+MPPI-Generic autorally torchrl
+MPPI-Generic autorally torchrl
+MPPI-Generic autorally torchrl
+autorally MPPI-Generic
+torchrl
+autorally MPPI-Generic
+torchrl
+autorally MPPI-Generic
+torchrl
+autorally MPPI-Generic
+torchrl
+autorally MPPI-Generic
+torchrl
+MPPI-Generic autorally torchrl
+MPPI-Generic autorally torchrl
+MPPI-Generic autorally torchrl
+MPPI-Generic autorally torchrl
+autorally MPPI-Generic
+torchrl
+autorally MPPI-Generic
+torchrl
+autorally MPPI-Generic
+torchrl
+autorally MPPI-Generic
+torchrl
+autorally MPPI-Generic
+torchrl
+
+Method
+128 128 128
+256 256 256
+512 512 512
+1024 1024 1024
+2048 2048 2048
+4096 4096 4096
+6144 6144 6144
+8192 8192 8192
+16384 16384 16384
+128 128 128
+256 256 256
+512 512 512
+1024 1024 1024
+2048 2048 2048
+4096 4096 4096
+6144 6144 6144
+8192 8192 8192
+16384 16384 16384
+
+Avg. Time [ms]
+0.2008 ± 0.0591 0.456 ± 0.160 25.60 ± 2.71
+0.2257 ± 0.0578 0.4543 ± 0.0833
+29.31 ± 2.44
+0.3016 ± 0.0658 0.4688 ± 0.0802
+29.91 ± 2.80
+0.4294 ± 0.0753 0.5120 ± 0.0963
+29.90 ± 3.00
+0.630 ± 0.104 0.8370 ± 0.0993
+30.39 ± 2.92
+1.202 ± 0.132 1.468 ± 0.134 31.28 ± 2.71
+1.776 ± 0.151 2.103 ± 0.155 34.26 ± 2.75
+2.360 ± 0.170 2.893 ± 0.248 37.08 ± 2.68
+4.611 ± 0.255 5.638 ± 0.418 51.97 ± 2.88
+0.1354 ± 0.0263 0.245 ± 0.111 24.70 ± 1.77
+0.1526 ± 0.0260 0.2385 ± 0.0284
+28.54 ± 1.52
+0.1964 ± 0.0320 0.2387 ± 0.0249
+28.67 ± 1.66
+0.2866 ± 0.0346 0.3060 ± 0.0306
+28.78 ± 1.65
+0.4047 ± 0.0381 0.4834 ± 0.0431
+29.13 ± 1.46
+0.7927 ± 0.0619 0.9680 ± 0.0636
+30.61 ± 1.70
+0.9418 ± 0.0623 1.1777 ± 0.0637
+32.39 ± 1.72
+1.3343 ± 0.0721 1.6789 ± 0.0758
+34.52 ± 1.46
+2.5903 ± 0.0999 3.128 ± 0.128 46.42 ± 1.73
+
+

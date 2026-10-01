@@ -1,0 +1,505 @@
+Multi-Agent Path Integral Control for Interaction-Aware Motion Planning in Urban Canals
+Lucas Streichenberg1,2,∗, Elia Trevisan1,∗, Jen Jen Chung2,3, Roland Siegwart2 and Javier Alonso-Mora1
+
+arXiv:2302.06547v1 [cs.RO] 13 Feb 2023
+
+Abstract— Autonomous vehicles that operate in urban environments shall comply with existing rules and reason about the interactions with other decision-making agents. In this paper, we introduce a decentralized and communication-free interaction-aware motion planner and apply it to Autonomous Surface Vessels (ASVs) in urban canals. We build upon a sampling-based method, namely Model Predictive Path Integral control (MPPI), and employ it to, in each time instance, compute both a collision-free trajectory for the vehicle and a prediction of other agents’ trajectories, thus modeling interactions. To improve the method’s efﬁciency in multi-agent scenarios, we introduce a two-stage sample evaluation strategy and deﬁne an appropriate cost function to achieve rule compliance. We evaluate this decentralized approach in simulations with multiple vessels in real scenarios extracted from Amsterdam’s canals, showing superior performance than a state-of-theart trajectory optimization framework and robustness when encountering different types of agents.
+I. INTRODUCTION
+With rising population density, cities are forced to enhance their mobility and transportation strategies. The City of Amsterdam aims to reduce the load on road infrastructure by transporting goods and people on the urban waterways [1]. This presents a great opportunity to operate Autonomous Surface Vessels (ASVs) such as Roboat [2] in urban canals. However, this is a very technically challenging task due to the complex and dynamic nature of the environment. Narrow canals, complex dynamics, static obstacles, and humanpiloted vessels must be dealt with while obeying existing canal regulations [3]. Model Predictive Path Integral Control (MPPI) [4] offers a parallelizable sampling-based framework for solving motion planning tasks with such complex dynamics and discontinuous costs as those exhibited in our domain. Unlike methods based on constrained optimization, which need to rely on convex approximations of the free space and on inﬂating the ego and obstacle agents into ellipsoidal shapes for collision avoidance [5], MPPI can account for the exact and potentially non-convex shape of both static and dynamic obstacles. This promises to be a signiﬁcant advantage in tight interaction-rich environments. Still, another
+This research is supported by the project “Sustainable Transportation and Logistics over Water: Electriﬁcation, Automation and Optimization (TRiLOGy)” of the Netherlands Organization for Scientiﬁc Research (NWO), domain Science (ENW), and the Amsterdam Institute for Advanced Metropolitan Solutions (AMS) in the Netherlands.
+∗These authors have contributed equally. 1Cognitive Robotics Department, TU Delft, {e.trevisan, j.alonsomora}@tudelft.nl 2Autonomous Systems Lab, ETH Zurich {stlucas, rsiegwart}@ethz.ch 3School of ITEE, The University of Queensland jenjen.chung@uq.edu.au
+
+Fig. 1: An ASV running our method (orange) encounters a noncommunicating vessel (blue). At each time step, the ASV is given its current position and a global path (dashed green line). Based on this, the ASV sets a local goal (purple circle) in front of itself on the global path. The ASV is also given the position and velocity of the non-communicating vessel. With these, the ASV estimates the local goal of the non-communicating vessel (red star) assuming constant velocity. Then, the ASV plans input sequences over a deﬁned horizon resulting in trajectories for both vessels.
+important aspect of achieving safe and efﬁcient navigation in crowded spaces is accounting for cooperation [6]. For these reasons, we propose a method to decentralize MPPI in order to navigate among non-communicating agents while providing interaction awareness and generating cooperative motion plans. We introduce awareness of navigation rules through discontinuous costs. Moreover, the proposed method can run in real-time thanks to our two-stage sample evaluation strategy and CPU parallelization.
+A. Related Work
+Cooperative and interactive motion planning for robotics is a challenging problem with a vast literature [7].
+The most well-known examples for planning in dynamic environments are the Dynamic Window Approach (DWA) [8], Reciprocal Velocity Obstacle (RVO) [9], its extension Optimal Reciprocal Collision Avoidance (ORCA) [10], and Artiﬁcial Potential Fields (APF) [11], [12]. While these methods are highly efﬁcient, they often lead to reactive behaviors.
+Model-free reinforcement learning algorithms have been successfully trained in simulation with hand-crafted reward functions to navigate among human crowds [13], [14], but generalization and collision avoidance are not guaranteed.
+Game theoretic approaches have been implemented in the context of autonomous cars to perform lane changes [15], merging [16] and to solve unsignalized intersections [17]. However, they rely on a coarse discretization of the action space and do not scale well with the number of agents.
+
+Model Predictive Control (MPC) based on trajectory optimization is a popular approach when it comes to local motion planning. In a multi-agent setting, however, the actions of the other agents are required to proceed with the motion planning of the ego-agent. In [18] a distributed MPC was developed for motion planning with multiple drones relying on ideal communication. A way to avoid communication is to estimate each agent’s state and predict their future motion using, for example, a constant velocity model [5], [19] or learning-based techniques [20]. However, as long as we ﬁrst predict and then plan, large parts of the state-space can be perceived as unsafe by the motion planner [21]. This can be overcome by modeling interaction, such that the ego-agent is aware that its actions can inﬂuence the actions of the other agents around it. Unfortunately, accounting for such a model while planning with constrained optimization techniques can become computationally expensive [22].
+In contrast to optimization-based methods, MPPI solves for the best control trajectory at each step by forward simulating the behavior of the full system. To achieve this, MPPI uses a parallelizable sampling-based framework [23] to rollout simulations, allowing it to ﬁnd an approximate solution to non-linear, non-convex, discontinuous Stochastic Optimal Control (SOC) problems [4], [24]. Compared to other SOC methods such as iterative Linear Quadratic Gaussian (iLQG) [25] or Differential Dynamic Programming (DDP) [26], MPPI does not require linearization of the system dynamics or quadratic approximation of the cost function. This makes MPPI particularly well-suited to our target task of ASV navigation in urban canals since the regulation-based interactions explicitly give rise to nondifferentiable costs. Moreover, MPPI’s fast parallelizable computations could solve interaction-aware motion planning problems while still running in real-time. When deployed to centralized multi-agent systems, however, the classic MPPI approach shows a signiﬁcant increase in the number of samples required with an increasing number of agents [27].
+B. Contributions
+We propose an interaction-aware motion planning method based on MPPI which can generate cooperative plans in environments with non-communicating agents accounting for the full dynamics of the system and the exact shapes of the obstacles. To summarize our contributions:
+• We propose a decentralized architecture that can operate with limited or no communication under the assumption that other agents’ states can be sensed exactly and that all the agents in the environment behave rationally.
+• To reduce the number of samples required to plan for multi-agent systems, we propose a two-stage sample evaluation technique that improves sample efﬁciency.
+• We formulate the objectives of the navigation task into an appropriate cost function to achieve rule compliance.
+To demonstrate the performance of our method, we compare it to a state-of-the-art regulations-aware optimization-based MPC [5] in several simulated experiments set up in real sections of Amsterdam’s canals. The proposed decentralized
+
+MPPI is also compared to the centralized version in environments with crowds of up to four interacting vessels. Finally, we demonstrate the robustness of the algorithm in scenarios where a human-driven vessel does not behave rationally and provide insights into the computation times.
+
+II. PRELIMINARIES
+We start by describing the basic MPPI algorithm. Then, since MPPI relies on a model of the system to perform the simulated rollouts, we also deﬁne the relevant dynamics that describe the behavior of our multi-ASV system.
+
+A. MPPI Algorithm
+The presented work is based on the MPPI derivations by [24]. With this method, we can solve SOC problems for discrete-time dynamical systems of the form,
+
+qt+1 = F (qt, u˜t), u˜t ∼ N (ut, Σ),
+
+(1)
+
+with state q, time step t, nonlinear state transition function F
+and noisy input u˜ with variance Σ and mean u, where u is
+the input we command to the system. The algorithm samples K input sequences U˜k, k ∈ [1, K] from a distribution N (ut, νΣ) (with scaling parameter ν) [28] and simulates them into K state trajectories Qk over a horizon T as,
+
+Qk = q0, F (q0, u˜k,0), . . . , F (qk,T −1, u˜k,T −1) . (2)
+
+Each sample is rated by computing the total cost Sk, which includes a stage cost and a terminal cost. Importance sampling weights wk are then computed based on the cost of the sample k minus the minimum sampled cost Smin as,
+
+1
+
+−1
+
+K−1
+
+wk = η exp λ (Sk − Smin) ,
+
+wk = 1, (3)
+
+k=0
+
+with normalization factor η and tuning parameter λ. The resulting control input sequence U ∗, which approximates the
+optimal control input sequence, is computed with,
+
+K−1
+
+U ∗ = wkU˜k.
+
+(4)
+
+k=0
+
+Then,
+
+the
+
+ﬁrst
+
+input
+
+u∗
+0
+
+of
+
+the
+
+computed
+
+sequence
+
+U∗
+
+is
+
+applied to the system.
+
+B. Vessel State and Dynamics
+We deﬁne the multi-agent state similarly to [27]. The state of agent i is deﬁned as the concatenation of its position, heading, and associated velocities,
+qi = xi vi = xi yi φi x˙ i y˙i φ˙i . (5)
+The full system state is then formed by stacking the individual states of each of the agents in the set M = {0, 1, ..., m},
+
+q = q0 q1 . . . qm .
+
+(6)
+
+The ASV we use is modeled as a nonlinear second order system [29]–[31]. Since the vessel sails at low speeds, we discard Coriolis and centripetal effects. Therefore,
+
+x˙ i = R (φi) vi, v˙ i = M−1 (Bui − D (vi) vi) , (7)
+
+Fig. 2: Overview of the framework: At every time step, each agent receives
+the state of all the agents in the environment. With this, we extract a local
+goal for the ego-agent (agent i in ﬁgure) from the global planner and predict
+local goals for the other agents. We then solve the planning task with MPPI
+as if it was centralized, planning a control input sequence and corresponding trajectory for each agent. We then apply the ﬁrst input u∗i,0 of the sequence to the ego-agent.
+
+where R (φi) is the rotation matrix from body to inertial frame, M is the mass matrix, Bui are the applied forces (thrust) and D (vi) is the drag matrix.
+
+C. Global Planning
+To help navigate large maps, we provide the ego-agent with a global path. Such a path is generated via the ROS navigation stack with its path planning plugin [32]. Instead of directly tracking this global path, we look for a local goal pg on the global path at a given look-ahead distance rpg (Fig. 5). Compared to just rigorously tracking the global path, this local goal approach gives the local planner more freedom to perform collision avoidance and other maneuvers.
+
+III. DECENTRALIZED INTERACTION-AWARE MODEL PREDICTIVE PATH INTEGRAL CONTROL
+In the following we outline the proposed architecture, state the changes to the classic MPPI framework and present the regulation-aware cost function along with the local goal prediction used for the decentralized computation of the cost.
+
+A. Approach and Architecture
+Our decentralized MPPI approach relies on each agent running its own MPPI solver for its local multi-agent system to anticipate the actions of other agents (see Fig. 2). That is, for agent i, the MPPI state and control output are deﬁned as,
+
+qi = qi qij ,
+
+∀j ∈ M \ i,
+
+(8)
+
+ui = ui uij ,
+
+where (.)ji signiﬁes a variable that agent i estimates of agent j. In the centralized case described in Section II-A, the system state is fully observable and the inputs computed by the central controller will be those executed by each agent. When we move to the decentralized case, the positions and velocities of other agents must be communicated or observed. Furthermore, while each agent samples control actions for all other agents in the MPPI rollouts, at execution time, there is no guarantee that other agents will behave accordingly. To focus on the decentralized coordination problem, we make a few assumptions. First, we assume noise-free observations
+
+Fig. 3: Screenshot of two agents running our decentralized method with no communication inside our simulator. The left (blue) agent is given a local goal (large blue ball), its state, and the state of the other (orange) agent, based on which it predicts a local goal (small orange ball) for the obstacle vessel. The blue agent plans a sequence of inputs for both itself and the obstacle agent resulting in two trajectories, depicted by the blue paths. In orange, we can see the other agent applying the same algorithm. Note that even though we use constant velocity to predict the goal of the obstacles, both agents plan cooperation in the collision avoidance.
+of the positions and velocities of other agents, i.e. qij = qj. Second, we assume that all agents behave rationally and that they are minimizing the same global cost. We later show in our experiments that the controller is still able to perform well when this assumption is violated. Third, in our experiments we only consider scenarios with homogeneous agents, meaning that they all have the same dynamics. This third assumption is not required in general as considering different dynamical models for different agents is possible as long as models are known. Fig. 3 shows a simulated encounter between two ASVs running our decentralized algorithm without communication.
+B. Two-stage Sample Evaluation
+With an increasing number of agents, it is increasingly likely for at least one agent to collide with a static obstacle in most rollouts. In the classical implementation of MPPI, this leads to most rollouts receiving a high cost and being effectively rejected, resulting in a very low sample efﬁciency. Therefore we propose to decouple the sampling into two stages as shown in Algorithm 1. Control-samples Uj,k are evaluated in parallel for every agent j ∈ M, predicting the set of individual trajectories Qj,k with agent-centric costs Sj,k (eq. 9). At this point all samples with cost larger than the collision penalty Ccollision are immediately discarded (lines 3 and 4 of Algorithm 1). To build the expected number of system samples K we sample uniformly from the remaining non-colliding samples of each agent and unify these into full system samples, i.e. by stacking as in eq. (6). For each system sample Qk the complete conﬁguration cost Sk is evaluated by adding the stored agent-centric costs Sj,k with any costs arising from collisions between vessels and regulation violations (line 14, Algorithm 1).
+C. Cost Formulation
+The sample cost Sk, ∀k ∈ [1, K] evaluation is split into agent-centric and conﬁguration costs. Both are considered instantaneous costs and are evaluated for every time-step t within the horizon T and each sample k. The agent-centric cost Sj,k,t (in the following Sagent) is evaluated for agent j for sample k and deﬁned as,
+Sagent = Cstatic + Crotation + Ctracking + Cspeed + Csample. (9)
+
+Algorithm 1: Decentralized MPPI for agent i (agent-speciﬁc superscripts are dropped for clarity)
+
+Require: U
+
+previous control sequence (hot start)
+
+Require: q
+
+current system state
+
+1: pi,g ← receiveEgoLocalGoal()
+
+2: pj,g ← predictLocalGoal(qj)
+
+∀j ∈ M\i
+
+3: for each agent j ∈ M do
+
+independent rollouts
+
+4: for each sample k do
+
+5:
+
+Ej,k = [ 0, . . . , T −1]
+
+t ∈ N (0, νΣ)
+
+6:
+
+U˜j,k = Uj + Ej,k
+
+7:
+
+Qj,k ← simulateSystem(qj, U˜j,k)
+
+8:
+
+Sj,k ← getIndividualCost(Qj,k, U˜j,k, pj,g)
+
+9:
+
+if Sj,k > Ccollision then
+
+10:
+
+discardSample(Qj,k, U˜j,k, Ej,k, Sj,k)
+
+11: Uniformly sample from the remaining valid input sequences to rebuild K full system samples
+12: for k = 1 : K do 13: Sk = j∈M Sj,k + getConﬁgurationCost(Qk)
+
+14: w1, . . . , wK = importanceSampling( S0, . . . , SK ) 15: return U ∗ = U + k=1 K wkEk
+
+Cstatic returns a constant penalty Ccollision if the vessel enters occupied space and Crotation is based on a linear penalty for rotation velocities (krot, slow for velocities ||v||2 < 0.5m/s, krot otherwise). The tracking cost is,
+
+Ctracking = ktracking ||pg − pt||2 ,
+
+(10)
+
+||pg − pt0 ||2
+
+where ktracking is a scaling factor, pg is the agent’s local goal, pt is the predicted agent position at time t and pt0 is the vessel position at the start of the prediction horizon. Cspeed
+is a constant penalty applied when the current speed is higher
+than the maximum speed. The sample cost is given by,
+
+Csample(ut, t) = 1 γ[ utT Σ−1ut + 2utT Σ−1 t], (11) 2
+
+with γ as a tuning parameter. The conﬁguration cost Sk,t (in the following Sconﬁguration) is evaluated for every timestep t within the horizon T for every sample k and combines
+dynamic collisions and regulation violations,
+
+Sconﬁguration = Cdynamic + Cregulation.
+
+(12)
+
+Dynamic collisions are deﬁned as those between multiple vessels and are penalized with the same constant Ccollision and the regulation cost Cregulation is derived from the two main trafﬁc rules (i) avoiding to the right in head-on encounters and (ii) right of way for crossing scenarios similar to COLREGs [33]. Regulation compliance is determined by a relative position and relative velocity check. Regarding the position, we check if there is a vessel with signiﬁcant velocity (||v|| > 0.5m/s) on starboard side within a given radius (Fig 4). Regarding the relative velocities, we evaluate if another vessel approaches from the right by,
+π ||vi × vj|| < ||vi|| ||vj|| sin(− 2 + δ), (13)
+
+Fig. 4: Conﬁgurations considered as regulation violations. Left: Not giving right of way to a vessel approaching from starboard. Right: Avoiding an oncoming vessel to the left.
+
+Fig. 5: Left: Extraction of the local goal of the ego vessel is performed by searching the global path backward until the goal position is within a radius rpg from the center of the vessel. Right: Local goal prediction for other agents is performed using a constant velocity model, then projected into unoccupied space if the goal is in collision with static obstacles.
+
+where δ deﬁnes the angular margin, and if the other vessel is approaching the ego-vessel head-on via,
+
+||vi · vj|| < ||vi|| · ||vj|| cos(π + δ).
+
+(14)
+
+Therefore if we detect a vessel on starboard side and the velocities satisfy (13), we consider the ego-agent as breaking the right-of-way rule (Fig. 4 left). If instead, we detect a vessel on starboard side with opposite velocity, we consider it as passing on the right (Fig. 4 right).
+
+D. Local Goal Prediction
+
+The proposed decentralized version of interaction-aware MPPI requires estimating the local goals for all non-ego vessels (line 2, Algorithm 1). We use a constant velocity model such that agent i estimates the goal of agent j as,
+
+pj,g i = ks T δT R φji vji + pij ,
+
+(15)
+
+with ks as a scaling factor and δT as step size. If the
+predicted goal is in collision, we project back along the vector towards pij and choose the ﬁrst unoccupied point as shown in Fig. 5.
+
+IV. EXPERIMENTS
+We perform extensive experiments in several maps taken from real canal sections of Amsterdam, namely the Herengracht (HG), Prinsengracht (PG), Bloemgracht (BG), and the intersection between Bloemgracht and Lijnbaansgracht (BGLG). In all experiments, the dimensions of both the map and the vessel are represented faithfully. In Section IVA we compare our method in two-agent scenarios with an optimization-based MPC, in Section IV-B we test our method in interaction-rich four-agent scenarios, in Section IV-C we demonstrate the robustness to non-rational human-driven agents, while in Section IV-D we discuss the computation times of the proposed method. All experiments running MPPI use a horizon T of 100 time-steps with step-size δT = 0.1s, input variance Σ = diag(0.5, 0.5, 0.01, 0.01) and exploration scaling factor ν = 12. We use K = {2000, 6000}
+
+(a) Prinsengracht. MPPI understands that the blue vessel can safely cross in front of the vessel with the right of way (orange) without slowing it down. RA-MPCC is not conﬁdent and ends up blocking the way, pushing the orange vessel out of its route.
+(b) Bloemgracht. The MPPI agents cooperate to perform collision avoidance, while RA-MPCC ends up in a deadlock.
+(c) Bloemgracht-Lijnbaansgracht. The MPPI agents correctly solve the crossing according to the right of way. RA-MPCC, not understanding interactions, deems much of the state-space as occupied therefore steering left and right. Eventually, the agent with the right of way has to stop and pass behind, violating the navigation rules. Fig. 6: Comparisons between the decentralized MPPI without communications and RA-MPCC. Vessels on the ﬁgures are to scale (4m long) and are plotted every 5 seconds. Results for 100 runs are summarized in Table I.
+samples for two- and four-agent scenarios, respectively. Each version of the MPPI shown in the experiments (centralized, decentralized, decentralized with no communications) uses our proposed two-stage sampling technique.
+A. Comparison with Optimization-based MPC We compare our method to a state-of-the-art optimization-
+based decentralized motion planner designed for ASVs in urban canals, namely the Regulations Aware Model Predictive Contouring Controller (RA-MPCC) [5]. The three scenarios on which we compare are an unprotected left turn (Fig. 6a), a head-on encounter (Fig. 6b) and a crossing (Fig. 6c). These three scenarios were then run 100 times with randomized initial conditions and global goals using the proposed centralized, decentralized, and decentralized with no communication MPPI as well as the RA-MPCC. For all controller types, the randomization was kept equal (i.e. same random seed). Table I summarizes the results, where we compare the number of runs that ended successfully, in a deadlock, or in a collision. Of the runs that ended successfully, we report the number of rule violations. We also report the average time to complete the scenario, deﬁned as the moment in which all agents reach their goal, and the total average distance, which is the sum of the average distances traveled by all agents.
+
+All controllers were encouraged through the cost function to keep a velocity around the speed limit (around 1.7m/s). From the table, however, it stands out that the RA-MPCC navigates much slower and therefore has much longer arrival times. This is both because of how its cost function is deﬁned, but also because the RA-MPCC has to plan within convex obstacle-free areas, which can sometimes be quite small and slow down the pace. Instead, MPPI considers the exact occupancy map without any need for pre-processing.
+While it is easy to give a discontinuous penalty to the MPPI whenever a sample violates a navigation rule, the RAMPCC has to use continuous cost functions to encourage rule compliance. This, however, inadvertently introduces repulsive forces between the two agents, which then tend to push each other into corners, which is the main cause of deadlocks in the Prinsengracht and the Bloemgracht-Lijnbaansgracht scenarios. In the Bloemgracht head-on encounter, the RAMPCC gets to its destination only about half of the time. Given that the RA-MPCC has to inﬂate the ego-agent in a set of circles, the obstacle agent into an ellipsoid, and the static obstacle map has to be pre-processed into convex regions, there is barely enough space to pass in the most narrow section of the canal. This, combined with the lack of understanding that the two agents can cooperate to solve the maneuver, leads to a large number of deadlocks.
+Collisions with the RA-MPCC instead happen for two reasons. Number one, the method ﬁrst approximates the static obstacle with polygons, which are then decomposed into convex shapes, to which we can then ﬁnd linear constraints by solving a quadratic program. However, there is no guarantee that the polygons contain all of the original obstacle. Safety margins are added, but margins too large means that some narrow canals are simply impossible to navigate. Number two, the optimization can often just fail, especially in more difﬁcult and risky situations. When this happens, the algorithm just applies zero input, and if the boat has enough momentum it can drift into a collision.
+Moreover, while our interaction-aware MPPI could plan with a horizon of 100 steps, the RA-MPPC could only plan 20 steps to meet the 10Hz control loop.
+
+TABLE I: Results for 100 runs of the experiments seen in Fig. 6 with randomized initial conditions and goals.
+
+Method
+
+Successes- Rule Average Total
+
+Deadlocks- Violations Time Average
+
+Collisions
+
+Distance
+
+PG
+
+Centralized
+
+100 - 0 - 0
+
+2
+
+24.65s 82.15m
+
+Dec. Comm.
+
+100 - 0 - 0
+
+2
+
+24.64s 82.14m
+
+Dec. No Comm. 100 - 0 - 0
+
+2
+
+25.12s 82.54m
+
+RA-MPCC
+
+95 - 5 - 0
+
+5
+
+51.81s 73.20m
+
+BG
+
+Centralized
+
+100 - 0 - 0
+
+0
+
+Dec. Comm.
+
+100 - 0 - 0
+
+0
+
+Dec. No Comm. 100 - 0 - 0
+
+0
+
+RA-MPCC
+
+52 - 37 - 11
+
+4
+
+22.23s 22.24s 22.18s 55.93s
+
+74.93m 74.79m 75.01m 67.64m
+
+BGLG
+
+Centralized
+
+100 - 0 - 0
+
+2
+
+28.47s 87.24m
+
+Dec. Comm.
+
+100 - 0 - 0
+
+2
+
+28.83s 88.26m
+
+Dec. No Comm. 100 - 0 - 0
+
+2
+
+29.01s 88.30m
+
+RA-MPCC
+
+74 - 23 - 3
+
+38
+
+54.46s 84.20m
+
+Fig. 7: Navigation among four autonomous vessels running decentralized MPPI without communication. Left: Narrow intersection with a bridge in Herengracht. Middle: Wide intersection with bridges in Prinsengracht. Right: Very narrow intersection in Bloemgracht. Vessels are plotted every 6 seconds.
+
+TABLE II: Results for 20 runs of the experiments seen in Fig. 7 with randomized initial conditions and goals.
+
+HG
+
+Method
+
+Successes- Rule Average Total
+
+Deadlocks- Violations Time Average
+
+Collisions
+
+Distance
+
+Centralized
+
+20 - 0 - 0
+
+0
+
+Dec. Comm.
+
+20 - 0 - 0
+
+0
+
+Dec. No Comm. 20 - 0 - 0
+
+3
+
+24.46 26.82 33.18
+
+204.42 214.64 225.48
+
+Centralized
+
+20 - 0 - 0
+
+0
+
+Dec. Comm.
+
+20 - 0 - 0
+
+0
+
+Dec. No Comm. 20 - 0 - 0
+
+0
+
+23.24 23.82 23.43
+
+214.92 216.99 214.71
+
+Centralized
+
+20 - 0 - 0
+
+1
+
+Dec. Comm.
+
+20 - 0 - 0
+
+2
+
+Dec. No Comm. 19 - 0 - 1
+
+0
+
+18.36 20.87 20.13
+
+143.14 149.78 144.86
+
+Fig. 8: Qualitative robustness evaluation for non-cooperative vessels. Left: The joystick-driven vessel (blue) avoids to the wrong side. The MPPI vessel (orange) avoids collisions by coming to a complete stop, then continues to the left. Right: The joystick-driven vessel (blue) blocks the MPPI, disregarding right of way. The MPPI agent (orange) avoids collisions, comes to a stop, then continues on its way. Vessels are plotted every 4 seconds.
+
+BGLG PG
+
+B. Navigation in Crowded Environments
+The proposed method is also capable of resolving scenarios with more than two agents. In Table II we show the results for 20 runs in crowded environments with four agents. The experiments are run in the maps shown in Fig. 7, where the vessels are exposed to many encounters in very narrow spaces. The results show that the centralized and decentralized method with shared local goals (with communication) can resolve the task successfully while behaving cooperatively. The decentralized version of our approach with no communication (thus predicting goals for other vessels) incurs in a collision in the tight Bloemgracht’s intersection. With the four agents so close to each other, the vessels need to perform large avoidance maneuvers. This causes the estimated local goals and corresponding predictions to diverge drastically from the ground truth. However, similarly to the results in Table I, decentralization has little effect on arrival time, total distance, and rule violations.
+C. Navigation among Human-piloted Vessels
+As long as the human-piloted agent behaves rationally, the resulting trajectories are very similar to the ones presented in Fig. 6, where all agents are autonomous. Therefore, in Fig. 8 we demonstrate how the proposed decentralized MPPI with no communication can cope with irrational agents.
+D. Computational Complexity
+As previously found in the literature [27], we conﬁrm that MPPI scales linearly with an increasing number of agents (with constant sample number K). Table III shows that the algorithm runs at about 10Hz with two agents, therefore in
+
+real-time, and down to less than 4Hz with ﬁve agents. We want to stress that this was achieved with parallelization of the sampling procedure over the CPU (Intel® Xeon® W-2123 CPU @ 3.60GHz × 8, 64 GB). Parallelizing this algorithm on a GPU would be highly beneﬁcial, allowing for real-time control of several agents [27].
+
+TABLE III: Average computation time tc and standard deviation σt,c for increasing number of agents
+
+Number of agents 2 3
+
+4
+
+5
+
+tc (ms) σtc (ms)
+
+90.7 137.2 182.9 209.9 6.7 8.9 17.5 26.0
+
+V. CONCLUSIONS
+Within this work, we developed an MPPI controller for decentralized interaction-aware navigation in urban canals. In multiple sets of randomized scenarios, we demonstrate that our method outperforms a state-of-the-art MPC in terms of success rate, deadlocks, collisions, rule violations, and arrival times. In extensive experiments among several rational autonomous agents and case studies with potentially non-cooperative human drivers, we show robust operation while providing insights into the limitations of the approach. We display that decentralizing the MPPI does not sacriﬁce performance. Moreover, we demonstrate that the method would be able to run in real-time with multiple agents. In the future, however, a GPU implementation would vastly reduce the computation time. Moreover, the sampling distribution can be improved, thus requiring fewer samples to obtain a good approximation of the optimal control.
+
+REFERENCES
+[1] Gemeente Amsterdam, “Uitvoeringsplan Transport over Water,” 2020, in Dutch. [Online]. Available: http://openresearch.amsterdam/en/page/ 65638/uitvoeringsplan-transport-over-water
+[2] Massachusetts Institute of Technology and Amsterdam Institute for Advance Metropolitan Solutions, “Roboat project.” [Online]. Available: https://roboat.org/
+[3] Ministerie van Binnenlandse Zaken en Koninkrijksrelaties, “Binnenvaartpolitiereglement,” 2017, in Dutch. [Online]. Available: https://wetten.overheid.nl/BWBR0003628/2017-01-01/#DeelI Hoofdstuk6 AfdelingII Artikel6.04
+[4] G. Williams, A. Aldrich, and E. Theodorou, “Model Predictive Path Integral Control using Covariance Variable Importance Sampling,” CoRR, Sep. 2015.
+[5] J. de Vries, E. Trevisan, J. van der Toorn, T. Das, B. Brito, and J. Alonso-Mora, “Regulations Aware Motion Planning for Autonomous Surface Vessels in Urban Canals,” in 2022 International Conference on Robotics and Automation (ICRA), May 2022, pp. 3291– 3297.
+[6] P. Trautman, J. Ma, R. M. Murray, and A. Krause, “Robot navigation in dense human crowds: the case for cooperation,” in 2013 IEEE International Conference on Robotics and Automation, May 2013, pp. 2153–2160, iSSN: 1050-4729.
+[7] W. Schwarting, J. Alonso-Mora, and D. Rus, “Planning and DecisionMaking for Autonomous Vehicles,” Annual Review of Control, Robotics, and Autonomous Systems, vol. 1, pp. 187–210, May 2018.
+[8] D. Fox, W. Burgard, and S. Thrun, “The dynamic window approach to collision avoidance,” IEEE Robotics Automation Magazine, vol. 4, no. 1, pp. 23–33, Mar. 1997.
+[9] J. van den Berg, M. Lin, and D. Manocha, “Reciprocal Velocity Obstacles for real-time multi-agent navigation,” in 2008 IEEE International Conference on Robotics and Automation, May 2008, pp. 1928–1935, iSSN: 1050-4729.
+[10] J. van den Berg, S. J. Guy, M. Lin, and D. Manocha, “Reciprocal nBody Collision Avoidance,” in Robotics Research, ser. Springer Tracts in Advanced Robotics, C. Pradalier, R. Siegwart, and G. Hirzinger, Eds. Berlin, Heidelberg: Springer, 2011, pp. 3–19.
+[11] M. Svenstrup, T. Bak, and H. J. Andersen, “Trajectory planning for robots in dynamic human environments,” in 2010 IEEE/RSJ International Conference on Intelligent Robots and Systems, Oct. 2010, pp. 4293–4298, iSSN: 2153-0866.
+[12] J. Ji, A. Khajepour, W. W. Melek, and Y. Huang, “Path Planning and Tracking for Vehicle Collision Avoidance Based on Model Predictive Control With Multiconstraints,” IEEE Transactions on Vehicular Technology, vol. 66, no. 2, pp. 952–964, Feb. 2017.
+[13] Y. F. Chen, M. Liu, M. Everett, and J. P. How, “Decentralized noncommunicating multiagent collision avoidance with deep reinforcement learning,” in 2017 IEEE International Conference on Robotics and Automation (ICRA), May 2017, pp. 285–292.
+[14] Y. F. Chen, M. Everett, M. Liu, and J. P. How, “Socially aware motion planning with deep reinforcement learning,” in 2017 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), Sep. 2017, pp. 1343–1350, iSSN: 2153-0866.
+[15] M. Bouton, A. Nakhaei, D. Isele, K. Fujimura, and M. J. Kochenderfer, “Reinforcement Learning with Iterative Reasoning for Merging in Dense Trafﬁc,” in 2020 IEEE 23rd International Conference on Intelligent Transportation Systems (ITSC), Sep. 2020, pp. 1–6.
+[16] M. Garzo´n and A. Spalanzani, “Game theoretic decision making for autonomous vehicles’ merge manoeuvre in high trafﬁc scenarios,” in 2019 IEEE Intelligent Transportation Systems Conference (ITSC), Oct. 2019, pp. 3448–3453.
+[17] R. Tian, N. Li, I. Kolmanovsky, Y. Yildiz, and A. R. Girard, “GameTheoretic Modeling of Trafﬁc in Unsignalized Intersection Network
+[19] M. Kamel, J. Alonso-Mora, R. Siegwart, and J. Nieto, “Robust collision avoidance for multiple micro aerial vehicles using nonlinear model predictive control,” in 2017 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), Sep. 2017, pp. 236–243, iSSN: 2153-0866.
+
+for Autonomous Vehicle Control Veriﬁcation and Validation,” IEEE Transactions on Intelligent Transportation Systems, vol. 23, no. 3, pp. 2211–2226, Mar. 2022.
+[18] C. E. Luis, M. Vukosavljev, and A. P. Schoellig, “Online Trajectory Generation With Distributed Model Predictive Control for Multi-Robot Motion Planning,” IEEE Robotics and Automation Letters, vol. 5, no. 2, pp. 604–611, Apr. 2020.
+[20] H. Zhu, F. M. Claramunt, B. Brito, and J. Alonso-Mora, “Learning Interaction-Aware Trajectory Predictions for Decentralized MultiRobot Motion Planning in Dynamic Environments,” IEEE Robotics and Automation Letters, vol. 6, no. 2, pp. 2256–2263, Apr. 2021.
+[21] P. Trautman and A. Krause, “Unfreezing the robot: Navigation in dense, interacting crowds,” in 2010 IEEE/RSJ International Conference on Intelligent Robots and Systems, Oct. 2010, pp. 797–803, iSSN: 2153-0866.
+[22] D. Sadigh, S. Sastry, S. A. Seshia, and A. D. Dragan, “Planning for Autonomous Cars that Leverage Effects on Human Actions,” in Robotics: Science and Systems XII. Robotics: Science and Systems Foundation, 2016.
+[23] H. J. Kappen, “Path integrals and symmetry breaking for optimal control theory,” Journal of Statistical Mechanics: Theory and Experiment, vol. 2005, no. 11, pp. P11 011–P11 011, Nov. 2005, publisher: IOP Publishing.
+[24] G. Williams, P. Drews, B. Goldfain, J. M. Rehg, and E. A. Theodorou, “Information-Theoretic Model Predictive Control: Theory and Applications to Autonomous Driving,” IEEE Transactions on Robotics, vol. 34, no. 6, pp. 1603–1622, Dec. 2018.
+[25] W. Li and E. Todorov, “Iterative linearization methods for approximately optimal control and estimation of non-linear stochastic system,” International Journal of Control - INT J CONTR, vol. 80, pp. 1439– 1453, Sep. 2007.
+[26] E. Theodorou, Y. Tassa, and E. Todorov, “Stochastic differential dynamic programming,” in Proceedings of the 2010 American Control Conference, ACC 2010. IEEE Computer Society, 2010, pp. 1125– 1132.
+[27] G. Williams, A. Aldrich, and E. A. Theodorou, “Model Predictive Path Integral Control: From Theory to Parallel Computation,” Journal of Guidance, Control, and Dynamics, vol. 40, no. 2, pp. 344–357, Feb. 2017, publisher: American Institute of Aeronautics and Astronautics.
+[28] G. R. Williams, “Model predictive path integral control: Theoretical foundations and applications to autonomous driving,” Doctoral Thesis, Georgia Institute of Technology, Atlanta, Mar. 2019, accepted: 2020-05-20T16:57:06Z Publisher: Georgia Institute of Technology. [Online]. Available: https://smartech.gatech.edu/handle/1853/62666
+[29] W. Wang, L. Mateos, S. Park, P. Leoni, B. Gheneti, F. Duarte, C. Ratti, and D. Rus, “Design, Modeling, and Nonlinear Model Predictive Tracking Control of a Novel Autonomous Surface Vehicle,” in IEEE International Conference on Robotics and Automation. IEEE, May 2018.
+[30] W. Wang, B. Gheneti, L. A. Mateos, F. Duarte, C. Ratti, and D. Rus, “Roboat: An Autonomous Surface Vehicle for Urban Waterways,” in 2019 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), Nov. 2019, pp. 6340–6347, iSSN: 2153-0866.
+[31] W. Wang, T. Shan, P. Leoni, D. Ferna´ndez-Gutie´rrez, D. Meyers, C. Ratti, and D. Rus, “Roboat II: A Novel Autonomous Surface Vessel for Urban Environments,” in 2020 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), Oct. 2020, pp. 1740–1747, iSSN: 2153-0866.
+[32] E. Marder-Eppstein, E. Berger, T. Foote, B. Gerkey, and K. Konolige, “The Ofﬁce Marathon: Robust navigation in an indoor ofﬁce environment,” in 2010 IEEE International Conference on Robotics and Automation, May 2010, pp. 300–307, iSSN: 1050-4729.
+[33] T. A. Johansen, T. Perez, and A. Cristofaro, “Ship Collision Avoidance and COLREGS Compliance Using Simulation-Based Control Behavior Selection With Predictive Hazard Assessment,” IEEE Transactions on Intelligent Transportation Systems, vol. 17, no. 12, pp. 3407–3422, Dec. 2016.
+
+

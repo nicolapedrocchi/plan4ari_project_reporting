@@ -1,0 +1,659 @@
+IEEE ROBOTICS AND AUTOMATION LETTERS. PREPRINT VERSION. ACCEPTED SEPTEMBER, 2022
+
+1
+
+Safety-aware time-optimal motion planning with uncertain human state estimation
+Marco Faroni1, Manuel Beschi1,2, Nicola Pedrocchi1
+
+arXiv:2210.11655v1 [cs.RO] 21 Oct 2022
+
+Abstract—Human awareness in robot motion planning is crucial for seamless interaction with humans. Many existing techniques slow down, stop, or change the robot’s trajectory locally to avoid collisions with humans. Although using the information on the human’s state in the path planning phase could reduce future interference with the human’s movements and make safety stops less frequent, such an approach is less widespread. This paper proposes a novel approach to embedding a human model in the robot’s path planner. The method explicitly addresses the problem of minimizing the path execution time, including slowdowns and stops owed to the proximity of humans. For this purpose, it converts safety speed limits into conﬁguration-space cost functions that drive the path’s optimization. The costmap can be updated based on the observed or predicted state of the human. The method can handle deterministic and probabilistic representations of the human state and is independent of the prediction algorithm. Numerical and experimental results on an industrial collaborative cell demonstrate that the proposed approach consistently reduces the robot’s execution time and avoids unnecessary safety speed reductions.
+Index Terms—Human-robot interaction; Motion planning; Path planning; Safety in HRI; Industrial robotics.
+I. INTRODUCTION
+C OLLABORATION between humans and robots requires a paradigm change in robots’ perception, reasoning, and action. From a planning point of view, the robot should be aware of the human’s behavior and act accordingly. Planning frameworks have embodied human-awareness at different levels, spanning ontologies [1], task planning [2], scheduling [3], motion planning [4], and control [5]. In motion planning, the robot should consider the human’s state to avoid collisions, enhance human comfort, or improve efﬁciency.
+Two main approaches are in the literature. A ﬁrst approach can be referred to as reactive, as it modiﬁes a given trajectory, during its execution, according to the current state of the human. Existing works do so by adjusting the path on the ﬂy [6], [7] or, more frequently, by modifying the robot speed along a given path [8], [9], [10], [11].
+Manuscript received: May 13, 2022; Revised: August 10, 2022; Accepted: September 12, 2022.
+This paper was recommended for publication by Editor Gentiane Venture upon evaluation of the Associate Editor and Reviewers’ comments.
+This work is partially supported by ShareWork project (H2020, European Commission – G.A. 820807).
+1Marco Faroni, Manuel Beschi, and Nicola Pedrocchi are with Istituto di Sistemi e Tecnologie Industriali Intelligenti per il Manifatturiero Avanzato, Consiglio Nazionale delle Ricerche – Milano, Italy {marco.faroni, nicola.pedrocchi}@stiima.cnr.it
+2Manuel Beschi is with Dipartimento di Ingegneria Meccanica e Industriale, University of Brescia – Brescia, Italy manuel.beschi@unibs.it
+Digital Object Identiﬁer (DOI): see top of this page.
+
+The second approach aims to plan trajectories thought to anticipate the humans’ actions in such a way as to assist or avoid them. For example, based on a prediction model, the planner may seek to avoid regions where the operator is expected to be. This category can be referred to as proactive [12]. Notice that the two approaches can co-exist: a proactive layer ﬁnds a human-aware trajectory, and a reactive one adjusts it at run-time, considering unexpected events.
+This paper proposes a proactive human-aware path planner that deﬁnes a cost function to minimize the trajectory execution time by including the expected safety slowdown owed to human-robot proximity.
+A. Related works
+Sisbot et al. [13] and Mainprice et al. [14] proposed a human-aware cost function that considers the human-robot distance, the human ﬁeld of view, and human comfort. The resulting motion planning problem is solved by using Transition-RRT [15], a sampling-based algorithm for custom cost functions. Hayne et al. [16] minimizes a cost function to avoid regions of the workspace previously occupied by the human and to favor repeatability of the robot motion (i.e., the cost function penalizes trajectories far from the previous ones). Similarly, Zhao and Pan [17] use STOMP [18] to minimize a cost function that penalizes previously occupied regions and to maximize the human-robot distance. Casalino et al. [12] deform the trajectory according to a repulsion ﬁeld associated with checkpoints on the human skeleton. Tarbouriech and Suleiman [19] propose a sampling-based algorithm that biases the search towards regions far from the current human state. Javdani et al. [20] and Kanazawa et al. [21] pose the problem of reducing the execution time of robot actions by avoiding idle times in handover tasks. For example, [21] uses model predictive control to reach a target state with a given optimized schedule, despite it does not consider collisions with the environment. Other works focused on the evaluation of human factors when using human-aware motion planning, showing an enhanced work ﬂuency and operators’ satisfaction [4], [22].
+A signiﬁcant issue in human-aware methods is how to deﬁne a meaningful cost function. All the methods above realize an arbitrary compromise between some desired cost terms. For example, [19], [23] ﬁnd a trade-off between the minimization of the path length and the maximization of the human-robot distance, while [21] minimizes a trade-off of the ﬁnal error, joint bound satisfaction, and human-robot collision probability. However, this approach does not model the delays caused by safety stops and slowdowns when the human is close to the
+
+2
+
+IEEE ROBOTICS AND AUTOMATION LETTERS. PREPRINT VERSION. ACCEPTED SEPTEMBER, 2022
+
+robot. Moreover, the solution strongly depends on the weight tuning. Notably, the prediction of the human’s motion comes with a signiﬁcant uncertainty owed to the accuracy of human tracking systems and the intrinsic unpredictability of human behavior. Therefore, a human-aware planner should consider the probabilistic representation of the operator’s motion.
+Finally, it is desirable that general-purpose motion planning algorithms can integrate human-aware motion planning methods. [13] and [14] go in this direction by deﬁning a cost function dependent on the robot conﬁguration and the human’s state and using it in a sampling-based path planner.
+B. Contribution
+This paper addresses the problem of planning paths with minimum expected execution time. Differently from existing works, the paper proposes a cost function that approximates the path execution time, including safety speed reductions caused by human proximity. To do so, it converts the expected limitations of the robot speed – as deﬁned in ISO-TS/15066 – into a delay in the nominal execution time (Section III). By solving a path planning problem with this cost function, it is possible to minimize the expected execution time, instead of an arbitrary trade-off of several costs. In this regard, the method can be used with any conﬁguration space-based motion planners. The method considers both deterministic and probabilistic representations of the the human’s state (Section III-C and III-D) and is independent of the model used to predict the human state. It deﬁnes a voxelized representation of the collaborative workspace, where each voxel is associated with a probability of occupancy of the human, and calculates the cost based on the slowdown severity and its probability of occurrence. Finally, the paper proposes an efﬁcient approximation suitable for choosing among multiple equivalent goal conﬁgurations. This approximation reduces the computational burden in complex scenarios (Section III-E).
+The effectiveness of the approach is demonstrated via simulations on a three-degree-of-freedom arm (Section IV) and real experiments in a manufacturing case study (Section V). A video of the experiments is also attached to the paper.
+II. HUMAN-AWARE MOTION PLANNING AND EXECUTION
+Planning and execution of robot movements in a collaborative application usually follow a standard paradigm as in Figure 1. A perception system monitors the workspace and feeds the human estimation and prediction module that, in turn, estimates the human state at the current and nearfuture time. The planning module uses this information to ﬁnd trajectories that do not collide with the human and, possibly, optimize a human-centered objective.
+A. Motion planning
+Most frameworks rely on a hierarchical approach composed of an ofﬂine planner that computes collision-free trajectories and a reactive planner that modiﬁes the motion at run-time. The ofﬂine planner usually consists of a path planner and a path parametrization algorithm (e.g., TOPP [24]). Samplingbased path planners are the most widespread, for they can
+
+Motion planner
+
+Offline planner
+
+Reactive planner
+
+HRC workspace
+
+Human estimation and prediction
+Fig. 1: Human-robot collaboration planning and execution.
+deal with high-dimensional search space efﬁciently [15], [25]. Human awareness can be embedded in the path planner using a cost function that depends on the human state. If trajectories are planned just before their execution, planning latency is an issue, and how to reduce it is an active research ﬁeld (e.g., informed sampling [26], [27], anytime path planning [28]).
+The reactive planner modiﬁes the trajectory during its execution to meet safety requirements and avoid unnecessary safety stops. It can act by limiting the robot’s speed, modifying the original path, or both. In general, reactive motion planners are shifting from conservative – yet straightforward – strategies such as safety zones to optimized methods that adapt the robot motion continuously [10], [29].
+Notice that human-aware motion planners rely on the knowledge of the human state and, possibly, on its prediction. Different strategies have been proposed in the literature, spanning graphical models such as Hidden Markov Models [30], recurrent neural networks [31], [32], inverse optimal control [33], conditional random ﬁelds [34]. Notice that the estimation of the future human state comes with signiﬁcant uncertainty, which should be explicitly taken into account in the motion planning and control modules [35].
+
+B. Safety requirements
+
+Collaborative robots are required to avoid collisions with
+
+humans or limit potential damages in case of contact. These
+
+requirements translate into limitations of the robot speed when
+
+the human is close to it. The technical speciﬁcation ISO/TS
+
+15066 (Robots and robotic devices – Collaborative robots)
+
+[36] deﬁnes speed reduction rules for collaborative operations.
+
+If speed and separation monitoring rules apply, then contact is not allowed. Thus, the human-robot distance S must not fall below a protective distance Sp. To avoid collisions, Sp is greater than or equal to the robot braking distance in the
+
+direction of the human and can be computed as:
+
+vrh vrh2
+
+Sp = vh Tr +
+
++ vrhTr +
+
++ C, (1)
+
+as
+
+2as
+
+where vrh is the robot velocity toward the human, vh is the human velocity toward the robot, as is the maximum Cartesian deceleration of the robot toward the human, Tr is the reaction time of the robot, and C is a parameter accounting for the uncertainty of the perception system. Inequality S ≥ Sp translates into the limitation of the human-robot relative speed:
+
+vrh ≤ vmax
+
+(2)
+
+where
+
+vmax = v2h + (asTr)2 − 2as C − S − asTr − vh (3)
+
+FARONI et al.: SAFETY-AWARE TIME-OPTIMAL MOTION PLANNING WITH UNCERTAIN HUMAN STATE ESTIMATION
+
+3
+
+If power and force limitation rules apply, then contact is allowed, and the force/pressure exchanged between human and robot must be limited. This results in the limitation vrh ≤ vmax, where vmax depends on the robot mass and shape, and on tabular values of the maximum exchangeable force/pressure (see Annex A of [36]).
+III. A COSTMAP APPROACH TO HUMAN-AWARE PLANNING
+A. Motivation
+The proximity of the human requires the robot to reduce its speed below a threshold. The value of this threshold varies in time, based on the human and the robot’s position and speed. Consequently, the time taken by the robot to cover a given path not only depends on the path itself but also on the relative position and velocity of the human and the robot. For example, given an initial and a ﬁnal conﬁguration, a short path might take more time than a long one if the short path drives the robot closer to the human. Our goal is to embed this reasoning in the robot’s path planner to search for the path that minimizes the expected execution time according to the human state and the safety rules that will slow the robot down during the execution.
+
+B. Formulation of time-optimal human-aware path planning
+The path planning problem consists of ﬁnding a feasible path from a starting conﬁguration qstart ∈ C to a set of goal conﬁgurations Qgoal ⊂ C, where C is the conﬁguration space. In robot manipulators, q ∈ C is a vector of joint positions. The optimal path planning problem is deﬁned as follows:
+
+Problem 1. Given a starting conﬁguration qstart ∈ C and a set of goal conﬁgurations Qgoal ⊂ C, ﬁnd a path σ∗ : [0, 1] → Cfree such that:
+σ∗ = argmin c(σ) s.t. σ∗(0) = qstart, σ∗(1) ∈ Qgoal (4)
+σ
+where: C is the conﬁguration space (for robot manipulators, q ∈ C is a vector of joint positions); Cfree ⊆ C is the subset given by all conﬁgurations not in collision with obstacles; c is a positive cost function that associates a path σ with a cost.
+
+We aim to deﬁne a cost function c such that
+
+c = tex(σ, H)
+
+(5)
+
+where tex is the estimated execution time of the path, also
+
+considering the effect of the human state H. To do so, let
+
+tnom be the expected execution time of a path σ in the case
+
+that the robot does not slow down because of the human and
+
+deﬁne
+
+¯ tex(σ, H)
+
+λ=
+
+≥1
+
+(6)
+
+tnom(σ)
+
+which can be seen as an average time-dilation factor that measures the effect of the human on the path execution time. By discretizing σ in w nodes, we can rewrite (5) as:
+
+w−1
+
+ql+1 + ql
+
+c = tnom,l λ 2 , H , (7)
+
+l=1
+
+where tnom,l is the expected execution time of the segment ql ql+1 in the case that the robot does not slow down and
+
+ri hj uijrh
+
+ri = FKi(q)
+
+Fig. 2: Graphical illustration of the variables involved in the deﬁnition of the human-aware costmap.
+
+λ is the time dilation factor of a segment. tnom,l is usually obtained a posteriori, from the path parametrization method (e.g., TOPP methods [24]). However, we can approximate it by imposing that at least one joint is always moving at full speed1. Being q˙max,k > 0 the maximum velocity of the kth joint, the minimum traveling time of the kth joint is equal to the maximum of the component-wise ratio |ql − ql+1|/q˙max. The minimum traveling time of the segment is therefore equal to (ql − ql+1)/q˙max ∞; thus:
+
+w−1 ql − ql+1
+
+ql+1 + ql
+
+c=
+
+λ
+
+,H
+
+(8)
+
+l=1 q˙max ∞ 2
+
+Our problem now is to derive λ(σ, q) that estimates the delay factor of a conﬁguration q, given the human state H.
+
+Remark 1. Cost function (8) may lead to an ill-posed optimization problem where solutions with equal cost but different traveling distances are equivalent. To penalize solutions with larger travelling distance, we apply Tikhonov regularization [37] to (8) and obtain:
+
+w−1 ql − ql+1
+
+ql+1 + ql
+
+w−1
+
+c=
+l=1
+
+λ q˙max ∞
+
+,H +ν 2
+
+ql − ql+1 2
+
+l=1
+
+(9)
+
+where ν > 0 is a sufﬁciently small regularization weight.
+
+C. Cost function for deterministic representation of the human
+
+Let us deﬁne the human state as a set of m points, H = {h1, . . . , hm}, where hj ∈ R3 is a Cartesian point of interest of the human. Then, consider a set of n robot points, R = {r1, . . . , rn}, ri ∈ R3. Each robot point of interest ri is related to the robot conﬁguration q through its forward kinematic function FKi so that ri = FKi(q). Let urh ij be the unit vector from ri to hj for all i = 1, ..., n and j = 1, ..., m. Please see Figure 2 for a graphical illustration
+of these variables.
+The maximum relative velocity between the robot and a
+human point hj can be expressed as:
+
+vjrh = max (uijrh)T (r˙i − h˙ j ) = max (uijrh)T Ji(q)q˙ − h˙ j
+
+i=1...n
+
+i=1...n
+
+(10)
+
+1This approximation allows decoupling the cost function from the robot’s velocity. This is useful when the cost function is used within a path planner that does not consider velocities and accelerations.
+
+4
+
+IEEE ROBOTICS AND AUTOMATION LETTERS. PREPRINT VERSION. ACCEPTED SEPTEMBER, 2022
+
+ λ6
+λ3 λ5 λ9 λˆ = λ2 λ8 λ1 λ4
+λ7
+
+ π6
+π3 π5 π9 πˆ = π2 π8 π1 π4
+π7
+
+Fig. 3: Illustrative example of 9 voxels with their values of
+πj and λj. λ results from (16), and it is sorted in descending order, while πˆ have elements πj sorted according to λˆ.
+
+where r˙, h˙ , q˙ are the time derivatives of r, h, and q, and
+
+Ji =
+
+dFKi dq
+
+is
+
+the
+
+linear
+
+Jacobian
+
+of
+
+ri.
+
+To express (10) in q, we repeat the approximation made in
+
+(8); that is, we impose that one joint is always moving at its maximum speed. Being ul = qql+1 l+1−−qqll 2 the unit vector of the lth segment of a path, it follows that:
+
+q˙l = Kul where K = min q˙max,k (11) k ul,k
+
+from which:
+
+vjrh = max uijrh T Ji(q)Kul −h˙ j
+i=1...n
+
+∀ l = 1, . . . , w. (12)
+
+vrh j is the expected velocity at a given conﬁguration q on the ql ql+1 segment of the path, disregarding possible safety slow-
+downs. According to Section II-B, the actual robot velocity
+must be smaller than a maximum vmax, derived from safety
+rules (in Speed and Separation Monitoring, vmax is given by (3)). If vrh j ≤ vmax ∀j, speed and traveling time are invariate. Otherwise, a speed reduction ratio equal to minj(vmax/vjrh) is expected, leading to an increase of the traveling time of a factor equal to maxj(vjrh/vmax). Therefore, the time dilation function λ of a given conﬁguration q results in:
+
+λ(q, H) = max λ1, . . . , λm, 1
+
+(13)
+
+vjrh
+where λj = maxj vmax . The time-optimal human-aware cost function c is ﬁnally obtained using (13) in (8). Note: The velocity of the human points, h˙ j, can hardly be
+foreseen with low uncertainty during the planning phase. In the experiments, we set h˙ j = 0 in (12) and vh = 0 in (3).
+
+D. Cost function for probabilistic representation of the human
+
+We aim to derive the time dilation factor λ(q, H) if the human points of interest are expressed as a probability distribution function. Let us discretize the Cartesian workspace in a set of voxel and deﬁne the voxelization function
+
+v : R3 → V = {1, . . . , m} ⊂ N, x → j
+
+(14)
+
+which associates the point x with the voxel j. We deﬁne the human state as a sequence of probability distributions, H = {π1, ..., πm}, where πj ∈ [0, 1] is the expected value of the probability of voxel j to be occupied by a human.
+
+Denoted by Cj the center of voxel j, we can compute λ(q, Cj) such that πj > 0. If πj = 0 then λj = 1. For each conﬁguration q and voxel j, we compute an expected occupancy probability πj and a time-dilation factor λj.
+To derive the expected value of λ, we need to bear in mind
+that, in case two voxels are occupied at the same time, the realized value of λ is the maximum of the two (i.e. the worst
+case). When the worst-case voxel is occupied, it determines the value of λ regardless of the occupancy of the others. If the
+worst-case voxel is not occupied, the same reasoning applies
+to the second worst-case voxel, and so on. To have a clear understanding of this, consider the example
+of Figure 3. The example shows m = 9 voxels, and voxel j = 6 has the higher value of λj. The probability that λ = λ6 is equal to the probability of voxel j to be occupied, regardless of the occupation of the other voxels, i.e. P (λ = λ6) = π6.
+The probability of the second most critical λj to occur, P (λ = λ3), is equal to the probability of voxel 3 to be occupied, conditioned to the probability of voxel 6 not being occupied P (λ = λ3) = π3(1 − π6).
+To generalize this reasoning, let λˆ be a vector of {λj} sorted in descending order, and πˆ be a vector of {πj} ordered according to λˆ. The probability that λˆy occurs is:
+
+ˆ
+
+πˆ1
+
+P (λ = λy) =
+
+πˆy
+
+k=1 y−1 1 − πˆk
+
+if y = 1
+if y ∈ {2, . . . , m} (15)
+
+Moreover, the probability that no voxel will be occupied is equal to k=1 m 1 − πˆk . In that case, λ would be equal to 1.
+The expected value of λ is therefore the average value of
+λˆy weighted by its probability to occur:
+
+m
+
+m
+
+λ = λˆy P (λ = λˆy) + 1 − πˆy
+
+(16)
+
+y=1
+
+y=1
+
+Finally, time-optimal human-aware cost function c results by using (16) in (8).
+
+E. An approximation for multiple goals
+
+A path planning problem can involve multiple goals. A
+
+practical example is when multiple conﬁgurations correspond
+
+to the same robot pose or when multiple instances of the
+
+same objects are available in the scene. A large number of
+
+goals increases the number of evaluations of cost function (8)2. Considering that a sampling-based path planner can take
+
+up to some seconds in real-world problems, the planning
+
+time may soon become unbearable for online purposes. When
+
+planning latency is an issue, it is helpful to approximate (8)
+
+to reduce the number of evaluations of λ(q, H). The proposed
+
+approximation assumes that the cost of goal conﬁgurations is
+
+predominant in selecting human-aware paths when multiple
+
+goals are available. For this reason, we aim to minimize a
+
+multi-objective cost function composed of the path length and
+
+a terminal human-aware cost:
+
+w−1
+
+c(σ, H) =
+
+qk+1 − qk 2 + b λ(qw, H) (17)
+
+k=1
+
+2In the worst case, the computational time is linear in the number of goals. This occurs when the planning problem is solved for each goal independently.
+
+FARONI et al.: SAFETY-AWARE TIME-OPTIMAL MOTION PLANNING WITH UNCERTAIN HUMAN STATE ESTIMATION
+
+5
+
+where b ≥ 0 is a weighting factor and qw ∈ Qgoal. Compared with (8), (17) only requires the computation of λ for all goal conﬁgurations. As a drawback, the optimal solution is a minimum-length path toward the goal that minimizes (17); i.e., the problem neglects the human effect on the path waypoints.
+
+F. Trajectory execution
+
+The proposed approach allows path planners to ﬁnd optimal human-aware paths. Then, the path is parametrized through a time-optimal path parametrization method [24] and executed by the robot. The execution phase needs to consider safety speciﬁcations, as mentioned in II-B. According to Speed and Separation Monitoring rules, the nominal robot speed is modiﬁed in real-time by computing a speed scaling factor sovr ∈ [0, 1] chosen as follows:
+
+vmax
+
+sovr = min rh , 1
+
+(18)
+
+vmax
+
+where vmax is calculated from (3) and, recalling (10),
+
+vmax rh = max vjrh
+j
+
+is the maximum relative speed allowed at the current instant.
+
+IV. NUMERICAL EXAMPLES
+This section considers a toy problem in which a 3-degreeof-freedom manipulator performs point-to-point movements. Starting and goal conﬁgurations are sampled randomly from the robot conﬁguration space. A voxel-based representation models the human occupancy, H = {π1, ..., πm}, where πj ∈ [0, 1] is the expected value of the probability of voxel j to be occupied by a human and is assigned according to the following function fπ:
+
+fπ = 1 − r µ − cj 2 if r µ − cj 2 ≤ 1 (19)
+
+0
+
+otherwise
+
+where µ ∈ R3 is a random Cartesian point in the robot workspace, cj ∈ R3 is the center of voxel j, and r = 0.5 m is a user-selected occupancy radius.
+
+A. Experiment A: human-aware motion planning assessment
+In the ﬁrst experiment, we assess the effectiveness of the human-aware motion planner (HAMP) compared to nonhuman-aware approaches in case the human position is static (i.e., the human position is kept constant during each query). We compare the following motion planners: a) MIN-PATH, which solves a minimum-length path planning problem disregarding the human presence; b) HAMP: minimization of the expected execution time with human awareness (9). Both planners use Informed-RRT∗ [26] to solve the planning problem. Both implement the trajectory execution module (Section III-F) to prevent collisions if the path collides with the worker. The trajectory execution module is a possible implementation of a safety module that slows the robot down based on the human-robot relative state. It is utterly necessary during real experiments to avoid the robot collides with the worker.
+
+We generate 100 planning queries; each query is solved and executed 6 times. We measure the path length, the execution time, the time delay owed to safety slowdowns (calculated as the ratio between the actual and the planned execution time), and whether the execution succeeded or failed (failures include the inability to ﬁnd a path and safety stops). To compare queries, we normalize the results of each query obtained by HAMP to the median value of the results obtained by MINPATH, considered as the baseline. We run two sets of trials with different safety distance thresholds C3.
+Results for C = 0.2 m are in Table Ia. HAMP ﬁnds longer paths (+30% on average) than MIN-PATH. Nonetheless, the average execution time and the average safety delay are signiﬁcantly smaller (-19% and -17%) because HAMP’s paths are less prone to interfere with the operator. Remarkably, HAMP improves the success rate by 9%, thanks to its ability to avoid areas too close to the operator. Results for C = 0.5 m are in Table Ib. This second set of trials is interesting to understand how the human-awareness behaves with more severe safety implementations. As for the previous trials, HAMP ﬁnds longer paths (+37% on average) with shorter average execution times (-11%). As the safety threshold is larger, more trajectory interruptions are expected to happen. HAMP adapts to this change by increasing the path lengths, leading to an improvement in the success rate of around +23%. Interestingly, a more conservative implementation of safety functions mainly impacts the success rate of HAMP.
+To better clarify the behavior of HAMP, Figure 4 plots all queries by their path length and execution time. As expected, the nominal execution time for MIN-PATH’s trajectories (green line) lies in the bottom part of the graph as it neglects the effect of safety slowdowns. The same trajectories, plotted versus their actual execution time (blue), show a large offset and a larger dispersion due to the activation of the safety slowdown. On the contrary, HAMP’s trajectories lie signiﬁcantly below MIN-PATH’s, i.e., the execution time is shorter than that of MIN-PATH, being equal to the path length. Notice that the slowdowns are caused by the trajectory execution module (Section III-F), which was used with both planners to prevent collisions. Therefore, HAMP implies less severe safety speed reduction during execution.
+Speaking of failures, it is also interesting that HAMP can perform the trajectory when MIN-PATH fails. Figure 5 shows the path lengths of HAMP’s trajectories for all the queries where MIN-PATH failed. Red and green markers indicate a failure or a success; notice that green circles (i.e., HAMP successes) are more likely when HAMP’s lengths are larger. Remarkably, during our experiments, MIN-PATH could never execute a query at which HAMP failed.
+B. Experiment B: probabilistic human-aware motion planning assessment
+In this second experiment, we update the human position during the experiment according to the probability distributions H. This is useful to highlight the advantages of the
+3According to (3), C is a safety threshold that accounts for uncertainty in perception and actuation, i.e., the safety margin from the human closest point.
+
+6
+
+IEEE ROBOTICS AND AUTOMATION LETTERS. PREPRINT VERSION. ACCEPTED SEPTEMBER, 2022
+
+TABLE I: Numerical results, normalized by MIN-PATH values (100 random trials repeated 6 times for each planner).
+
+(a) Experiment A (static human position), C = 0.2 m
+
+(b) Experiment A (static human position), C = 0.5 m
+
+Path length Execution time Safety speed delay
+Success rate
+
+HAMP – mean (std.dev.)
+1.30(0.141) 0.81(0.092) 0.83(0.092)
+HAMP = 0.985 MIN-PATH = 0.901
+
+Path length Execution time Safety speed delay
+Success rate
+
+HAMP – mean (std.dev.)
+1.37(0.187) 0.89(0.121) 0.82(0.112)
+HAMP = 0.829 MIN-PATH = 0.675
+
+(c) Experiment B (probabilistic update of the human position)
+
+Path length Execution time Safety speed delay Success rate
+
+HAMP mean (std.dev.)
+1.32(0.256) 0.90(0.220) 0.73(0.200)
+0.86
+
+HAMP-Probabilistic mean (std.dev.)
+1.39(0.224) 0.89(0.161) 0.69(0.154)
+0.93
+
+(d) Experiment C (multiple equivalent goals)
+
+Path length Execution time Safety speed delay Success rate
+
+HAMP mean (std.dev.)
+1.87(0.440) 0.49(0.147) 0.24(0.072)
+0.99
+
+HAMP-Approximated mean (std.dev.)
+1.77(0.458) 0.52(0.181) 0.29(0.102)
+0.98
+
+7
+
+7
+
+6
+
+6
+
+5
+
+5
+
+execution time [s]
+
+execution time [s]
+
+4
+
+4
+
+3
+
+3
+
+2
+
+MIN-PATH (nom. time)
+
+MIN-PATH (exec. time)
+
+HAMP (exec. time)
+
+1
+
+0.5
+
+1.0
+
+1.5
+
+2.0
+
+2.5
+
+3.0
+
+3.5
+
+path length [rad]
+
+(a) Experiment A, C = 0.2 m
+
+2
+
+MIN-PATH (nom. time)
+
+MIN-PATH (exec. time)
+
+HAMP (exec. time)
+
+1
+
+0.5
+
+1.0
+
+1.5
+
+2.0
+
+2.5
+
+3.0
+
+3.5
+
+path length [rad]
+
+(b) Experiment A, C = 0.5 m
+
+Fig. 4: Lenght and execution time of each trajectory of Experiment A. Green crosses: MIN-PATH with nominal execution time (i.e., disregarding safety slowdowns); Blue circles: MIN-PATH with actual execution time; Orange triangles: HAMP with actual execution time. Dashed lines are the linear regression of the respective colors.
+
+MIN-PATH (failed)
+
+2.50
+
+HAMP (failed)
+
+HAMP (success)
+
+2.25
+
+length hamp / length min-path
+
+2.00
+
+1.75
+
+1.50
+
+1.25
+
+1.00 0
+
+5
+
+10
+
+15
+
+20
+
+n. test (only failures considered)
+
+Fig. 5: Failures during execution by at least one planner (Exp. A, C = 0.5 m). Crosses: MIN-PATH; Circles: HAMP. Red markers indicate a failure, green markers indicate a success.
+
+probabilistic formulation of the human-aware motion planner given in Section III-D. Indeed, existing human-aware motion planners assume deterministic representation of the human’s state and prediction [13], [14].
+
+We compare the following motion planners: i) MIN-PATH: minimization of the path length; ii) HAMP: minimization of the expected execution time with deterministic human awareness (i.e., (9) with λ computed as described in Section III-C); iii) HAMP-Probabilistic: minimization of the expected execution time with probabilistic human awareness (i.e., (9) with λ computed as described in Section III-D). We generate 100 queries, and each query is executed 6 times by each planner.
+Results are in Table Ic. Both human-aware methods lead to longer paths, shorter execution times, and higher success rates. In general, HAMP-Probabilistic gives better results, especially considering the success rate. Compared to the ﬁrst experiment, HAMP’s success rate worsens because it is not able to predict the future human position. As a consequence, the new position of the human is more often on the way of the robot’s path. On the contrary, HAMP-Probabilistic’s success rate is comparable to that of the ﬁrst experiment because the planner accounts for the future possible position of the human.
+C. Experiment C: Assessment of the multi-goal approximation
+This experiment assesses the validity of the approximated multi-goal approach described in Section III-E. We set up an
+
+FARONI et al.: SAFETY-AWARE TIME-OPTIMAL MOTION PLANNING WITH UNCERTAIN HUMAN STATE ESTIMATION
+
+7
+
+experiment where the goal of each query is a set of 20 randomly sampled conﬁgurations. We compare the following motion planners: i) MIN-PATH: minimization of the path length; ii) HAMP: minimization of (9); iii) HAMP-Approximated: minimization of (17). As in the previous experiments, we generate 100 random queries, and each query is executed six times by each planner. Results are in Table Id. Both human-aware approaches dramatically reduce the execution time (HAMP: -50%, Hamp-Approximated: -45%) by ﬁnding much longer paths (HAMP: +100%, Hamp-Approximated: +70%). This improvement is because human-aware planners often ﬁnd a goal that does not require safety slowdowns when multiple equivalent goals are available. For example, if a goal qgoal1 is further than a goal qgoal2 but closer to the human, both HAMP and HAMP-Approximated would probably choose the second goal, while MIN-PATH would still go for the ﬁrst one.
+The tests prove the validity of the approximation (17), as it yields results similar to HAMP. This demonstrates that, in the multi-goal case, the human-awareness cost of the goal conﬁguration is often higher than that of the whole path.
+V. CASE STUDY
+We tested our approach on a cell designed within the EUfunded project Sharework. As shown in Figure 6, the cell is composed of a 6-degree-of-freedom collaborative robot, Universal Robots UR10e, mounted upside down. It is equipped with two ﬁxed cameras, Intel Realsense D435, with a frame rate equal to 30 Hz, acting as a perception system for the human position. The case study is a collaborative process where the robot should pick 16 objects from the table and place them in one of the two boxes. In the meantime, the operator assembles mechanical parts near the robot. We implement a planning and control architecture such as that of Figure 1. The ofﬂine planner computes a path just before every robot’s movement. Once an optimal path has been found (or the maximum planning time has expired), the path is executed according to Section III-F. We use a point-cloud representation of the human and feed the human prediction module with the centroid of the point cloud. We use a simple prediction model that assumes a constant human position based on the moving average of the centroid position over the last second.
+A. Experiments and results
+We compared MIN-PATH (minimization of the path length) and HAMP-Approximated (minimization of the expected execution time with goal-approximated human awareness (17)). The experiments involved 10 participants4. Each participant performed the task twice: once when the robot was using MINPATH and once when using HAMP-Approximated. The participants were unaware of which motion planner was running during each test; the order of the motion planners was chosen randomly. For each test, we computed four indices: the time taken by the robot to complete all the pick&place tasks (in seconds); the time taken by the operator to complete all the
+4All subjects participated voluntarily, signing an informed consent form in accordance with the Declaration of Helsinki.
+
+Fig. 6: Experimental setup. The robot picks and places objects from and into the boxes on the panel, while the human works in the workspace.
+
+TABLE II: Experimental results: execution time, average speed scaling, and the average distance between the human and the robot for 16 pick&place operations.
+
+Robot execution time [s] Human execution time [s] Safety speed scaling [%] Distance human-robot [m]
+
+HAMP-Approximated mean (std.dev.)
+135(15.0) 109(17) 91.2(2.67) 1.07(0.074)
+
+MIN-PATH mean (std.dev.)
+166(23.9) 115(13) 78.8(18.6) 0.96(0.15)
+
+pick&place tasks (in seconds); the average speed scaling (% of the nominal speed); and the average distance between the robot and the human (in meters). Results are in Table II. With HAMP-Approximated, the overall execution time is shorter (19%) and the average speed scaling is greater (+16%). The average distance between the human and the robot obtained using HAMP-Approximated is around 11% greater than that obtained using MIN-PATH. Results do not show a signiﬁcant difference in the operators’ execution time, suggesting that the choice of the planner do not signiﬁcantly affect the operators’ behavior. The experiments are shown in the video attached to this paper. Notice that the order of the pick&place tasks is chosen by the planners. HAMP-Approximated is able to ﬁnd the sequence that reduces interference with the human, leading to less severe slowdowns.
+
+B. Discussion
+Experimental results are coherent with those obtained in simulation in Section IV. However, the performance enhancement measured in real-world tests is less accentuated than that obtained with simulations. The human-aware motion planner reduced the execution time by 45% in simulation and 19% in real tests (Table Id and II). Although this difference partially owes to the differences between the two scenarios (i.e., different robot and environment, different number of available goals), a key aspect is the different behavior of the human state. In simulated tests, the human kept still throughout each planning and execution (Experiment A) or updated according to the probability distribution (Experiment B). In real-world tests, we used a simpliﬁed model to predict human movements,
+
+8
+
+IEEE ROBOTICS AND AUTOMATION LETTERS. PREPRINT VERSION. ACCEPTED SEPTEMBER, 2022
+
+which could include large whole-body movements across the cell (see the attached videos). Therefore, the accuracy of the human’s state prediction is utterly important, and the planning scheme of Figure 1 may beneﬁt from embedding the proposed approach into an online path re-planner [7].
+VI. CONCLUSIONS
+This paper proposed a novel method to embed human awareness into robot path planners. Compared with existing approaches, our method explicitly addresses minimization of the trajectory execution time considering the safety speed reduction owed to the proximity of the human and consider the uncertainty of the human estimation in estimating the robot slowdown. As demonstrated in simulations and real-world experiments, these features signiﬁcantly reduce execution time and avoid unnecessary safety speed reduction. Future works will aim to reduce the computational time to calculate the time-dilation factor λ by directly estimating the human-robot distance or the time dilation factor through an artiﬁcial neural network. The aim is two-fold: allow for the integration of the approach into path re-planning algorithms, and use larger values of n and m to model the robot and the human (regarding the second point, notice that the computation of λ for multiple points can be easily parallelized).
+REFERENCES
+[1] A. Umbrico, A. Orlandini, and A. Cesta, “An ontology for human-robot collaboration,” Procedia CIRP, vol. 93, pp. 1097–1102, 2020.
+[2] G. Michalos, J. Spiliotopoulos, S. Makris, and G. Chryssolouris, “A method for planning human robot shared tasks,” CIRP J. Manuf. Sci. Technol., vol. 22, pp. 76–90, 2018.
+[3] N. Nikolakis, N. Kousi, G. Michalos, and S. Makris, “Dynamic scheduling of shared human-robot manufacturing operations,” Procedia CIRP, vol. 72, pp. 9–14, 2018.
+[4] P. A. Lasota and J. A. Shah, “Analyzing the effects of human-aware motion planning on close-proximity human–robot collaboration,” Human factors, vol. 57, no. 1, pp. 21–33, 2015.
+[5] J. de Gea Fernández, D. Mronga, M. Günther, T. Knobloch, M. Wirkus, M. Schröer, M. Trampler, S. Stiene, E. Kirchner, V. Bargsten et al., “Multimodal sensor-based whole-body control for human–robot collaboration in industrial settings,” Rob. Auton. Syst., vol. 94, pp. 102–119, 2017.
+[6] M. Saveriano, F. Hirt, and D. Lee, “Human-aware motion reshaping using dynamical systems,” Pattern Recognit. Lett., vol. 99, pp. 96–104, 2017.
+[7] C. Tonola, M. Faroni, N. Pedrocchi, and M. Beschi, “Anytime informed path re-planning and optimization for human-robot collaboration,” in Proc. IEEE Int. Conf. on Robot and Human Interactive Comm., 2021.
+[8] A. M. Zanchettin, N. M. Ceriani, P. Rocco, H. Ding, and B. Matthias, “Safety in human-robot collaborative manufacturing environments: Metrics and control,” IEEE Trans. Autom. Sci. Eng., vol. 13, no. 2, pp. 882–893, 2016.
+[9] J. A. Marvel and R. Norcross, “Implementing speed and separation monitoring in collaborative robot workcells,” Rob. Comput. Integr. Manuf., vol. 44, pp. 144–155, 2017.
+[10] C. Byner, B. Matthias, and H. Ding, “Dynamic speed and separation monitoring for collaborative robot applications–concepts and performance,” Rob. Comput. Integr. Manuf., vol. 58, pp. 239–252, 2019.
+[11] A. Palleschi, M. Hamad, S. Abdolshah, M. Garabini, S. Haddadin, and L. Pallottino, “Fast and safe trajectory planning: Solving the cobot performance/safety trade-off in human-robot shared environments,” IEEE Rob. Autom. Lett., vol. 6, no. 3, pp. 5445–5452, 2021.
+[12] A. Casalino, D. Bazzi, A. M. Zanchettin, and P. Rocco, “Optimal proactive path planning for collaborative robots in industrial contexts,” in IEEE Int. Conf. on Robotics and Automation, 2019, pp. 6540–6546.
+[13] E. A. Sisbot and R. Alami, “A human-aware manipulation planner,” IEEE Transactions on Robotics, vol. 28, no. 5, pp. 1045–1057, 2012.
+
+[14] J. Mainprice, E. Akin Sisbot, L. Jaillet, J. Cortés, R. Alami, and T. Siméon, “Planning human-aware motions using a sampling-based costmap planner,” in IEEE Int. Conf. Rob. Autom., 2011, pp. 5012–5017.
+[15] D. Devaurs, T. Siméon, and J. Cortés, “Enhancing the transition-based rrt to deal with complex cost spaces,” in 2013 IEEE International Conference on Robotics and Automation, 2013, pp. 4120–4125.
+[16] R. Hayne, R. Luo, and D. Berenson, “Considering avoidance and consistency in motion planning for human-robot manipulation in a shared workspace,” in IEEE Int. Conf. Rob. Autom., 2016, pp. 3948– 3954.
+[17] X. Zhao and J. Pan, “Considering human behavior in motion planning for smooth human-robot collaboration in close proximity,” in 2018 27th IEEE International Symposium on Robot and Human Interactive Communication (RO-MAN), 2018, pp. 985–990.
+[18] M. Kalakrishnan, S. Chitta, E. Theodorou, P. Pastor, and S. Schaal, “STOMP: Stochastic trajectory optimization for motion planning,” in Proc. IEEE ICRA, Shanghai (China), 2011, pp. 4569–4574.
+[19] S. Tarbouriech and W. Suleiman, “Bi-objective motion planning approach for safe motions: Application to a collaborative robot,” Journal of Intelligent and Robotic Systems, vol. 99, pp. 45–63, 2020.
+[20] S. Javdani, H. Admoni, S. Pellegrinelli, S. S. Srinivasa, and J. A. Bagnell, “Shared autonomy via hindsight optimization for teleoperation and teaming,” Int. J. Rob. Res., vol. 37, no. 7, pp. 717–742, 2018.
+[21] A. Kanazawa, J. Kinugawa, and K. Kosuge, “Adaptive motion planning for a collaborative robot based on prediction uncertainty to enhance human safety and work efﬁciency,” IEEE Transactions on Robotics, vol. 35, no. 4, pp. 817–832, 2019.
+[22] M. Beschi, M. Faroni, C. Copot, and N. Pedrocchi, “How motion planning affects human factors in human-robot collaboration,” in IFAC Conf. Cyber-Physical Human-Systems, 2020.
+[23] Y. Wang, Y. Sheng, J. Wang, and W. Zhang, “Optimal collision-free robot trajectory generation based on time series prediction of human motion,” IEEE Rob. Autom. Lett., vol. 3, no. 1, pp. 226–233, 2018.
+[24] H. Pham and Q.-C. Pham, “A new approach to time-optimal path parameterization based on reachability analysis,” IEEE Transactions on Robotics, vol. 34, no. 3, pp. 645–659, 2018.
+[25] M. Elbanhawi and M. Simic, “Sampling-based robot motion planning: A review,” Ieee access, vol. 2, pp. 56–77, 2014.
+[26] J. D. Gammell, T. D. Barfoot, and S. S. Srinivasa, “Informed sampling for asymptotically optimal path planning,” IEEE Transactions on Robotics, vol. 34, no. 4, pp. 966–984, 2018.
+[27] J. Gammell, S. Srinivasa, and T. D. Barfoot, “Batch informed trees (bit*): Informed asymptotically optimal anytime search,” Int. J. Rob. Res., vol. 39, no. 5, 2020.
+[28] J. Xu, K. Song, D. Zhang, H. Dong, Y. Yan, and Q. Meng, “Informed anytime fast marching tree for asymptotically optimal motion planning,” IEEE Tran on Industrial Electronics, vol. 68, pp. 5068–5077, 2021.
+[29] M. Faroni, M. Beschi, and N. Pedrocchi, “An MPC framework for online motion planning in human-robot collaborative tasks,” in Proc. IEEE Int. Conf. on Emerging Tech. and Factory Automation, 2019.
+[30] D. Kulic´, C. Ott, D. Lee, J. Ishikawa, and Y. Nakamura, “Incremental learning of full body motion primitives and their sequencing through human motion observation,” Int. J. Rob. Res., vol. 31, no. 3, pp. 330– 345, 2012.
+[31] K. Fragkiadaki, S. Levine, P. Felsen, and J. Malik, “Recurrent network models for human dynamics,” in Proceedings of the IEEE International Conference on Computer Vision, 2015, pp. 4346–4354.
+[32] P. Kratzer, M. Toussaint, and J. Mainprice, “Prediction of human full-body movements with motion optimization and recurrent neural networks,” in IEEE Int. Conf. Rob. Autom., 2020, pp. 1792–1798.
+[33] B. Berret, E. Chiovetto, F. Nori, and T. Pozzo, “Evidence for composite cost functions in arm movement planning: An inverse optimal control approach,” PLOS Computational Biology, vol. 7, no. 10, pp. 1–18, 2011.
+[34] H. S. Koppula and A. Saxena, “Anticipating human activities using object affordances for reactive robotic response,” IEEE Tran on Pattern Analysis and Machine Intelligence, vol. 38, no. 1, pp. 14–29, 2015.
+[35] D. Fridovich-Keil, A. Bajcsy, J. F. Fisac, S. L. Herbert, S. Wang, A. D. Dragan, and C. J. Tomlin, “Conﬁdence-aware motion prediction for realtime collision avoidance1,” Int. J. Rob. Res., vol. 39, no. 2-3, pp. 250– 265, 2020.
+[36] “ISO/TS 15066:2016 Robots and robotic devices – Collaborative robots,” Int. Org. for Standardization, Geneva, CH, Standard, 2016.
+[37] A. Neubauer, “Tikhonov regularisation for non-linear ill-posed problems: optimal convergence rates and ﬁnite-dimensional approximation,” Inverse problems, vol. 5, no. 4, p. 541, 1989.
+
+

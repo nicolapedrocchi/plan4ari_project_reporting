@@ -1,0 +1,271 @@
+Real-Time, Energy-Efficient, Sampling-Based Optimal Control via FPGA Acceleration
+Tanmay Desai1, Brian Plancher2,3, and R. Iris Bahar1
+
+arXiv:2601.17231v1 [cs.RO] 23 Jan 2026
+
+Abstract— Autonomous mobile robots (AMRs), used for search-and-rescue and remote exploration, require fast and robust planning and control schemes. Sampling-based approaches for Model Predictive Control, especially approaches based on the Model Predictive Path Integral Control (MPPI) algorithm, have recently proven both to be highly effective for such applications and to map naturally to GPUs for hardware acceleration. However, both GPU and CPU implementations of such algorithms can struggle to meet tight energy and latency budgets on battery-constrained AMR platforms that leverage embedded compute. To address this issue, we present an FPGAoptimized MPPI design that exposes fine-grained parallelism and eliminates synchronization bottlenecks via deep pipelining and parallelism across algorithmic stages. This results in an average 3.1x to 7.5x speedup over optimized implementations on an embedded GPU and CPU, respectively, while simultaneously achieving a 2.5x to 5.4x reduction in energy usage. These results demonstrate that FPGA architectures are a promising direction for energy-efficient and high-performance edge robotics.
+
+I. INTRODUCTION
+Autonomous Mobile Robots (AMRs) require robust sensing, planning, and control for real-world applications ranging from search-and-rescue to remote exploration and elder care [1], [2], [3], [4]. Recently, sampling-based stochastic optimal control algorithms—particularly Model Predictive Path Integral (MPPI) control [5]—have demonstrated impressive results on diverse robotic platforms [6], [7], [8], [9], [10]. These methods are amenable to GPU acceleration [11], [12], joining a growing ecosystem of GPU-accelerated robotics libraries [13], [14], [15], [16], [17], [18], [19].
+However, GPU-based implementations incur substantial power consumption, limiting their applicability to batteryconstrained AMRs [20], [21], [22]. Field Programmable Gate Arrays (FPGAs) offer a compelling alternative through domain-specialized hardware that eliminates GPU synchronization overhead and memory-access stalls. Yet realizing this promise requires more than implementation effort—it demands algorithmic restructuring. Naive ports of existing GPU/CPU code to HLS will not unlock FPGA potential. Instead, effective FPGA acceleration of sampling-based optimal control demands explicit hardware-software co-design: systematic analysis of algorithm structure, exposure of finegrained parallelism, and deliberate mapping onto hardware resources under timing constraints.
+Sampling-based stochastic control algorithms exhibit a common pattern: sample generation, parallel rollouts, cost
+
+1Colorado
+
+School
+
+of
+
+Mines
+
+ririsbahar}@mines.edu
+
+2,3Barnard College, Columbia University, and
+
+plancher@dartmouth.edu
+
+{desaitanmay, Dartmouth College.
+
+evaluation, and reduction to extract optimal control. On CPUs and GPUs, these stages operate sequentially or with coarse-grained parallelism, creating implicit data dependencies and synchronization bottlenecks. FPGA acceleration requires restructuring to expose deep pipelining and parallel dataflows. This is non-trivial: (i) breaking dependencies in reduction/weighting phases, (ii) reformulating sequential operations (e.g., cost summation) as parallel trees, (iii) selecting numerical representations (fixed-point vs. floatingpoint), balancing precision and hardware utilization, and (iv) partitioning memory hierarchies (BRAM, URAM) to sustain parallel throughput. These are architectural imperatives—not optional tuning—that fundamentally define achievable latencies and energy profiles.
+To our knowledge, this is the first systematic FPGA acceleration of sampling-based stochastic optimal control for robotics. While FPGA-accelerated control has been explored for classical methods (e.g., trajectory planning, perception), the application to stochastic sampling-based optimal control—with its unique combination of parallel Monte Carlo sampling and sequential reduction—remains unexplored. We address this gap through hardware-software co-design, instantiated on MPPI. Our approach leverages three core insights: (1) Dependency analysis characterizing parallelizable phases (sample generation, rollouts) vs. sequential phases (cost aggregation), enabling principled pipelining; (2) Dataflowcentric architecture restructuring algorithms from sequential control-flow into deeply-pipelined spatial dataflow, eliminating synchronization; (3) Resource-aware numerics codesigning fixed-point arithmetic and memory patterns to maximize hardware utilization without sacrificing accuracy.
+We implement this methodology on an Xilinx ZCU102 FPGA, achieving parallel trajectory rollout generation via deep pipelining, tree-reduction-based cost accumulation, and optimized memory partitioning with comprehensive scalability analysis. Closed-loop trajectory tracking experiments demonstrate 3.1x–7.5x latency improvements and 2.2x–5.4x energy gains over optimized CPU/GPU baselines—gains from algorithmic restructuring exposing fine-grained parallelism, not hardware class differences. Our methodology generalizes across sampling-based stochastic control techniques, positioning this work as a blueprint for FPGA acceleration of a broad class of robotics algorithms.
+II. RELATED WORK
+As previously mentioned, FPGAs have demonstrated fast, accurate, scalable, and energy-efficient computation for a
+
+variety of robotics applications, embodiments, and algorithms [23], [24], [21], [25], [26], [27], [28], [21], [29], [30]. Within motion planning and control specifically, FPGA efforts have concentrated on search-based planning and on naïvely parallel kernels that map well to spatial dataflow, such as collision checking and dynamics (gradient) computations [26], [25], [23], [21], as well as control of deterministic linear systems [24] and their applications to robotics, power electronics, and fusion [31], [32], [33], [34], [35], [36]. A complementary line of work has also leveraged FPGAs for model inference of offline learned control laws, trading exact constraint handling for speed [32], [33], [31]. Importantly, across all of this work, stochastic optimal control remains underexplored on FPGAs. This paper fills that gap with a pipelined, dataflow FPGA design that exposes fine-grained parallelism across the full MPPI pipeline.
+
+III. BACKGROUND
+
+The Model Predictive Path Integral Control (MPPI) algorithm (Algorithm 1) is a sampling-based stochastic optimal control method that considers a stochastic dynamical system with the state and controls at time t denoted as xt ∈ Rn and ut ∈ Rm and the stochastic disturbance denoted as wt ∼ N (0, Σu). Under a dynamics model, xt+1 = f (xt, ut, wt) and timestep ∆t, the discrete time Euler integrator for a batch of K stochastic trajectories under the same control sequence can be defined as:
+xt+1 (k) = xt(k) + f xt(k), ut + wt(k) · ∆t. (1)
+
+The MPPI algorithm proceeds by rolling out these K trajectories and then updating the nominal control sequence through a weighting of the resulting trajectory costs, J:
+
+N −1
+J (k) = ϕ xN(k) + ct(k) xt(k), ut, wt(k) . (2)
+t=0
+
+Commonly, the stage cost c, and terminal cost ϕ, are formed as the sum of a tracking cost on the deviation of the state from the reference trajectory as well as a total control input cost, weighted by matrices Q ∈ Rn×n and R ∈ Rm×m:
+
+(k) (k) ref ⊤ (k) ref
+ct = xt − xt Q xt − xt
+
+(k) ⊤ (k)
+
++ ut + wt
+
+R ut + wt ,
+
+(3)
+
+(k) ref ⊤
+
+(k)
+
+ref
+
+ϕk = xN − xN Qf xN − xN .
+
+(4)
+
+MPPI then updates the control sequence by favoring lowcost roll-outs through an exponential weighting:
+
+K −1
+ut ← ut + αkwt(k),
+k=0
+
+αk =
+
+exp − λ1 Jk . (5) j=0 K−1 exp − λ1 Jj
+
+Here, the temperature hyperparameter λ > 0 controls the balance between exploration and exploitation as a smaller λ concentrates weight on lower-cost trajectories.
+
+Algorithm 1 Model Predictive Path Integral Control (MPPI)
+
+1: Inputs: x0, Xref , N , K, λ, Σu, max_iters
+
+2: Initialize: nominal controls u0:N−1
+
+3: for iteration i = 0, . . . , max_iters do
+
+4: for k = 0 to K − 1 do 5: x0(k) ← x0, J (k) ← 0
+
+6:
+
+for t = 0 to N − 1 do
+
+7: Compute xt+1 (k) via (1)
+
+8: J (k) += ct(k) via (3)
+
+9:
+
+J (k) += ϕ(k) via (4)
+
+10: for t = 0 to N − 1 do
+
+11:
+
+Compute ut via (5)
+
+12: return X, U
+
+When used for online model predictive control (MPC), this process repeats at each control step until convergence or a maximum number of iterations is reached. The first control, u0, is then applied to the real system, at which point the new system state x0 is determined from sensor feedback, and the process repeats until the target is reached.
+We note that as a 0th-order optimization method, MPPI is particularly well suited for nonlinear systems with non-convex cost functions, and its naïvely-parallel computation structure enables easy GPU deployments for real-time planning applications. As such, many recent papers using such methods have demonstrated impressive results on varied platforms and tasks [6], [7], [8], [9], [10].
+IV. MPPI COMPUTATIONAL DATAFLOW ANALYSIS
+As described in Section III, MPPI comprises four main computational operations per control update: (i) Sampling random noise for the control perturbations, (ii) Dynamics rollouts to propagate states (Eq. (1)), (iii) Stage and terminal cost evaluation per each state along each rollout (Eqs. (3), (4)), and (iv) Exponential weighting and control updates (Eq. (5)).
+From these computational operations emerge recurring computation patterns: (i) coarse-grained parallelism (between trajectories), (ii) fine-grained parallelism (small matrix operations inside rollouts and costs), (iii) (pseudo-)random number generation for sampling control perturbation noise, and (iv) global reductions across the total costs to compute the control updates. These operations can also be pipelined so that different trajectories (or different timesteps of the same trajectory) reside in different operations concurrently. In practice, the boundary between “parallel blocks” and “pipelined operations” is a software co-design knob that should be adapted to the target hardware (e.g., CPU, GPU, or FPGA) to balance resource utilization and synchronization overhead. Table I summarizes how each platform maps to these computational patterns.
+CPU fit with computational patterns. Modern CPUs handle control flow and scalar work well, and can leverage highquality software libraries for (Pseudo-)Random Number Generators with low latency. However, despite recent advances in multi-threading and SIMD computations, they offer limited
+
+TABLE I: Key Computational Characteristics of MPPI: Architectural Fit
+
+Pattern
+Coarse-grained parallelism (trajectories) Fine-grained parallelism (small mat-ops) (Pseudo-)Random number generator Global reductions
+
+CPU Poor Moderate Excellent Poor
+
+GPU Excellent
+Good Good Good
+
+FPGA Good Excellent Poor Excellent
+
+throughput for both coarse-grained (many trajectories) and fine-grained (per-timestep small matrix-ops) parallelism as compared to GPUs and FPGAs. Similarly, global reductions tend to be bandwidth/latency bound due to a similar lack of large-scale parallel computational resources. As a result, for MPPI, CPUs are best as a correctness/portability baseline or when the sample count K is small.
+GPU fit with computational patterns. GPUs excel at coarse-grained parallelism across many trajectories and provide solid support for fine-grained math via wide SIMD and fast shared memory (L1 cache). They also offer decent (Pseudo-) Random Number Generator libraries and reasonably efficient global reductions. Nevertheless, repeated synchronizations and irregular access patterns can limit utilization and prevent ultra-performant fine-grained parallelism, and thus overall compute performance. GPUs are a strong match when K is large and kernels are uniform, but may face diminishing returns when stages introduce tight dependencies or frequent global reductions. As such, while MPPI’s naïvely-parallel rollouts work well on the GPU, the need to synchronize for global reductions for each parallel computed trajectory and the (potentially complex) nonlinear dynamics computations may not be computed with maximal efficiency.
+FPGA fit with computational patterns. FPGAs enable custom dataflow pipelines that exploit fine-grained parallelism extremely well and implement deterministic, lowlatency reduction trees for global operations. However, they typically do not offer as many on-chip parallel compute units to scale to as large of operation as GPUs. As such, leveraging deep pipelining over custom functional units is critical for performance. In addition, on-fabric (Pseudo-)Random Number Generators are not native to most FPGAs and require extra logic and space for implementation, typically trailing CPUs/GPUs in statistical quality [37].
+V. MPPI FPGA CO-DESIGN
+To effectively co-design an FPGA implementation of MPPI, it is essential to develop a formulation that plays to the strengths and minimizes the weaknesses of FPGAs in the context of the MPPI algorithm, as discussed in Section IV. As such, and as shown in Fig. 1, our overall design maximizes the excellent fine-grained parallelism and global reduction capabilities on the FPGA to enable fast and efficient overall computation. The following subsections provide an in-depth examination of the design process pertinent to
+
+the MPPI architecture. We first build on the prior section, which characterizes data dependencies, and extend that to understand per-stage throughput on the FPGA. We then use this analysis to align producer–consumer rates across our computational pipeline. This drives scheduling, buffer depths, and data representations that maximize FPGA utilization while meeting latency and energy goals.
+A. Overall Design
+We detail the overall final design in Fig. 1. Here, Fig. 1(b), in the upper right, shows the decomposition of a single control iteration into 4 constituent computational stages, where each layer represents parallel execution units that exhibit producerconsumer concurrency through pipelined data flow. This constitutes the coarse-grained parallelism achieved through task-level dataflow decomposition of the MPPI algorithm due to the many naturally parallel trajectories. Fig. 1(a), in the upper left, visualizes this parallelism for a sample size of K = 3 trajectories, where kxt denotes the state reached by trajectory k ∈ [0, K − 1] at a time step t ∈ [0, N − 1] within the planning horizon. Finally, in Fig. 1(c), in the bottom, we demonstrate that each computational stage from (b) encompasses internal operations that are further parallelized through fine-grained pipelining, exploiting instruction-level and operation-level parallelism within individual algorithmic components.
+As mentioned in Sec. IV, the FPGA fabric provides a fixed pool of parallel compute units, which we keep busy via custom dataflows; this makes deeply pipelined architectures particularly powerful. Accordingly, we break MPPI into a four-stage pipelined dataflow: (1) Gaussian noise generation, (2) trajectory rollouts, (3) cost calculations, and (4) weighting and control sequence updates. Stages 1–3 admit substantial coarse-grained parallelism across the K trajectories and finegrained parallelism within the computations in each stage, while Stage 4 is a global reduction. We exploit this structure on the FPGA to overlap stages and maximize utilization.
+B. Stage 1: Gaussian Noise Generation
+As noted in Sec. IV, while CPUs and GPUs offer built-in random number generators, FPGAs do not. This is therefore a critical stage in designing an algorithm to ensure optimal performance, given its reliance on randomness. To address this, we considered multiple pseudo-random number generators (PRNGs). The end end our finalists were two classes of PRNGs, both common and popular in FPGA implementations, derived from both linear feedback shift registers (LFSRs) [38] and XOR-Shift [39] operations. Ultimately, we selected an XOR-Shift-based scheme as it was able to produce a full 32-bit result every clock cycle, unlike LFSR, which produces one bit at a time. This makes XOR-Shift immediately suitable for high-throughput noise generation without the heavy resource cost required to parallelize LFSR.
+Unfortunately, both LFSR and XOR-Shift produce uniform random numbers, which are unsuitable for our application, since MPPI requires Gaussian-distributed noise. To address
+
+Fig. 1: This figure presents the overall FPGA architecture for the MPPI algorithm. a) illustrates the agent’s rollouts, showing the states propagated over the prediction horizon for a single control time step. b) depicts the 4 key stages of the MPPI control update mapped to a dataflow architecture, highlighting the parallel and overlapping execution of these stages within one iteration. c) details the internal functionalities of each stage from (b), further decomposed into deep pipelined sub-stages to minimize latency and maximize throughput.
+this, we use the Box-Muller transform (Eq. 6) to convert uniform samples into standard normal (Gaussian) noise.
+
+Ri = −2 ln U˜1,i
+
+Θi = 2πU˜2,i
+
+(6)
+
+steer_samples[i] = Ri sin (Θi)
+
+accel_samples[i] = Ri cos (Θi)
+
+To minimize generation latency, Gaussian noise for each control is produced in parallel every cycle, with samples written concurrently across P memory banks to prevent port contention, where P represents the parallel iterations of generation. However, the limited number of write ports in each bank of the Block RAM (BRAM) prevents simultaneous writes of control values to a single, monolithic array. To overcome this bottleneck, we apply array partitioning: the original steer and acceleration arrays are split into multiple smaller subarrays, each mapped to its own BRAM block. Fig. 2 illustrates how this partitioning enables true parallel writes across all trajectory states, eliminating port contention and preserving our pipeline’s throughput. This stage also behaves as a data source, resulting in simultaneous noise generation with FPGA initialization.
+While this approach is effective, it demands significant floating-point computation, branching, and large memory for tables, consuming significant FPGA resources, both in
+
+Fig. 2: Array partitioning: Noise values for control arrays are partitioned into 4 sub-blocks. As shown, there are K trajectories, where each trajectory produces N pairs of noise values (for acceleration and steering) for the N time steps, which are written to BRAM in blocks of 4 at a time.
+terms of Block-RAM (BRAM) memory and Digital Signal Processing (DSP) compute units. To minimize this, our design adopts the COordinate Rotation Digital Computer (CORDIC) algorithm [40], which replaces multipliers and dividers with shift-and-add operations. This technique is highly amenable to pipelined FPGA implementation, with each iteration forming a lightweight pipeline stage that uses only a single adder or subtractor, enabling resource sharing and efficient computation of trigonometric, logarithmic, and exponential functions.
+
+C. Stage 2: Trajectory Rollouts
+This phase employs a dataflow architecture, leveraging parallelism across K trajectories and N time steps. The dataflow for this phase leverages an outer loop iterating over K trajectories, partially unrolled with factor P , and an inner loop spanning N time steps, entirely pipelined.
+The data flow graph shown in Fig. 1(c) shows the resulting fully pipelined data movement: as soon as one stage produces a result, the next stage can consume it, constrained only by data dependencies. Point-to-point wiring eliminates instruction-fetch overhead, allowing each stage to process incoming data without delay. Because this streaming transfer occurs on every clock cycle, end-to-end pipeline latency is minimized. Use of FIFO buffers between stages ensures sustained throughput by decoupling producer and consumer blocks, preventing stalls even under variable processing times.
+We also exploit fine grained parallelism in the underlying dynamics functions, Eq. 1, parallelizing updates across the state and control dimmensions.
+D. Stage 3: Cost Calculations
+The cost stage uses a streaming dataflow that reduces each trajectory to a scalar: stage/terminal costs, (Eqs. 3 and 4), are run in a pipelined kernel. During computation, array partitioning and per-trajectory accumulators break loopcarried dependencies, quadratic costs are inlined to cut call overhead and improve scheduling, and small matrix multiplies map to DSP blocks to increase parallelism without memory contention, fully exploiting fine-grained parallelism. As with stage 2, outputs from the P parallel channels are buffered in FIFOs for downstream use.
+E. Stage 4: Weighting and Control Sequence Updates
+This final stage transforms trajectory cost values into an optimal control policy update through importance-weighted parameter estimation, representing the computational convergence point of the entire dataflow architecture through a large-scale reduction. The importance-weighted reduction implements a K-to-N many-to-few reduction pattern, collapsing the ensemble dimension while preserving temporal structure. The temporal smoothing filter maintains causal structure through incremental updates, avoiding full-window recomputation at each time step. The refined control sequence feeds forward to the initialization stage, establishing the temporal feedback loop that enables iterative policy improvement.
+VI. EXPERIMENTS AND RESULT
+In this section, we provide three sets of results for a racecar path tracking task, adapted from [41], describing the latency and energy reductions, as well as end-to-end tracking and success rate improvements delivered by our FPGA design.
+A. Methodology
+Our FPGA design is implemented with Vitis HLS [42] and runs on a 200 MHz Xilinx UltraScale+ MPSoC ZCU102. We compare our implementation to the state-of-the-art benchmark MPPI-generic implementation [41] running on a 1020
+
+(a) Track 1
+
+(b) Track 2
+
+(c) Track 3
+
+(d) Track 4
+
+(e) Track 5
+Fig. 3: Different tracks used for our experiments.
+MHz, 1024-CUDA-core NVIDIA Jetson Orin Nano 8 GB GPU. Existing CPU implementations of the MPPI algorithm exist in Python [43] and Jax [44], but have known overheads. Instead, we implemented our own CPU baseline using Eigen [45] for efficient linear algebra and OpenMP [46] for multi-threading. Our CPU implementation was run on the 6-core Arm Cortex-A78 64-bit CPU, which is also on the NVIDIA Jetson Orin Nano 8 GB.
+Our experiments involved five randomly generated tracks (see Fig. 3), each starting from 11 different initial points, resulting in 55 total tests per device. Each test was run 20 times, and averages are reported. For each test, we measured energy usage, control-loop delay, and success rates. Consistent hyperparameters were maintained across all devices. All of our examples use a car with the Kinematic Bicycle model and the quadratic cost function as in [41].
+B. Latency Reduction
+The average per-step computation time, defined as the duration required to execute one full control loop and generate the optimal control update, is summarized in Table II and Fig. 4a. Our FPGA-based implementation achieves an average runtime of 2.33 ms per control step across all tracks, outperforming the NVIDIA Jetson platform by 3.1x (7.241 ms) and the multi-threaded CPU implementation by 7x (17.374 ms). These results demonstrate that the fine-grained parallelism and pipelined dataflow architecture of the FPGA delivers substantially lower latency for our target application.
+
+TABLE II: Latency, Energy Consumption, Energy-Delay-Product (EDP), End-to-End Tracking Error, and Success Rate for the CPU, GPU, and FPGA across all experiments. Improvements and reductions are noted for the FPGA as compared to the CPU and GPU baselines, showing the FPGA’s best overall performance across the board.
+
+Device
+CPU GPU FPGA (Ours)
+
+Timing (ms) 17.37 7.24 2.33
+
+Energy (mJ) 80.16 37.44 14.90
+
+EDP (ms·mJ) 1392.38 271.06 34.72
+
+Avg Error (cm) 61.6 48.6 47.6
+
+Success Rate
+93% 95% 96%
+
+Speedup
+7.5x 3.1x
+-
+
+Energy Reduction
+5.4x 2.5x
+-
+
+EDP Gain 40.1x 7.8x
+-
+
+(a) Average control-step latency per track for CPU, GPU, and FPGA; (b) CDF of average position error (log scale), showing consistently
+
+FPGA yields large speedups over both.
+
+low error for the FPGA.
+
+Fig. 4: Latency and accuracy comparison across platforms.
+
+C. Energy Reduction
+Table II also reports the mean energy drawn per controlloop iteration for each platform. Our FPGA implementation consumes roughly half the energy of the Jetson Orin Nano, attributable to its bespoke dataflow pipelines and fine-grained parallelism that eliminate the overhead of general-purpose cores and GPU SM schedulers. Compared to the multithreaded CPU baseline, the FPGA implementation has a 5.4x energy advantage, thanks in part to its clock-gated, customized logic that activates only the necessary resources for each arithmetic operation. The combination of the speedups presented in the prior section and the energy reductions presented here leads to large gains in overall Energy-Delay Product (EDP) with over 40x improvements for the FPGA over the CPU and 7.8x over the GPU.
+D. End-to-End Tracking Performance
+Table II quantifies the average tracking error and success rate across all tasks, and Fig. 4b shows the cumulative density function of the average tracking error across all tests. We find that our FPGA-based implementation achieves the lowest mean deviations from the reference path. The FPGA is also the only hardware platform to not have a high error spike on any track (Fig. 4b), showing that despite relying on lightweight, hardware-friendly pseudo-random number generators, rather than more accurate software libraries, the FPGA’s low latency enables it to consistently provide low tracking error and high success.
+
+VII. CONCLUSION AND FUTURE WORK
+In this work, we analyze the computational patterns present in the popular MPPI algorithm and co-design an optimized FPGA implementation. Our design optimizing for dataflow parallelism and avoiding control-flow checks, enabling seamless fine-grained parallel pipelining. Our results show an average 3.1x to 7.5x latency improvement over optimized implementations on an embedded GPU and CPU, respectively, while simultaneously achieving a 2.5x to 5.4x improvement in energy efficiency.
+There are many exciting directions for future research, including exploring fixed-point arithmetic optimization and dynamic partial reconfiguration to enable even higher performance and lower energy consumption across more complex and changing environments. We would also be interested in exploring deployments to physical robots. Fixedpoint representations can reduce resource use and power consumption, but need careful precision analysis. Dynamic partial reconfiguration allows runtime adaptation in response to changing conditions, crucial for long-term autonomous missions needing recovery and adaptability.
+REFERENCES
+[1] J. Broekens, M. Heerink, and H. Rosendal, “Assistive social robots in elderly care: A review,” Gerontechnology, vol. 8, pp. 94–103, 04 2009.
+[2] G. Fragapane, D. Ivanov, M. Peron, F. Sgarbossa, and J. O. Strandhagen, “Increasing flexibility and productivity in industry 4.0 production networks with autonomous mobile robots and smart intralogistics,” Annals of Operations Research, vol. 308, 01 2022.
+
+[3] E. Krotkov, D. Hackett, L. Jackel, M. Perschbacher, J. Pippine, J. Strauss, G. Pratt, and C. Orlowski, “The darpa robotics challenge finals: Results and perspectives,” in The DARPA robotics challenge finals: Humanoid robots to the rescue. Springer, 2018, pp. 1–26.
+[4] M. Tranzatto, T. Miki, M. Dharmadhikari, L. Bernreiter, M. Kulkarni, F. Mascarich, O. Andersson, S. Khattak, M. Hutter, R. Siegwart, et al., “CERBERUS in the DARPA subterranean challenge,” Science Robotics, vol. 7, no. 66, p. eabp9742, 2022.
+[5] G. Williams, P. Drews, B. Goldfain, J. M. Rehg, and E. A. Theodorou, “Aggressive driving with model predictive path integral control,” in 2016 IEEE International Conference on Robotics and Automation (ICRA), 2016, pp. 1433–1440.
+[6] J. Pravitra, K. A. Ackerman, C. Cao, N. Hovakimyan, and E. A. Theodorou, “L1-adaptive mppi architecture for robust and agile control of multirotors,” in 2020 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS). IEEE, 2020, pp. 7661–7666.
+[7] Y. Seo, D. Kim, J. Bak, Y. Oh, and Y. Lee, “Extremely fast computation of CoM trajectory generation for walking leveraging MPPI algorithm,” in Intl. Conf. on Humanoid Robots (Humanoids), 2023, pp. 1–7.
+[8] E. Trevisan and J. Alonso-Mora, “Biased-MPPI: Informing samplingbased model predictive control by fusing ancillary controllers,” IEEE Robotics and Automation Letters, vol. 9, no. 6, pp. 5871–5878, 2024.
+[9] J. Alvarez-Padilla, J. Z. Zhang, S. Kwok, J. M. Dolan, and Z. Manchester, “Real-time whole-body control of legged robots with modelpredictive path integral control,” in 2025 IEEE International Conference on Robotics and Automation (ICRA). IEEE, 2025, pp. 14 721– 14 727.
+[10] H. Xue, C. Pan, Z. Yi, G. Qu, and G. Shi, “Full-order sampling-based MPC for torque-level locomotion control via diffusion-style annealing,” in 2025 IEEE International Conference on Robotics and Automation (ICRA). IEEE, 2025, pp. 4974–4981.
+[11] G. Williams, A. Aldrich, and E. Theodorou, “Model predictive path integral control: From theory to parallel computation,” Journal of Guidance, Control, and Dynamics, vol. 40, pp. 1–14, 01 2017.
+[12] B. Vlahov, J. Gibson, M. Gandhi, and E. A. Theodorou, “Mppi-generic: A cuda library for stochastic trajectory optimization,” arXiv preprint arXiv:2409.07563, 2024.
+[13] J. Liang, V. Makoviychuk, A. Handa, N. Chentanez, M. Macklin, and D. Fox, “GPU-accelerated robotic simulation for distributed reinforcement learning,” in Conference on Robot Learning. PMLR, 2018, pp. 270–282.
+[14] B. Plancher and S. Kuindersma, “A performance analysis of parallel differential dynamic programming on a GPU,” in International Workshop on the Algorithmic Foundations of Robotics. Springer, 2018, pp. 656–672.
+[15] E. Cervera, “GPU-accelerated vision for robots: Improving system throughput using OpenCV and CUDA,” IEEE Robotics & Automation Magazine, vol. 27, no. 2, pp. 151–158, 2020.
+[16] V. Makoviychuk, L. Wawrzyniak, Y. Guo, M. Lu, K. Storey, M. Macklin, D. Hoeller, N. Rudin, A. Allshire, A. Handa, et al., “Isaac gym: High performance GPU-based physics simulation for robot learning,” arXiv preprint arXiv:2108.10470, 2021.
+[17] T. Miki, L. Wellhausen, R. Grandia, F. Jenelten, T. Homberger, and M. Hutter, “Elevation mapping for locomotion and navigation using gpu,” in 2022 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS). IEEE, 2022, pp. 2273–2280.
+[18] B. Sundaralingam, S. K. S. Hari, A. Fishman, C. Garrett, K. Van Wyk, V. Blukis, A. Millane, H. Oleynikova, A. Handa, F. Ramos, et al., “Curobo: Parallelized collision-free robot motion generation,” in 2023 IEEE International Conference on Robotics and Automation (ICRA). IEEE, 2023, pp. 8112–8119.
+[19] C. H. Huang, P. Jadhav, B. Plancher, and Z. Kingston, “PRRTC: GPUparallel rrt-connect for fast, consistent, and low-cost motion planning,” arXiv preprint arXiv:2503.06757, 2025.
+[20] Y. Liu, G. Calderoni, and R. I. Bahar, “Hardware acceleration of monte-carlo sampling for energy efficient robust robot manipulation,” in 2020 30th International Conference on Field-Programmable Logic and Applications (FPL). IEEE, 2020, pp. 284–290.
+[21] Z. Wan, B. Yu, T. Y. Li, J. Tang, Y. Zhu, Y. Wang, A. Raychowdhury, and S. Liu, “A survey of FPGA-based robotic computing,” IEEE Circuits and Systems Magazine, vol. 21, no. 2, pp. 48–74, 2021.
+[22] B. Boroujerdian, H. Genc, S. Krishnan, B. P. Duisterhof, B. Plancher, K. Mansoorshahi, M. Almeida, W. Cui, A. Faust, and V. J. Reddi, “The role of compute in autonomous micro aerial vehicles: Optimizing for
+
+mission time and energy efficiency,” ACM Transactions on Computer Systems (TOCS), vol. 39, no. 1-4, pp. 1–44, 2022. [23] S. Murray, W. Floyd-Jones, Y. Qi, D. J. Sorin, and G. D. Konidaris, “Robot motion planning on a chip.” in Robotics: Science and Systems, vol. 6, 2016. [24] I. McInerney, G. A. Constantinides, and E. C. Kerrigan, “A survey of the implementation of linear model predictive control on FPGAs,” IFAC-PapersOnLine, vol. 51, no. 20, pp. 381–387, 2018. [25] B. Plancher, S. M. Neuman, T. Bourgeat, S. Kuindersma, S. Devadas, and V. J. Reddi, “Accelerating robot dynamics gradients on a CPU, GPU, and FPGA,” IEEE Robotics and Automation Letters, vol. 6, no. 2, pp. 2335–2342, 2021. [26] S. M. Neuman, B. Plancher, T. Bourgeat, T. Tambe, S. Devadas, and V. J. Reddi, “Robomorphic computing: a design methodology for domain-specific accelerators parameterized by robot morphology,” in Proceedings of the 26th ACM International Conference on Architectural Support for Programming Languages and Operating Systems, Virtual USA, 2021, pp. 674–686. [27] Y. Liu, G. Calderoni, and R. I. Bahar, “Hardware acceleration of monte-carlo sampling for energy efficient robust robot manipulation,” in 2020 30th International Conference on Field-Programmable Logic and Applications (FPL), 2020, pp. 284–290. [28] Y. Liu, C. E. Derman, G. Calderoni, and R. I. Bahar, “Hardware acceleration of robot scene perception algorithms,” in Proceedings of the 39th International Conference on Computer-Aided Design, ser. ICCAD ’20. New York, NY, USA: Association for Computing Machinery, 2020. [Online]. Available: https://doi.org/10.1145/340030 2.3415766 [29] A. Bayrak and M. Ö. Efe, “FPGA based offline 3D UAV local path planner using evolutionary algorithms for unknown environments,” in IECON 2016 - 42nd Annual Conference of the IEEE Industrial Electronics Society, 2016, pp. 4778–4783. [30] Y. Zhou, X. Jin, and T. Wang, “FPGA implementation of a* algorithm for real-time path planning,” International Journal of Reconfigurable Computing, vol. 2020, no. 1, p. 8896386, 2020. [Online]. Available: https://onlinelibrary.wiley.com/doi/abs/10.1155/2020/8896386 [31] Q. Sui, B. Du, Y. Zuo, and W. Martinez, “Exploring the Potential of FPGA in High-Frequency Switching DC-DC Boost Converters Using Model Predictive Control,” in 2025 IEEE Applied Power Electronics Conference and Exposition (APEC). Atlanta, GA, USA: IEEE, Mar. 2025, pp. 2752–2756. [32] S. Lucia, D. Navarro, B. Karg, H. Sarnago, and Ó. Lucía, “Deep Learning-Based Model Predictive Control for Resonant Power Converters,” IEEE Transactions on Industrial Informatics, vol. 17, no. 1, pp. 409–420, Jan. 2021. [33] F. Dong, X. Li, K. You, and S. Song, “Standoff tracking using DNNbased MPC with implementation on FPGA,” IEEE Transactions on Control Systems Technology, vol. 31, no. 5, pp. 1998–2010, 2023. [34] S. Gerkšicˇ and B. Pregelj, “Finite-word-length FPGA implementation of model predictive control for ITER resistive wall mode control,” Fusion Engineering and Design, vol. 169, p. 112480, Aug. 2021. [35] E. N. Hartley, J. L. Jerez, A. Suardi, J. M. Maciejowski, E. C. Kerrigan, and G. A. Constantinides, “Predictive control using an FPGA with application to aircraft control,” IEEE Transactions on Control Systems Technology, vol. 22, no. 3, pp. 1006–1017, 2013. [36] Y. Li, S. E. Li, X. Jia, S. Zeng, and Y. Wang, “FPGA accelerated model predictive control for autonomous driving,” Journal of Intelligent and Connected Vehicles, vol. 5, no. 2, pp. 63–71, Jan. 2022. [37] D. B. Thomas, L. Howes, and W. Luk, “A comparison of CPUs, GPUs, FPGAs, and massively parallel processor arrays for random number generation,” in Proceedings of the ACM/SIGDA International Symposium on Field Programmable Gate Arrays, ser. FPGA ’09. New York, NY, USA: Association for Computing Machinery, 2009, p. 63–72. [Online]. Available: https://doi.org/10.1145/1508128.1508139 [38] D. Datta, B. Datta, and H. S. Dutta, “Design and implementation of multibit LFSR on FPGA to generate pseudorandom sequence number,” in 2017 Devices for Integrated Circuit (DevIC), 2017, pp. 346–349. [39] F. Panneton and P. L’Ecuyer, “On the XORshift random number generators,” ACM Trans. Model. Comput. Simul., vol. 15, no. 4, p. 346–361, Oct. 2005. [Online]. Available: https://doi.org/10.1145/1113 316.1113319 [40] J.-S. Pan, S.-Q. Zhang, S.-C. Chu, C.-C. Hu, and J. Wu, “Efficient FPGA implementation of sine cosine algorithm using high level synthesis,” Journal of Internet Technology, vol. 25, pp. 865–876, 11 2024.
+
+[41] B. I. Vlahov, J. Gibson, M. S. Gandhi, and E. A. Theodorou, “MPPIgeneric: A CUDA library for stochastic trajectory optimization,” 2024. [Online]. Available: https://api.semanticscholar.org/CorpusID: 276928605
+[42] P. Coussy and A. Morawiec, High-level synthesis. Springer, 2010, vol. 1.
+[43] M. Aoki, “python_simple_mppi: Simple MPPI implementation with python,” https://github.com/MizuhoAOKI/python_simple_mppi, 2025.
+
+[44] J. Lehtomaa, “jax-mppi: Model predictive path integral MPPI control with JAX,” https://github.com/jlehtomaa/jax-mppi, 2025.
+[45] G. Guennebaud, B. Jacob, et al., “Eigen v3,” http://eigen.tuxfamily.org, 2010.
+[46] L. Dagum and R. Menon, “OpenMP: an industry standard API for shared-memory programming,” IEEE computational science and engineering, vol. 5, no. 1, pp. 46–55, 1998.
+
+

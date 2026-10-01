@@ -1,0 +1,468 @@
+Task-Space Clustering for Mobile Manipulator Task Sequencing
+Quang-Nam Nguyen1, Nicholas Adrian2, and Quang-Cuong Pham1,2,3
+
+arXiv:2305.17345v1 [cs.RO] 27 May 2023
+
+Abstract— Mobile manipulators have gained attention for the potential in performing large-scale tasks which are beyond the reach of fixed-base manipulators. The Robotic Task Sequencing Problem for mobile manipulators often requires optimizing the motion sequence of the robot to visit multiple targets while reducing the number of base placements. A two-step approach to this problem is clustering the task-space into clusters of targets before sequencing the robot motion. In this paper, we propose a task-space clustering method which formulates the clustering step as a Set Cover Problem using bipartite graph and reachability analysis, then solves it to obtain the minimum number of target clusters with corresponding base placements. We demonstrated the practical usage of our method in a mobile drilling experiment containing hundreds of targets. Multiple simulations were conducted to benchmark the algorithm and also showed that our proposed method found, in practical time, better solutions than the existing state-of-the-art methods.
+I. INTRODUCTION
+In many robotic applications, a manipulator is required to perform multiple repetitive tasks such as drilling, spotwelding, inspection scanning, picking and placing, etc. These tasks often involve visiting numerous targets in the workspace. The problem of optimizing the robot motion sequence to visit multiple targets is called the Robotic Task Sequencing Problem (RTSP) [1], [2].
+A mobile manipulator is often formed by mounting a manipulator, such as a robotic arm, on a mobile base, which helps extend the workspace of the manipulator [3], [4]. In mobile manipulation tasks, the targets are often distributed in a large workspace that is beyond the reach of fixed-base manipulators, such as drilling on both sides of a workpiece as shown in Fig. 1, picking and placing [4], surface inspection [5], concrete 3D printing [6], etc.
+Mobile Manipulator RTSP has extra complexities due to the added degrees-of-freedom (DOFs) from the mobile base. Moreover, minimizing the number of base placements often has higher priority over the arm motion because of the higher localization uncertainty of the mobile base, especially during accelerating from and to a placement. Therefore, we propose solving the Mobile Manipulator RTSP in 2 steps:
+• Task-space clustering: dividing all targets into a minimum number of clusters to cover the whole workspace.
+• Task sequencing: finding the optimal motion sequence for the robot to visit all targets in the shortest path.
+Our main contribution in this paper is a task-space clustering method to divide all targets into a minimum number
+1Singapore Centre for 3D Printing (SC3DP), Nanyang Technological University (NTU), Singapore nam.ngquang@gmail.com
+2HP-NTU Digital Manufacturing Corporate Lab, Nanyang Technological University (NTU), Singapore
+3Eureka Robotics, Singapore
+
+(a) Simulation environment.
+
+(b) Experimental setup.
+
+Fig. 1: A mobile drilling task containing 336 targets with polar angles between [110◦, 150◦] and azimuthal angles between [−37◦, 37◦] (for 288 front targets) and [168◦, 192◦] (for
+48 back targets), on both sides of a 1m-long workpiece.
+
+of clusters, for each of which there is a base pose where the manipulator can reach all the inside targets. The key of our method is the formulation of a Set Cover Problem (SCP) by constructing a bipartite graph (bigraph) between task-space targets and floor points using reachability analysis. The method has been integrated with task sequencing in a planning algorithm used for a mobile drilling experiment.
+The remainder of this paper is organized as follows. In the next section, we discuss related works in solving RTSP for fixed-base and mobile manipulators. In section III, we describe the task and introduce the pipeline of our method which will be discussed in more details in sections IV, V. In section VI, we present the experimental results, benchmarking, and comparison with existing methods.
+II. RELATED WORKS
+Several works have been done on solving RTSP for fixedbase robots. A recent survey can be found in [7]. To the best of our understanding, two of the fastest near-optimal RTSP solvers are RoboTSP [1] and Cluster-RTSP [2] which use different approaches. They reported the planning time of few minutes for a drilling task with hundreds of targets.
+RTSP has also been solved for mobile manipulators such as in [8] where authors conducted a search on 10-DOF configuration-space (C-space) to minimize overall configuration displacement based on genetic algorithms. An approach to extend the usage of RTSP solvers for mobile manipulators is finding optimal base placements around the workspace based on robot’s reachability or manipulability without targets’ information, but these placements may not be optimal for every task. In [9], reachability map was introduced as a 3D workspace representation that represents the reachability probability of points in task-space. The reachability map was
+
+then used in [10] to find robot placements for a constrained linear trajectory and was extended for 3D trajectories in [11]. In [12], extended manipulability measure is used as precomputed workspace representation instead of reachability. In [13], robot placements to reach a target with probabilities can be found using Inverse Reachability Distribution.
+Some works have also attempted to solve the Mobile Manipulator RTSP using the 2-step approach: clustering the workspace before sequencing. In [4], a mobile manipulator performed picking multiple objects from multiple trays. The problem of finding minimum base placements to visit these trays was formulated as the 0-1 knapsack problem and solved in 139 seconds for 22 trays. However, the initial clusters like the trays are usually not available in other cases. Meanwhile, our method focuses on tasks with more general settings where only the position and orientation of the targets are given. In [5], a mobile manipulator performed inspection scanning with a camera attached to its end-effector. The authors proposed finding reachable targets for each point on the floor then using a search-based algorithm to find the optimal base sequence, and reported that their method produces better results than other existing methods. In contrast, our method finds reachable floor points for each target and formulates the problem of finding optimal base poses as a Set Cover Problem which can be solved by near-optimal solvers.
+
+III. METHODOLOGY OVERVIEW
+
+A. Task description
+
+1) Targets: We focus on 5-dimensional targets (3D position and 2D orientation) such as in drilling, milling, welding tasks. Consider a 5D target, we use the Cartesian coordinate system to locate the position of the target while the orientation is represented by a unit vector in the spherical coordinate system. A set of 5D targets is given in world frame as:
+
+T = {t1, . . . , tn}, ti = (xti, yti, zti, θ ti , φ ti )
+
+(1)
+
+where θti and φti denote polar angle and azimuthal angle, respectively, of the target’s orientation vector in the spherical coordinate system. Since the 6th dimension, such as rotation
+about the drilling direction, is irrelevant, one can set specific
+values for it as tuning parameters, similarly to [1]. 2) Floor points: The 2D floor where the mobile base is
+moving on can be discretized into a grid of discrete points:
+
+F = {f1, . . . , fm}, f j = (x jf , y jf ), (2)
+
+Remark 3.1 (Feasible tasks): When the mobile base is placed at position f j on the floor with free orientation, there is a set S j of targets that the manipulator can reach. A task is feasible if the union of these sets equals the set of all targets:
+
+Sj = T
+
+(3)
+
+j=1,...,m
+3) Problem definition: The goal of RTSP is to find the
+
+optimal sequence of robot configurations to visit all targets
+
+subjected to a certain optimization objective such as motion
+
+time [7]. Finding the optimal motion time depends on
+
+solving for joint velocity and acceleration constraints, which
+
+is difficult to find in practical time for substantial target count. Instead, it will be more tractable to optimize for shortest configuration path as optimization objective. Beyond that, as we are solving the Mobile Manipulator RTSP, we also prioritize minimizing the number of base placements because of higher localization uncertainty of the mobile base compared to the robotic arm.
+
+B. Proposed method
+To solve the Mobile Manipulator RTSP, we follow a 2-step approach: clustering the targets in task-space into a minimum number of clusters while simultaneously determining the corresponding base poses to reach targets in each cluster, then sequencing the robot configurations to visit every target while optimizing the total length of the configuration path.
+We propose the task-space clustering as follows (Fig. 2): 1) Reachability analysis: Generate and analyse the kinematic reachability of the robot to find a geometric reachable region inside which every point is reachable (Fig. 3). 2) Bigraph connection: We formulate the task-space clustering as a Set Cover Problem [14], [15] using a bigraph which connects elements of the set of targets T with the set of floor points F based on the previous reachability analysis. 3) Cluster assignment: Solve the SCP for the minimum number of clusters needed to cover all targets and the corresponding base poses to visit them. For the task sequencing step, we implement RoboTSP [1] with some modifications: optimizing Euclidean distance of the base and manipulator paths in task-space, then optimizing C-space path length. Details of these clustering and sequencing methods are discussed in sections IV and V.
+
+IV. TASK-SPACE CLUSTERING
+The purpose of our task-space clustering method is to find the minimum number of base poses where the robot can reach all targets in the corresponding clusters which cover every target in the task-space. We propose formulating this clustering problem as a uniform-cost SCP [14] as follows:
+Definition 4.1 (Uniform-cost SCP): A uniform-cost SCP consists of a set U = {u1, . . . , un} often called the universe and a collection S = {s1, . . . , sm} of subsets of U, that is s j ⊂ U ∀ j. The union of these sets must be equal to U:
+
+sj =U
+
+(4)
+
+j=1,...,m
+
+The optimization problem is to find the minimum subcollection C ⊂ S that still covers all elements of U.
+The universe U and collection S in our robotic case are:
+• The universe: U = {u1, . . . , un} is the set of indices ui = i of targets in T = {t1, . . . , tn} which was defined in (1).
+• Each set s j contains the indices of targets that are reachable when the robot is placed at point f j on the floor F = {f1, . . . , fm} which was defined in (2).
+We propose a fast method to construct the collection S of reachable sets S = {s1, . . . , sm} by an inverse approach: for each target, find reachable floor points where robot can reach the target, based on reachability analysis. The condition (4) is equivalent to the condition of feasible task (Remark 3.1).
+
+(a) A bigraph connecting sets T and F.
+
+(b) Horizontal plane at z = zti.
+
+(c) Horizontal plane at z = 0.
+
+(d) Reachable floor points.
+
+(e) Clusters of targets with corresponding base poses.
+
+Fig. 2: The pipeline of our task-space clustering method. (a) Bigraph whose edges connect vertices between set T of targets and set F of floor points. (b) Target i is reachable by the robot placed at point (x jf , y jf ) on the floor if it is inside a cross-section of the geometric reachable region with the z = zti plane. (c) Inversely, target i is kept inside this reachable cross-section if the base is placed inside a respective 2D region on the floor. (d) Example of reachable floor points for some targets at different
+locations. (e) The minimum set of target clusters with corresponding base poses is found by solving a uniform-cost SCP.
+
+A. Reachability analysis
+The purpose of this step is to define a reachable region relative to the robot which meets two requirements: the robot can reach any point in this region within a specified range of orientations, and it has a simple geometric shape.
+To fulfil the first requirement, we construct a reachability database which involves discretizing the Cartesian space relative to the robot into 3D voxels. For each voxel position, we perform Inverse Kinematics (IK) and record all valid voxels at which IK solutions exist for all sampling orientations within a specified range as follows:
+• Sampling polar angles: specify a range that bounds the polar angles of all targets, and discretize it into Nsam sampling polar angles: θ sam 1 , θ sam 2 , . . . , θ sam Nsam . We take Nsam = 10 values from [110◦, 150◦] for our test case. If the polar range is wider, divide it into smaller ranges.
+• Sampling azimuthal angles: for reachability database generation, set the sampling azimuthal angle φ sam = 0.
+Figure 3a illustrates the cloud of valid voxels after the database generation. Note that a reachability database can be used for tasks with targets having polar angles within the sampling polar range, while the azimuthal angles can have any values, based on the following observation and setting:
+
+Firstly, we define the robot frame having its z′-axis along
+the rotational axis of the first joint which is parallel to the “up” direction with z′ = 0 at the floor level, while the x′-axis and y′-axis are parallel to the “front” and “left” directions of
+the robot, respectively. This is because the axis of the first
+joint is usually vertical after mounted onto the mobile base.
+Secondly, for reachability database generation, we restrict
+the range of the manipulator’s first joint to, for example, [− jres 1 , jres 1 ] = [−90◦, 90◦] which is narrower than our robot’s hardware limit of [− jlim 1 , jlim 1 ] = [−170◦, 170◦], since we are only interested in the space in front of the robot. This setting enables rotating the reachable region about the z′-axis by
+rotating the first joint instead of rotating the mobile base,
+subjected to a reachable azimuthal width per base pose:
+
+∆φmax = 2 × ( j1lim − jres 1 )
+
+(5)
+
+To fulfil the second requirement, we find a geometric shape
+that fits inside the raw valid voxel cloud, as follows: 1) Step 1: Manually specify a region by 3 limit planes:
+• 2 horizontal planes that bound the z-range of the targets: Zmin ≤ z′ ≤ Zmax with Zmin ≤ min zti, Zmax ≥ max zti.
+• 1 vertical plane to keep a safe distance from the robot to avoid potential collisions: x′ ≥ Xmin
+
+(a) Reachability database. (b) Geometric reachable region.
+Fig. 3: (a) Reachability database: all voxels between the green surfaces are reachable. (b) Geometric reachable region: 3 limit planes and 2 limit spherical surfaces are determined.
+
+2) Step 2: Define 2 limit spherical surfaces having the same centre at a position (Xs, 0, Zs) relative the robot:
+
+sam
+Xs = l sin θ Zs = z j2′ + l cos θ sam (6)
+
+where θ sam is the average value of the sampling polar angles, l is the end-effector’s length (in our case it is calculated from the second-last joint to the end-effector’s tip), and z′j2 is the z′-coordinate of the second joint. This is because when no end-effector is attached, the reachable region often has a near-spherical shape centred at the average location of the second joint [16], that is (x′j2, y′j2, z′j2) = (0, 0, z′j2). Note that the z′-axis was set along the first joint’s rotational axis.
+3) Step 3: We compute the minimum and maximum radii Rmin, Rmax corresponding to 2 limit spherical surfaces such that all voxels inside a closed region formed by 2 limit spherical surfaces and 3 limit planes are valid voxels (see Fig. 3b). This geometric reachable region is defined by:
+
+Zmin ≤ z′ ≤ Zmax
+
+x′ ≥ Xmin
+
+(7)
+
+Rmin ≤ (x′ − Xs)2 + y′2 + (z′ − Zs)2 ≤ Rmax
+
+In our test case: Xmin = 0.40m, Zmin = 0.40m, Zmax = 1.20m,
+Xs = 0.22m, Zs = 0.64m, Rmin = 0.51m, Rmax = 0.84m.
+Remark 4.1 (Checking reachable targets): In case the target’s azimuthal angle is φti = 0, this target is reachable if its position is inside the geometric reachable region of robot, i.e. all conditions in (7) are satisfied. In case φti̸ = 0, one can rotate the geometric reachable region by φti about the z′-axis.
+
+B. Bigraph connection
+To construct the reachable sets s1, . . . , sm that connect the elements of T with elements of F, the direct approach is to place the robot at point f j on the floor and record to s j the indices of targets such that at least one IK solution is found to reach them. However, solving IK in n × m iterations is timeconsuming for numerous targets. A faster way of finding reachable targets for each floor point is using Remark 4.1 which also requires n × m iterations.
+
+An inverse approach is using the Inverse Reachability
+
+Distribution as in [13] or similarly in [5], [16] to find
+
+reachable base placements for each target. However, for
+
+multiple targets, this approach may require matching the
+
+inverted voxels to the grid points on the floor for every target.
+
+We propose another inverse approach which requires n fast
+
+iterations: based on the geometric reachable region defined
+
+in (7), find reachable floor points for each target as follows.
+
+Consider a target ti = (xti, yti, zti, θit , φit ), the robot placed
+
+at floor point f j = (x jf , y jf ) with orientation ϕ j ∈ [φit −
+
+∆φmax/2, φti + ∆φmax/2] can rotate its geometric reachable
+
+region by (φit − ϕ j) to check whether it can reach target
+
+i.
+
+Substituting
+
+x′
+
+=
+
+(xti
+
+−
+
+x
+
+f j
+
+)
+
+cos
+
+φ
+
+t i
+
++
+
+(yti
+
+−
+
+y
+
+f j
+
+)
+
+sin
+
+φ ti
+
+,
+
+y′ =
+
+(yti
+
+−
+
+y
+
+f j
+
+)
+
+cos
+
+φ ti
+
+−
+
+(xti
+
+−
+
+x
+
+f j
+
+)
+
+sin
+
+φ ti
+
+,
+
+z′ = zti
+
+into
+
+(7),
+
+we
+
+get:
+
+(xti − x jf ) cos φit + (yti − y jf ) sin φit ≥ Xmin (xti − x jf − Xs cos φit )2 + (yti − y jf − Xs sin φit )2 ≥ rmin 2 (xti − x jf − Xs cos φit )2 + (yti − y jf − Xs sin φit )2 ≤ rmax 2
+(8) rmax = R2max − (zti − Zs)2
+
+rmin =
+
+0,
+
+if
+
+(zti
+
+− Zs)2
+
+>
+
+R2
+min
+
+R2
+min
+
+−
+
+(zti
+
+−
+
+Zs
+
+)2
+
+,
+
+otherwise
+
+Note that the first line in (7) becomes Zmin ≤ zti ≤ Zmax which is always satisfied by the definition of Zmin, Zmax.
+We use (8) to find all reachable floor points (x jf , y jf ) for each target (see Fig. 2b,c), which takes n iterations. From
+n obtained sets of reachable floor points, we can easily
+construct m sets of indices of reachable targets for every
+floor point: S = {s1, . . . , sm}. Thus, two sets T and F in the bigraph are connected, and the uniform-cost SCP is obtained.
+
+C. Cluster assignment
+
+Although the optimization problem of SCP is NP-complete [14], [15], there are many heuristic methods to find nearoptimal solutions to SCP in polynomial time (see VI.B). We solve the SCP obtained above to get the minimum number of reachable floor points, called chosen floor points, with the corresponding chosen sets of indices of reachable targets.
+Since the range of azimuthal angles in some chosen sets may be wider than the reachable azimuthal width per base pose ∆φmax defined in (5), clusters are assigned as follows:
+• For each chosen set sk, sort its elements by their azimuthal angles, then the width of azimuthal range is:
+
+∆φks = 2π − max(∆φit )
+
+(9)
+
+i∈sk
+
+where ∆φit is the azimuthal difference from target i to
+
+the
+
+next
+
+sorted
+
+target
+
+(except
+
+∆φ tlast
+
+=
+
+2π
+
++φ
+
+t f
+
+irst
+
+− φ tlast
+
+).
+
+• If a chosen set sk satisfies ∆φ sk ≤ ∆φmax, assign its
+
+elements into a cluster Cj = sk and set the corresponding base position at (xbj , ybj ) = (xkf , ykf ) with base orientation ϕbj at the middle of sk’s azimuthal range (see Fig. 4).
+
+• Update other chosen sets, then repeat two steps above.
+
+• Split an unsatisfied chosen set into smaller sets satisfying ∆φ sk,new ≤ ∆φmax, then repeat the previous steps.
+
+Fig. 4: An example of azimuthal angles in a set sk, how to calculate azimuthal range and choose the base orientation.
+
+(a) Visit the 1st cluster.
+
+(b) Visit the 2nd cluster.
+
+Let p be the number of the clusters obtained from above, then the clusters and their corresponding base poses are:
+C = {C1, . . . ,Cp} B = {b1, . . . , bp}, b j = (x jb, y jb, ϕ jb) (10)
+
+V. TASK SEQUENCING
+This task sequencing step aims to optimize the configuration path of the robot to visit all targets, which is related to the General Travelling Salesman Problem (GTSP) [1]. Since finding the exact solution for a large-size GTSP is inapplicable in practice, we reduce the planning time by breaking it down into finding the target sequence that optimizes the Euclidean distance of the end-effector followed by optimizing the configuration path. To do so, we adopted the RoboTSP algorithm [1] with several modifications:
+1) Finding base sequence: Find the optimal sequence of base poses seq(b(p + 2)) that minimizes the length of the base pose tour which starts from the home pose bhome, travels through all p base poses, and back to bhome. The sequence is found as a solution to the Travelling Salesman Problem (TSP). For TSP solver, we use the 2-Opt algorithm [17] as it yields high-quality solutions in low computation time [1].
+2) Finding target sequence: Find the length-optimal target sequence seq(t(n + 2)) in task-space given seq(b(p + 2)). The tour starts from a home end-effector’s pose thome, visits n targets t1, . . . , tn, and back to thome. We propose solving a TSP on all targets while respecting the base sequence by virtually separating the clusters by a distance h larger than the longest distance between targets in any cluster:
+
+h = hscale · max { max {∥ri − r j∥}}
+
+(11)
+
+1≤k≤p i, j∈Ck
+
+where ri = (xti, yti, zti) is the position of target i, and hscale ≥ 1 is a tuning parameter (hscale = 1 in our experiments).
+In comparison with finding length-optimal target sequence
+
+for each cluster individually, our approach minimizes the
+
+total task-space path length of the end-effector including
+
+transitions between clusters. In terms of motion time, we
+
+have noticed that the former has higher time-optimality when
+
+the clusters are far apart while the latter produces faster paths
+
+when clusters are closer. We prefer the latter approach since
+
+a long-distance movement of the manipulator during base
+
+transitions leads to a large shift of the centre of gravity which
+
+may cause wheel’s slip contributing to localization errors.
+
+(c) Visit the 3rd cluster.
+
+(d) Visit the 4th cluster.
+
+Fig. 5: Real experiment of the mobile drilling task in Fig. 1.
+
+3) Finding configuration sequence: Similar to RoboTSP [1], we construct an undirected graph of n + 2 layers following the sequence seq(t(n + 2)). Each layer in [2, n + 1] contains nodes representing IK solutions to reach a target, while the start and end layers represent home configuration. The shortest configuration path is found using a graph search.
+Finally, based on the base pose tour and manipulator configuration sequence, we can compute fast collision-free Cspace trajectories using classical motion planning algorithms such as RRT-Connect with post-processing [18], [19].
+VI. EXPERIMENTS
+A. Real experiment
+We implemented our method in a task and motion planning algorithm for a mobile drilling task containing 336 targets with a wide range of locations and orientations (Fig. 1). Our mobile manipulator consists of DENSO VS-087 6-DOF manipulator mounted on Clearpath Ridgeback 3-DOF omnidirectional mobile base. An OpenRAVE simulation environment [20] was used to mimic and solve the task, using LRg solver, 0.10m floor grid size, and 0.05m voxel size (explained in VI.B). Our algorithm found 4 clusters with 4 corresponding base poses (Fig. 2e, 5), motion sequence and collisionfree trajectories to visit all targets, in 100 seconds. The total motion time was 414 seconds. The experiment is shown in an accompanying video (https://youtu.be/Vopupf81hYo).
+B. Benchmarking
+We benchmarked the key elements of our proposed algorithm in a mobile drilling task similar to Fig. 1, with a wider azimuthal range of [−46◦, 46◦] (front) and [152◦, 208◦] (back), in OpenRAVE simulations. All simulations were performed on CPU AMD® Ryzen 9 running Ubuntu 18.04.
+1) Benchmarking online processes: Since the sequencing method is based on RoboTSP which was benchmarked in [1], here we only evaluate the clustering method in more details.
+
+TABLE I: Benchmarking reachability database generation.
+
+Voxel size (m) 0.04 0.05 0.07 0.10
+
+Number of voxels 74004 40204 15902 6332
+
+Computation time (s) 1765.2 943.5 366.6 126.1
+
+(a) Floor grid size: 0.10m.
+
+(b) Number of targets: 336.
+
+(c) Floor grid size: 0.10m.
+
+(d) Number of targets: 336.
+
+Fig. 6: Benchmarking the clustering process.
+
+Fig. 7: Planning time breakdown.
+The benchmarking parameters include the number of targets, grid size of the floor, and SCP solvers such as:
+• Greedy: at each iteration, choose the set with the highest number of uncovered elements [14], [21].
+• Linear Programming relaxation and rounding (LPr): formulate SCP as Integer Program (IP) and relax it into Linear Program, then apply deterministic rounding [14].
+• Lagrangian Relaxation and greedy (LRg): we implemented the SetCoverPy algorithm [21] which relaxes the IP by adding a Lagrange multiplier vector to the cost function, and combines with greedy algorithm. The author of [21] reported 99% optimality on their tests.
+The evaluation metrics are the SCP solution (number of clusters found) and computation time. The benchmarking results are shown in Fig. 6. In most cases, LRg solver found the best solution and consumed longer but acceptable computation time. We used LRg solver, set grid size at 0.10m, and recorded the computation time spent on different steps of the task and motion planning algorithm in Fig. 7.
+2) Benchmarking offline process: We consider the reachability database generation as an offline process since it can be reused for tasks with target orientations within the sampling polar angle range, using the same robot. The computation time for different voxel size values is shown in Table I.
+
+C. Comparison
+To the best of our understanding, there is no open-source algorithm that can solve our experiment and benchmark tasks where targets have a wide range of orientations. Therefore, in this subsection, we consider only 264 targets on one side of the workpiece with 110◦ ≤ θti ≤ 150◦, φti = 0 ∀i. We compare our algorithm with two state-of-the-art RTSP solvers:
+• Baseline 1: RoboTSP extended with sphere-clustering. Since RoboTSP [1] is designed for fixed-base robots, we add a clustering step which clusters the targets into spheres that fit inside the cloud of valid voxels. This sphere-clustering is then solved using greedy colouring of connected sequential breadth-first search variant [22].
+• Baseline 2: Cluster-RTSP algorithm proposed in [2]. The comparison results are shown in Table II. In this test case, our method appeared to be the fastest solver while produced the minimum number of base poses and shorter motion time as compared to two baseline methods. The simulations are shown in the accompanying video.
+TABLE II: Comparison with existing methods
+
+Algorithm Our method Baseline 1 Baseline 2
+
+Base poses 2 8 70
+
+Planning time (s) 49.7 51.8 368.1
+
+Motion time (s) 225.4 265.0 323.5
+
+VII. CONCLUSION
+In this paper, we have proposed a fast, near-optimal taskspace clustering method for solving the Mobile Manipulator RTSP. In a mobile drilling task where 336 targets were distributed on the surface of a workpiece and had a wide range of orientations, our algorithm divided all targets into 4 clusters with 4 corresponding base poses to reach them, then found length-optimal configuration sequence and collisionfree trajectories to visit every target, in 100 seconds. This method can be used in practical applications such as drilling, spot-welding, surface finishing, inspection scanning, picking and placing, etc. Our future directions include extending the proposed method for mobile manipulators with the base moving in 3D space such as in gantry systems, and developing a clustering method for continuous tasks such as 3D printing.
+ACKNOWLEDGMENT
+This research was supported by the National Research Foundation, Prime Minister’s Office, Singapore under its Medium-Sized Centre funding scheme, CES SDC Pte Ltd, Sembcorp Architects & Engineers Pte Ltd, and Chip Eng Seng Construction Ltd.
+
+REFERENCES
+[1] F. Sua´rez-Ruiz, T. S. Lembono, and Q.-C. Pham, “Robotsp - a fast solution to the robotic task sequencing problem,” in 2018 IEEE International Conference on Robotics and Automation (ICRA). IEEE, 2018, pp. 1611–1616.
+[2] C. Wong, C. Mineo, E. Yang, X.-T. Yan, and D. Gu, “A novel clustering-based algorithm for solving spatially constrained robotic task sequencing problems,” IEEE/ASME Transactions on Mechatronics, vol. 26, no. 5, pp. 2294–2305, 2020.
+[3] S. Vafadar, A. Olabi, and M. S. Panahi, “Optimal motion planning of mobile manipulators with minimum number of platform movements,” in 2018 IEEE International Conference on Industrial Technology (ICIT). IEEE, 2018, pp. 262–267.
+[4] J. Xu, Y. Domae, T. Ueshiba, W. Wan, and K. Harada, “Planning a minimum sequence of positions for picking parts from multiple trays using a mobile manipulator,” IEEE Access, vol. 9, pp. 165 526– 165 541, 2021.
+[5] R. Malhan and S. K. Gupta, “Finding optimal sequence of mobile manipulator placements for automated coverage planning of large complex parts,” in Proceedings of the ASME 2021 International Design Engineering Technical Conferences (IDETC), 2022.
+[6] M. E. Tiryaki, X. Zhang, and Q.-C. Pham, “Printing-while-moving: a new paradigm for large-scale robotic 3d printing,” in 2019 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS). IEEE, 2019, pp. 2286–2291.
+[7] S. Alatartsev, S. Stellmacher, and F. Ortmeier, “Robotic task sequencing problem: A survey,” Journal of intelligent & robotic systems, vol. 80, no. 2, pp. 279–298, 2015.
+[8] P. T. Zacharia and N. Aspragathos, “Optimal robot task scheduling based on genetic algorithms,” Robotics and Computer-Integrated Manufacturing, vol. 21, no. 1, pp. 67–79, 2005.
+[9] F. Zacharias, C. Borst, and G. Hirzinger, “Capturing robot workspace structure: representing robot capabilities,” in 2007 IEEE/RSJ International Conference on Intelligent Robots and Systems. Ieee, 2007, pp. 3229–3236.
+[10] F. Zacharias, C. Borst, M. Beetz, and G. Hirzinger, “Positioning mobile manipulators to perform constrained linear trajectories,” in
+
+2008 IEEE/RSJ International Conference on Intelligent Robots and Systems. IEEE, 2008, pp. 2578–2584. [11] F. Zacharias, W. Sepp, C. Borst, and G. Hirzinger, “Using a model of the reachable workspace to position mobile manipulators for 3d trajectories,” in 2009 9th IEEE-RAS International Conference on Humanoid Robots. IEEE, 2009, pp. 55–61. [12] N. Vahrenkamp, T. Asfour, G. Metta, G. Sandini, and R. Dillmann, “Manipulability analysis,” in 2012 12th ieee-ras international conference on humanoid robots (humanoids 2012). IEEE, 2012, pp. 568–573. [13] N. Vahrenkamp, T. Asfour, and R. Dillmann, “Robot placement based on reachability inversion,” in 2013 IEEE International Conference on Robotics and Automation. IEEE, 2013, pp. 1970–1975. [14] D. P. Williamson and D. B. Shmoys, The design of approximation algorithms. Cambridge university press, 2011. [15] P. K. Agarwal and J. Pan, “Near-linear algorithms for geometric hitting sets and set covers,” in Proceedings of the thirtieth annual symposium on Computational geometry, 2014, pp. 271–279. [16] O. Porges, T. Stouraitis, C. Borst, and M. A. Roa, “Reachability and capability analysis for manipulation tasks,” in ROBOT2013: First Iberian Robotics Conference: Advances in Robotics, Vol. 2. Springer, 2014, pp. 703–718. [17] D. L. Applegate, R. E. Bixby, V. Chva´tal, and W. J. Cook, The traveling salesman problem: A Computational Study. Princeton university press, 2011. [18] J. J. Kuffner and S. M. LaValle, “Rrt-connect: An efficient approach to single-query path planning,” in Proceedings 2000 ICRA. Millennium Conference. IEEE International Conference on Robotics and Automation. Symposia Proceedings (Cat. No. 00CH37065), vol. 2. IEEE, 2000, pp. 995–1001. [19] Q.-C. Pham, “Trajectory planning,” Handbook of Manufacturing Engineering and Technology, pp. 1873–1887, 2015. [20] R. Diankov, “Automated construction of robotic manipulation programs,” Ph.D. dissertation, University of Tokyo, 2010. [21] G. Zhu, “A new view of classification in astronomy with the archetype technique: An astronomical case of the np-complete set cover problem,” arXiv preprint arXiv:1606.07156, 2016. [22] A. Kosowski and K. Manuszewski, “Classical coloring of graphs,” Contemporary Mathematics, vol. 352, pp. 1–20, 2004.
+
+

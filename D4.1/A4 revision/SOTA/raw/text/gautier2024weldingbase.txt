@@ -1,0 +1,404 @@
+COMPARISON OF ROBOT MORPHOLOGIES AND BASE POSITIONING FOR WELDING APPLICATIONS
+Nicolas Gautier 1,2, Yves Guillermit 1, Yazid Sebsadji 1, Mathieu Porez 2, Damien Chablat 2,∗ 1Weez-U Welding, 101 rue de Coulmiers, 44 000 Nantes, France
+2Nantes Université, École Centrale Nantes, CNRS, LS2N, UMR 6004, 1 rue de la Noe, 44321 Nantes, France
+
+arXiv:2407.05720v1 [cs.RO] 8 Jul 2024
+
+ABSTRACT
+This article undertakes a comprehensive examination of two distinct robot morphologies: the PUMA-type arm (Programmable Universal Machine for Assembly) and the UR-type robot (Universal Robots). The primary aim of this comparative analysis is to assess their respective performances within the specialized domain of welding, focusing on predefined industrial application scenarios. These scenarios encompass a range of geometrical components earmarked for welding, along with specified welding paths, spatial constraints, and welding methodologies reflective of real-world scenarios encountered by manual welders. The case studies presented in this research serve as illustrative examples of Weez-U Welding practices, providing insights into the practical implications of employing different robot morphologies. Moreover, this study distinguishes between various base positions for the robot, thereby aiding welders in selecting the optimal base placement aligned with their specific welding objectives. By offering such insights, this research facilitates the selection of the most suitable architecture for this particular range of trajectories, thus optimizing welding efficiency and effectiveness. A departure from conventional methodologies, this study goes beyond merely considering singularities and also delves into the analysis of collisions between the robot and its environment, contingent upon the robot’s posture. This holistic approach offers a more nuanced understanding of the challenges and considerations inherent in deploying robotic welding systems, providing valuable insights for practitioners and researchers alike in the field of robotic welding technology.
+Keywords: Welding application, serial robot, trajectory planning, simulation
+1. INTRODUCTION
+Robots have become integral components in various industries, offering versatile solutions to complex tasks ranging from manufacturing and logistics to healthcare and beyond [1]. However, selecting the most suitable robot architecture remains a critical decision, influencing factors such as performance, flexibility, and adaptability to specific applications [2]. In this article,
+∗Corresponding author: Damien.Chablat@cnrs.fr
+
+we present a systematic process for comparing robot architectures in the context of welding tasks in making informed design choices such as those faced by the French company Weez-U Welding when designing its innovative teleoperated robotic solutions to optimize their performances to their custumer’s applications. Currently, many performance indicators are used to characterize the performance of robots, such as the determinants, the condition number, or the dexterity [3]. However, even methods allowing the normalization of the Jacobian matrix with the characteristic length do not always reach consensus in the robotics community [4]. Indeed, these criteria are often different from the criteria used by engineers to design a robot, for example, in selecting motors, gears, or drivers. However, a robot by its definition is not designed to perform a single trajectory [5], as its main property is its ability to execute families of trajectories [3, 6]. This article revisits new design criteria by integrating the welding workspace and considering collisions in the selection of robots for which we designed a specific simulation environment under ROS2 [7].
+After a brief introduction, we will provide an overview of the study’s context for welding robotics and the company that will utilize the chosen robot. Next, the robot architectures along with their dimensions will be presented, including the welding torches. The case studies will then be introduced, outlining the positions of the robots within their respective environments. Finally, the results will be presented based on the case studies. A conclusion will close this article.
+2. WELDING PROCESS
+Since 2019, Weez-U Welding has offered teleoperation solutions that promote collaboration between welders and robots. These solutions combine the precision and reliability of a robot handling the torch (the welding tool) with the adaptability and intelligence of human control. By doing this, the company aims to eliminate the dangerous and arduous aspects of welding, while also strengthening the profession’s attractiveness, which is facing recruitment difficulties [8].
+2.1 Welding Torch Positioning Parameters The welding process involves localized melting of the parts
+to be joined using an intense heat source [9]. One of the crucial
+
+1
+
+FIGURE 1: WELDING TORCH POSITION AND ORIENTATION PARAMETERS.
+steps to ensure a quality weld is to maintain an appropriate position of the welding torch along the entire trajectory. Incorrect positioning of the torch can compromise the quality of the weld bead: uneven heat distribution that can lead to cracks, undercuts, or pores in the weld, improper material deposition that can result in adhesion and weld strength issues, etc. Therefore, it is crucial to consider the robot’s ability to maintain a precise and stable torch position to ensure optimal welding results. There are different values of torch positions and orientations depending on the applications, technologies used, type and thickness of the materials to be welded, etc.
+• The torch tilt angle (see Figure 1) which varies depending on the thickness of the parts but is usually between 40° and 50° for fillet weld (two perpendicular parts, see Figure 1).
+• The drag angle (see Figure 1) also varies depending on the processes and applications, usually ranging from -10° (pull) to +15° (push).
+• In MIG/MAG processes, a normal stick-out distance (distance between the contact tube outlet and the workpiece see Figure 1) is typically 10 to 15 times the electrode (wire) diameter, wire diameters are generally found between 0.6 mm and 1.6 mm.
+In this study, we will use the following set of generic parameters: 45° tilt angle (for plates with the same thickness), +7° drag angle (medium angle for aluminum welding ), and a 15 mm stick-out distance (medium distance for a 1.2mm diameter wire). The drag angle may not be maintained at the end of a corner, a transition phase may be performed over a maximum distance of 20 cm. These parameters were chosen based on the authors’ previous experiences and feedback from their clients’ applications.
+Weez-U Welding’s solution also focuses on real-time control of the welding process. The welder uses a remote controller to minimize exposure to toxic fumes, metal spatters, and radiation from the electric arc. A camera mounted on the torch allows the welder to see the weld in real-time. However, for optimal torch positioning and clear visibility of the weld pool, the camera needs to be aligned with the welding axis (ideally in front of the weld pool). This adds another constraint to the torch’s orientation
+
+FIGURE 2: CLASSIC MORPHOLOGIES OF 6-AXIS ROBOTIC ARMS.
+2.2 Welding Trajectories There are different types of welding trajectories, each adapted
+to specific needs in terms of shape, size, and weld quality [9]. The linear trajectory is one of the most common, used for straight welds horizontally or vertically. Circular trajectories are used for welding around cylindrical parts such as pipes. Weaving trajectories are often used for long welds and exhibit significant variations. Finally, other more complex trajectories may be used to address specific shapes that require a unique approach, such as a tubular connection formed by the intersection of two cylindrical parts. In terms of trajectory speed, a manual welder welds between 15 and 90 cm/min (2.5 mm/s to 15 mm/s).
+In this study, we will only deal with linear and circular trajectories. All simulations will be carried out at the most critical speed of 90 cm/min. In cases where the limits of joint speed are exceeded, we will indicate the recommended maximum Cartesian speed (with a 20% margin).
+2.3 Welding Workspace The targeted domains and markets of Weez-U Welding cor-
+respond to construction-type applications: i.e. transportation, construction, energy, etc. These workspaces are characterized by constrained environments where accessibility and mobility are limited. The robot considered in the following will be a lightweight arm that can be manually moved to the welding areas. Therefore, we will consider multiple base mounting positions for the robot.
+3. MORPHOLOGY OF THE STUDIED ROBOTS 3.1 Choice of Morphologies to Study
+A study on around thirty commercially available 6-axis collaborative robots highlighted the predominance of three morphology types: anthropomorphic morphology (PUMA-like, Figure 2a), anthropomorphic with a wrist offset (Figure 2b), and with 3 parallel axes (UR-like, Figure 2c). The works of D. Salunkhe (see [10]) have shown that the second morphology presented constraints and peculiarities that made it less relevant for collaborative applications at the moment. Therefore, for this work, we decided to focus on comparing the other two morphologies. Figure 3 illustrates the 3D models of the two morphologies used in the simulations. Throughout the document, the notation 𝐿arm will refer to the lengths described in Figure 3, corresponding respectively to 735 mm for the UR-like morphology and 793 mm for the PUMA-like arm. The segment lengths presented are the result of an internal study aimed at maximizing arm reach while
+
+2
+
+(a) PUMA-like arm.
+
+FIGURE 3: 3D MODELS OF THE TWO STUDIED MORPHOLOGIES.
+remaining within the torque limits of our two types of actuator. The decision to offset the fifth actuator for the PUMA-like morphology is aimed at reducing wrist length to improve arm dexterity [11]. The actuators considered in this study do not have articulation limits.
+3.2 Geometric Parameters of the two Studied Morphologies The Denavit Hartenberg (or DH) parameters of both studied
+morphologies are given in Table 1 (see [6] for the definition of frames for the anthropomorphic arm and [12] for the definition of frames for the UR-like arm).
+
+TABLE 1: DH PARAMETERS FOR THE STUDIED ANTHROPOMORPHIC ARM AND UR-LIKE ARM.
+
+PUMA-like
+
+UR-like
+
+𝑖 𝑑𝑖 [m] 𝑎𝑖 [m] 𝛼𝑖 [rad] 𝑑𝑖 [m] 𝑎𝑖 [m] 𝛼𝑖 [rad]
+
+0-
+
+0
+
+0
+
+-
+
+0
+
+0
+
+1 0.11
+
+0
+
+𝜋/2 0.117 0
+
+𝜋/2
+
+20
+
+0.42
+
+0
+
+0
+
+0.38
+
+0
+
+3 0.38
+
+0
+
+−𝜋/2
+
+0 0.355
+
+0
+
+40
+
+0
+
+𝜋/2 -0.11
+
+0
+
+𝜋/2
+
+50
+
+0
+
+−𝜋/2 0.22
+
+0
+
+−𝜋/2
+
+6-
+
+0
+
+0
+
+0.19
+
+-
+
+0
+
+The Tool Center Point (or TCP) of the PUMA-like arm is positioned at 0.37 m from the center of the wrist along the axis of the last actuator and with an offset of 0.03 m. The TCP of the UR-like arm is positioned at 0.19 m from the origin of the last actuator and with an offset of 0.04 m. The angle formed between the last axis and the stick out is 45° for both arms (see Figure 4).
+
+(b) UR-like arm.
+FIGURE 4: POSITIONING OF THE WELDING TORCH ON THE PUMA-LIKE ARM AND UR-LIKE ARM.
+4. APPLICATION CASES In this section, we will describe a series of application cases
+representative of welding in the industry, highlighting challenges encountered during the assembly of various parts. The application cases addressed pertain to industrial applications currently performed by manual welders. For each presented use case, we will describe the methodology used by manual welders in real production conditions, as well as the specific criteria that will be used to evaluate the effectiveness of the robots. For the following figures from 5 to 9, blue markers correspond to the different positions and orientations of the robot base fixation, and red curves correspond to the different weld beads on the workpiece. The base positions shown take into account the space constraints, the possible locations of base attachment points (beam or plate), the minimum distance between the TCP and the base, and the arm’s reach limit. However, distances have not been optimized for every morphology and every trajectory but chosen in the way an operator is likely to do. Moreover, for each played trajectory according to the time 𝑡, we define by 𝑡0 and 𝑡𝑛 the initial and final times of the trajectory respectively.
+4.1 Upward Trajectory with Base Position on the Ground In this application, the robot base is placed on the ground (see
+Table 2), and we aim to perform an upward trajectory from the ground (see Figure 5). Here, we seek to determine the maximum weldable height while maintaining the torch inclination constant. We aim to maximize the following criterion:
+ℎ [𝑧(𝑡)]𝑡 = 𝑡0𝑛 . (1) 𝐿arm
+
+3
+
+4.3 Fillet weld around end In this application, the workpiece is welded on both sides in
+a single trajectory (see Figure 7). Table 2 summarizes the four studied base positions. The contouring point is the most critical step as it must be performed quickly to prevent melting of the metal piece (increase the Cartesian speed by 15%). The change in torch orientation also requires significant articulation movements. We aim to minimize the joint speeds to avoid approaching the speed limits provided by the motors. The following criterion will be used:
+(︃ 𝑞̇ 𝑖 )︃ 𝑣max = 𝑣cartesian | max 𝑞̇ 𝑖max = 0.8, 𝑖 ∈ {1, 2, . . . , 6} , (3)
+where 𝑞̇ 𝑖 and 𝑞̇ 𝑖max are the joint speed and the joint speed limit of the i𝑡ℎ joint of the arm respectively.
+FIGURE 5: APPLICATION CASE 1: UPWARD TRAJECTORY WITH BASE POSITION ON THE GROUND.
+4.2 Horizontal Trajectory with Base Position on Wall In this application, the robot base is placed on a wall (see
+Table 2), and we aim to perform a horizontal trajectory (see Figure 6). Here, we aim to determine the maximum weldable length between singularity limits. We aim to maximize the following criterion:
+𝑑 [𝑦(𝑡)]𝑡 = 𝑡0𝑛 . (2) 2𝐿arm
+
+FIGURE 7: APPLICATION CASE 3: FILLET WELD AROUND END.
+
+FIGURE 6: APPLICATION CASE 2: HORIZONTAL TRAJECTORY WITH THE BASE POSITION ON THE WALL.
+
+4.4 Pipe on plate welding Trajectory
+In this application, we aim to weld a tube with a diameter of 0.3 m (see Figure 8). The robot is either directly fixed on the tube or positioned above as a wall mount (see Table 2). The trajectory is performed in four steps (4/4 circle) by a manual operator, who welds in the following order 1.1, 1.2, 1.3, and 1.4 (see Figure 8). The application requires that all trajectories be performed without changing the base position. For symmetry reasons, the feasibility study can be summarized by evaluating trajectory 1.1 or 1.3 and trajectory 1.2 or 1.4. In this application, we will focus on the number of achievable trajectories with and without camera support.
+
+4
+
+FIGURE 8: APPLICATION CASE 4: PIPE ON PLATE WELDING TRAJECTORY.
+4.5 Beam T-connection with stiffener This application features complex trajectories due to obsta-
+cles in the environment (see Figure 9). We will analyse achievable robot movements without relocating the base. If none of the pre-defined base positions (Table 2) allow all three trajectories, we will investigate if combining them can achieve the desired outcome.
+
+TABLE 2: POSITIONING OF THE ROBOT BASE FOR THE APPLICATION CASES.
+
+Position 𝑋 𝑌
+
+𝑍 Roll Pitch Yaw
+
+[m] [m] [m] [rad] [rad] [rad]
+
+Application Case 1
+
+A
+
+0.5 -0.3 0
+
+0
+
+0
+
+𝜋
+
+Application Case 2
+
+A
+
+0
+
+0 0.8 0 𝜋/2
+
+0
+
+Application Case 3
+
+A
+
+0 -1 0.3 0
+
+0 𝜋/2
+
+B
+
+0.3 -0.3 0
+
+0
+
+0
+
+𝜋
+
+C
+
+0.3 -0.8 0
+
+0
+
+0
+
+𝜋
+
+D
+
+0.3 0 0.5 0 𝜋/2 −𝜋/2
+
+Application Case 4
+
+A
+
+0 -0.5 0.15 0
+
+0 𝜋/2
+
+B
+
+0
+
+0 0.5 0 𝜋/2 −𝜋/2
+
+Application Case 5
+
+A
+
+0
+
+0 0.29 0
+
+0
+
+0
+
+B
+
+0.6 -0.25 0
+
+0
+
+0
+
+𝜋
+
+C
+
+0.2 0.25 0
+
+0
+
+0 −𝜋/2
+
+must remain below the motor limits. Once done, to evaluate the performance of each morphology, we will test each possible configuration and analyze the number of postures that allow the trajectory to be performed. The PUMA-type arm offers 8 solutions to the inverse kinematics problem, whereas the UR-type morphology offers either 2, 4, 6, or 8 solutions, depending on the case. The results of the best configuration will be presented (maximizing specific application parameters and minimizing both the required motor torques and joint velocities). This comparison will be performed for all base positions of the robot defined for each application case. This will allow us to determine, for each morphology, the optimal placement of the base among the solutions.
+
+FIGURE 9: APPLICATION CASE 5: BEAM T-CONNECTION WITH STIFFENER.
+5. SIMULATION METHODOLOGY 5.1 Comparison Criteria
+The methodology adopted to compare the two robot morphologies involves several essential criteria. First and foremost, it is crucial to ensure that the envisaged trajectory is feasible for the robot, this entails: 1) the absence of collisions with the environment and the absence of singularities; 2) that the torque required to execute the trajectory must remain within the limits of the robot’s actuators; 3) as well as the joint velocities, which
+
+5.2 Simulation Methodology
+As mentioned before, the objective of the simulation is to determine the feasibility of a trajectory for a given robot morphology and base position. Our input data will therefore be (i) the weld bead to be performed, (ii) the robot morphology, (iii) its base position, and (iv) the CAD model of the piece to be welded. The welding rules presented in Section 2 allow us to construct the trajectory to be performed by the robot’s end effector (welding torch). Knowing the initial position of the welding torch as well as the position of the robot’s base, we can calculate all solutions to the inverse kinematics problem. Once done, all this information is transmitted to the ROS2 simulation environment [7] where the generated trajectories are executed (see Figure 10). The different simulation variables are then processed to obtain the joint speeds and applied motor torques. Based on these two variables, as well as the presence of collision and singularity, we can establish the feasibility of the trajectory. Figure 11 summarizes the methodology used in this work.
+
+5
+
+FIGURE 10: SIMULATION VISUALIZATION USING RVIZ.
+5.3 Simulation Tools
+Inverse Kinematics Problem: Both studied morphologies have analytical solutions to the inverse kinematics problem. The resolution methods can be found in [6] for the PUMA-type arm and [12] for the UR-type arm.
+Collision and Singularity Detection: For this study, as mentioned before, we used a ROS2 simulation environment and the Moveit toolbox [13]. Moveit is used for motion control, as well as collision detection with the environment and collisions with the robot itself. We configured Moveit to detect collisions with a margin of 0.01 m. This ensures a minimum robustness regarding the placement of the base and differences in piece geometry. Moveit also informs when the robot enters singularity with a margin of 6°, beyond which the joint velocities become too high for the actuators.
+Joint Velocities: During 𝑡0 ≤ 𝑡 ≤ 𝑡𝑛, we retrieve the joint positions from a ROS topic. We derive these values over time to obtain the joint speeds. The speed limits considered for the motors are 5 rpm for the first three and 10 rpm for the last three.
+Motor Torques: For the calculation of motor torques, we used the Newton-Euler method [14]. We only considered static torques. Let’s note that the speeds and accelerations are low during the welding process and actuator reduction ratios are very high (of the order of 100), the dynamic torques can be neglected. For the calculation of the centers of mass, we assumed that the mass of each part is evenly distributed (except for the welding torch [0.03 m, 0, 0.08 m]). The mass of the welding hose package is considered as a 2 kg point mass applied to actuator 3. The center of mass applied to an actuator is calculated from the barycenter of the downstream parts. Table 3 summarizes the new masses and positions of the centers of mass applied to each joint in their respective frame starting from the last actuator.
+Finally, the maximum torque considered applicable to the actuators is 65 Nm for actuators 1, 2, and 3 and 20 Nm for actuators 4, 5, and 6.
+
+6. RESULTS
+This section presents simulation results for various welding applications. Robot performance was assessed based on previously defined general and specific criteria. For each robot morphology and base position, we will focus on the best-performing posture, while also mentioning the number of postures achieving similar results. If achieving the desired welding parameters leads to infeasible trajectories, we will provide the closest achievable values (with a 20% margin). Finally, we will identify the morphology and base placement that yielded the most successful outcomes.
+In the following, the notations 𝑞̇ , 𝜏, 𝑞̇ 𝑚𝑎𝑥 and 𝜏𝑚𝑎𝑥 refer respectively to the average motor speed, the average motor torque, the highest motor speed reached and the highest motor torque reached.
+6.1 Vertical trajectory with base position on the ground
+The main objective of this application is to determine the maximum weldable height starting from the ground while maintaining the torch inclination constant. The results obtained show that the UR-type arm reaches a maximum welding height of 720 mm (𝑞̇ = 1.96%, 𝜏 = 15.6%, 𝑞̇ 𝑚𝑎𝑥 = 9.8% on motor 3 and 𝜏𝑚𝑎𝑥 = 36% on motor 4) for a single posture (depending on wrist position, performance for other postures was lower), while the PUMA-like arm reaches a maximum height of 560 mm (𝑞̇ = 3.34%, 𝜏 = 8.11%, 𝑞̇ 𝑚𝑎𝑥 = 51.93% on motor 3 and 𝜏𝑚𝑎𝑥 = 31.55% on motor 2) for four postures. These values correspond respectively to ℎ = 0.98 and ℎ = 0.71 for criterion (1) defined in Section 4.1. The maximum heights were achieved by reaching a singularity position for both morphologies. These results demonstrate that the UR-like arm offers a superior vertical welding capability compared to the PUMA-like arm in this application. We can also note that the PUMA-type arm has higher joint speeds on this trajectory, with motor 3, in particular, reaching a maximum of 51.93% of its limits.
+6.2 Horizontal trajectory with base position on the wall
+The main objective of this application is to determine the maximum horizontal distance weldable with the base position on the wall. The results obtained show that the UR-type arm reaches a maximum welding distance of 1500 mm (𝑞̇ = 3.43%, 𝜏 = 14.86% and 𝜏𝑚𝑎𝑥 = 68.66% on motor 1) for two postures (depending on wrist position, performance for other postures was lower), while the PUMA-like arm reaches a maximum distance of 560 mm (𝑞̇ = 3.12%, 𝜏 = 12.53% and 𝜏𝑚𝑎𝑥 = 57.36% on motor 1) for four postures. These values correspond respectively to 𝑑 = 1.02 and 𝑑 = 0.76 for criterion (2) defined in Section 4.2. The limit positions were achieved by reaching a singularity position for both morphologies. These results demonstrate that the URlike arm offers a superior welding capability with positioning on the partition horizontally compared to the PUMA-like arm in this application. We can note that at the reach limit (when the arm is extended) the torque on motor 1 reaches high values for both morphologies (68.66% for type UR and 57.36% for type PUMA). However, this is still within the limits of the actuator.
+
+6
+
+FIGURE 11: SIMULATION METHODOLOGY USED TO DETERMINE THE FEASIBILITY OF A TRAJECTORY.
+
+TABLE 3: MASSES AND CENTER OF MASS POSITIONS USED TO CALCULATE THE MOTOR TORQUES.
+
+Joint J1 J2 J3 J4 J5 J6
+
+UR-like Mass [g] 1 040 3 190 890 740 740 2 000
+
+UR-like COM [m] [0, -0.08, 0]
+[0.362, 0, 0.05] [0.295, 0, 0] [0, 0, 0] [0, 0, 0]
+[0, -0.03, 0.08]
+
+PUMA-like Mass [g] 1 040 3 210 1 040 860 740 2 000
+
+PUMA-like COM [m] [0, 0.08, 0] [0.4, 0, 0] [0, 0.05, 0]
+[0, 0.1, -0.05] [0, 0, 0]
+[-0.03, 0, 0.11]
+
+6.3 Fillet weld around end
+The crucial step of this application is to perform the contouring of the workpiece without exceeding the motor’s joint speed limits. The trajectories were made with a Cartesian speed of 90cm/min. The trajectory could not be performed in base positions A (self-collision between links 2 and 4, at the contouring point), B (collision between link 3 of the robot and the workpiece on trajectory 1.2), and D (collision between link 3 and the workpiece on trajectory 1.2 if the camera is positioned in front of the welding pool, or enter in singularity position if the camera is behind). In position C, the best posture for the UR-type morphology exceeds the maximum speed of motor 2 by 26.8% (𝑣𝑚𝑎𝑥 = 57𝑐𝑚/𝑚𝑖𝑛 for criterion (3), 𝑞̇ = 7.11%, 𝜏 = 15.88% and 𝜏𝑚𝑎𝑥 = 39.84% on motor 4). The best posture for the PUMAlike arm exceeds the maximum speed of motor 1 by 106.8% (𝑣𝑚𝑎𝑥 = 35𝑐𝑚/𝑚𝑖𝑛 for criterion (3), 𝑞̇ = 5.42%, 𝜏 = 9.93% and 𝜏𝑚𝑎𝑥 = 46.94% on motor 2).
+6.4 Pipe on plate welding trajectory
+In this application, we want to test the robots’ ability to weld a 0.3 m diameter tube without changing the base position. The welding is divided into four trajectories. In position A, all trajectories can be performed with camera maintenance for the PUMA-like arm with only one posture for each trajectory (𝑞̇ = 7.65%, 𝜏 = 11.10%, 𝑞̇ 𝑚𝑎𝑥 = 22.27% on motor 2 and 𝜏𝑚𝑎𝑥 = 48.9% on motor 2 for trajectory 1.1 & 1.3 and 𝑞̇ = 11.93%, 𝜏 = 8.7%, 𝑞̇ 𝑚𝑎𝑥 = 17.3% on motor 1 and 𝜏𝑚𝑎𝑥 = 42.02% on motor 2 for trajectory 1.2 & 1.4). For the UR-type arm, trajectories 1.2 & 1.4 can be performed with camera maintenance for two postures (𝑞̇ = 11.07%, 𝜏 = 14.37%, 𝑞̇ 𝑚𝑎𝑥 = 27.39% on motor 1 and 𝜏𝑚𝑎𝑥 = 37.45% on motor 4), but trajectories 1.1 &
+
+1.3 are not feasible even without maintaining the camera (collision with the tube). In position B, none of the trajectories are feasible for both robots. For trajectories 1.1 & 1.3, the robots collide with the tube. For trajectories 1.2 & 1.4, the robot enters in selfcollision (link 2 and link 4). If the robot’s base rises about 30 cm, trajectories 1.2 & 1.4 could be feasible with camera maintenance.
+6.5 Beam T-connection with stiffener
+In this application, we want to test the robots’ capability to weld in a highly constrained environment. For both morphologies, none of the trajectories can be realized with the chosen simulation parameters. However, trajectories 1 and 3 are achievable up to 75% (up to halfway through the 2nd trajectory) with camera support. The remaining 25% can be accomplished either by not maintaining the camera in line or by performing a second trajectory starting from the previous trajectory with the camera facing the weld pool (camera at the back on the first trajectory). Trajectory 2 is feasible if the drag angle is at least 12°; otherwise, the joint 6 axis collides with the T-structure. The camera will also become inaccessible at the end of the trajectory as the workpiece will obstruct the weld pool. For the UR-type arm, all trajectories can be performed from position A, as summarized in Table 4. The motor speeds and torques are far from the limits for all the trajectories with 𝑞̇ < 5%, 𝜏 < 14%, 𝑞̇ 𝑚𝑎𝑥 < 27% and 𝜏𝑚𝑎𝑥 < 37% for all the motors. For the PUMA-type arm, the robot base will need to be moved to execute all trajectories (see Table 4), position A for trajectories 1 & 3, and position B or C for trajectory 2 (no preferable solution). Similar to the UR-type arm, motors speeds and torques are far from the limits for all the trajectories with 𝑞̇ < 6%, 𝜏 < 11%, 𝑞̇ 𝑚𝑎𝑥 < 20% and 𝜏𝑚𝑎𝑥 < 54% for all the motors.
+
+7
+
+TABLE 4: NUMBER OF FEASIBLE TRAJECTORIES FOR THE URLIKE AND PUMA-LIKE ARMS.
+
+,
+Position A Position B Position C
+Position A Position B Position C
+
+UR-like
+
+Trajectory 1 Trajectory 2
+
+2
+
+2
+
+-
+
+1
+
+-
+
+3
+
+PUMA-like
+
+Trajectory 1 Trajectory 2
+
+2
+
+-
+
+-
+
+4
+
+-
+
+1
+
+Trajectory 3 1 1 -
+Trajectory 3 2 -
+
+TABLE 5: RELATIVE PERFORMANCE OF THE UR-LIKE ARM COMPARED WITH THE PUMA-LIKE ARM BASED ON THE APPLICATION CASES CRITERIA
+
+Application cases
+
+1 2 345
+
+Relative performance [%] +38 +34 +63 -50 +50
+
+7. CONCLUSIONS This study compared the performance of two common in-
+dustrial robot morphologies: the anthropomorphic arm (PUMAtype) and the three-joint parallel robot (UR-type). We evaluated their suitability for specific welding tasks using physical feasibility criteria like speed, motor torque, and collision avoidance. Simulated experiments analyzed the behavior of each morphology in various industry-relevant scenarios. The results revealed distinct advantages and limitations for each robot type, impacting their fit for different welding applications.
+While the UR-type robot achieved superior performance in four out of five applications (as detailed in Table 5), its postures were less intuitive. Specific wrist configurations could hinder performance, as seen in applications 1 and 2 where optimal weld distances were achieved with only one or two postures. In contrast, the PUMA-type robot maintained consistent performance across various postures.
+Interestingly, the study found no significant difference in average or maximum motor torques or joint speeds between the two morphologies (except for specific cases mentioned). However, the research did highlight the critical role of robot base positioning in optimizing welding processes. Recommendations for optimal base placement were provided for each simulated application.
+Future work will explore the impact of welding tools (torch and hose) on robot dynamics. Additionally, an optimization algorithm will be developed to determine the ideal base placement for any given robot morphology and application within the feasible workspace. This will also involve evaluating the sensitivity of base placement to assess robot robustness.
+ACKNOWLEDGEMENT This research was supported by ANRT CIFRE grant n°2023
+/1565 which funded the first author’s doctoral studies.
+
+REFERENCES
+[1] Weiss, Astrid, Wortmeier, Ann-Kathrin and Kubicek, Bettina. “Cobots in industry 4.0: A roadmap for future practice studies on human–robot collaboration.” IEEE Transactions on Human-Machine Systems Vol. 51 No. 4 (2021): pp. 335– 345.
+[2] Parkan, Celik and Wu, Ming-Lu. “Decision-making and performance measurement models with applications to robot selection.” Computers & Industrial Engineering Vol. 36 (1999): pp. 503–523.
+[3] Angeles, Jorge. Fundamentals of robotic mechanical systems: theory, methods, and algorithms. Springer (2003).
+[4] Chablat, Damien and Angeles, Jorge. “On the kinetostatic optimization of revolute-coupled planar manipulators.” Mechanism and machine theory Vol. 37 No. 4 (2002): pp. 351–374.
+[5] Siciliano, Bruno, Khatib, Oussama and Kröger, Torsten. Springer handbook of robotics. Vol. 200. Springer (2008).
+[6] Khalil, Wisama and Dombre, Etienne. Modeling, Identification and Control of Robots. Hermes Penton Ltd (2002).
+[7] Quigley, Morgan, Gerkey, Brian, Conley, Ken, Faust, Josh, Foote, Tully, Leibs, Jeremy, Berger, Eric, Wheeler, Rob and Ng, Andrew. “ROS: an open-source Robot Operating System.” Proc. of the IEEE International Conf.erence on Robotics and Automation (ICRA) - Workshop on Open Source Robotics: pp. 1–6. 2009. Kobe, Japan.
+[8] Ferraguti, Federica, Villani, Valeria and Storchi, Chiara. “MyWelder: a collaborative system for intuitive robotassisted.” Mechatronics Vol. 89 (2023): p. 102920.
+[9] Weman, Klas. Welding processes handbook. Elsevier (2011).
+[10] Salunkhe, Durgesh, Chablat, Damien and Wenger, Philippe. “Trajectory planning issues in cuspidal commercial robots.” 2023 IEEE International Conference on Robotics and Automation (ICRA): pp. 7426–7432. 2023. IEEE.
+[11] Tourassis, Vassilios D and Emiris, Dimitrios M. “A comparative study of ideal elbow and dual-elbow robot manipulators.” Mechanism and Machine Theory Vol. 28 No. 3 (1993): pp. 357–373.
+[12] Hawkins, Kelsey P. “Analytic inverse kinematics for the Universal Robots UR-5/UR-10 Arms.” Internal repport of Institute for Robotics and Intelligent Machines (IRIM) (2013): pp. 1–5.
+[13] Coleman, David, Sucan, Ioan, Chitta, Sachin and Correll, Nikolaus. “Reducing the barrier to entry of complex robotic software: a moveit! case study.” arXiv preprint arXiv:1404.3785 (2014): pp. 1–14.
+[14] Khalil, Wisama. “Dynamic modeling of robots using recursive Newton-Euler techniques.” ICINCO2010: pp. 3–20. 2010. Portugal.
+
+8
+
+

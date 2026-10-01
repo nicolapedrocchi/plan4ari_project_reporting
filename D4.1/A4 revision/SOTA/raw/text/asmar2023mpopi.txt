@@ -1,0 +1,686 @@
+Model Predictive Optimized Path Integral Strategies
+Dylan M. Asmar,1 Ransalu Senanayake,1 Shawn Manuel,1 and Mykel J. Kochenderfer1
+
+arXiv:2203.16633v3 [eess.SY] 1 Mar 2023
+
+Abstract— We generalize the derivation of model predictive path integral control (MPPI) to allow for a single joint distribution across controls in the control sequence. This reformation allows for the implementation of adaptive importance sampling (AIS) algorithms into the original importance sampling step while still maintaining the beneﬁts of MPPI such as working with arbitrary system dynamics and cost functions. The beneﬁt of optimizing the proposal distribution by integrating AIS at each control step is demonstrated in simulated environments including controlling multiple cars around a track. The new algorithm is more sample efﬁcient than MPPI, achieving better performance with fewer samples. This performance disparity grows as the dimension of the action space increases. Results from simulations suggest the new algorithm can be used as an anytime algorithm, increasing the value of control at each iteration versus relying on a large set of samples.
+Repository— https://github.com/sisl/MPOPIS
+I. INTRODUCTION
+Many modern control applications beneﬁt from modeling nonlinear dynamics of the system. Examples include vehicle collision avoidance [1], aerial maneuvers [2], and autonomous racing [3]. Model predictive control (MPC) has become a popular method to accommodate the nonlinearity of the dynamics [4]. Some MPC formulations use a quadratic objective function and linear constraints encoding an approximation of the dynamics. Other approaches involve solving the nonlinear program associated with the dynamics by using variants of sequential quadratic programming and interior point methods to approximate solutions [5]. Another technique that has emerged is the use of the Koopman operator [6]. Korda and Mezic´ [7] show that combining this approach with a linear MPC controller reduces the computational complexity of the underlying optimization problem to one that is comparable to a linear dynamical system of similar state and action space sizes. However, efﬁciently developing ﬁnite-dimensional representations of the linear dynamics is still an area of active research [8].
+An alternative MPC-based approach is to use Monte Carlo sampling as part of the optimization of the trajectory. Model predictive path integral control (MPPI) is one such approach, which has been motivated from the perspective of the Hamilton-Jacobi-Bellman equation [9], information theory [10], [11], and stochastic optimization [12]. MPPI can work with arbitrary system dynamics and cost functions, and it uses importance sampling to estimate the optimal control input. Williams et al. [13] demonstrated MPPI to work in real time with a neural network representing the system dynamics. The main idea behind MPPI is to sample a set
+1 Stanford Intelligent Systems Laboratory (SISL), Stanford University <asmar, ransalu, sman64, mykel>@stanford.edu
+
+of control sequences, compute the cost of each sequence, and then calculate a cost informed weighted average of the sampled controls. The ﬁrst control in the sequence is executed and the remainder of the weighted average is used as the mean of the proposal distributions at the next time step.
+The insight that the performance of MPPI is tightly coupled with sampling from a proposal distribution deﬁned from the previous control sequence has led to research in different areas. One focus has been on increasing the robustness when a disturbance changes the state of the system. Such a disturbance often results in samples from the proposal distribution, which is based on the previous control sequence, to not accurately estimate the the optimal control. Williams et al. [14] augment MPPI with an ancillary controller which tracks the nominal trajectory forming Tube-MPPI. Gandhi et al. [15] further extend this approach and provide bounds on the free energy growth while rejecting unknown disturbances. This methodology still relies on developing a nominal control input from sampling separate distributions at each time step around the previous control sequence.
+The formulation of MPPI structured the importance sampling to be from separate distributions at each control step. This formulation limits the form of the proposal distribution. In execution, we are limited to a ﬁnite number of samples and the quality of the estimate using importance sampling is inﬂuenced by the reference distribution [16]. This limitation often requires large sample sizes to approximate the optimal control and manifests in experiments when the dimension of the action space increases [17].
+Kusumoto et al. [18] extend MPPI by adding an informed sampling process. They use conditional variational autoencoders to learn distributions that imitate samples from a training data set containing optimized controls. Using these learned distributions, they adjust the mean of the sampling distribution before executing the MPPI process. Okada and Taniguchi [19] use optimization methods originally developed for gradient descent to adjust the control input at each time step, increasing the convergence to the optimal control. Lambert et al. [20] introduce a Bayesian MPC approach that allows for multi-modal distributions and approximate the posterior distribution using Stein variational gradient descent. Pravitra et al. [21] implement an iteration step within the MPPI framework, but only adjust the mean of the sampling distributions from the weighted average of the previous MPPI iteration. Wang et al. [22] use the Tsallis divergence to form a general sampling based algorithm and use a similar iteration procedure to reﬁne the distribution within the control update step. However, the sampling and
+
+optimization are over separate distributions at each control step.
+These works either adjust the control output after the sampling, adjust only the mean of the proposal distribution, or update individual distributions corresponding to the control at each time step. Our work extends these ideas by providing a method to further reﬁne the proposal distribution by learning a more suitable mean and covariance after obtaining feedback from an original set of samples. To accomplish this change, we generalize the derivation of MPPI to allow for a single joint distribution across controls in the control sequence. With this formulation, we add an adaptive importance sampling (AIS) procedure at each time step. The other approaches discussed can be implemented in addition with our proposed reformulation and beneﬁt from the introduction of an AIS step within the MPPI process. Adapting the proposal distribution across control inputs results in an increase in performance with fewer samples, albeit with a reduction in parallel capability. Our work allows for the MPPI algorithm to be implemented with smaller sample sizes and as an anytime algorithm, increasing performance as computation time allows.
+II. MODEL PREDICTIVE OPTIMIZED PATH INTEGRAL CONTROL
+In this section, we generalize MPPI to treat the controls across a time horizon as a single input. We then discuss modiﬁcations outlined in other work with MPPI, present the model predictive optimized path integral (MPOPI) control algorithm, and then comment on the computational cost.
+A. Generalized Problem Formulation and Derivation
+In MPPI, the control sequence is treated as a set of distinct controls at time t with the inputs to the system as vt ∼ N (ut, Σ) where ut is the commanded control input at time t and Σ is the covariance of the Gaussian noise associated with the input. Therefore, when sampling from the control distribution and estimating the optimal control, we are sampling from separate distributions corresponding to each time step. However, the weights derived from importance sampling are dependent on the cost of the whole control sequence. Using separate distributions at each time step presents a problem if we want to improve our estimation of the expectation by integrating techniques that use the calculated trajectory costs and the control sequence as a single input. Our solution is to treat the sequence of controls as one control input and construct a combined covariance matrix and sample from one, larger joint distribution. This formulation allows different optimization techniques to be applied between time steps to obtain a better estimate of the optimal control through adaptive importance sampling.
+Mirroring the derivation of Williams et al. [10], we consider the same dynamical system, xt+1 = F(xt, vt), where xt ∈ Rn is the state of the system at time t, vt ∈ Rm is the input to the system, and F is the state-transition function of the system. The input, vt, is a random vector generated by a white-noise process with density function
+
+vt ∼ N (ut, Σt) where ut ∈ Rm is the commanded control
+
+input at time t and Σt is the covariance of the Gaussian
+
+noise associated with input ut. We will deﬁne the vector
+
+U to be composed of the components of each control input
+
+U = [u0, u1, . . . , uT −1] , U ∈ RmT and deﬁne the combined
+
+covariance matrix as
+Σ0 0 . . . 0 
+
+ 0 Σ1 . . . 0 
+
+ Σ= .
+
+..
+
+.
+
+ 
+
+,
+
+Σ
+
+∈
+
+RmT
+
+×mT
+
+.
+
+(1)
+
+ .. .. . .
+
+.. 
+
+0 0 . . . ΣT −1
+
+Therefore, the input, V, is a random vector with density function V ∼ N (U, Σ) and we can express the analytical form of the density function q corresponding to the distribution QU,Σ as
+q(V | U, Σ) = ((2π)mT |Σ|)−1/2
+exp − 1 (V − U) Σ−1(V − U) . (2) 2
+
+Similar to Williams et al. [10], we deﬁne our cost function as
+
+one that can be decomposed into a state dependent cost c(X)
+
+and
+
+a
+
+quadratic
+
+control
+
+cost
+
+L(X,
+
+U)
+
+=
+
+c(X)+
+
+λ 2
+
+(U
+
+Σ−1U+
+
+βU˜ U) + cU˜ where X = [x0, F(x0, v0), F(F(x0, v0), v1), . . . ], X ∈ RnT , vt ∈ Rm are the components of V ∈ RmT ,
+
+and βU˜ and cU˜ are constants. We can now write our optimal
+
+control problem as
+
+U∗ = arg min EQU,Σ [φ(X) + L(X, U)] (3)
+U∈U
+
+where U is the set of all valid control vectors and φ(X) is a terminal cost function operating on the terminal state within X. Based on our deﬁnition of X, the state cost of a control sequence is S(V) = c(X) + φ(X) and the free-energy of the control system is then
+
+1 F (S, p, X, λ) = −λ log EP exp − λ S(V) (4)
+
+1
+
+p(V)
+
+= −λ log EQU,Σ exp − S(V)
+
+(5)
+
+λ
+
+q(V | U, Σ)
+
+where λ is the inverse temperature and P is the distribution over a set of control vectors with probability density, p. From the concavity of the logarithm function, we can apply Jensen’s inequality and then use the deﬁnition of the KL divergence
+
+F (S, p, X, λ) ≤ EQU,Σ [S(V)] + λDKL(QU,Σ || P). (6)
+
+This inequality relates the free energy to the state cost of
+the control problem and the divergence between distribution
+QU,Σ and P. Suppose the base distribution is p(V) = q(V | U˜ , Σ)
+where U˜ is a nominal input applied to the system. Deﬁning, β˜ = −2U˜ Σ−1 and cU˜ = U˜ Σ−1U˜ , we have
+U
+
+q(U | Σ)
+
+DKL(QU,Σ || QU˜,Σ) = EQU,Σ log
+
+(7)
+
+q(U˜ | Σ)
+
+= EQU,Σ 1 (U − U˜ ) Σ−1(U − U˜ )
+
+(8)
+
+2
+
+= EQU,Σ 12 U Σ−1U + βU˜ U + cU˜ . (9)
+
+Using eq. (9) and the state cost, we can rewrite eq. (6) as
+
+F (S, p, X, λ)≤ EQU,Σ φ(X) + c(X)
+
++ λ2 U Σ−1U + βU˜ U + cU˜ (10)
+
+≤ EQU,Σ [φ(X) + L(X, U)]
+
+(11)
+
+and we have established that the free energy provides a lower bound on our reformulated optimal control problem. Furthermore, this inequality becomes an equality if we consider the optimal control distribution Q∗ deﬁned by its density function q∗(V) = 1η exp − λ1 S(V) p(V). We can now minimize the divergence between our control distribution and the optimal distribution and achieve an optimal control trajectory instead of minimizing eq. (3) directly.
+The processes of minimizing the KL-divergence between our control distribution and the optimal distribution also follows closely to the original derivation [10] and results in the quadratic minimization problem
+
+U∗ = arg min EQ∗ (V − U) Σ−1(V − U)
+
+(12)
+
+U∈U
+
+with the optimal solution in the unconstrained case of
+
+U∗ = EQ∗ [V] .
+
+(13)
+
+Previous work has addressed incorporating control constraints as part of the dynamical model, therefore we only consider the unconstrained solution and discuss modiﬁcations in section II-B.
+Using importance sampling to determine the expectation in eq. (13) also follows the original derivation closely. Let QUˆ,Σ represent a tentative sampling distribution to perform importance sampling from, then we get our control through
+
+U∗ = EQUˆ,Σ [w(V)V]
+
+(14)
+
+w(V) = 1 exp − 1 S(V) + λ(Uˆ − U˜ ) Σ−1V
+
+(15)
+
+η
+
+λ
+
+η = exp − 1 S(V) + λ(Uˆ − U˜ ) Σ−1V dV. (16) λ
+
+No assumptions were changed and all of the theoretical results from MPPI still hold such as eq. (14) being a global optimal solution (from the information-theoretic perspective) under the assumption we can evaluate the expectation perfectly. With no other modiﬁcation, this approach is equivalent to traditional MPPI. When constructing Σ in eq. (1) we only allowed for control input noise in order to mirror MPPI. In the derivation, we made no assumptions on the structure of Σ except that it is a valid covariance matrix and Σ ∈ RmT ×mT .
+
+B. Other Modiﬁcations
+Information-theoretic model predictive control does present some practical issues such as numerical stability with the trajectory costs. Previous work established methods to address such problems and we extend those concepts to our algorithm. Notice in eq. (15) that λ directly affects the control cost. That is, as λ increases and distributes the weight among trajectories, it also increases the contribution of the control cost. We can decouple the inﬂuence of λ by
+
+redeﬁning the base distribution as p˜(V) = p(V | αUˆ , Σ) where 0 ≤ α ≤ 1. The new base distribution changes our weight to
+
+w(V) = 1 exp − 1 S(V) + γ(Uˆ − U˜ ) Σ−1V
+
+(17)
+
+η
+
+λ
+
+where γ = λ(1 − α). With this change, as α moves from 0 to 1, the control cost is less of a factor in the overall weight. Additionally, calculating the weight in eq. (17) can result in numerical instability. To avoid those issues a normalizing factor is introduced to set the lowest cost to zero.
+The control sequence produced by the sampling methodology can produce inputs that change rapidly across time steps. There are a few ways to address this case. One option is to incorporate a smoothing process into the dynamics model. Since there are no restrictions on the model dynamics in the formulation, we can incorporate different input modiﬁcations as part of the dynamics. This idea follows the same concept on how to integrate control constraints allowing us to only consider the unconstrained solution in eq. (13). We can modify our inputs by introducing a function g that applies the appropriate smoothing and control constraints to our inputs before applying the dynamics and our system becomes xt+1 = F(xt, g(vt)).
+
+C. Adaptive Importance Sampling
+Using importance sampling to estimate eq. (14) is a key aspect of MPPI. However, since we are limited to a ﬁnite number of samples, the quality of the estimate is inﬂuenced by the reference distribution [16]. One approach to improve our estimate is to use AIS to adapt our proposal distribution iteratively. There are many AIS algorithms with different performance costs and beneﬁts as surveyed by Bugallo et al. [23]. Control problems present various challenges and the choice of which AIS algorithm to implement will vary across scenarios. With the generalized formulation, we are not restricted to the choice of an AIS algorithm as U and Σ can be updated to achieve a better proposal distribution including correlation terms across control steps. Separating the AIS step from the MPPI algorithm also allows different parameter settings for the control problem and the AIS algorithm (e.g. different λ values to allow exploration during AIS but more selective when calculating the ﬁnal control). This work focuses on the integration of different AIS algorithms into MPPI and leaves the investigation of speciﬁc trade-offs of different algorithms for future research.
+
+D. Algorithm
+Algorithm 1 outlines the MPOPI algorithm. This algorithm is executed at each time step until the task is complete. Bold capital letters (e.g. U, Σ, X) represent the composite vectors/matrices as described in section II-A and bold lowercase letters with subscripts (e.g. ut, xt) represent the components of the composite vectors. The call to PerformAIS represents a call to an AIS algorithm to execute at each iteration. One of the key differences from MPPI to note is the calculation of the control cost component on line 9 and the weighted
+
+average to update U (line 16). We have to account for the appropriate change in control amount as we change our proposal distribution. If we set L = 1, then U − U vanishes and MPOPI is equivalent to MPPI.
+
+Algorithm 1: Model Predictive Optimized Path In-
+
+tegral Control
+
+Given: F, g, K, T
+
+U ∈ RmT Σ ∈ RmT ×mT
+
+φ, c, λ, α
+
+/* Cost function/parameters */
+
+L
+
+/* Max number of AIS iterations */
+
+ψ1, ψ2, . . . , ψp
+
+/* AIS parameters */
+
+1 x0 ← GetStateEstimate()
+
+2 U ←U
+
+3 Σ ←Σ
+
+4 for ← 1 to L do
+
+5
+
+for k ← 1 to K do
+
+6
+
+Sample Ek from N (0, Σ )
+
+7
+
+for t ← 1 to T do
+
+8
+
+xt ← F(xt−1, g(ut−1 + εkt−1))
+
+9
+
+sk ← c(X) + φ(X) + λ(1 − α)U Σ−1 (Ek + U − U)
+
+10
+
+if < L then
+
+11
+
+U , Σ ← PerformAIS(U , Σ , S, ψ1, ψ2, . . . , ψp, )
+
+12 ρ ← min(S)
+
+13 η ←
+
+k=1 K exp
+
+−
+
+1 λ
+
+(sk
+
+−
+
+ρ)
+
+14 for k ← 1 to K do
+
+15
+
+wk
+
+←
+
+1 η
+
+exp
+
+−
+
+1 λ
+
+(sk
+
+−
+
+ρ)
+
+16
+
+U += wk (Ek + U − U)
+
+17 SendToActuators(u0)
+
+18 for t ← 1 to T − 1 do
+
+19
+
+ut−1 ← ut
+
+20 uT −1 ← Initialize(uT −1)
+
+Figure 1 provides a graphical depiction of how MPOPI can improve samples to better estimate the optimal control. The trajectories were generated from throttle and steering commands for controlling a car. Figure 1a depicts the trajectories of the controls sampled from the initial proposal distribution. After each iteration, the proposal distribution is updated and new samples are generated. Figure 1b and ﬁg. 1c show how the sampled controls evolve, resulting in higher scoring trajectories after each iteration of the AIS algorithm.
+E. Computational Cost
+A key enabler for MPPI to work real time is its ability to be implemented in parallel. The computational complexity of MPPI can be summarized as the complexity of obtaining KT samples and the complexity of propagating the system dynamics T times for K samples in parallel. The addition of AIS changes this complexity. The sampling and propagation of the system dynamics must occur L times, along with the addition of the complexity of the AIS algorithm L − 1 times. Modern sampling and AIS algorithms are efﬁcient. The largest computational burden comes from propagating the dynamics in L sequential steps. Using AIS will allow the use of fewer samples and still take advantage of parallel operations during the propagation step, but at the burden of reestablishing the parallel computations L times.
+The MPOPI algorithm is more sample efﬁcient and the iterative nature lends itself to an anytime approach where L can increase with computation time available. However,
+
+these beneﬁts come at the cost of a reduction in parallel capability. For example, given M = KL samples, MPPI would propagate the system dynamics in parallel for all M samples. However, MPOPI requires propagating K samples in parallel in L sequential steps where the execution of the AIS algorithm must occur after each propagation of K samples. The complexity of establishing parallel computations is hardware, problem, and implementation speciﬁc. As problem complexity increases, MPOPI provides an alternative approach to adding more samples.
+III. EXPERIMENTS
+We tested the MPOPI algorithm in different virtual environments and compared it to MPPI with the same modiﬁcations discussed in section II-B. MPPI has been shown across the literature to perform equitably or outperform numerous other control algorithms and was chosen as the baseline [13], [18], [21]. We integrated ﬁve different AIS algorithms with MPOPI. The algorithms have the ability to use multiple proposal distributions, but we chose to use one proposal distribution to keep the comparison closer to MPPI. We implemented a Population Monte Carlo (PMC) algorithm [24], a mean only moment matching AIS algorithm (µ-AIS), a mean and covariance moment matching AIS algorithm (µΣAIS) similar to Mixture-PMC [25], a Cross-Entropy method (CE) [26], and a Covariance Matrix Adaptation Evolutionary Strategy (CMA) [27]. The µ-AIS algorithm is similar to the iterative approach introduced by Pravitra et al. [21], but we allowed for different values of λ for updating the mean and the ﬁnal weight calculation of the samples. This separation resulted in better performance versus using a shared λ. We kept parameters constant across similar algorithms to show a more direct comparison. Reference the repository for parameters used and details of the implementation.
+We ﬁrst looked at the continuous version of the MountainCar environment [28] and then performed simulations with a non-linear car model. To increase the action space size and complexity, we modiﬁed the car environment to control multiple cars cooperatively and conducted experiments on MuJoCo gym environments. In this section, the term effective samples refers to the total samples an algorithm had available. For MPPI, it is the number of samples and for MPOPI, it is the number of samples multiplied by the number of AIS iterations, KL. We also discuss rewards when describing objective functions instead of costs. The effective sample sizes were increased by changing the number of samples or AIS iterations with MPOPI or the total number of samples for MPPI. The smallest sample size in the MountainCar and car racing scenarios restricted MPOPI to one AIS iteration to show the equivalence to MPPI and provide a more direct comparison. All simulations used the same parameters for MPPI and MPOPI (e.g. λ, α, T ).
+A. MountainCar Environment
+The goal of the MountainCar problem is to get an underpowered car up a hill to a goal location with the dynamics and parameters as speciﬁed by Kochenderfer et al. [29]. The
+
+(a) Initial trajectories.
+
+(b) Trajectories after AIS iteration 3.
+
+(c) Trajectories after AIS iteration 8.
+
+Fig. 1: Evolution of 150 trajectories from sampled controls using MPOPI and the cross entropy method for the AIS algorithm. Green depicts high valued trajectories and red represents low valued trajectories within each sub-ﬁgure. The control is a series of throttle and steering commands. Details of this environment are described in section III-B.
+
+action space consisted of a single continuous action at each time step. The reward function for this problem was modiﬁed to be R(xt, vt) = −1 + |vt| + 100000R∗ where R∗ is an indicator variable for reaching the goal location with vt > 0. The environment terminated when the car reached the goal location or at 200 steps. The simulations consisted of 1000 trials for effective samples ranging from 20 to 180 with MPOPI using 20 samples and varying the number of AIS iterations. The results are shown in ﬁg. 2. The algorithms converge to a similar number of steps while also reaching a point where increasing the number of samples provided little return. MPPI was able to reach similar performance but failed to outperform versions of MPOPI except for PMC. The CE and CMA versions of MPOPI were able to reach the plateau with as few as 40 and 60 effective samples respectively. The PMC algorithm uses multinomial resampling and struggles with a small initial sample size.
+
+Mean # of Steps
+
+120
+
+MPPI
+
+CMA
+
+µΣ-AIS
+
+110
+
+PMC
+
+CE
+
+µ-AIS
+
+100
+
+90
+
+80
+20 40 60 80 100 120 140 160 180
+Effective Samples
+Fig. 2: MountainCar results. Shaded regions are 95% conﬁdence intervals. Adjusting the proposal distribution allows MPOPI to achieve MPPI level performance in as few as 2 iterations and 40 effective samples.
+
+B. Car Racing
+This scenario simulated a form of car racing and was constructed to be similar to the virtual racing environment used by Williams [17]. The total length of the track was
+
+approximately 1.18 km with multiple curves. We imple-
+
+mented a nonlinear single-track model that captures transient
+
+dynamics in corning with a variant of a Fiala brush tire model
+
+[30]. The model was a representation of the electric X1,
+
+an autonomous experimental car. For details of the model
+
+dynamics and parameters of the X1 see Subosits and Gerdes
+
+[30] and Brown and Gerdes [31]. The action space for a
+
+single car consisted of two continuous inputs per time step:
+
+a steering command and a throttle/brake command. The
+
+controls were issued at 10 Hz with the dynamics operating
+
+at 100 Hz. The reward function for each car was R(xt) =
+
+2|vt| − |d| − 5000Rβ∗ − 1000000Rt∗ where vt is the velocity
+
+of the car at time step t, d is the distance of the car from
+
+the middle of the track lane, R∗β is an indicator variable for
+
+exceeding
+
+a
+
+certain
+
+drift
+
+amount
+
+β,
+
+and
+
+R∗
+t
+
+is
+
+an
+
+indicator
+
+variable for when the car leaves the track boundary (β is
+
+the angle between the velocity vector and the longitudinal
+
+axis; the limit was set to 45°). All runs consisted of 25 trials
+
+and each trial concluded when the car completed 2 laps,
+
+exceeded the β limit for more than 5 sec, or was outside
+
+the track boundary for greater than 1 sec. The number of
+
+effective samples varied from 375 to 2250 with MPOPI using
+
+iterations of 150 or 375 samples depending on the number of
+
+cars and the AIS algorithm. More details of this environment
+
+and videos can be seen in the repository.
+
+Results of controlling a single car are shown in ﬁg. 3a.
+
+There were no violations of the track boundary or the β
+
+limit. All versions of MPOPI except for µ-AIS outperformed
+
+MPPI and achieved MPPI peak performance with as few as
+
+375 samples and 3 iterations of the AIS algorithm. There
+
+was more of a disparity in performance with fewer effective
+
+samples. The single car scenario resulted in the car attaining
+
+speeds of 39 m/s with β values exceeding 34°.
+
+We modiﬁed the car racing environment to cooperatively
+
+control multiple cars. For Nc cars, the reward function was
+
+Nc
+
+Nc−1 Nc
+
+R(xt) = Ri − 11000Rc∗ −
+
+|di,j |
+
+i=1
+
+i=1 j=i+1
+
+(18)
+
+Median Reward/Step Median Reward/Step Median Reward/Step
+
+48.0 47.5 47.0 46.5 46.0
+375
+
+MPPI PMC
+
+CMA CE
+
+µΣ-AIS µ-AIS
+
+750 1125 1500 1875 2250
+Effective Samples
+
+86 84 82 80 78 76 74 72 70
+375
+
+MPPI PMC
+
+CMA CE
+
+µΣ-AIS µ-AIS
+
+750 1125 1500 1875 2250
+Effective Samples
+
+110 100
+90 80 70 60 50
+375
+
+MPPI µ-AIS
+
+µΣ-AIS CMA
+
+PMC CE
+
+750 1125 1500 1875 2250
+Effective Samples
+
+(a) Single Car.
+
+(b) Two Cars.
+
+(c) Three Cars.
+
+Fig. 3: Car racing results. Shaded regions are 95 % conﬁdence intervals. The sample efﬁciency of MPOPI versus MPPI becomes more pronounced as the problem complexity increases.
+
+TABLE I: 4-Car completion rate with zero violations.
+
+Effective MPPI µ-AIS µΣ-AIS PMC CE CMA Samples
+
+750 1125 1500 1875 2250
+
+0.67 0.96 0.84 1.00 0.88 1.00 0.88 1.00 0.96 1.00
+
+0.88 0.80 1.00 0.96 0.88 0.84 1.00 1.00 0.96 0.96 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00
+
+where
+
+Ri
+
+is
+
+the
+
+individual
+
+reward
+
+for
+
+car
+
+i,
+
+R∗
+c
+
+is
+
+an
+
+indicator
+
+for the cars being within 4 m of each other, and di,j is the
+
+distance between car i and car j. The last term was added
+
+to increase complexity by emphasizing coordinated actions
+
+across the action space.
+
+Results for two and three cars are shown in ﬁg. 3b and
+
+ﬁg. 3c. There were no violations for the two and three car
+
+scenarios. The success rate of a trial in the 4-car scenario
+
+with no violations is shown in table I. For a 5-car scenario,
+
+MPPI was only able to complete 3 out of 25 trials with 6000
+
+samples. The CE and CMA versions of MPOPI were able
+
+to control up to six cars successfully with as few as 1500
+
+effective samples.
+
+For a given effective sample size, the CE and CMA meth-
+
+ods beneﬁted from using fewer samples with more iterations
+
+as the number of cars increased. However, as the sample size
+
+decreased, the method to approximate the covariance matrix
+
+in the CE version of MPOPI became more important. Algo-
+
+rithms specializing in estimating large covariance matrices
+
+with few samples resulted in higher performance. Details of
+
+the different covariance matrix estimation algorithms tested
+
+are provided in the repository. Changing the sample size and
+
+iteration count on the single and two car scenarios did not
+
+have a noteworthy change in performance.
+
+C. MuJoCo Gym Environments
+To further test MPOPI, we conducted experiments on MuJoCo gym environments [32], [33] using EnvPool [34]. No environmental parameters were changed from the documented implementations. We ran each scenario 10 times and the experiments were conducted for 250 steps. We conducted experiments using only the CE version of MPOPI based on previous results. The average total accumulated reward is shown for two tasks in table II. Algorithm parameters were
+
+not tuned for performance on the different scenarios and were kept consistent across MPPI and MPOPI. Reference the repository wiki page for more details on the parameters of the algorithms used.
+HalfCheetah-v4 and Ant-v4 have six and eight dimensional action spaces respectively. These environments were chosen to test MPOPI on different scenarios with complex control spaces. Similar to previous results, MPOPI achieved similar performance as MPPI with fewer effective samples. The MuJoCo gym and multi-car results demonstrate the signiﬁcance the proposal distribution can have on the quality of the importance sampling estimate of the optimal control. MPOPI increases in performance with each iteration of the AIS algorithm and also increases in performance with a larger initial sample size. These results suggest MPOPI can be used in complex problems as an anytime algorithm where the sample size and iteration count can be adjusted as computation time allows.
+
+TABLE II: MuJoCo environment results. Average total reward for 250 steps on the HalfCheetah-v4 and Ant-v4 environments. The margin shown is the 95 % conﬁdence interval.
+
+Effective Samples
+250 500 1000 1500 3000
+
+HalfCheetah-v4
+
+MPPI
+
+MPOPI-CE
+
+1554 ± 224 1973 ± 162 2071 ± 103 2192 ± 197 2440 ± 108
+
+2154 ± 223 2771 ± 183 3358 ± 328 3798 ± 140 4737 ± 315
+
+Ant-v4
+
+MPPI
+
+MPOPI-CE
+
+1444 ± 92 1635 ± 147 1814 ± 100 1946 ± 131 2180 ± 95
+
+1711 ± 161 1839 ± 93 2197 ± 89 2251 ± 77 2417 ± 114
+
+IV. CONCLUSION
+We increased the sample efﬁciency of MPPI by implementing adaptive importance sampling into the original importance sampling step of MPPI. The beneﬁt of learning a better proposal distribution from previous samples was demonstrated in simulated environments and became further evident as the dimension of the action space increased. Simulation results suggest MPOPI can be used as an anytime algorithm, increasing the value of control at each iteration versus relying on a single large set of samples. The modiﬁcation to adjust the proposal distribution to increase the efﬁciency and quality of the samples used is a promising change to an already high performing control algorithm.
+
+REFERENCES
+[1] J. Ji, A. Khajepour, W. W. Melek, and Y. Huang, “Path planning and tracking for vehicle collision avoidance based on model predictive control with multiconstraints,” IEEE Transactions on Vehicular Technology, vol. 66, no. 2, pp. 952–964, 2017.
+[2] Z. Samadikhoshkho, S. Ghorbani, F. Janabi-Shariﬁ, and K. Zareinia, “Nonlinear control of aerial manipulation systems,” Aerospace Science and Technology, vol. 104, p. 105 945, 2020.
+[3] P. Foehn, D. Brescianini, E. Kaufmann, T. Cieslewski, M. Gehrig, M. Muglikar, and D. Scaramuzza, “Alphapilot: Autonomous drone racing,” Autonomous Robots, pp. 1–14, 2021.
+[4] M. Schwenzer, M. Ay, T. Bergs, and D. Abel, “Review on model predictive control: An engineering perspective,” International Journal of Advanced Manufacturing Technology, vol. 117, no. 5, pp. 1327– 1349, 2021.
+[5] D. Kouzoupis, G. Frison, A. Zanelli, and M. Diehl, “Recent advances in quadratic programming algorithms for nonlinear model predictive control,” Vietnam Journal of Mathematics, vol. 46, no. 4, pp. 863– 882, 2018.
+[6] M. O. Williams, I. G. Kevrekidis, and C. W. Rowley, “A data–driven approximation of the Koopman operator: Extending dynamic mode decomposition,” Journal of Nonlinear Science, vol. 25, no. 6, pp. 1307–1346, 2015.
+[7] M. Korda and I. Mezic´, “Linear predictors for nonlinear dynamical systems: Koopman operator meets model predictive control,” Automatica, vol. 93, pp. 149–160, 2018.
+[8] C. A. Johnson and E. Yeung, “A class of logistic functions for approximating state-inclusive Koopman operators,” in American Control Conference (ACC), 2018.
+[9] E. A. Theodorou, J. Buchli, and S. Schaal, “A generalized path integral control approach to reinforcement learning,” Journal of Machine Learning Research, vol. 11, no. 104, pp. 3137–3181, 2010.
+[10] G. Williams, N. Wagener, B. Goldfain, P. Drews, J. M. Rehg, B. Boots, and E. A. Theodorou, “Information theoretic MPC for modelbased reinforcement learning,” in IEEE International Conference on Robotics and Automation (ICRA), 2017.
+[11] E. A. Theodorou and E. Todorov, “Relative entropy and free energy dualities: Connections to path integral and KL control,” in IEEE Conference on Decision and Control (CDC), 2012.
+[12] G. I. Boutselis, Z. Wang, and E. A. Theodorou, “Constrained sampling-based trajectory optimization using stochastic approximation,” in IEEE International Conference on Robotics and Automation (ICRA), 2020.
+[13] G. Williams, P. Drews, B. Goldfain, J. M. Rehg, and E. A. Theodorou, “Information-theoretic model predictive control: Theory and applications to autonomous driving,” IEEE Transactions on Robotics, vol. 34, no. 6, pp. 1603–1622, 2018.
+[14] G. Williams, B. Goldfain, P. Drews, K. Saigol, J. M. Rehg, and E. A. Theodorou, “Robust sampling based model predictive control with sparse objective information,” in Robotics: Science and Systems, 2018.
+[15] M. S. Gandhi, B. Vlahov, J. Gibson, G. Williams, and E. A. Theodorou, “Robust model predictive path integral control: Analysis and performance guarantees,” IEEE Robotics and Automation Letters, vol. 6, no. 2, pp. 1423–1430, 2021.
+[16] P.-T. D. Boer, D. P. Kroese, S. Mannor, and R. Y. Rubinstein, “A tutorial on the cross-entropy method,” Annals of Operations Research, vol. 134, pp. 19–67, 1 2005.
+[17] G. Williams, “Model predictive path integral control: Theoretical foundations and applications to autonomous driving,” Ph.D. dissertation, Georgia Institute of Technology, 2019.
+[18] R. Kusumoto, L. Palmieri, M. Spies, A. Csiszar, and K. O. Arras, “Informed information theoretic model predictive control,” in IEEE International Conference on Robotics and Automation (ICRA), 2019.
+[19] M. Okada and T. Taniguchi, “Acceleration of gradient-based path integral method for efﬁcient optimal and inverse optimal control,” in IEEE International Conference on Robotics and Automation (ICRA), 2018.
+[20] A. Lambert, F. Ramos, B. Boots, D. Fox, and A. Fishman, “Stein variational model predictive control,” in Conference on Robot Learning, ser. Proceedings of Machine Learning Research, 2021.
+[21] J. Pravitra, E. A. Theodorou, and E. N. Johnson, “Flying complex maneuvers with model predictive path integral control,” in AIAA SciTech Forum, 2021.
+
+[22] Z. Wang, O. So, J. Gibson, B. Vlahov, M. S. Gandhi, G.-H. Liu, and E. A. Theodorou, “Variational inference MPC using Tsallis divergence,” in Robotics: Science and Systems, 2021.
+[23] M. F. Bugallo, V. Elvira, L. Martino, D. Luengo, J. Miguez, and P. M. Djuric, “Adaptive importance sampling: The past, the present, and the future,” IEEE Signal Processing Magazine, vol. 34, no. 4, pp. 60–79, 2017.
+[24] O. Cappé, A. Guillin, J.-M. Marin, and C. P. Robert, “Population Monte Carlo,” Journal of Computational and Graphical Statistics, vol. 13, no. 4, pp. 907–929, 2004.
+[25] O. Cappé, R. Douc, A. Guillin, J.-M. Marin, and C. P. Robert, “Adaptive importance sampling in general mixture classes,” Stat and Comput, vol. 18, no. 4, pp. 447–459, 2008.
+[26] R. Y. Rubinstein and D. P. Kroese, The cross-entropy method: a uniﬁed approach to combinatorial optimization, Monte-Carlo simulation, and machine learning. Springer-Verlag, 2004, vol. 133.
+[27] Y. El-Laham, V. Elvira, and M. F. Bugallo, “Robust covariance adaptation in adaptive importance sampling,” IEEE Signal Processing Letters, vol. 25, no. 7, pp. 1049–1053, 2018.
+[28] A. W. Moore, “Efﬁcient memory-based learning for robot control,” Ph.D. dissertation, University of Cambridge, 1990.
+[29] M. J. Kochenderfer, T. A. Wheeler, and K. H. Wray, Algorithms for Decision Making. MIT Press, 2022.
+[30] J. K. Subosits and J. C. Gerdes, “Impacts of model ﬁdelity on trajectory optimization for autonomous vehicles in extreme maneuvers,” IEEE Transactions on Intelligent Transportation Systems, vol. 6, no. 3, pp. 546–558, 2021.
+[31] M. Brown and J. C. Gerdes, “Coordinating tire forces to avoid obstacles using nonlinear model predictive control,” IEEE Transactions on Intelligent Transportation Systems, vol. 5, no. 1, pp. 21–31, 2020.
+[32] E. Todorov, T. Erez, and Y. Tassa, “MuJoCo: A physics engine for model-based control,” in IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), 2012.
+[33] G. Brockman, V. Cheung, L. Pettersson, J. Schneider, J. Schulman, J. Tang, and W. Zaremba, OpenAI gym, 2016. eprint: arXiv:1606. 01540.
+[34] J. Weng, M. Lin, S. Huang, B. Liu, D. Makoviichuk, V. Makoviychuk, Z. Liu, Y. Song, T. Luo, Y. Jiang, Z. Xu, and S. Yan, “EnvPool: A highly parallel reinforcement learning environment execution engine,” arXiv preprint arXiv:2206.10558, 2022.
+
+

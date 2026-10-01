@@ -1,0 +1,613 @@
+Clustering-Embedded Model Predictive Path Integral Control: Avoiding Averaging-Induced Failure and Enabling Efficient Cluster Selection for
+Dynamic Obstacles
+Zidong Liu1, Kaixin Chang1 and Xu Chen†,1
+
+arXiv:2607.06499v1 [cs.RO] 7 Jul 2026
+
+Abstract— With the widespread availability of parallel computing hardware, sampling-based motion planning methods such as Model Predictive Path Integral (MPPI) control have become increasingly powerful for complex nonlinear systems in non-smooth task spaces. However, the sampling and forwardsimulation pipeline in MPPI suffers from averaging-induced failure in cluttered environments, where the importanceweighted update averages incompatible rollouts and leads to hesitation or even collision when an obstacle lies directly ahead. This paper proposes Clustering-Embedded MPPI (CEMPPI), a framework that architecturally resolves the averaginginduced failures inherent in standard MPPI within non-convex environments. Rather than simply mitigating interference, CEMPPI redefines the control law by integrating a high-fidelity pruning and clustering stage. By leveraging density-based spatial clustering of applications with noise (DBSCAN) alongside a novel geometric direction feature that is extracted from collision-derived reference points, the system isolates feasible trajectory modes from the noise of infeasible rollouts. This is paired with an intelligent selection logic that optimizes for minimum cost in static scenes while actively steering opposite to obstacle flux in dynamic environments. Experiments in 2D JAX-accelerated simulations show that CE-MPPI alleviates obstacle-front hesitation and avoids persistent coupling with moving obstacles in dynamic scenes. In particular, real-world tests on a 6-DoF UR5e manipulator with CUDA-parallel rollouts in Isaac Gym achieve a 48% reduction in time-to-goal and a 12% shorter end-effector path.
+I. INTRODUCTION
+With the rapid growth of computing hardware, samplingbased motion planning methods [1], [2] such as Model Predictive Path Integral (MPPI) control [3] have become increasingly popular for real-time robotic motion planning. MPPI iteratively generates stochastic rollouts, performs forward simulation, evaluates trajectory costs, and applies a path-integral weighted update to refine the control sequence. Compared to traditional gradient-based MPC [4], MPPI does not require the cost function to be differentiable, making it convenient to deploy with nonlinear dynamics and complex, non-smooth objectives [5]. Moreover, unlike learningbased approaches such as reinforcement learning [6] that typically rely on extensive offline training, sampling-based motion planning operates as a fully online planner and
+*This work was supported in part by an Amazon-UW Science Hub Gift Award. The views and conclusions contained in this document are those of the authors and should not be interpreted as representing the official policies, either expressed or implied, of the sponsoring organization.
+†: corresponding author. 1Department of Mechanical Engineering, University of Washington, Seattle, WA, USA. {liuzd, kxc118, chx}@uw.edu
+
+can further benefit from GPU-accelerated parallel rollout computation [7] for real-time performance.
+The performance of sampling-based motion planning hinges on the sampling number and the diversity of rollouts [8]. For example for MPPI, at each replanning step, the algorithm samples control sequences by injecting stochastic perturbations (typically Gaussian noise) around a nominal control sequence and then applies an importance-weighted update. However, the weighted averaging mechanism can be problematic in cluttered environments with multi-modal feasible solutions [9]. As illustrated in Fig. 1, even when colliding rollouts receive negligible weights, importanceweighted averaging of left- and right-passing rollouts can produce a control update toward the obstacle, causing hesitation and potential collision, leading to what we shall refer to as averaging-induced failure.
+Fig. 1. Averaging-induced failure in MPPI: the weighted control update may point toward the obstacle even when colliding rollouts are heavily penalized.
+To address averaging-induced failure and maximize the sampling efficiency in motion planning, we propose Clustering-Embedded MPPI (CE-MPPI), as illustrated in Fig. 2. Exploiting the massive parallelism of GPUaccelerated forward simulations, CE-MPPI engineers Gaussian control perturbations into a high-speed optimization engine. After rollouts are generated, we first prune colliding trajectories. For the remaining feasible rollouts, we apply the density-based spatial clustering of application with noise (DBSCAN) clustering [10] using a compact geometric feature defined by the direction from a collision-derived reference point to each rollout terminal state, where the reference point is computed from the mean terminal po-
+
+sition of colliding rollouts near the closest obstacle. This feature yields well-separated clusters corresponding to distinct avoidance directions (e.g., left vs. right in 2-D). CEMPPI then performs obstacle-aware cluster selection. For static obstacles, we select the cluster with the minimum average cost, which avoids averaging across incompatible modes while prioritizing low-cost progress, as illustrated in Fig. 3. For dynamic obstacles, we estimate the obstacle motion direction from recent observations and select the cluster whose average motion is most opposite to the obstacle motion, based on a dot-product criterion, as shown in Fig. 4. This directional selection mitigates persistent interference when the robot and obstacle move in similar directions, where greedy cost reduction can keep the robot coupled with the moving obstacle for an extended period. Finally, CE-MPPI updates the nominal control sequence using only rollouts within the selected cluster.
+We validate CE-MPPI in JAX [11] with Just-In-Time (JIT) acceleration in 2-D simulations, demonstrating a systematic resolution of averaging-induced failures and achieving robust replanning in dynamic scenes through proactive bypassing guided by obstacle motion direction. We further deploy CEMPPI on a real 6-(Degrees of Freedom) DoF UR5e manipulator with CUDA-accelerated rollouts in Isaac Gym [12], showing that CE-MPPI remains efficient and effective for high-DoF obstacle avoidance in real-world settings.
+A. Related Work
+MPPI was initially demonstrated in challenging, highspeed autonomous driving tasks [3]. Since then, it has been adopted in a broad range of robotic systems, including manipulators [5], [13], [14], drones [15], and legged robots [16]. STORM [5] and RAMP [13] demonstrated MPPI-style planning on 6–7 DoF manipulators with GPU acceleration, enabling real-time goal reaching and obstacle avoidance in cluttered workspaces. Zhou et al. [14] further improved real-time performance for dynamic obstacle avoidance of manipulators by proposing a parallel MPPI framework with a gradient-velocity modulated signed distance field (SDF) cost. Zhai et al. [15] proposed Perception-Aware MPPI for quadrotor navigation in unknown environments by augmenting MPPI with perception-driven objectives to encourage online exploration and alternative path discovery when the goal is occluded. Alvarez-Padilla et al. [16] demonstrated real-time whole-body control on a real-world legged robot using MPPI.
+A major computational bottleneck of MPPI lies in sampling and the associated parallel forward simulations, motivating extensive research on improving sampling efficiency and the rollout generation process. Kim et al. [17] proposed a single-instance sampling strategy for task-space MPPI control to reduce computational burden while maintaining real-time accuracy. Yan and Devasia [18] introduced outputsampled MPPI (o-MPPI), which samples in an output space to better satisfy output constraints and achieve higher efficiency with fewer rollouts and shorter horizons. Aoki et al. [19] further studied switching the sampling space
+
+online to balance efficiency and safety in vehicle navigation. In the context of mitigating averaging-induced failure, CSC-MPPI [9] addressed weighted-averaging issues by first enforcing constraints using a primal–dual gradient-based adjustment that iteratively shifts sampled trajectories into feasible regions, and then clustering the resulting feasible rollouts via DBSCAN using features derived from average linear and angular velocities. There, the cluster with the minimum average cost was selected for the path-integral update. However, because velocity-based statistics can be similar across distinct avoidance directions, left- and rightpassing clusters may remain weakly separated, which can degrade clustering quality and lead to hesitation near obstacles. Moreover, in dynamic scenes where obstacle motion is aligned with the robot’s motion, selecting clusters purely based on instantaneous cost may still result in persistent coupling with the moving obstacle.
+
+B. Contributions
+The main contributions of this paper are as follows:
+1) We propose CE-MPPI, which engineers a high-fidelity pruning-and-clustering stage that removes colliding rollouts and clusters feasible rollouts via DBSCAN. By introducing a novel geometric direction feature anchored to collision-derived reference points, the framework separates distinct feasible trajectory modes and enables a mode-consistent update.
+2) We provide a decisive obstacle-aware selection logic: while optimizing for minimum cost in static environments, the algorithm executes an anticipatory response in dynamic scenes by selecting clusters that counter obstacle flux. This approach resolves averaging-induced failures and preempts the persistent blocking risks inherent in unpredictable physical spaces.
+3) CE-MPPI is validated through comparative experiments against MPPI and CSC-MPPI in both simulation and real-world experiments. In 2-D JAXaccelerated simulations, CE-MPPI mitigates averaginginduced failure and demonstrates strong escape capability from persistent coupling with moving obstacles, reducing time-to-goal by 17.4% and path length by 9.1% compared to CSC-MPPI in the dynamic scenario. In real-world experiments on a 6-DoF UR5e manipulator with CUDA-accelerated rollouts in Isaac Gym, CEMPPI achieves a 48% reduction in time-to-goal and a 12% shorter end-effector path compared to standard MPPI.
+
+II. PROPOSED CLUSTERING-EMBEDDED MPPI A. MPPI Preliminaries
+We consider a general discrete-time system
+
+xt+1 = f (xt, ut),
+
+(1)
+
+where xt ∈ Rn and ut ∈ Rm denote the system state and control input, respectively. At each iteration t, MPPI
+optimizes a horizon-N control sequence
+
+Ut := {ut+j }j=0 N−1,
+
+(2)
+
+Fig. 2. Overview of the proposed CE-MPPI. CE-MPPI samples perturbed control sequences and performs parallel forward simulation to obtain trajectory rollouts and costs. Colliding rollouts are pruned, the remaining feasible rollouts are clustered via DBSCAN, and a single cluster is selected (static: minimum average cost; dynamic: motion opposite to the obstacle direction). The MPPI update is then computed using weights normalized over the selected cluster.
+
+where j ∈ {0, . . . , N − 1} indexes the within-horizon time step.
+MPPI evaluates K stochastic rollouts by perturbing the nominal controls. More specifically, for rollout index k ∈ {1, . . . , K}, sampled Gaussian noise ϵt+j (k) ∼ N (0, Σ) is added to form the perturbed control
+ut+j (k) = ut+j + ϵt+j (k) , j = 0, . . . , N − 1. (3)
+Starting from xt(k) = xt, the rollout is obtained via forward simulation
+xt+j+1 (k) = f xt+j (k) , ut+j (k) , j = 0, . . . , N − 1. (4)
+Each rollout is assigned a trajectory cost
+N −1
+St(k) = ϕ xt+N (k) + ℓ xt+j (k) , ut+j (k) , (5)
+j=0
+where ϕ(·) and ℓ(·) denote terminal and stage costs, respectively. The importance weight for rollout k is then defined as
+(k) exp − λ1 St(k) wt = K 1 (r) , (6)
+r=1 exp − λ St
+where λ > 0 is the temperature parameter controlling the sharpness of the weighting.
+Finally, MPPI updates the nominal controls via a weighted average of perturbations:
+K
+ut+j := ut+j + wt(k) ϵt+j (k) , j = 0, . . . , N − 1. (7)
+k=1
+Only the first control ut is executed, and the procedure repeats in a receding-horizon manner.
+One can note that in cluttered environments with dynamic moving objects, the standard MPPI is subjected to averaginginduced failure. Although multiple feasible modes can be sampled, the importance-weighted averaging step can blend incompatible rollouts, producing a control update that points toward collision.
+
+B. Proposed CE-MPPI Fig. 2 illustrates the overall workflow of the proposed CE-
+MPPI, and Alg. 1 provides the corresponding pseudocode. CE-MPPI redefines the control loop by first pruning colliding trajectories and distilling the remaining feasible rollouts into distinct motion modes via DBSCAN. The system then executes a decisive selection logic: 1) static environments trigger an optimization for the absolute minimum cost, and 2) dynamic scenes evoke an anticipatory strategy that selects clusters countering obstacle flux. By isolating these highintegrity rollouts, the nominal control sequence is updated to eliminate the risk of persistent blocking and averaginginduced failure. Next, we detail each main stage of the process: collision-based pruning, DBSCAN clustering, obstacleaware cluster selection, and the within-cluster MPPI update.
+Fig. 3. Static obstacle case in CE-MPPI. Colliding rollouts are pruned (purple dashed trajectories), and the remaining feasible rollouts are clustered into distinct avoidance clusters. CE-MPPI selects the cluster with the minimum average cost and performs the within-cluster MPPI update to compute the control input.
+1) Collision-based pruning of rollouts: For each rollout k ∈ {1, . . . , K} obtained by forward simulation in (4), we evaluate a collision indicator Icol(τt(k)), where
+τt(k) := {xt+j (k) }j=0 N (8)
+
+Algorithm 1 Proposed CE-MPPI
+
+Require: xt, Ut = {ut+j}j=0 N−1, K, N, λ, Σ, f (·), ℓ(·), ϕ(·),
+
+p(·), collision checker Icol(·), DBSCAN, H, ∆t, {ot−h}h=0 H−1 (if dynamic)
+
+Ensure: updated Ut (apply ut)
+
+1: [Rollouts] for each k = 1, . . . , K in parallel do 2: sample {ϵt+j (k) }j=0 N−1; set ut+j (k) ← ut+j + ϵt+j (k)
+
+3: simulate τt(k) = {xt+j (k) }j=0 N via (4), compute St(k),
+
+and record xt+N (k) 4: c(k) ← Icol(τt(k))
+
+5: end for
+
+6: [Pruning] Vt ← {k | c(k) = 0},
+
+C col
+t
+
+←
+
+{k
+
+|
+
+c(k)
+
+=
+
+1}
+
+7:
+
+if
+
+|Ccol|
+t
+
+=
+
+0
+
+then
+
+8: [Fallback] compute standard weights wt(k) using (6)
+
+9: [Update] ut+j ← ut+j + k=1 K wt(k)ϵt+j (k) , j =
+
+0, . . . , N − 1
+
+10: else
+
+11:
+
+[Clustering]
+
+compute
+
+p¯ col
+t
+
+and
+
+features
+
+zt(k)
+
+for
+
+k
+
+∈
+
+Vt; run DBSCAN ⇒ {Ct,c}c=1 Mt (ignore noise)
+
+¯
+
+1
+
+(k)
+
+12: [Cluster stats] St,c ← |Ct,c| k∈Ct,c St for c =
+
+1, . . . , Mt
+
+13: [Selection] if static then
+
+14:
+
+c⋆
+t
+
+←
+
+arg
+
+minc
+
+S¯t,c
+
+15: else
+
+▷ dynamic obstacles
+
+16:
+
+compute vˆt,c and vˆobs,t
+
+17:
+
+c⋆
+t
+
+←
+
+arg
+
+minc
+
+vˆt⊤,cvˆobs,t
+
+18: end if 19: [Within-cluster weighting] compute w˜t(k) normal-
+
+ized over Ct,c⋆t (e.g., using exp(−S/λ) and renormaliza-
+
+tion)
+
+20: [Update] ut+j ← ut+j + 0, . . . , N − 1
+
+(k) (k)
+k∈Ct,c⋆ w˜t ϵt+j , j =
+t
+
+21: end if
+
+22: [Execute] apply ut; shift and warm-start Ut+1
+
+denotes the simulated state trajectory at replanning time t. Rollouts that collide with obstacles are removed:
+Vt := k Icol τt(k) = 0 , (9)
+as illustrated by the purple dashed trajectories in Fig. 3. This pruning operation corresponds to the pruning stage in Alg. 1. This step prevents invalid trajectories from receiving nonnegligible weights and reduces the number of samples used in subsequent clustering and selection.
+2) DBSCAN clustering of valid rollouts: This clustering procedure corresponds to the clustering stage in Alg. 1. Rather than clustering full state sequences, we cluster feasible rollouts using a compact geometric feature derived from their terminal states xt+N (k) . Let p(x) ∈ Rp denote a mapping of the state’s task-relevant position (e.g., planar position for a mobile robot or end-effector position for a manipulator). We use the terminal positions of colliding rollouts to construct a collision-derived reference point. Define the index set of
+
+colliding rollouts as
+
+Ccol t := k ∈ {1, . . . , K} Icol(τt(k)) = 1 . (10)
+
+When
+
+|Ccol|
+t
+
+>
+
+0,
+
+we
+
+compute
+
+the
+
+mean
+
+terminal
+
+position
+
+of
+
+colliding rollouts
+
+p¯tcol := col 1 |Ct |
+
+p xt+N (k) ,
+col
+
+k∈Ct
+
+(11)
+
+which indicates where colliding rollouts tend to terminate. For each feasible rollout k ∈ Vt, we form a direction vector from this reference point to the rollout terminal position
+
+dt(k) := p xt+N (k) − p¯tcol, (12)
+
+and use its normalized direction as the clustering feature:
+
+(k) dt(k)
+
+zt := (k)
+
+.
+
+(13)
+
+∥dt ∥ + ϵ
+
+We then apply DBSCAN to {zt(k)}k∈Vt , yielding Mt clusters {Ct,1, . . . , Ct,Mt }, where Mt is the number of clusters
+
+returned by DBSCAN. Noise rollouts identified by DBSCAN
+
+are ignored in subsequent cluster selection. These clusters
+
+typically correspond to distinct local avoidance modes (e.g.,
+
+passing an obstacle from different sides). The geometric
+
+feature is designed to promote cluster separability, enabling
+
+a mode-consistent MPPI update that avoids averaging across
+
+incompatible rollouts.
+
+If
+
+no
+
+colliding
+
+rollout
+
+is
+
+observed
+
+(i.e.,
+
+|Ccol|
+t
+
+=
+
+0),
+
+we
+
+skip clustering and revert to the standard MPPI update using
+
+all rollouts.
+
+3) Static and dynamic obstacle-aware cluster selection:
+
+CE-MPPI selects a single cluster so that the MPPI update is
+
+computed from a coherent set of rollouts. This static criterion
+
+corresponds to the selection stage in Alg. 1.
+
+For static obstacles, we select the cluster with the lowest
+
+average cost:
+
+ct⋆ := arg min S¯t,c ,
+
+(14)
+
+c∈{1,...,Mt }
+
+as illustrated by the green trajectories in Fig. 3. For dynamic obstacles, shown as the gray circle in Fig. 4,
+we incorporate the estimated obstacle motion direction to guide the selection of the cluster. We first define the average motion direction of each cluster. For rollout k ∈ Ct,c, let
+
+(k) p(xt+N (k) ) − p(xt(k))
+
+gt :=
+
+(15)
+
+(k)
+
+(k)
+
+p(xt+N ) − p(xt ) + ϵ
+
+denote its unit terminal displacement direction, where ϵ > 0 is a small constant for numerical stability. The clusteraverage direction is computed as
+
+1 vt,c :=
+
+gt(k),
+
+|Ct,c| k∈Ct,c
+
+(16)
+
+vˆt,c := vt,c .
+
+∥vt,c∥ + ϵ
+
+Fig. 4. Dynamic obstacle case in CE-MPPI. Colliding rollouts are pruned (purple dashed trajectories), and the remaining feasible rollouts are clustered. Using the estimated obstacle motion direction vobs, CE-MPPI selects the cluster whose average motion is most opposite to the obstacle motion and performs the within-cluster MPPI update to compute the control input.
+
+We then estimate the obstacle motion direction from the most recent H position measurements {ot−h}h=0 H−1, where ot−h ∈ Rp denotes the obstacle position in the same task space as p(·):
+
+1 H−2 ot−h − ot−h−1
+
+vobs,t := H − 1
+
+, ∆t
+
+h=0
+
+(17)
+
+vˆobs,t := vobs,t .
+
+∥vobs,t∥ + ϵ
+
+Finally, we select the cluster whose average direction is most opposite to the obstacle motion:
+
+ct⋆ := arg min vˆt,c ⊤ vˆobs,t
+c∈{1,...,Mt }
+
+(18)
+
+as illustrated by the blue trajectories in Fig. 4. Since both vectors are normalized, the dot product is positive when the cluster moves in a similar direction to the obstacle and negative when it moves in the opposite direction. Minimizing it therefore favors rollouts that move against the obstacle flow, which empirically increases clearance and reduces the risk of closing-speed collisions.
+4) Within-cluster MPPI update: Finally, CE-MPPI performs the MPPI update using only the rollouts within the selected cluster Ct,c⋆t , as illustrated by the orange trajectories in Figs. 3 and 4. Compared to the standard MPPI weights in (6), we compute weights normalized over the selected cluster:
+
+w˜t(k) :=
+
+exp − λ1 St(k) ,
+r∈Ct,c⋆ exp − λ1 St(r)
+t
+
+k ∈ Ct,c⋆t , (19)
+
+and update the nominal control sequence as
+
+ut+j := ut+j +
+
+w˜t(k) ϵt+j (k) , j = 0, . . . , N − 1.
+
+k∈Ct,c⋆
+t
+
+(20)
+
+As in standard MPPI, only the first control ut is applied, and
+
+the process repeats in a receding-horizon manner.
+
+III. EXPERIMENTS
+This section evaluates the effectiveness of the proposed CE-MPPI through both simulation and real-world experiments. In simulation, we construct two 2-D planar scenarios that are prone to failure modes of standard MPPI: a staticobstacle scenario designed to induce averaging-induced failure, and a dynamic-obstacle scenario in which the obstacle motion is aligned with the robot’s nominal direction of travel. These settings assess CE-MPPI’s ability to avoid collisions while maintaining planning efficiency. In real-world experiments, we deploy CE-MPPI on a 6-DoF manipulator in obstacle avoidance and goal reaching tasks, demonstrating that the proposed method remains flexible and efficient even for high-DoF systems.
+
+A. Simulation Setup
+We implement CE-MPPI and evaluate it in two planar scenarios: (i) a static-obstacle case designed to induce averaging-induced failure in standard MPPI, and (ii) a dynamic-obstacle case where the obstacle motion is aligned with the robot’s nominal direction of travel.
+1) Hardware and implementation: All simulation experiments are conducted on a PC equipped with an Intel Core i7-9750H CPU, an NVIDIA GeForce GTX 1650 GPU, and 32 GB RAM. We implement MPPI in JAX and accelerate rollout simulation and cost evaluation using just-in-time (JIT) compilation.
+2) Robot model: The robot is a differential-drive platform with state xt = [xt, yt, θt]⊤, where (xt, yt) denotes the planar position and θt denotes the heading angle. The control input is ut = [uv,t, uω,t]⊤, where uv,t and uω,t are the linear and angular velocities, respectively. Using a discretetime kinematic model with time step dt, the dynamics are
+
+xt+1 = xt + uv,t cos θt dt,
+
+yt+1 = yt + uv,t sin θt dt,
+
+(21)
+
+θt+1 = θt + uω,t dt.
+
+3) Cost function: We use a quadratic tracking cost with a terminal cost. The stage cost is defined as
+
+ℓ(xt) = (xt − xf )⊤Q(xt − xf ),
+
+(22)
+
+and the terminal cost is
+
+ϕ(xt+N ) = (xt+N − xf )⊤H(xt+N − xf ), (23)
+
+where xf is the goal state. Similar to CSC-MPPI [9], we set Q = diag(10, 10, 0) and H = diag(50, 50, 50). The other key simulation parameters are summarized in Table I.
+
+B. Simulation Results
+In this section, we conduct comparative simulation experiments in two scenarios. For each scenario, we evaluate three methods: standard MPPI, CSC-MPPI, and the proposed CE-MPPI. All reported quantitative results are averaged over three runs.
+
+TABLE I SIMULATION PARAMETERS.
+
+Parameter Rollouts K Horizon N Time step dt Linear velocity bound |uv,t| Angular velocity bound |uω,t| Temperature λ
+
+Value 300 30 0.03 s ≤ 0.8 m/s ≤ 7 rad/s Scenario 1: 0.7, Scenario 2: 0.01
+
+TABLE II SIMULATION RESULTS IN TWO SCENARIOS.
+
+Scenario 1
+2
+
+Method MPPI CSC-MPPI CE-MPPI MPPI CSC-MPPI CE-MPPI
+
+Collision-free No Yes Yes No Yes Yes
+
+Time (s) –
+4.23 4.02
+– 9.66 7.98
+
+Path (m) –
+2.27 2.22
+– 4.73 4.30
+
+1) Scenario 1 (static obstacle, averaging-induced failure): Scenario 1 contains a static obstacle configuration designed to test the ability to avoid averaging-induced failure. The qualitative trajectories are shown in Fig. 5(a), (b), and (c), and the quantitative results are summarized in Table II. As shown in Fig. 5(a), MPPI can collide with the obstacle in this scenario. This is partly because the robot may build up a relatively high speed while it is still some distance away from the obstacle. When the robot approaches the obstacle, the importance-weighted update can average incompatible avoidance rollouts, producing a control update that still points toward the obstacle. In such cases, the robot may not fully stop in time, resulting in collision.
+CSC-MPPI avoids collision in most runs and mitigates averaging-induced failure, but it can exhibit prolonged hesitation near the obstacle, as shown in Fig. 5(b). This behavior is related to its clustering criterion based on averaged control statistics, namely the mean linear velocity v and mean angular velocity ω. Even when CSC-MPPI separates collisionfree rollouts into two clusters that pass on different sides of the obstacle, the mean v across clusters can remain similar, which reduces cluster separability and can delay decisive avoidance.
+In contrast, CE-MPPI clusters feasible rollouts using a geometric feature derived from the direction vector from the collision-derived reference point to each rollout terminal position. This feature more clearly distinguishes clusters with different avoidance directions, rather than clustering based on velocity magnitude. As a result, even when feasible rollouts form two clusters on opposite sides of the obstacle, CE-MPPI can efficiently select one cluster and proceed toward the goal, as shown in Fig. 5(c). Quantitatively, Table II shows that CE-MPPI reaches the goal faster than CSC-MPPI and with a slightly shorter path length in Scenario 1. Since MPPI is not collision-free in this scenario, no statistics are available there.
+2) Scenario 2 (dynamic obstacle with static obstacles): Scenario 2 includes one dynamic obstacle and two static
+
+obstacles, as shown in Fig. 5(d)–(k) and Table II. The dynamic obstacle (yellow) moves along the positive x direction at approximately 0.43 m/s and interferes with the robot as it travels toward the goal. Both MPPI and CSC-MPPI are affected by the moving obstacle. For MPPI, when the robot approaches the obstacle, it tends to steer to the right to avoid collision while still attempting to make progress toward the goal. However, the moving obstacle continues to block the robot, and in some cases MPPI collides with the obstacle, as shown in Fig. 5(d) and (e). CSC-MPPI avoids collision but still suffers from persistent blocking. As illustrated by the long segment of robot motion roughly along the x axis in Fig. 5(f), (g), and (h), the robot continues to move while waiting for the moving obstacle to clear before committing to a detour that reduces the cost. As a result, CSC-MPPI remains blocked for an extended period and travels an unnecessarily long path, which is reflected by the 9.66 s travel time and 4.73 m path length in Table II.
+In contrast, CE-MPPI explicitly accounts for the obstacle motion direction during cluster selection. Once a moving obstacle is detected, CE-MPPI selects the rollout cluster whose average motion is opposite to the obstacle motion direction, enabling an early bypass behind the obstacle, as shown in Fig. 5(i). Although this choice may not minimize the instantaneous cost at the current step, incorporating obstacle direction provides a simple predictive bias that reduces persistent blocking and improves overall planning efficiency. This is corroborated by the shorter travel time (7.98 s) and shorter path length (4.30 m) achieved by CEMPPI in Table II.
+
+C. Real-World Experimental Setup
+
+To validate CE-MPPI in real-world settings and examine
+
+its effectiveness on high-DoF robots, we conduct experiments
+
+on a 6-DoF UR5e manipulator. The experimental platform is
+
+shown in Fig. 6. We use the same PC as in the simulation as
+
+the onboard computing platform. Different from the 2-D sim-
+
+ulation, forward simulation for MPPI rollouts is performed
+
+in Isaac Gym, leveraging CUDA-based parallel computation
+
+to improve runtime efficiency.
+
+1) State and control interface.: We read the UR5e joint
+
+states via ROS, using a 12-dimensional state vector xt =
+
+[q
+
+⊤ t
+
+,
+
+q˙ ⊤t
+
+]
+
+⊤
+
+∈
+
+R12,
+
+where
+
+qt
+
+∈
+
+R6
+
+and
+
+q˙ t
+
+∈
+
+R6
+
+denote
+
+joint
+
+positions and velocities. CE-MPPI outputs a joint-velocity
+
+command ut ∈ R6, which is sent back to the UR5e through ROS for receding-horizon execution. Due to GPU memory
+
+constraints, we set the control rate to 10 Hz (dt = 0.1 s).
+
+The other key parameters of the real-world experiment are
+
+summarized in Table III.
+
+2) Cost function: We use a goal-reaching objective with
+
+collision penalties. Let pee(qt) ∈ R3 and Ree(qt) ∈ SO(3) denote the end-effector position and orientation from forward
+
+kinematics, and let (pg, Rg) be the goal pose. The stage cost
+
+is defined as
+
+ℓ(xt, ut) = wp ∥pee(qt) − pg∥2 + wR dR Ree(qt), Rg + wc Icol(qt), (24)
+
+Fig. 5. Simulation results in two scenarios. Scenario 1 (static obstacle) is shown in (a), (b), and (c) for MPPI, CSC-MPPI, and CE-MPPI, respectively. Scenario 2 (one dynamic obstacle with two static obstacles) is shown in (d)–(k): MPPI in (d) and (e), CSC-MPPI in (f), (g), and (h), and CE-MPPI in (i), (j), and (k).
+
+Fig. 6. Experimental setup.
+
+where dR(·, ·) measures orientation mismatch (e.g., quaternion angle error), and Icol(qt) ∈ {0, 1} indicates collision or contact with the table, shelf and obstacle. For the UR5e robot and our task space, we set (wp, wR, wc) = (10, 3, 1000).
+D. Real-World Experimental Results
+We conduct real-world experiments on the UR5e platform shown in Fig. 7. The scene is set on a tabletop with a black box placed in front of the robot as an obstacle. A cube on the table serves as the goal target for the end-effector to reach.
+1) Baseline feasibility: CSC-MPPI requires iteratively modifying colliding rollouts via gradient-based updates to move them out of collision regions. On a high-DoF ma-
+
+Fig. 7. Real-world UR5e tabletop experiment. A black box serves as the obstacle and the cube on the table is the end-effector goal target.
+
+TABLE III REAL-WORLD EXPERIMENT PARAMETERS
+
+Parameter
+Rollouts K Horizon N Control step dt Joint velocity bound |q˙i| Joint position bound |qi| Temperature λ DBSCAN ε (task space)
+
+Value 50 12
+0.1 s (10 Hz) ≤ 0.1 rad/s ≤ 2π rad
+0.05 0.3 m
+
+TABLE IV REAL-WORLD RESULTS ON THE UR5E TABLETOP SETUP.
+
+Method
+MPPI CE-MPPI
+
+Collision-free
+Yes Yes
+
+Time (s)
+179.20 93.11
+
+EE Path (m)
+0.83 0.73
+
+nipulator, where sampling perturbs all joints simultaneously, this refinement step introduces substantial computational overhead. In our setup, a single planning cycle exceeds the 10 Hz control budget, preventing CSC-MPPI from producing control commands in time for real-time execution. Therefore, we focus on comparing standard MPPI and CE-MPPI on the real robot.
+2) MPPI vs. CE-MPPI: For both MPPI and CE-MPPI, the collision penalty is set sufficiently large so that the robot remains collision-free in practice. However, standard MPPI often exhibits prolonged hesitation near the obstacle, which significantly increases the time to reach the goal. In contrast, CE-MPPI performs the weighted update using only rollouts from the selected cluster, avoiding averaging across incompatible avoidance rollouts and enabling faster escape from the near-obstacle stagnation region. Table IV summarizes the results. MPPI takes 179.20 s to reach the target, nearly twice as long as CE-MPPI (93.11 s), and yields a longer end-effector path (0.83 m vs. 0.73 m). These results indicate that CE-MPPI improves escape efficiency and goalreaching performance in the presence of nearby obstacles on a high-DoF manipulator.
+IV. CONCLUSIONS
+We propose CE-MPPI to architecturally lift MPPI by pruning colliding rollouts and optimally clustering feasible rollouts using a compact geometric feature. CE-MPPI then selects a single cluster for a within-cluster MPPI update, using a minimum-cost criterion for static obstacles and an opposite-to-obstacle-motion criterion for dynamic obstacles. This design mitigates averaging-induced failure and reduces persistent blocking by proactively choosing a bypass direction in dynamic scenes. Simulation on a differentialdrive robot and real-world experiments on a 6-DoF UR5e manipulator demonstrate the efficiency and effectiveness of CE-MPPI for real-time motion planning.
+REFERENCES
+[1] M. Kazim, J. Hong, M.-G. Kim, and K.-K. K. Kim, “Recent advances in path integral control for trajectory optimization: An overview in theoretical and algorithmic perspectives,” Annual Reviews in Control, vol. 57, p. 100931, 2024.
+
+[2] A. Orthey, C. Chamzas, and L. E. Kavraki, “Sampling-based motion planning: A comparative review,” Annual Review of Control, Robotics, and Autonomous Systems, vol. 7, 2023.
+[3] G. Williams, P. Drews, B. Goldfain, J. M. Rehg, and E. A. Theodorou, “Information-theoretic model predictive control: Theory and applications to autonomous driving,” IEEE Transactions on Robotics, vol. 34, no. 6, pp. 1603–1622, 2018.
+[4] M. Schwenzer, M. Ay, T. Bergs, and D. Abel, “Review on model predictive control: An engineering perspective,” The international journal of advanced manufacturing technology, vol. 117, no. 5, pp. 1327–1349, 2021.
+[5] M. Bhardwaj, B. Sundaralingam, A. Mousavian, N. D. Ratliff, D. Fox, F. Ramos, and B. Boots, “Storm: An integrated framework for fast joint-space model-predictive control for reactive manipulation,” in Conference on Robot Learning. PMLR, 2022, pp. 750–759.
+[6] C. Tang, B. Abbatematteo, J. Hu, R. Chandra, R. Mart´ın-Mart´ın, and P. Stone, “Deep reinforcement learning for robotics: A survey of real-world successes,” Annual Review of Control, Robotics, and Autonomous Systems, vol. 8, no. 1, pp. 153–188, 2025.
+[7] Y. Lee, K. H. Choi, and K.-S. Kim, “Gpu-enabled parallel trajectory optimization framework for safe motion planning of autonomous vehicles,” IEEE Robotics and Automation Letters, vol. 9, no. 11, pp. 10 407–10 414, 2024.
+[8] A. Razmjoo, T. Xue, S. Shetty, and S. Calinon, “Sampling-based constrained motion planning with products of experts,” The International Journal of Robotics Research, p. 02783649251404955, 2024.
+[9] L. Park, K. Jang, and S. Kim, “Csc-mppi: A novel constrained mppi framework with dbscan for reliable obstacle avoidance,” in 2025 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS). IEEE, 2025, pp. 19 645–19 652.
+[10] D. Deng, “Dbscan clustering algorithm based on density,” in 2020 7th international forum on electrical engineering and automation (IFEEA). IEEE, 2020, pp. 949–953.
+[11] J. Bradbury, R. Frostig, P. Hawkins, M. J. Johnson, C. Leary, D. Maclaurin, G. Necula, A. Paszke, J. VanderPlas, S. WandermanMilne, et al., “Jax: composable transformations of python+ numpy programs,” 2018.
+[12] V. Makoviychuk, L. Wawrzyniak, Y. Guo, M. Lu, K. Storey, M. Macklin, D. Hoeller, N. Rudin, A. Allshire, A. Handa, et al., “Isaac gym: High performance gpu-based physics simulation for robot learning,” arXiv preprint arXiv:2108.10470, 2021.
+[13] V. Vasilopoulos, S. Garg, P. Piacenza, J. Huh, and V. Isler, “Ramp: Hierarchical reactive motion planning for manipulation tasks using implicit signed distance functions,” in 2023 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS). IEEE, 2023, pp. 10 551–10 558.
+[14] L. Zhou, Z. Li, Y. Li, and S. Bai, “Parallel mppi with gradient-velocity modulated sdf cost for high-performance real-time dynamic obstacle avoidance by robot manipulators,” IEEE Transactions on Robotics, 2025.
+[15] Y. Zhai, R. Reiter, and D. Scaramuzza, “Pa-mppi: Perception-aware model predictive path integral control for quadrotor navigation in unknown environments,” IEEE Robotics and Automation Letters, 2026.
+[16] J. Alvarez-Padilla, J. Z. Zhang, S. Kwok, J. M. Dolan, and Z. Manchester, “Real-time whole-body control of legged robots with modelpredictive path integral control,” in 2025 IEEE International Conference on Robotics and Automation (ICRA). IEEE, 2025, pp. 14 721– 14 727.
+[17] D. Kim, E. Im, Y. Kim, M. Lim, and Y. Lee, “Single-instance sampling for computationally efficient and accurate real-time task space mppi control,” IEEE Transactions on Robotics, vol. 41, pp. 6327–6344, 2025.
+[18] L. L. Yan and S. Devasia, “Output-sampled model predictive path integral control (o-mppi) for increased efficiency,” in 2024 IEEE International Conference on Robotics and Automation (ICRA). IEEE, 2024, pp. 14 279–14 285.
+[19] M. Aoki, K. Honda, H. Okuda, and T. Suzuki, “Switching sampling space of model predictive path-integral controller to balance efficiency and safety in 4wids vehicle navigation,” in 2024 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS). IEEE, 2024, pp. 3196–3203.
+
+

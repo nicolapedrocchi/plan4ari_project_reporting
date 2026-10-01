@@ -1,0 +1,1539 @@
+An Online Learning Approach to Model Predictive Control
+Nolan Wagener,∗# Ching-An Cheng,∗# Jacob Sacks,† and Byron Boots∗ Georgia Institute of Technology
+{nolan.wagener, cacheng, jsacks}@gatech.edu, bboots@cc.gatech.edu
+
+arXiv:1902.08967v3 [cs.RO] 9 Oct 2019
+
+Abstract—Model predictive control (MPC) is a powerful technique for solving dynamic control tasks. In this paper, we show that there exists a close connection between MPC and online learning, an abstract theoretical framework for analyzing online decision making in the optimization literature. This new perspective provides a foundation for leveraging powerful online learning algorithms to design MPC algorithms. Speciﬁcally, we propose a new algorithm based on dynamic mirror descent (DMD), an online learning algorithm that is designed for non-stationary setups. Our algorithm, Dynamic Mirror Descent Model Predictive Control (DMD-MPC), represents a general family of MPC algorithms that includes many existing techniques as special instances. DMDMPC also provides a fresh perspective on previous heuristics used in MPC and suggests a principled way to design new MPC algorithms. In the experimental section of this paper, we demonstrate the ﬂexibility of DMD-MPC, presenting a set of new MPC algorithms on a simple simulated cartpole and a simulated and real-world aggressive driving task. Videos of the real-world experiments can be found at https://youtu.be/vZST3v0_S9w and https://youtu.be/MhuqiHo2t98.
+I. INTRODUCTION
+Model predictive control (MPC) [20] is an effective tool for control tasks involving dynamic environments, such as helicopter aerobatics [1] and aggressive driving [30]. One reason for its success is the pragmatic principle it adopts in choosing controls: rather than wasting computational power to optimize a complicated controller for the full-scale problem (which may be difﬁcult to accurately model), MPC instead optimizes a simple controller (e.g., an open-loop control sequence) over a shorter planning horizon that is just sufﬁcient to make a sensible decision at the current moment. By alternating between optimizing the simple controller and applying its corresponding control on the real system, MPC results in a closed-loop policy that can handle modeling errors and dynamic changes in the environment.
+Various MPC algorithms have been proposed, using tools ranging from constrained optimization techniques [7, 20, 27] to sampling-based techniques [30]. In this paper, we show that, while these algorithms were originally designed differently if we view them through the lens of online learning [16], many of them actually follow the same general update rule. Online learning is an abstract theoretical framework for analyzing online decision making. Formally, it concerns iterative interactions between a learner and an environment over T rounds. At
+∗Institute for Robotics and Intelligent Machines †School of Electrical and Computer Engineering #Equal contribution
+
+round t, the learner makes a decision θ˜t from some decision
+
+set Θ. The environment then chooses a loss function t based on the learner’s decision, and the learner suffers a cost t(θ˜t).
+
+In addition to seeing the decision’s cost, the learner may be
+
+given additional information about the loss function (e.g., its
+
+gradient evaluated at θ˜t) to aid in choosing the next decision
+
+θ˜t+1. The learner’s goal is to minimize the accumulated costs
+
+T t=1
+
+t(θ˜t), e.g., by minimizing regret [16].
+
+We ﬁnd that the MPC process bears a strong similarity with
+
+online learning. At time t (i.e., round t), an MPC algorithm
+
+optimizes a controller (i.e., the decision) over some cost
+
+function (i.e., the per-round loss). To do so, it observes the cost of the initial controller (i.e., t(θ˜t)), improves the controller,
+
+and executes a control based on the improved controller in the
+
+environment to get to the next state (which in turn deﬁnes the next per-round loss) with a new controller θ˜t+1.
+
+In view of this connection, we propose a generic frame-
+
+work, DMD-MPC (Dynamic Mirror Descent Model Predictive
+
+Control), for synthesizing MPC algorithms. DMD-MPC is
+
+based on a ﬁrst-order online learning algorithm called dy-
+
+namic mirror descent (DMD) [14], a generalization of mirror
+
+descent [4] for dynamic comparators. We show that several
+
+existing MPC algorithms [31, 32] are special cases of DMD-
+
+MPC, given speciﬁc choices of step sizes, loss functions, and
+
+regularization. Furthermore, we demonstrate how new MPC
+
+algorithms can be derived systematically from DMD-MPC
+
+with only mild assumptions on the regularity of the cost
+
+function. This allows us to even work with discontinuous cost
+
+functions (like indicators) and discrete controls. Thus, DMD-
+
+MPC offers a spectrum from which practitioners can easily
+
+customize new algorithms for their applications.
+
+In the experiments, we apply DMD-MPC to design a range
+
+of MPC algorithms and study their empirical performance.
+
+Our results indicate the extra design ﬂexibility offered by
+
+DMD-MPC does make a difference in practice; by properly
+
+selecting hyperparameters which are obscured in the previous
+
+approaches, we are able to improve the performance of exist-
+
+ing algorithms. Finally, we apply DMD-MPC on a real-world
+
+AutoRally car platform [13] for autonomous driving tasks and
+
+show it can achieve competent performance.
+
+Notation: As our discussions will involve planning horizons, for clarity, we use lightface to denote variables that are meant for a single time step, and boldface to denote the variables congregated across the MPC planning horizon. For example,
+
+we use uˆt to denote the planned control at time t and uˆt (uˆt, . . . , uˆt+H−1) to denote an H-step planned control sequence starting from time t. We use a subscript to extract elements from a congregated variable; e.g., we use uˆt,h to the denote the hth element in uˆt (the subscript index starts from
+zero). All the variables in this paper are ﬁnite-dimensional.
+
+II. AN ONLINE LEARNING PERSPECTIVE ON MPC
+
+A. The MPC Problem Setup
+Let n, m ∈ N+ be ﬁnite. We consider the problem of controlling a discrete-time stochastic dynamical system
+
+xt+1 ∼ f (xt, ut)
+
+(1)
+
+for some stochastic transition map f : Rn × Rm → Rn. At time t, the system is in state xt ∈ Rn. Upon the execution of control ut ∈ Rm, the system randomly transitions to the next state xt+1, and an instantaneous cost c(xt, ut) is incurred. Our goal is to design a state-feedback control law (i.e., a rule of choosing ut based on xt) such that the system exhibits good performance (e.g., accumulating low costs over T time steps).
+In this paper, we adopt the MPC approach to choosing ut: at state xt, we imagine controlling a stochastic dynamics model fˆ (which approximates our system f ) for H time steps
+into the future. Our planned controls come from a control distribution πθ that is parameterized by some vector θ ∈ Θ, where Θ is the feasible parameter set. In each simulation (i.e., rollout), we sample1 a control sequence uˆt from the control distribution πθ and recursively apply it to fˆ to generate a predicted state trajectory xˆt (xˆt, xˆt+1, . . . , xˆt+H ): let xˆt = xt; for τ = t, . . . , t + H − 1, we set xˆτ+1 ∼ fˆ(xˆτ , uˆτ ). More compactly, we can write the simulation process as
+
+xˆt ∼ fˆ(xt, uˆt)
+
+(2)
+
+in terms of some fˆ that is deﬁned naturally according to
+the above recursion. Through these simulations, we desire to select a parameter θt ∈ Θ that minimizes an MPC objective Jˆ(πθ; xt), which aims to predict the performance of the system if we were to apply the control distribution πθ starting from xt.2 In other words, we wish to ﬁnd the θt that solves
+
+min Jˆ(πθ; xt).
+
+(3)
+
+θ∈Θ
+
+Once θt is decided, we then sample3 uˆt from πθt , extract the ﬁrst control uˆt, and apply it on the real dynamical system f in (1) (i.e., set ut = uˆt) to go to the next state xt+1. Because θt is determined based on xt, MPC is effectively state-feedback.
+The motivation behind MPC is to use the MPC objective Jˆ to reason about the controls required to achieve desirable
+
+1This can be sampled in either an open-loop or closed-loop fashion. 2Jˆ can be seen as a surrogate for the long-term performance of our
+controller. Typically, we set the planning horizon H to be much smaller than
+T to reduce the optimization difﬁculty and to mitigate modeling errors. 3This setup can also optimize deterministic policies, e.g., by deﬁning πθ
+to be a Gaussian policy with the mean being the deterministic policy.
+
+round t − 1 θ˜t−1 θt−1
+t−1
+ut−2 xt−1
+
+round t Φ θ˜t θt
+t
+ut−1 xt
+
+round t + 1 Φ θ˜t+1 θt+1
+t+1
+ut xt+1
+
+Fig. 1: Diagram of the online learning perspective, where blue and red denote the learner and the environment, respectively.
+
+long-term behaviors. Consider the statistic
+
+H −1
+
+C(xˆt, uˆt)
+
+c(xˆt+h, uˆt+h) + cend(xˆt+H ), (4)
+
+h=0
+
+where cend is a terminal cost function. A popular MPC objective is Jˆ(πθ; xt) = E[C(xˆt, uˆt) | xt, πθ, fˆ], which estimates the expected H-step future costs. Later in Section III-A, we will discuss several MPC objectives and their properties.
+Although the idea of MPC sounds intuitively promising, the optimization can only be approximated in practice (e.g., using an iterative algorithm like gradient descent), because (3) is often a stochastic program (like the example above) and the control command ut needs to be computed at a high frequency. In consideration of this imperfection, it is common to heuristically bootstrap the previous approximate solution as the initialization to the current problem. Speciﬁcally, let θt−1 be the approximate solution to the previous problem and θ˜t denote the initial condition of θ in solving (3). The bootstrapping step can then written as
+
+θ˜t = Φ(θt−1)
+
+(5)
+
+by effectively deﬁning a shift operator Φ (see Section A for details). Because the subproblems in (3) of two consecutive time steps share all control variables except for the ﬁrst and the last ones, shifting the previous solution provides a warm start to (3) to amortize the computational complexity.
+
+B. The Online Learning Perspective
+As discussed, the iterative update process of MPC resembles the setup of online learning [16]. Here we provide the details to convert an MPC setup into an online learning problem. Recall from the introduction that online learning mainly consists of three components: the decision set, the learner’s strategy for updating decisions, and the environment’s strategy for updating per-round losses. We show the counterparts in MPC that correspond to each component below. Note that in this section we will overload the notation Jˆ(θ; xt) to mean Jˆ(πθ; xt).
+We use the concept of per-round loss in online learning as a mechanism to measure the decision uncertainty in MPC, and propose the following identiﬁcation (shown in Fig. 1) for the MPC setup described in the previous section: we set the rounds in online learning to synchronize with the time steps of our control system, set the decision set Θ as the space of feasible parameters of the control distribution πθ, set the learner as the
+
+MPC algorithm which in round t outputs the decision θ˜t ∈ Θ and side information ut−1, and set the per-round loss as
+
+t(·) = Jˆ(· ; xt).
+
+(6)
+
+In other words, in round t of this online learning setup, the learner plays a decision θ˜t along with a side information ut−1 (based on the optimized solution θt−1 and the shift
+
+operator in (5)), the environment selects the per-round loss t(·) = Jˆ(·; xt) (by applying ut−1 to the real dynamical system in (1) to transit the state to xt), and ﬁnally the learner receives t and incurs cost t(θ˜t) (which measures the sub-
+
+optimality of the future plan made by the MPC algorithm).
+
+This online learning setup differs slightly from the standard setup in its separation of the decision θ˜t and the side information ut−1; while our setup can be converted into a standard one that treats θt−1 as the sole decision played in round t,
+
+we adopt this explicit separation in order to emphasize that the variable part of the incurred cost t(θ˜t) pertains to only θ˜t. That is, the learner cannot go back and revert the previous control ut−1 already applied on the system, but only uses t to update the current and future controls uˆt, . . . , uˆt+H−1.
+
+The performance of the learner in online learning (which
+
+by our identiﬁcation is the MPC algorithm) is measured in
+
+terms of the accumulated costs
+
+T t=1
+
+t(θ˜t).
+
+For
+
+problems
+
+in non-stationary setups, a normalized way to describe the
+
+accumulated costs in the online learning literature is through
+
+the concept of dynamic regret [14, 34], which is deﬁned as
+
+T
+
+T
+
+D-Regret = t(θ˜t) − t(θt ),
+
+(7)
+
+t=1
+
+t=1
+
+where θt ∈ arg minθ∈Θ t(θ). Dynamic regret quantiﬁes how suboptimal the played decisions θ˜1, . . . , θ˜T are on the corresponding loss functions. In our proposed problem setup, the optimality concept associated with dynamic regret conveys a consistency criterion desirable for MPC: we would like to make a decision θt−1 at state xt−1 such that, after applying control ut−1 and entering the new state xt, its shifted plan θ˜t remains close to optimal with respect to the new loss function t. If the dynamics model fˆ is accurate and the MPC algorithm is ideally solving (3), we can expect that bootstrapping the previous solution θt−1 through (5) into θ˜t would result in a small instantaneous gap t(θ˜t) − t(θt ) which is solely due to unpredictable future information (such as the stochasticity in the dynamical system). In other words, an online learning algorithm with small dynamic regret, if applied to our online learning setup, would produce a consistently optimal MPC algorithm with regard to the solution concept discussed above. However, we note that having small dynamic regret here does not directly imply good absolute performance on the control system, because the overall performance of the MPC algorithm is largely dependent on the form of the MPC objective Jˆ (e.g., through choice of H and accuracy of fˆ). Small dynamic regret more precisely means whether the plan produced by an MPC algorithm is consistent with the given MPC objective.
+
+III. A FAMILY OF MPC ALGORITHMS BASED ON DYNAMIC MIRROR DESCENT
+
+The online learning perspective on MPC suggests that good MPC algorithms can be designed from online learning algorithms that achieve small dynamic regret. This is indeed the case. We will show that a range of existing MPC algorithms are in essence applications of a classical online learning algorithm called dynamic mirror descent (DMD) [14]. DMD is a generalization of mirror descent [4] to problems involving dynamic comparators (in this case, the {θt } in dynamic regret in (7)). In round t, DMD applies the following update rule:
+
+θt = arg min γtgt, θ + Dψ(θ θ˜t)
+
+θ∈Θ
+
+(8)
+
+θ˜t+1 = Φ(θt),
+
+where gt = ∇ t(θ˜t) (which can be replaced by unbiased sampling if ∇ t(θ˜t) is an expectation), Φ is called the shift model,4 γt > 0 is the step size, and for some θ, θ ∈ Θ, Dψ(θ θ ) ψ(θ) − ψ(θ ) − ∇ψ(θ ), θ − θ is the Bregman divergence generated by a strictly convex function ψ on Θ.
+The ﬁrst step of DMD in (8) is reminiscent of the proximal
+update in the usual mirror descent algorithm. It can be thought
+of as an optimization step where the Bregman divergence acts as a regularization to keep θ close to θ˜t. Although Dψ(θ θ ) is not necessarily a metric (since it may not be symmetric), it is still useful to view it as a distance between θ and θ . Indeed, familiar examples of the Bregman divergence include the squared Euclidean distance and KL divergence5 [3].
+The second step of DMD in (8) uses the shift model Φ to anticipate the optimal decision for the next round. In the
+context of MPC, a natural choice for the shift model is
+the shift operator in (5) deﬁned previously in Section II-A
+(hence the same notation), because the per-round losses in two
+consecutive rounds here concern problems with shifted time
+indices. Hall and Willett [14] show that the dynamic regret of
+DMD scales with how much the optimal decision sequence {θt } deviates from Φ (i.e., t θt+1 − Φ(θt ) ), which is proportional to the unpredictable elements of the problem.
+
+Algorithm 1: Dynamic Mirror Descent MPC (DMD-MPC)
+for t = 1, 2, . . . , T do t(·) = Jˆ(· ; xt) θt = arg min γt∇ t(θ˜t), θ + Dψ(θ θ˜t)
+θ∈Θ
+Sample uˆt ∼ πθt and set ut = uˆt Sample xt+1 ∼ f (xt, ut) θ˜t+1 = Φ(θt) end
+
+Applying DMD in (8) to the online learning problem described in Section II-B leads to an MPC algorithm shown
+4In [14], Φ is called a dynamical model, but it is not the same as the dynamics of our control system. We therefore rename it to avoid confusion.
+5For probability distributions p and q over a random variable x, the KL divergence is deﬁned as KL(p q) Ex∼p log q(x) p(x) .
+
+in Algorithm 1, which we call DMD-MPC. More precisely, DMD-MPC represents a family of MPC algorithms in which a speciﬁc instance is deﬁned by a choice of:
+1) the MPC objective Jˆ in (6), 2) the form of the control distribution πθ, and 3) the Bregman divergence Dψ in (8).
+Thus, we can use DMD-MPC as a generic strategy for synthesizing MPC algorithms. In the following, we use this recipe to recreate several existing MPC algorithms and demonstrate new MPC algorithms that naturally arise from this framework.
+
+A. Loss Functions
+We discuss several deﬁnitions of the per-round loss t, which all result from the formulation in (6) but with different Jˆ. These loss functions are based on the statistic C(xˆt, uˆt) deﬁned in (4) which measures the H-step accumulated cost of a given trajectory. For transparency of exposition, we will suppose henceforth that the control distribution πθ is open-loop6; similar derivations follow naturally for closedloop control distributions. For convenience of practitioners, we also provide expressions of their gradients in terms of the likelihood-ratio derivative7 [12]. For some function Lt(xˆt, uˆt), all these gradients shall have the form
+
+∇ t(θ) = Euˆt∼πθ Exˆt∼fˆ(xt,uˆt)[Lt(xˆt, uˆt)∇θ log πθ(uˆt)]. (9)
+
+In short, we will denote Euˆt∼πθ Exˆt∼fˆ(xt,uˆt) as Eπθ,fˆ. These gradients in practice are approximated by ﬁnite samples.
+1) Expected Cost: The most commonly used MPC objective is the H-step expected accumulated cost function under
+model dynamics, because it directly estimates the expected long-term behavior when the dynamics model fˆ is accurate and H is large enough. Its per-round loss function is8
+
+t(θ) = Eπθ,fˆ[C(xˆt, uˆt)]
+
+(10)
+
+∇ t(θ) = Eπθ,fˆ[C(xˆt, uˆt)∇θ log πθ(uˆt)]. (11)
+
+2) Expected Utility: Instead of optimizing for average cost,
+we may care to optimize for some preference related to the trajectory cost C, such as having the cost be below some
+threshold. This idea can be formulated as a utility that returns
+a normalized score related to the preference for a given trajectory cost C(xˆt, uˆt). Speciﬁcally, suppose that C is lower bounded by zero9 and at some round t deﬁne the utility Ut : R+ → [0, 1] (i.e., Ut : C(xˆt, uˆt) → Ut(C(xˆt, uˆt))) to be a function with the following properties: Ut(0) = 1, Ut is monotonically decreasing, and limz→+∞ Ut(z) = 0. These are sensible properties since we attain maximum utility
+when we have zero cost, the utility never increases with the
+
+6Note again that even while using open-loop control distributions, the overall control law of MPC is state-feedback.
+7We assume the control distribution is sufﬁciently regular with respect to its parameter so that the likelihood-ratio derivative rule holds.
+8In experiments, we subtract the empirical average of the sampled costs from C in (11) to reduce the variance, at the cost of a small amount of bias.
+9If this is not the case, let cmin infxˆt,uˆt C(xˆt, uˆt), which we assume is ﬁnite. We can then replace C with C˜(xˆt, uˆt) C(xˆt, uˆt) − cmin.
+
+cost, and the utility approaches zero as the cost increases without bound. We then deﬁne the per-round loss as
+
+t(θ) = − log Eπθ,fˆ[Ut(C(xˆt, uˆt))]
+
+(12)
+
+∇ t(θ) = − Eπθ,fˆ[Ut(C(xˆt, uˆt))∇θ log πθ(uˆt)] . (13) Eπθ,fˆ[Ut(C(xˆt, uˆt))]
+
+The gradient in (13) is particularly appealing when esti-
+
+mated with samples. Suppose we sample N control sequences
+
+uˆ
+
+1 t
+
+,
+
+.
+
+.
+
+.
+
+,
+
+uˆ
+
+N t
+
+from
+
+πθ
+
+and
+
+(for
+
+the
+
+sake
+
+of
+
+compactness)
+
+sample
+
+one state trajectory from fˆ for each corresponding control
+
+sequence, resulting in xˆ1t , . . . , xˆNt . Then the estimate of (13)
+
+is a convex combination of gradients:
+
+N
+∇ t(θ) ≈ − wi∇θ log πθ(uˆit),
+i=1
+
+where wi =
+
+Ut (Ci )
+
+and Ci
+
+=
+
+C
+
+(xˆ
+
+i t
+
+,
+
+uˆit
+
+),
+
+for
+
+N j=1
+
+Ut (Cj
+
+)
+
+i = 1, . . . , N . We see that each weight wi is computed by
+
+considering the relative utility of its corresponding trajectory.
+
+A cost Ci with high relative utility will push its correspond-
+
+ing weight wi closer to one, whereas a low relative utility
+
+will cause wi to be close to zero, effectively rejecting the
+
+corresponding sample.
+
+We give two examples of utilities and their related losses. a) Probability of Low Cost: For example, we may care
+about the system being below some cost threshold as often as possible. To encode this preference, we can use the threshold utility Ut(C) 1{C ≤ Ct,max}, where 1{·} is the indicator function and Ct,max is a threshold parameter. Under this choice, the loss and its gradient become
+
+t(θ) = − log Eπθ,fˆ[1{C(xˆt, uˆt) ≤ Ct,max}]
+
+(14)
+
+= − log Pπθ,fˆ(C(xˆt, uˆt) ≤ Ct,max)
+
+∇ t(θ) = − Eπθ,fˆ[1{C(xˆt, uˆt) ≤ Ct,max}∇θ log πθ(uˆt)] . (15) Eπθ,fˆ[1{C(xˆt, uˆt) ≤ Ct,max}]
+
+As we can see, this loss function also gives the probability of achieving cost below some threshold. As a result (Fig. 2a), costs below Ct,max are treated the same in terms of the utility. This can potentially make optimization easier since we are trying to make good trajectories as likely as possible instead of ﬁnding the best trajectories as in (10).
+However, if the threshold Ct,max is set too low and the gradient is estimated with samples, the gradient estimate may have high variance due to the large number of rejected samples. Because of this, in practice, the threshold is set adaptively, e.g., as the largest cost of the top elite fraction of the sampled trajectories with smallest costs [6]. This allows the controller to make the best sampled trajectories more likely and therefore improve the controller.
+b) Exponential Utility: We can also opt for a continuous surrogate of the indicator function, in this case the exponential utility Ut(C) exp(− λ1 C), where λ > 0 is a scaling parameter. Unlike the indicator function, the exponential utility provides nonzero feedback for any given cost and allows us to discriminate between costs (i.e., if C1 > C2, then
+
+Ut(C) = 1{C ≤ Ct,max} Ut(C) = exp(− 1λC)
+
+1.00
+
+1.00
+
+0.75
+
+0.75
+
+Increasing Ct,max
+
+0.50
+
+0.50
+
+0.25
+
+0.25
+
+Increasing λ
+
+0.00
+
+0
+
+1
+
+2
+
+3
+
+4
+
+5
+
+C
+
+(a) Threshold utility
+
+0.00 0
+
+2
+
+4
+
+C
+
+(b) Exponential utility
+
+Fig. 2: Visualization of different utilities.
+
+Ut(C1) < Ut(C2)), as shown in Fig. 2b. Furthermore, λ acts as a continuous alternative to Ct,max and dictates how quickly or slowly Ut decays to zero, which in a soft way determines
+the cutoff point for rejecting given costs. Under this choice, the loss and its gradient become
+
+1
+
+(θ) = − log Eπθ,fˆ exp − C(xˆt, uˆt)
+
+(16)
+
+tλ
+
+Eπθ ,fˆ
+
+exp
+
+−
+
+1 λ
+
+C
+
+(xˆ
+
+t
+
+,
+
+uˆ t
+
+)
+
+∇θ log πθ(uˆt)
+
+∇ t(θ) = −
+
+1
+
+. (17)
+
+Eπθ,fˆ exp − λ C(xˆt, uˆt)
+
+The loss function in (16) is also known as the risk-seeking objective in optimal control [28]; this classical interpretation is based on a Taylor expansion of (16) showing
+λ t(θ) ≈ Eπθ,fˆ[C(xˆt, uˆt)] − 1λ Vπθ,fˆ[C(xˆt, uˆt)]
+when λ is large, where Vπθ,fˆ[C(xˆt, uˆt)] is the variance of C(xˆt, uˆt). Here we derive (16) from a different perspective that treats it as a continuous approximation of (14). The use of exponential transformations to approximate indicators is a common machine-learning trick (like the Chernoff bound [8]).
+
+B. Algorithms
+
+We instantiate DMD-MPC with different choices of loss function, control distribution, and Bregman divergence as concrete examples to showcase the ﬂexibility of our framework. In particular, we are able to recover well-known MPC algorithms as special cases of Algorithm 1.
+Our discussions below are organized based on the class of Bregman divergences used in (8), and the following algorithms are derived assuming that the control distribution is a sequence of independent distributions. That is, we suppose πθ is a probability density/mass function that factorizes as
+
+H −1
+
+πθ(uˆt) = πθh (uˆt,h),
+
+(18)
+
+h=0
+
+and θ = (θ0, θ1, . . . , θH−1) for some basic control distribution πθ parameterized by θ ∈ Θ, where Θ denotes the feasible set
+for the basic control distribution. For control distributions in the form of (18), the shift operator Φ in (5) would set θ˜t by identifying θ˜t,h = θt−1,h+1 for h = 0, . . . , H − 2, and initializing the ﬁnal parameter as either θ˜t,H−1 = θ˜t,H−2 or θ˜t,H−1 = θ¯ for some default parameter θ¯.
+
+1) Quadratic Divergence: We start with perhaps the most
+common Bregman divergence: the quadratic divergence. That
+is, we suppose the Bregman divergence in (8) has a quadratic form 10 Dψ(θ θ ) 12 (θ − θ )TA(θ − θ ) for some positivedeﬁnite matrix A. Below we discuss different choices of A and their corresponding update rules.
+a) Projected Gradient Descent: This basic update rule is a special case when A is the identity matrix. Equivalently, the update can be written as θt = arg minθ∈Θ θ −(θ˜t −γtgt) 2.
+b) Natural Gradient Descent: We can recover the natural gradient descent algorithm [2] by deﬁning A = F(θ˜t) where
+
+F (θ˜t) = Eπθ˜ ∇θ˜t log πθ˜t (uˆt)∇θ˜t log πθ˜t (uˆt)T
+t
+
+is the Fisher information matrix. This rule uses the natural Riemannian metric of distributions to normalize the effects of different parameterizations of the same distribution [25].
+c) Quadratic Problems: While the above two update rules are quite general, we can further specialize the Bregman divergence to achieve faster learning when the per-round loss function can be shown to be quadratic. This happens, for instance, when the MPC problem in (3) is an LQR or LEQR problem11 [11]. That is, if
+
+1T
+
+T
+
+t(θ) = θ Rtθ + rt θ + const.
+
+2
+
+for some constant vector rt and positive deﬁnite matrix Rt,
+
+we can set A = Rt and γt = 1, making θt given by the ﬁrst
+
+step of (8) correspond to the optimal solution to t (i.e., the
+
+solution of LQR/LEQR). The particular values of Rt and rt
+
+for each of LQR and LEQR are derived in Section D.
+
+2) KL Divergence and the Exponential Family: We show
+
+that for control distributions in the exponential family [23],
+
+the Bregman divergence in (8) can be set to the KL di-
+
+vergence, which is a natural way to measure distances be-
+
+tween distributions. Toward this end, we review the basics
+
+of the exponential family. We say a distribution pη with
+
+natural parameter η of random variable u belongs to the
+
+exponential family if its probability density/mass function
+
+satisﬁes pη(u) = ρ(u) exp( η, φ(u) − A(η)), where φ(u) is
+
+the sufﬁcient statistics, ρ(u) is the carrier measure, and A(η) =
+
+log ρ(u) exp( η, φ(u) ) du is the log-partition function. The
+
+distribution pη can also be described by its expectation pa-
+
+rameter µ Epη [φ(u)], and there is a duality between the two parameterizations: µ = ∇A(η) and η = ∇A∗(µ), where A∗(µ) = supη∈H η, µ −A(η) is the Legendre transformation of A and H = {η : A(η) < +∞}. That is, ∇A = (∇A∗)−1.
+
+The duality results in the property below.
+
+Fact 1. [23] KL(pη pη ) = DA(η η) = DA∗ (µ µ ).
+
+We can use Fact 1 to deﬁne the Bregman divergence in (8) to optimize a control distribution πθ in the exponential family:
+• if θ is an expectation parameter, we can set Dψ(θ θ˜t) KL(πθ πθ˜t ), or
+
+10This is generated by deﬁning ψ(θ) 12 θTAθ. 11The dynamics model fˆ is linear, the step cost c is quadratic, the per-round loss t is (10), and the basic control distribution is a Dirac-delta distribution.
+
+• if θ is a natural parameter, we can set Dψ(θ θ˜t) KL(πθ˜t πθ).
+We demonstrate some examples using this idea below. a) Expectation Parameters and Categorical Distribu-
+tions: We ﬁrst discuss the case where θ is an expectation parameter and the ﬁrst step in (8) is
+
+θt = arg min γtgt, θ + KL(πθ πθ˜t ).
+
+(19)
+
+θ∈Θ
+
+To illustrate, we consider an MPC problem with a discrete
+control space {1, 2, . . . , m} and use the categorical distri-
+bution as the basic control distribution in (18), i.e., we set πθh = Cat(θh), where θh ∈ ∆m is the probability of choosing each control among {1, 2, . . . , m} at the hth predicted time step and ∆m denotes the probability simplex in Rm. This parameterization choice makes θ an expectation parameter of πθ that corresponds to sufﬁcient statistics given by indicator
+functions. With the structure of (9), the update direction is
+
+gt,h = Eπ ˜ ,fˆ Lt(xˆt, uˆt)euˆt,h θ˜t,h
+θt
+
+(h = 0, 1, . . . , H −1)
+
+where θ˜t,h and gt,h are the hth elements of θ˜t and gt, respectively, euˆt,h ∈ Rm has 0 for each element except at index uˆt,h where it is 1, and denotes elementwise division. Update (19) then becomes the exponentiated gradient algorithm [16]:
+
+1˜
+
+θt,h =
+
+θt,h
+
+exp(−γtgt,h) (h = 0, 1, . . . , H − 1)
+
+(20)
+
+Zt,h
+
+where θt,h is the hth element of θt, Zt,h is the normalizer for θt,h, and denotes elementwise multiplication. That is, instead of applying an additive gradient step to the parameters, the update in (19) exponentiates the gradient and performs elementwise multiplication. This does a better job of accounting for the geometry of the problem, and makes projection a simple operation of normalizing a distribution.
+b) Natural Parameters and Gaussian Distributions: Alternatively, we can set θ as a natural parameter and use
+
+θt = arg min γtgt, θ + KL(πθ˜t πθ)
+
+(21)
+
+θ∈Θ
+
+as the ﬁrst step in (8). In particular, we show that, with (21), the structure of the likelihood-ratio derivative in (9) can be leveraged to design an efﬁcient update. The main idea follows from the observation that when the gradient is computed through (9) and θ˜t is the natural parameter, we can write
+gt = ∇ t(θ˜t) = Eπ˜ ,fˆ[Lt(xˆt, uˆt)(φ(uˆt) − µ˜t)] (22)
+θt
+where µ˜t is the expectation parameter of θ˜t and φ is the sufﬁcient statistics of the control distribution. We combine the factorization in (22) with a property of the proximal update below (proven in Section C) to derive our algorithm.
+Proposition 1. Let gt be an update direction. Let M be the image of H under ∇A. If µt − γtgt ∈ M and ηt+1 = arg minη∈H γtgt, η + DA(η ηt), then µt+1 = µt − γtgt.12
+
+12A similar proposition can be found for (19).
+
+We ﬁnd that, under the assumption13 in Proposition 1, the update rule in (21) becomes
+
+µt+1 = (1 − γt)µ˜t + γtEπ˜ ,fˆ[Lt(xˆt, uˆt)φ(uˆt)]. (23)
+θt
+In other words, when γt ∈ [0, 1], the update to the expectation parameter µt in (8) is simply a convex combination of the sufﬁcient statistics and the previous expectation parameter µ˜t.
+We provide a concrete example of an MPC algorithm that follows from (23). Let us consider a continuous control space and use the Gaussian distribution as the basic control distribution in (18), i.e., we set πθh (uˆt,h) = N (uˆt,h; mh, Σh) for some mean vector mh and covariance matrix Σh. For πθh , we can choose sufﬁcient statistics φ(uˆt,h) = (uˆt,h, uˆt,huˆTt,h), which results in the expectation parameter µh = (mh, Sh) and the natural parameter ηh = (Σh−1mh, − 21 Σh−1), where Sh Σh + mhmTh is the second moment of πθh . Let us set θh as the natural parameter. Then (21) is equivalent to the update rule for h = 0, . . . , H − 1:
+mt,h = (1 − γt)m˜ t,h + γtEπ ˜ ,fˆ[Lt(xˆt, uˆt)uˆt,h] T θt (24)
+St,h = (1 − γt)S˜t,h + γtEπ ˜ ,fˆ Lt(xˆt, uˆt)uˆt,huˆt,h .
+θt
+Several existing algorithms are special cases of (24).
+• Cross-entropy method (CEM) [6]: If t is set to (14) and γt = 1, then (24) becomes
+Eπ ˜ ,fˆ[1{C(xˆt, uˆt) ≤ Ct,max}uˆt,h] mt,h = θt
+Eπ˜ ,fˆ[1{C(xˆt, uˆt) ≤ Ct,max}] θt (25)
+Eπ ˜ ,fˆ 1{C(xˆt, uˆt) ≤ Ct,max}uˆt,huˆTt,h St,h = θt ,
+Eπ˜ ,fˆ[1{C(xˆt, uˆt) ≤ Ct,max}]
+θt
+which matches the update rule of the cross-entropy method for Gaussian distributions [6].14 • Model-predictive path integral (MPPI) [31]: If we choose t as the exponential utility, as in (16), and do not update the covariance, the update rule becomes
+
+Eπ ˜ ,fˆ e− λ1 C(xˆt,uˆt)uˆt,h
+θ
+
+mt,h = (1 − γt)m˜ t,h + γt t
+
+1
+
+,
+
+Eπθ˜ ,fˆ e− λ C(xˆt,uˆt)
+t
+
+(26)
+
+which reduces to the MPPI update rule [31] for γt = 1. This connection is also noted in [24].
+
+C. Extensions
+In the previous sections, we discussed multiple instantiations of DMD-MPC, showing the ﬂexibility of our framework. But they are by no means exhaustive. In Section B, we discuss variations of DMD-MPC, e.g., imposing constraints and different ways to approximate the expectation in (9).
+
+13If µt −γtgt is not in M, the update in (21) needs to perform a projection, the form of which is algorithm dependent.
+14Though CEM is typically presented as updating the mean and covariance of a Gaussian distribution, the update rule is derived by matching the ﬁrst and second moments between the Gaussian distribution and a uniform distribution over trajectories whose costs are at most Ct,max, which is identical to (25).
+
+IV. RELATED WORK
+Recent work on MPC has studied sampling-based approaches, which are ﬂexible in that they do not require differentiability of a cost function. One such algorithm which can be used with general cost functions and dynamics is MPPI, which was proposed by Williams et al. [31] as a generalization of the control afﬁne case [30]. The algorithm is derived by considering an optimal control distribution deﬁned by the control problem. This optimal distribution is intractable to sample from, so the algorithm instead tries to bring a tractable distribution (in this case, Gaussian with ﬁxed covariance) as close as possible in the sense of KL divergence. This ends up being the same as ﬁnding the mean of the optimal control distribution. The mean is then approximated as a weighted sum of sampled control trajectories, where the weight is determined by the exponentiated costs. Although this algorithm works well in practice (including a robust variant [33] achieving state-ofthe-art performance in aggressive driving [10]), it is not clear that matching the mean of the distribution should guarantee good performance, such as in the case of a multimodal optimal distribution. By contrast, our update rule in (26) results from optimizing an exponential utility.
+A closely related approach is the cross-entropy method (CEM) [6], which also assumes a Gaussian sampling distribution but minimizes the KL divergence between the Gaussian distribution and a uniform distribution over low cost samples. CEM has found applicability in reinforcement learning [19, 21, 26], motion planning [17, 18], and MPC [9, 32].
+These sampling-based control algorithms can be considered special cases of general derivative-free optimization algorithms, such as covariance matrix adaptation evolutionary strategies (CMA-ES) [15] and natural evolutionary strategies (NES) [29]. CMA-ES samples points from a multivariate Gaussian, evaluates their ﬁtness, and adapts the mean and covariance of the sampling distribution accordingly. On the other hand, NES optimizes the parameters of the sampling distribution to maximize some expected ﬁtness through steepest ascent, where the direction is provided by the natural gradient. Akimoto et al. [2] showed that CMA-ES can also be interpreted as taking a natural gradient step on the parameters of the sampling distribution. As we showed in Section III-B, natural gradient descent is a special case of DMD-MPC framework. A similar observation that connects between MPPI and mirror descent was made by Okada and Taniguchi [24], but their derivation is limited to the KL divergence and Gaussian case.
+V. EXPERIMENTS
+We use experiments to the validate the ﬂexibility of DMDMPC. We show that this framework can handle both continuous (Gaussian distribution) and discrete (categorial distribution) variations of control problems, and that MPC algorithms like MPPI and CEM can be generalized using different step sizes and control distributions to improve performance. Extra details and results are included in Sections E and F.
+
+Expected cost, 10 samples
+
+Threshold utility, 10 samples
+
+108
+
+Expected cost, 100 samples
+
+108
+
+Threshold utility, 100 samples
+
+Expected cost, 1000 samples
+
+Threshold utility, 1000 samples
+
+Exponential utility, 10 samples
+
+Exponential utility, 100 samples
+
+107
+
+107
+
+Exponential utility, 1000 samples
+
+Episode cost
+
+106
+
+106
+
+10−6
+
+10−4
+
+10−2
+
+100
+
+102
+
+10−2
+
+10−1
+
+100
+
+101
+
+102
+
+Step size γt
+
+Step size γt
+
+(a) Continuous controls
+
+Expected cost, 10 samples
+
+108
+
+Expected cost, 100 samples
+
+Expected cost, 1000 samples
+
+107
+
+Threshold utility, 10 samples
+
+108
+
+Threshold utility, 100 samples
+
+Threshold utility, 1000 samples
+
+Exponential utility, 10 samples
+
+Exponential utility, 100 samples
+
+107
+
+Exponential utility, 1000 samples
+
+Episode cost
+
+106
+
+106
+
+10−6
+
+10−4
+
+10−2
+
+100
+
+102
+
+10−2
+
+10−1
+
+100
+
+101
+
+102
+
+Step size γt
+
+Step size γt
+
+(b) Discrete controls
+Fig. 3: Varying step size and number of samples (same legends for (a) and (b)). EC = expected cost (10). PLC = probability of low cost (14) with elite fraction = 10−3. EU = exponential utility (16) with λ = 1.
+
+A. Cartpole
+We ﬁrst consider the classic cartpole problem where we seek to swing a pole upright and keep it balanced only using actuation on the attached cart. We consider both the continuous and discrete control variants. For the continuous case, we choose the Gaussian distribution as the control distribution and keep the covariance ﬁxed. For the discrete case, we choose the categorical distribution and use update (20). In either case, we have access to a biased stochastic model (uses a different pole length compared to the real cart).
+We consider the interaction between the choice of loss, step size, and number of samples used to estimate (9),15 shown in Figs. 3 and 4. For this environment, we can achieve low cost when optimizing the expected cost in (10) with a proper step size (10−2 for both continuous and discrete problems) while being fairly robust to the number of samples. When using either of the utilities, the number of samples is more crucial in the continuous domain, with more samples allowing for larger step sizes. In the discrete domain (Fig. 3b), performance is largely unaffected by the number of samples when the step size is below 10, excluding the threshold utility with 1000 samples. In Fig. 4a, for a large range of utility parameters, we see that using step sizes above 1 (the step size set in MPPI and CEM) give signiﬁcant performance gains. In Fig. 4b, there’s a more complicated interaction between the utility parameter
+15For our experiments, we vary the number of samples from πθ and ﬁx the number of samples from fˆ to ten. Furthermore, we use common random numbers when sampling from fˆ to reduce estimation variance.
+
+Episode cost
+
+108 107 106
+10−4
+108 107 106
+
+Probability of low cost γt = 0.25 108 γt = 0.5 γt = 1.0 γt = 2.0 γt = 4.0 107
+106
+
+Exponential utility
+
+10−3
+
+10−2
+
+10−1
+
+Elite fraction
+
+0 10−4 10−3 10−2 10−1 100 101 102 103 λ
+
+(a) Continuous controls
+
+Probability of low cost
+
+Exponential utility
+
+γt = 2.5 108 γt = 5.0 γt = 10.0 γt = 20.0 γt = 40.0 107
+
+106
+
+Lap time (s)
+
+20
+
+64 samples 192 samples 448 samples 960 samples 1920 samples 3840 samples
+
+10
+
+0.6
+
+0.8
+
+1.0
+
+1.2
+
+Step size γt
+
+Fig. 5: Simulated AutoRally performance with different step sizes and number of samples. Though many samples coupled with large steps yield the smallest lap times, the performance gains are small past 1920 samples. With fewer samples, a lower step size helps recover some lost performance.
+
+Episode cost
+
+10−4
+
+10−3
+
+10−2
+
+10−1
+
+Elite fraction
+
+0 10−4 10−3 10−2 10−1 100 101 102 103 λ
+
+(b) Discrete controls Fig. 4: Varying loss parameter and step size (1000 samples).
+
+and step size, with huge changes in cost when altering the utility parameter and keeping the step size ﬁxed.
+B. AutoRally
+1) Platform Description: We use the autonomous AutoRally platform [13] to run a high-speed driving task on a dirt track, with the goal of the task to achieve as low a lap time as possible. The robot (Fig. 6) is a 1:5 scale RC chassis capable of driving over 20 m/s (45 mph) and has a desktop-class Intel Core i7 CPU and Nvidia GTX 1050 Ti GPU. Our code for the control algorithm is based on modiﬁcations of code available on the AutoRally repository.16 For real-world experiments, we estimate the car’s pose using a particle ﬁlter from [10] which relies on a monocular camera, IMU, and GPS. In both simulated and real-world experiments, the dynamics model is a neural network which has been ﬁtted to data collected from human demonstrations. We note that the dynamics model is deterministic, so we don’t need to estimate any expectations with respect to the dynamics.
+2) Simulated Experiments: We ﬁrst use the Gazebo simulator (Fig. 9 in Section E-B) from the AutoRally repo to perform a sweep of algorithm parameters, particularly the step size and number of samples, to evaluate how changing these parameters can affect the performance of DMD-MPC. For all of the experiments, the control distribution is a Gaussian with ﬁxed covariance, and we use update (26) (i.e., the loss is the exponential utility (16)) with λ = 6.67. The resulting lap times are shown in Fig. 5.17 We see that although using more samples does result in smaller lap times, there are diminishing returns past 1920 samples per gradient. Indeed, with a proper
+16https://github.com/AutoRally/autorally 17The large error bar for 64 samples and step size of 0.8 is due to one particular lap where the car stalled at a turn for about 60 seconds.
+
+Fig. 6: Rally car driving during an experiment.
+step size, even as few as 192 samples can yield lap times within a couple seconds of 3840 samples and a step size of 1. We also observe that the curves converge as the step size decreases further, implying that only a certain number of samples are needed for a given step size. This is a particularly important advantage of DMD-MPC over methods like MPPI: by changing the step size, DMD-MPC can perform much more effectively with fewer samples, making it a good choice for embedded systems which can’t produce many samples due to computational constraints.
+3) Real-World Experiments: In the real-world setting (Fig. 7), the control distribution is a Gaussian with ﬁxed covariance, and we use update (26) with λ = 8. We ran two sets of experiments, each with a different target speed: one at 9 m/s and the other at 11 m/s.18
+18The conference version of this paper does not have the second set of experiments (target of 11 m/s). Those experiments were conducted after the camera-ready deadline of the conference.
+Fig. 7: Real-world AutoRally task.
+
+TABLE I: Statistics for real-world experiments at target of 9 m/s.
+
+Samples 1920
+64
+
+Step size γt
+1 0.8 0.6
+1 0.8 0.6
+
+Lap time (s)
+31.76 ± 0.55 31.81 ± 0.21 32.83 ± 0.31
+33.74 ± 0.78 33.84 ± 0.80 33.61 ± 0.74
+
+Avg. speed (m/s)
+5.70 ± 0.16 5.75 ± 0.03 5.60 ± 0.05
+5.45 ± 0.16 5.46 ± 0.11 5.50 ± 0.13
+
+Max speed (m/s)
+9.21 ± 0.30 9.03 ± 0.19 8.62 ± 0.12
+9.50 ± 0.22 9.12 ± 0.26 9.14 ± 0.42
+
+TABLE II: Statistics for real-world experiments at target of 11 m/s.
+
+Samples 64
+
+Step size γt
+1 0.6
+
+Lap time (s)
+31.05 ± 0.67 30.30 ± 0.56
+
+Avg. speed (m/s)
+5.80 ± 0.26 5.98 ± 0.15
+
+Max speed (m/s)
+10.17 ± 0.30 10.30 ± 0.05
+
+For the ﬁrst set of experiments, we used the following conﬁgurations: each of 1920 and 64 samples, and each of step sizes 1 (corresponding to MPPI), 0.8, and 0.6.19 Overall (Table I), there’s a mild degradation in performance when decreasing the step size at 1920 samples, due to the car taking a longer path on the track (Fig. 12a vs. Fig. 12c in Section F-B). With 64 samples, the results seem unaffected by the step size. This could be because, despite the noisiness of the DMD-MPC update, the setpoint controller in the car’s steering servo acts as a ﬁlter, smoothing out the control signal and allowing the car to drive on a consistent path (Fig. 13 in Section F-B). Videos of this experiment can be found at https://youtu.be/vZST3v0_S9w.
+For the second set of experiments, we ﬁxed the number of samples at 64 and used step sizes of 1 (corresponding to MPPI) and 0.6. The statistics slightly improve with a decreased step size, but qualitatively there is a larger difference between the step sizes. With a step size of 1, the car often wobbles while driving, turns around at one point, and crashes in one of the trials (Fig. 14a). On the other hand, with a step size of 0.6, the car drives much more smoothly and achieves the aggressive driving task with no issues (Fig. 14b). Despite the smoothing effect of the low-level controllers in the car, the more stringent costs associated with the larger target speed cause the noisiness of the DMD-MPC update to manifest in the car’s performance when using a step size of 1. A smaller step size mitigates this noisiness. Videos of this experiment can be found at https://youtu.be/MhuqiHo2t98.
+VI. CONCLUSION
+We presented a connection between model predictive control and online learning. From this connection, we proposed an algorithm based on dynamic mirror descent that can work for a wide variety of settings and cost functions. We also discussed the choice of loss function within this online learning framework and the sort of preference each loss function imposes. From this general algorithm and assortment of loss functions, we show several well known algorithms are special cases and presented a general update for members of the exponential family.
+19Due to weaker batteries used with 64 samples, results should not be compared across number of samples.
+
+We empirically validated our algorithm on continuous and discrete simulated problems and on a real-world aggressive driving task. In the process, we also studied the parameter choices within the framework, ﬁnding, for example, that in our framework a smaller number of rollout samples can be compensated for by varying other parameters like the step size.
+We hope that the online learning and stochastic optimization viewpoints of MPC presented in this paper opens up new possibilities for using tools from these domains, such as alternative efﬁcient sampling techniques [5] and accelerated optimization methods [22, 24], to derive new MPC algorithms that perform well in practice.
+ACKNOWLEDGEMENTS
+This material is based upon work supported by NSF NRI award 1637758, NSF CAREER award 1750483, an NSF Graduate Research Fellowship under award No. 2015207631, and a National Defense Science & Engineering Graduate Fellowship. We thank Aravind Battaje, Nathan Hatch, and Hemanth Sarabu for assisting in AutoRally experiments.
+REFERENCES
+[1] Pieter Abbeel, Adam Coates, and Andrew Y. Ng. Autonomous helicopter aerobatics through apprenticeship learning. The International Journal of Robotics Research, 29(13):1608–1639, 2010.
+[2] Youhei Akimoto, Yuichi Nagata, Isao Ono, and Shigenobu Kobayashi. Theoretical foundation for CMAES from information geometry perspective. Algorithmica, 64(4):698–716, 2012.
+[3] Arindam Banerjee, Srujana Merugu, Inderjit S. Dhillon, and Joydeep Ghosh. Clustering with Bregman divergences. Journal of machine learning research, 6(Oct): 1705–1749, 2005.
+[4] Amir Beck and Marc Teboulle. Mirror descent and nonlinear projected subgradient methods for convex optimization. Operations Research Letters, 31(3):167–175, 2003.
+
+[5] Richard Bellman and John Casti. Differential quadrature and long-term integration. Journal of Mathematical Analysis and Applications, 34(2):235–238, 1971.
+[6] Zdravko I. Botev, Dirk P. Kroese, Reuven Y. Rubinstein, and Pierre L’Ecuyer. The cross-entropy method for optimization. In Handbook of statistics, volume 31, pages 35–59. Elsevier, 2013.
+[7] Eduardo F. Camacho and Carlos Bordons Alba. Model predictive control. Springer Science & Business Media, 2013.
+[8] Herman Chernoff. A measure of asymptotic efﬁciency for tests of a hypothesis based on the sum of observations. The Annals of Mathematical Statistics, 23(4):493– 507, 1952.
+[9] Kurtland Chua, Roberto Calandra, Rowan McAllister, and Sergey Levine. Deep reinforcement learning in a handful of trials using probabilistic dynamics models. In Advances in Neural Information Processing Systems, pages 4754–4765, 2018.
+[10] Paul Drews, Grady Williams, Brian Goldfain, Evangelos A. Theodorou, and James M. Rehg. Vision-Based High-Speed Driving With a Deep Dynamic Observer. IEEE Robotics and Automation Letters, 4(2):1564–1571, 2019.
+[11] Tyrone E. Duncan. Linear-exponential-quadratic Gaussian control. IEEE Transactions on Automatic Control, 58(11):2910–2911, 2013.
+[12] Peter W. Glynn. Likelihood ratio gradient estimation for stochastic systems. Communications of the ACM, 33(10): 75–84, 1990.
+[13] Brian Goldfain, Paul Drews, Changxi You, Matthew Barulic, Orlin Velev, Panagiotis Tsiotras, and James M. Rehg. AutoRally: An Open Platform for Aggressive Autonomous Driving. IEEE Control Systems Magazine, 39(1):26–55, 2019.
+[14] Eric Hall and Rebecca Willett. Dynamical models and tracking regret in online convex programming. In International Conference on Machine Learning, pages 579–587, 2013.
+[15] Nikolaus Hansen, Sibylle D. Müller, and Petros Koumoutsakos. Reducing the Time Complexity of the Derandomized Evolution Strategy with Covariance Matrix Adaptation (CMA-ES). Evolutionary Computation, 11(1):1–18, 2003.
+[16] Elad Hazan. Introduction to online convex optimization. Foundations and Trends® in Optimization, 2(3-4):157– 325, 2016.
+[17] Bjarne E. Helvik and Otto Wittner. Using the CrossEntropy Method to Guide/Govern Mobile Agent’s Path Finding in Networks. International Workshop on Mobile Agents for Telecommunication Applications, 2164, 2002.
+[18] Marin Kobilarov. Cross-entropy randomized motion planning. In Robotics: Science and Systems, volume 7, pages 153–160, 2012.
+[19] Shie Mannor, Reuven Y. Rubinstein, and Yohai Gat. The cross entropy method for fast policy search. In
+
+Proceedings of the 20th International Conference on Machine Learning (ICML-03), pages 512–519, 2003. [20] David Q. Mayne. Model predictive control: Recent developments and future promise. Automatica, 50(12): 2967–2986, 2014. [21] Ishai Menache, Shie Mannor, and Nahum Shimkin. Basis Function Adaptation in Temporal Difference Reinforcement Learning. Annals of Operations Research, 134: 215–238, 2005. [22] Megumi Miyashita, Shiro Yano, and Toshiyuki Kondo. Mirror descent search and its acceleration. Robotics and Autonomous Systems, 106:107–116, 2018. [23] Frank Nielsen and Vincent Garcia. Statistical exponential families: A digest with ﬂash cards. arXiv preprint arXiv:0911.4863, 2009. [24] Masashi Okada and Tadahiro Taniguchi. Acceleration of Gradient-based Path Integral Method for Efﬁcient Optimal and Inverse Optimal Control. In 2018 IEEE International Conference on Robotics and Automation (ICRA), pages 3013–3020. IEEE, 2018. [25] Magnus Rattray, David Saad, and Shun-ichi Amari. Natural gradient descent for on-line learning. Physical review letters, 81(24):5461, 1998. [26] István Szita and András Lörincz. Learning Tetris using the noisy cross-entropy method. Neural computation, 18 (12):2936–2941, 2006. [27] Yuval Tassa, Nicolas Mansard, and Emo Todorov. Control-limited differential dynamic programming. In 2014 IEEE International Conference on Robotics and Automation (ICRA), pages 1168–1175. IEEE, 2014. [28] LJ van den Broek, WAJJ Wiegerinck, and HJ Kappen. Risk sensitive path integral control. In Proceedings of the 26th Conference on Uncertainty in Artiﬁcial Intelligence (UAI 2010), pages 1–8. AUAI Press, 2010. [29] Daan Wierstra, Tom Schaul, Tobias Glasmachers, Yi Sun, Jan Peters, and Jürgen Schmidhuber. Natural evolution strategies. The Journal of Machine Learning Research, 15(1):949–980, 2014. [30] Grady Williams, Paul Drews, Brian Goldfain, James M. Rehg, and Evangelos A. Theodorou. Aggressive driving with model predictive path integral control. In 2016 IEEE International Conference on Robotics and Automation (ICRA), pages 1433–1440. IEEE, 2016. [31] Grady Williams, Nolan Wagener, Brian Goldfain, Paul Drews, James M. Rehg, Byron Boots, and Evangelos A. Theodorou. Information Theoretic MPC for ModelBased Reinforcement Learning. In 2017 IEEE International Conference on Robotics and Automation (ICRA), pages 1714–1721. IEEE, 2017. [32] Grady Williams, Paul Drews, Brian Goldfain, James M. Rehg, and Evangelos A. Theodorou. InformationTheoretic Model Predictive Control: Theory and Applications to Autonomous Driving. IEEE Transactions on Robotics, 34(6):1603–1622, 2018. [33] Grady Williams, Brian Goldfain, Paul Drews, Kamil Saigol, James M. Rehg, and Evangelos A. Theodorou.
+
+Robust sampling based model predictive control with sparse objective information. In Robotics Science and Systems, 2018. [34] Lijun Zhang, Shiyin Lu, and Zhi-Hua Zhou. Adaptive Online Learning in Dynamic Environments. In Advances in Neural Information Processing Systems, pages 1323– 1333, 2018.
+
+APPENDIX A SHIFT OPERATOR
+We discuss some details in deﬁning the shift operator. Let θt−1 be the approximate solution to the previous problem and θ˜t denote the initial condition of θ in solving (3), and consider sampling uˆt ∼ πθ˜t and uˆt−1 ∼ πθt−1 . We set
+θ˜t = Φ(θt−1)
+by deﬁning a shift operator Φ that outputs a new parameter in Θ. This Φ can be chosen to satisfy desired properties, one example being that when conditioned on uˆt−1 and xt, the marginal distributions of uˆt, . . . , uˆt+H−2 are the same for both uˆt of πθ˜t and uˆt−1 of πθt−1 . A simple example of this property is shown in Fig. 8. Note that uˆt also involves a new control uˆt+H−1 that is not in uˆt−1, so the choice of Φ is not unique but algorithm dependent; for example, we can set uˆt+H−1 of πθ˜t to follow the same distribution as uˆt+H−2 (cf. Section III-B). Because the subproblems in (3) of two consecutive time steps share all control variables except for the ﬁrst and the last ones, the “shifted” parameter Φ(θt−1) to the current problem should be almost as good as the optimized parameter θt−1 is to the previous problem. In other words, setting θ˜t = Φ(θt−1) provides a warm start to (3) and amortizes the computational complexity of solving for θt.
+
+h=0
+
+h=1
+
+h=2
+
+h=3
+
+h=4
+
+πθ
+
+πΦ(θ)
+
+h=0
+
+h=1
+
+h=2
+
+h=3
+
+h=4
+
+Fig. 8: A simple example of the shift operator Φ. Here, the control distribution πθ consists of a sequence of H = 5 independent Gaussian distributions. The shift operator moves the parameters of the Gaussians one time step forward and replaces the parameters at h = 4 with some default parameters.
+APPENDIX B VARIATIONS OF DMD-MPC
+The control distributions in DMD-MPC can be fairly general (in addition to the categorical and Gaussian distributions that we discussed) and control constraints on the problem (e.g., control limits) can be directly incorporated through proper choices of control distributions, such as the beta distribution, or through mapping the unconstrained control through some squashing function (e.g., tanh or clamp). Though our framework cannot directly handle state constraints as in constrained optimization approaches, a constraint can be relaxed to an indicator function which activates if the constraint is violated. The indicator function can then be added to the cost function in (4) with some weight that encodes how strictly the constraint should be enforced.
+Moreover, different integration techniques, such as Gaussian quadrature [5], can be adopted to replace the likelihoodratio derivative in (9) for computing the required gradient direction. We also note that the independence assumption on the control distribution in (18) is not necessary in our framework; time-correlated control distributions and feedback policies are straightforward to consider in DMD-MPC.
+
+APPENDIX C PROOFS
+Proof of Proposition 1: We prove the ﬁrst statement; the second one follows directly from the duality relationship. The statement follows from the derivations below; we can write
+ηt+1 = arg min γtgt, η + DA(η ηt)
+η∈H
+= arg min γtgt, η + A(η) − ∇A(ηt), η
+η∈H
+= arg min γtgt − µt, η + A(η)
+η∈H
+= arg max µt − γtgt, η − A(η)
+η∈H
+= ∇A∗(µt − γtgt)
+where the last equality is due to the assumption that µt −γtgt ∈ M. Then applying ∇A on both sides and using the relationship that ∇A = (∇A∗)−1, we have µt+1 = ∇A(ηt+1) = µt − γtgt.
+
+APPENDIX D DERIVATION OF LQR AND LEQR LOSSES
+The dynamics in Equation (1) are given by
+
+xt+1 = Axt + But + wt
+
+for some matrices A ∈ Rn×n and B ∈ Rn×m and wt ∼ N (0, W ), where W ∈ Sn++. For a control sequence uˆt, noise sequence wˆt, and initial state xt, the resulting state sequence xˆt is found through convolution:
+
+  
+
+xˆt
+
+I
+
+ 0
+
+0 · · · 0    0 0 · · · 0 
+
+ xˆt+1 
+
+A
+
+ 
+
+2
+
+ 
+
+ B
+
+0
+
+· · · 0  uˆt
+
+I
+
+ 
+
+uˆt+1
+
+ 
+
+ 
+
+0 · · · 0 wˆt
+
+ 
+
+wˆt+1
+
+ 
+
+ xˆt+2  =  A xt +  AB
+
+B · · · 0  .  +  A
+
+I · · · 0 . ,
+
+ ..   ..    
+
+ 
+
+..
+
+..
+
+..
+
+..  ..   ..
+
+
+
+
+
+.. . . ..  .. 
+
+.
+
+.
+
+.
+
+.
+
+..
+
+.
+
+.
+
+..
+
+xˆt+H
+
+AH
+
+AH−1B AH−2B · · · B uˆt+H−1
+
+AH−1 AH−2 · · · I wˆt+H−1
+
+or, in matrix form:
+
+xˆt = F xt + Guˆt + Lwˆt,
+
+where F , G, and L are deﬁned naturally from the convolution equation above. Note that wˆt ∼ N (0, W ), where W = diag(W, W, . . . , W, W ). Thus, we also have that
+
+xˆt ∼ N (F xt + Guˆt, LW LT).
+
+We deﬁne the instantaneous and terminal costs as
+
+1T
+
+1T
+
+c(x, u) = x Qx + u Ru
+
+2
+
+2
+
+1T cend(x) = x Qendx,
+
+2
+
+where
+
+Q, Qend
+
+∈
+
+Sn
++
+
+and
+
+R
+
+∈
+
+Sm ++.
+
+Thus,
+
+the
+
+statistic
+
+C(xˆt, uˆt)
+
+is
+
+C(xˆt, uˆt) = 1 xˆtTQxˆt + 1 uˆtTRuˆt,
+
+2
+
+2
+
+where Q = diag(Q, Q, . . . , Q, Qend) and R = diag(R, R, . . . , R, R). Our control distribution is a Dirac delta distribution located at the given parameter: πθ(uˆt) = δ(uˆt − θ).
+
+A. LQR
+
+The loss is deﬁned as
+
+t(θ) = Eπθ,xˆt
+
+1 2
+
+xˆTt Qxˆt
+
++
+
+12 uˆTt Ruˆt
+
+.
+
+Expanding
+
+this
+
+out
+
+gives:
+
+t(θ) = Eπθ,xˆt 12 xˆtTQxˆt + 12 uˆtTRuˆt
+
+1T T
+
+TT
+
+1T T
+
+1 TT
+
+= θ G QG + R θ + xt F QGθ + xt F QF xt + E wˆt L QLwˆt
+
+2
+
+2
+
+2
+
+1T T
+
+TT
+
+1T T
+
+1
+
+T
+
+= θ G QG + R θ + xt F QGθ + xt F QF xt + tr QLW L .
+
+2
+
+2
+
+2
+
+We see this is a quadratic problem in θ by deﬁning
+
+Rt = GTQG + R rt = GTQF xt.
+
+B. LEQR The loss is deﬁned as
+
+t(θ) = − log Eπθ,xˆt exp − 1 1 λ 2 xˆtTQxˆt + 12 uˆtTRuˆt
+
+for some parameter λ > 0. For compactness, we deﬁne Q = 1λ Q and R = 1λ R so that the exponent contains − 21 xˆTt Q xˆ − 12 uˆTt R uˆt. In expanding the loss, we use the following fact:
+
+Fact
+
+2.
+
+For
+
+x ∼ N (µ, Σ),
+
+where
+
+Σ ∈ Sn++,
+
+and
+
+constants
+
+A
+
+∈
+
+Sn
++
+
+and
+
+b ∈ Rn:
+
+Ex exp − 12 xTAx − bTx = 1 |AΣ + I| exp − 12 µTΣ−1µ − (Σ−1µ − b)T(A + Σ−1)−1(Σ−1µ − b) .
+
+Proof: We expand the expectation and complete the square:
+
+1T
+
+T
+
+1
+
+Ex exp − x Ax − b x =
+
+1
+
+T −1
+
+1T
+
+T
+
+exp − (x − µ) Σ (x − µ) exp − x Ax − b x dx
+
+2
+
+(2π)n|Σ|
+
+2
+
+2
+
+=1
+
+exp − 1 xT(A + Σ−1)x + 2(b − Σ−1µ)Tx + µTΣ−1µ dx
+
+(2π)n|Σ|
+
+2
+
+=
+
+1
+
+exp(c) exp − 1 (x − µ˜)TΣ˜ −1(x − µ˜) dx
+
+(2π)n|Σ|
+
+2
+
+(2π)n|Σ˜ |
+
+=
+
+exp(c)
+
+(2π)n|Σ|
+
+= 1 exp(c) |A + Σ−1||Σ|
+
+=
+
+1
+
+exp − 1 µTΣ−1µ − (Σ−1µ − b)T(A + Σ−1)−1(Σ−1µ − b) ,
+
+|AΣ + I|
+
+2
+
+where µ˜ = (A + Σ−1)−1(Σ−1µ − b), Σ˜ = (A + Σ−1)−1, and c = − 12 µTΣ−1µ − (Σ−1µ − b)T(A + Σ−1)−1(Σ−1µ − b) .
+
+We now expand the loss:
+
+t(θ) = − log Eπθ,xˆt exp − 12 xˆtTQ xˆt − 12 uˆtTR uˆt
+
+1T
+
+1T
+
+= − log Exˆt exp − xˆt Q xˆt − θ R θ
+
+2
+
+2
+
+= − log
+
+1 exp |Q LW LT + I|
+
+− 1 (F xt + Gθ)T(LW LT)−1(F xt + Gθ) 2 − (F xt + Gθ)T(LW LTQ LW LT + LW LT)−1(F xt + Gθ)
+
++ θTR θ
+
+=1
+
+(F
+
+xt
+
++
+
+Gθ)T[(LW
+
+T −1
+L)
+
++
+
+(LW
+
+LTQ
+
+LW
+
+LT
+
++
+
+LW
+
+LT)−1](F
+
+xt
+
++
+
+Gθ)
+
++
+
+θTR
+
+θ
+
+1
+
+T
+
++ log |Q LW L + I|.
+
+2
+
+2
+
+We see this is a quadratic problem in θ by deﬁning
+
+Rt = GT
+
+(LW
+
+T −1
+L)
+
++
+
+rt = GT
+
+(LW
+
+T −1
+L)
+
++
+
+1
+
+T
+
+T
+
+T
+
+LW L QLW L + LW L
+
+λ
+
+1
+
+T
+
+T
+
+T
+
+LW L QLW L + LW L
+
+λ
+
+−1 G + 1 R λ
+−1
+F xt.
+
+APPENDIX E EXPERIMENTAL SETUP
+A. Cartpole
+The state is xt = (pt, ϕt, vt, ϕ˙ t), where pt is the cart position, ϕt is the pole’s angle, vt and ϕ˙ t are the corresponding velocities, and the control ut is the force applied to the cart. We deﬁne the instantaneous cost and terminal cost of the MPC problem as
+c(xt, ut) = 10p2t + 500(ϕt − π)2 + vt2 + 15ϕ˙ 2t + 1000 · 1{|ϕt − π| ≥ ∆} cend(xt) = c(xt, 0)
+where ∆ is some threshold. For our experiments, we set ∆ = 12◦ = 0.21 radians. In our experiments, the pole is massless except for some weight at the end of the pole. The mass of the cart and pole weight
+are 0.711 kg and 0.209 kg, respectively. The true length of the pole is 0.326 m, whereas the length used in the model is 0.346 m. Each time step is modeled using an Euler discretization of 0.02 seconds. Each episode of the problem lasts 500 time steps (i.e, 10 seconds) and has episode cost equal to the sum of encountered instantaneous costs. Both the true system and the model apply Gaussian additive noise to the commanded control with zero mean and a standard deviation of 5 newtons. For the continuous system, the commanded control is clamped to ±25 newtons. For the discrete system, the controller can either command 10 newtons to the left, 10 newtons to the right, or 0 newtons.
+Both the discrete and continuous controller use a planning horizon of 50 time steps (i.e., 1 second). For the continuous controller, we keep the standard deviation of the Gaussian distribution ﬁxed at 2 newtons for each time step in the planning horizon. When applying a control ut on the real cartpole, we choose the mode of πθt rather than sample from the distribution.
+All reported results were gathered using ten episodes per parameter setting.
+
+B. AutoRally
+The state of the vehicle is xt = (px,t, py,t, ϕt, rt, vx,t, vy,t, ϕ˙ t), where (px,t, py,t) is the position of the car in the global frame, ϕt and rt are the yaw and roll angles, vx,t and vy,t are the longitudinal and lateral velocities in the car frame, and ϕ˙ t is the yaw rate. The control ut we apply is the throttle and steering angle. For some weights w1, . . . , w4, the cost function is
+c(xt, ut) = w1|st − stgt|k + w2M (px,t, py,t) + w3Sc(xt) cend(xt) = w4C(xt).
+
+Here, st and stgt are the current and target speed of the car, respectively. Note the speed is calculated as st =
+
+v2
+x,t
+
++
+
+vy2,t.
+
+M (px,t, py,t) is the positional cost of the car (low cost in center of track, high cost at edge of track), Sc(xt) is an indicator
+
+variable which activates if the slip angle20 exceeds a certain threshold, and C(xt) is an indicator function which activates if the car leaves the track at all in the trajectory. Note that the terminal cost depends on the trajectory instead of the terminal state. Each time step represents 0.02 seconds for every experiment except the real-world experiment with a target of 11 m/s where each time step represents 0.025 seconds. The length of the planning trajectory is 100 time steps (i.e., either 2 seconds
+or 2.5 seconds depending on the length of the time step). The values for the cost function parameters are given in Table III. The control space for each of the throttle and steering angle is normalized to the range [−1, 1]. For our experiments, we
+clamp the throttle to [−1, 0.65]. In simulated experiments, the standard deviations of the throttle and steering angle distributions were 0.3 and 0.275, respectively. In the real world experiments, they were both set to 0.3. When applying a control ut on the car, we chose the mean of πθt rather than sampling from the distribution.
+
+Fig. 9: Simulated AutoRally task.
+
+In simulation, the environment (Fig. 9) is an elliptical track approximately 3 meters wide and 30 meters across at its furthest point. The real-world dirt track is about 5 meters wide and and has a track length of 170 meters. All reported results for simulated experiments were gathered using 30 consecutive laps in the counter-clockwise direction for each parameter setting. For real-world experiments, results were gathered using ten laps for each parameter setting when the target speed is 9 m/s and ﬁve laps for 11 m/s.
+
+TABLE III: Cost function settings for AutoRally experiments.
+
+stgt (m/s) k w1 w2 w3
+
+w4
+
+Slip angle threshold (rad)
+
+Gazebo simulator
+
+11
+
+1 30 250 10 10000
+
+0.275
+
+Real world
+
+9 or 11 2 4.25 200 100 10000
+
+0.9
+
+APPENDIX F EXTRA EXPERIMENTAL RESULTS
+A. Simulated Experiments
+Adding onto the results from Section V-B2, we qualitatively evaluate two particular extremes: few vs. many samples (64 vs. 3840) and small vs. large step size (0.5 vs. 1) by looking at the path and speed of the car during the episode (Fig. 10). At small step sizes (Figs. 10a and 10c), the path and speed proﬁles are rather similar, while with few samples and a large step size (Fig. 10b), the car drives much more slowly and erratically, sometimes even stopping. In the ideal scenario with many samples and a large step size, the car can achieve consistently high speed while driving smoothly (Fig. 10d).
+We also experimented with instead optimizing the expected cost (10) and found performance was dramatically worse (Fig. 11), even when using 3840 samples per gradient. At best, the car would drive in the center of the track at speeds below 4 m/s (Fig. 11c), and at worst, the car would either slowly drive along the track walls (Fig. 11a) or the controller would eventually produce NaN controls that would prematurely end the experiment (Fig. 11d). This poor performance is likely due to most samples in the estimate of (11) having very high cost (e.g., due to leaving the track) and contributing signiﬁcantly to the gradient estimate. On the other hand, when estimating (17), as in the experiments in Section V-B2, these high cost trajectories are assigned very low weights so that only low cost trajectories contribute to the gradient estimate.
+
+20The slip angle is deﬁned as − arctan |vvy,t x,t| , which gives the angle between the direction the car is pointing and the direction in which it is actually traveling.
+
+(a) 64 samples, γt = 0.5
+
+(b) 64 samples, γt = 1
+
+(c) 3840 samples, γt = 0.5
+
+(d) 3840 samples, γt = 1
+
+Fig. 10: Car speeds when optimizing the exponential utility (16). The speeds and trajectories are very similar at step size 0.5, irrespective of the number of samples. At step size 1, though, 64 samples result in capricious maneuvers and low speeds, whereas 3840 samples result in smooth driving at high speeds.
+
+(a) γt = 0.025
+
+(b) γt = 0.05
+
+(c) γt = 0.075
+
+(d) γt = 0.1
+
+Fig. 11: Car speeds when optimizing the expected cost (10). All tested step sizes result in low speeds. At too low or too high of a step size, the car will drive along the wall or crash into it.
+
+B. Figures for Real-World Experiments
+
+(a) γt = 1
+
+(b) γt = 0.8
+
+(c) γt = 0.6
+
+Fig. 12: Car speeds with 1920 samples per gradient estimate and target of 9 m/s.
+
+(a) γt = 1
+
+(b) γt = 0.8
+
+(c) γt = 0.6
+
+Fig. 13: Car speeds with 64 samples per gradient estimate and target of 9 m/s.
+
+(a) γt = 1
+
+(b) γt = 0.6
+
+Fig. 14: Car speeds with 64 samples per gradient estimate and target of 11 m/s. In Fig. 14a, note the crash and U-turn at the top of the plot as well as the wider spread of the paths throughout the whole track. By contrast, in Fig. 14b, the resulting paths are more consistent, and there are no failure points.
+
+

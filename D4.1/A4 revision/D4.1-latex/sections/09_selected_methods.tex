@@ -1,0 +1,17 @@
+\section{Selected methodologies and fallback options}\label{sec:selected}
+
+\begin{table}[h]
+\centering\small
+\caption{Method-selection record.}\label{tab:methods}
+\begin{plangrid}{|L{2.6cm}|Y|L{3.7cm}|L{2.5cm}|}
+\planheadrow \thead{Function} & \thead{Selected approach} & \thead{Baselines} & \thead{Fallback} \\ \hline
+Task localisation (P2) & Set-cover over segments with path-wise feasibility test & Point-based placement~\cite{makhal2018reuleaux,nguyen2023taskclustering}; optimisation-based~\cite{zhao2025bstar,weingartshofer2021tcpbase} & Operator-defined stations \\ \hline
+Segment feasibility, cost-to-go (P3) & Layered graph / DP over IK classes and discretised null space, breakpoint cost & Descartes~\cite{demaeyer2017descartes}; anytime tracking~\cite{wang2025anytimetracking}; co-optimisation~\cite{chen2025cooptimization} & Single-class DP \\ \hline
+Transfer and global planning (T4.2) & Informed sampling with mixed global/local sampling and multi-path reuse, vectorised primitives & OMPL planners; VAMP~\cite{thomason2024vamp} & Pre-taught via-points \\ \hline
+Online look-ahead (P4) & Multi-goal null-space MPPI, exact IK per class, select-never-blend, planner-guided & Null-space NMPC~\cite{sun2024nullspacempc}; predictive IK~\cite{faroni2019pik}; P3 plan replay & P3 plan + speed scaling \\ \hline
+Micro-interpolation (P5, T4.3) & Path--velocity MPC with speed band and hard limits & Path-accurate OTG~\cite{lange2016pathaccurate}; trajectory scaling~\cite{faroni2020scaling,palleschi2021fastsafe} & Speed override only \\ \hline
+Human-aware cost & ISO/TS 15066 time-dilation cost~\cite{faroni2022safetyaware}; risk-aware rollouts~\cite{trevisan2025drampi} & Plain SSM speed scaling & Safety stop \\ \hline
+\end{plangrid}
+\end{table}
+
+\runin{Verification obligations.} Exact task tracking and hard limits are guaranteed by construction (exact IK per class, Core-IPC MPC); MPPI provides performance, not certification. Optimality and completeness claims are attached to the deterministic layers (P3, T4.2 planner). Fallbacks cover infeasible optimisation (P3 plan), missed deadlines (speed scaling in the Core IPC) and degraded sensing (stop at the next planned detach point).

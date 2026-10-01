@@ -1,0 +1,1844 @@
+12 December 2024
+Constrained Sampling-Based MPC using Path Integral for Collision-Free Robot Manipulation
+Xingfang Wang, Hui Li, Dong Wang, Xiao Huang, Zhihong Jiang
+Abstract The dynamic and unknown human behaviors in human-robot interaction make it challenging for collision-free robot manipulation. Although sampling-based MPC has achieved real-time control in the above scenarios, it is hard to handle equality hard constraints, such as working along a speciﬁed trajectory, due to sampling disturbances. To improve manipulation performance under multiple constraints, this paper presents a novel constrained sampling-based MPC (CSMPC) method using path integral. Firstly, hierarchical optimization combining policy sampling projection and the Lagrange multiplier method is used to handle equality hard constraints for high-precision manipulation tasks. Secondly, collision avoidance and smooth motion are modeled as inequality soft constraints, where collision detection and time series prediction are used to ensure the safety and smoothness of dynamic interaction. Finally, an adaptive noise method is built to improve the stability of physical robot manipulation. The simulation and experiment results demonstrate that the proposed method enables a 7-DOF robot manipulator to achieve precise manipulation while avoiding dynamic obstacles.
+Keywords collision avoidance, model predictive control, optimal control, robot manipulation, robotics and control systems, sampling-based planning
+Posted on 12 December 2024 — CC-BY 4.0 — This is a preprint and has not been peer reviewed. Data may be preliminary. — https:// doi.org/10.36227/techrxiv.173398154.46056666/v1
+
+JOURNAL OF LATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021
+
+1
+
+Constrained Sampling-Based MPC using Path Integral for Collision-Free Robot Manipulation
+Xingfang Wang, Hui Li, Dong Wang, Xiao Huang, and Zhihong Jiang
+
+Abstract—The dynamic and unknown human behaviors in human-robot interaction make it challenging for collision-free robot manipulation. Although sampling-based MPC has achieved real-time control in the above scenarios, it is hard to handle equality hard constraints, such as working along a specified trajectory, due to sampling disturbances. To improve manipulation performance under multiple constraints, this paper presents a novel constrained sampling-based MPC (CSMPC) method using path integral. Firstly, hierarchical optimization combining policy sampling projection and the Lagrange multiplier method is used to handle equality hard constraints for high-precision manipulation tasks. Secondly, collision avoidance and smooth motion are modeled as inequality soft constraints, where collision detection and time series prediction are used to ensure the safety and smoothness of dynamic interaction. Finally, an adaptive noise method is built to improve the stability of physical robot manipulation. The simulation and experiment results demonstrate that the proposed method enables a 7-DOF robot manipulator to achieve precise manipulation while avoiding dynamic obstacles.
+Index Terms—Model predictive control, sampling-based planning, robot manipulation, collision avoidance, optimal control.
+
+Dynamic obstacle
+
+Collision-free manipulation
+
+Fig. 1. The robot follows the specified trajectory to polish the inner hole of the red workpiece while safely interacting with the human using CSMPC. The visual perception figure is used to compute collision detection.
+
+I. INTRODUCTION
+W ITH the development of human-robot interaction, the work area of robots and humans is gradually moving from separation to integration. This poses a huge challenge to collision-free robot manipulation [1]. Because the robot must consider dynamic and unknown human behavior, along with various unstructured obstacles in real-time, as shown in Fig. 1. The robot needs to comprehensively solve the multi-constraint problems of collision avoidance, smooth motion, and various task requirements. Therefore, how to handle the above multiple constraints quickly and safely in a human-robot environment is a challenging decision and control problem.
+The above problem in static scenarios has been well solved by many methods. However, when applied in actual dynamic scenarios, there are still some drawbacks in terms of computational cost and policy optimality. Operational Space Control (OSC) is a classical method to address such problems [2]. It
+X. F. Wang, H. Li, D. Wang, X. Huang, and Z. H. Jiang are with the School of Mechatronical Engineering, National Key Lab of Autonomous Intelligent Unmanned System, Key Laboratory of Biomimetic Robots and Systems of Chinese Ministry of Education, Beijing Institute of Technology, Beijing, 100081, China.
+This work was supported in part by the National Natural Science Foundation of China (U22B2079, 62103054, 62273049, U2013602), Beijing Natural Science Foundation (L243011, 4232054, 4242050), the Foundation of National Key Laboratory of Human Factors Engineering (HFNKL2023WW06), and Beijing Institute of Technology Research Fund Program for Young Scholars (XSQD-6120220298). (Corresponding author: Xiao Huang, Zhihong Jiang, e-mail: huangxiao@bit.edu.cn, jiangzhihong@bit.edu.cn)
+
+calculates different constraints as the cost of tasks in their respective spaces and then projects them onto the robot’s control space through the Jacobian matrix. However, the process of inverse Kinodynamic in OSC typically incurs high computational costs and singularity, and this method cannot guarantee policy optimality in dynamic scenarios. Moreover, it is a model-based control method and inaccurate models can severely affect its control performance [3]. As popular sampling-based planning algorithms, Rapidly-exploring Random Trees Star (RRT*) [4] and Probabilistic RoadMap (PRM) [5] are also able to provide a fast solution for the static manipulation scenarios of multi-dimensional robot systems. However, the interference of dynamic obstacles may seriously affect the convergence of the algorithm [6]. With the development of artificial intelligence, Reinforcement Learning (RL) has been applied to robot manipulation. RL can complete many challenging tasks in non-structured environments by learning the end-to-end representation of the optimal policy [7], [8]. Although RL can reduce its dependence on model accuracy by learning the system model, it usually requires a lot of training time in practical applications, which affects its implementation in actual dynamic environments [9].
+Model Predictive Control (MPC) is a promising algorithm framework for the dynamic and uncertain nature of the environment. And it has been successfully applied in practical scenarios such as autonomous driving [10], humanoid walking [11], and safe navigation in human-robot interaction [12]. MPC uses the system model to predict the system’s response over a future time horizon, and based on these predictions,
+
+JOURNAL OF LATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021
+
+2
+
+computes the optimal control policy to achieve a stable, robust, and high-performance control effect. Based on the use of gradients, MPC can be categorized into gradient-based MPC and sampling-based MPC, with the former directly utilizing gradients and the latter estimating gradients in optimization. Benefiting from the smooth dynamics model obtained by derivation, gradient-based MPC is suitable for handling multi-constraint optimization problems in high-dimensional systems. For example, the combination of MPC and Differential Dynamic Programming (MPC-DDP) enables the robot to perform tasks such as dual-arm coordination and mobile manipulation to avoid human interference [13]–[15]. In [11], an efficient hierarchical control framework is designed using MPC and iterative Linear Quadratic Regulator (MPC-iLQR) to explore robust whole-body control of humanoid robots. However, gradient-based MPC methods require that the cost and dynamics are differentiable, making it difficult to handle discrete problems. Actual manipulation tasks often involve discontinuous phenomena, which increases the complexity of modeling and time to optimize convergence.
+Sampling-based MPC, such as the Cross-Entropy Method (CEM) and Model Predictive Path Integral (MPPI), provides a promising alternative approach [16], [17]. Sampling-based MPC can estimate gradients and solve discrete optimization problems by sampling. This method does not require differentiability, making its modeling simpler. According to [18], MPPI can also be viewed as an application of CEM on stochastic diffusion processes. It is based on the path integral control framework [19], and solves the optimization problem using importance sampling and Kullback-Leibler (KL) divergence, which are the key concepts of information theory. Sampling-based MPC methods do not require linear or quadratic approximations of cost, and dynamics, which can be simply and flexibly applied to robot manipulation tasks in dynamic environments [20], [21]. They construct inequality constraints by designing clamping functions in dynamics [10] or adding control barrier functions [22] and quadratic penalty terms [23] in the cost. However, limited by the stochasticity of samples, these methods have difficulties handling equality constraints. It is hard to meet the needs in precise robot manipulation, such as tracking the path for workpiece grinding and maintaining a stable motion posture during medical examinations in human-robot interaction scenarios. Moreover, these methods amplify the disadvantage of producing non-smooth motion trajectories in high-dimensional robot systems, leading to system instability [24].
+A. Contribution
+In this paper, we focus on enhancing the ability of samplingbased MPC using path integral to strictly handle equality constraints in high-dynamic environments. Furthermore, we aim to achieve smooth robot motion and satisfactory manipulation precision without violating equality constraints, ensuring the real-time, safety and accuracy of the collision-free robot manipulation. Specifically, this paper has the following contributions:
+1) We propose a novel sampling-based MPC method that strictly handles equality constraints in stochastic op-
+
+timization. Hierarchical optimization combining nullspace projection of policy sampling and the Lagrange multiplier method is used to provide a general derivation for state-only and state-input equality constraints, which can deal with equality hard constraints. 2) We develop a novel method to make collision avoidance and smooth motion as inequality soft constraints without violating equality constraints. Deep visual perception and robot skeleton models are used for collision detection of dynamic obstacles. The time series smoothing prediction method based on statistics is designed to suppress noise interference and ensure motion smoothness. 3) We provide a novel method to improve the motion stability for robot manipulation. Adaptive noise is able to adjust the exploration capability of sampling based on task performance, which can avoid exploration stagnation in optimization and improve smooth motion transition during collision-free manipulation.
+The proposed method is verified by precise manipulation tasks in dynamic scenarios, including safe sorting of items, trajectory tracking, polishing workpiece holes, and contactbased medical examination. The structure of this paper is as follows. Section II outlines the preparatory work, Section III provides a detailed description of the proposed method, Sections IV and V present the simulation and experimental results, and Section VI concludes this paper.
+
+II. PRELIMINARIES
+
+This section briefly introduces the theoretical background and mathematical symbols used in our method. The theory of MPPI derives an information-theoretic framework to design sampling-based MPC optimization algorithms [10], [17]. The derivation relies on information theoretic dualities between free energy and relative entropy [25]. The result of the derivation is an optimal control law expression obtained through weighted averaging of sampling trajectories, which is a gradient-free update law suitable for online calculation.
+We consider a discrete-time dynamical system:
+
+xt+1 = F(xt, vt)
+
+(1)
+
+where xt is the system state, F is the system dynamics, and vt is the sampling input with the mean ut. vt can be simply defined as vt = ut + ϵt, where ϵt ∼ N (0, Σ).
+Assuming we have a finite time range t ∈ {0, 1, . . . T − 1} where the unit of time is determined by the system control frequency. Then, an input sequence is V = {v0, v1, . . . vT −1}, and a mean input sequence is U = {u0, u1, . . . uT −1}. Based on the noise characteristics, the probability density functions q(V ) and p(V ) are defined. And p(V ) is the variation of q(V ) when U = 0, which is the density function without control.
+
+T −1
+
+1
+
+T −1
+
+q(V ) = Z−1exp − (vt − ut) Σ (vt − ut) (2)
+
+t=0 2
+
+T −1
+
+1 T −1
+
+p(V ) = Z−1exp − 2 vt Σ vt (3)
+
+t=0
+
+JOURNAL OF LATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021
+
+3
+
+where
+
+Z
+
+=
+
+((2
+
+π
+
+)m
+
+|Σ
+
+|
+
+)
+
+1 2
+
+.
+
+The
+
+distributions
+
+of
+
+these
+
+two
+
+density functions are denoted as Q and P, respectively. Now, a sampling trajectory H is defined based on an input sequence
+
+V and an initial state x0.
+
+H(V ; x0) = (x0, F(x0, v0), F(F(x0, v0), v1), . . .)
+
+= (x0, x1, x2, . . . , xT )
+
+(4)
+
+Then, combining the sampling trajectory H, S(H(V ; x0)) is defined as the state cost of an input sequence.
+
+T −1
+
+S(H(V ; x0)) = ϕ(xT ) + s(xt)
+
+(5)
+
+t=0
+
+For simplicity of notation, we simplify this to S(V ). ϕ(xT ) is
+a terminal cost, s(xt) is the state cost at time t. The optimal distribution Q∗ is defined using the system free energy [10]:
+
+q∗(V ) = 1 exp − 1 S(V ) p(V ) (6)
+
+η
+
+λ
+
+where η represents the normalization constant, λ is called the inverse temperature. By measuring the degree of difference between the two probability distributions, Kullback-Leibler (KL) divergence is used to derive the optimal probability distribution form over all possible trajectories. The optimization problem is designed by minimizing the KL divergence between the optimal distribution Q∗ and the probability distribution Q obtained by the controller, and the optimal control input is derived as follows:
+
+U ∗ = min[DKL(Q∗||Q)]
+
+(7)
+
+U
+
+ut∗ = EQ∗ [vt] = q∗(V )vtdV
+
+(8)
+
+where DKL(Q∗||Q) is the KL divergence between Q∗ and Q.
+
+The
+
+best
+
+way
+
+to
+
+compute
+
+u∗
+t
+
+is
+
+to
+
+directly
+
+sample
+
+from
+
+the
+
+optimal distribution and take the average. However, we cannot
+
+sample from Q∗ directly, so importance sampling is used to
+
+sample from the known distribution Q to compute the integral.
+
+ut∗ =
+
+q∗(V ) p(V ) q(V ) p(V ) q(V ) vtdV
+
+ω(V )
+
+= EQ[ω(V )vt]
+
+(9)
+
+where the importance sampling weight is given by:
+
+1
+
+1
+
+T −1
+1 T −1
+
+ω(V ) = exp − S(V ) + λ
+
+η
+
+λ
+
+2 ut Σ (ut + 2ϵt)
+
+t=0
+
+(10)
+
+The
+
+noise
+
+sequence
+
+Ek
+
+is
+
+represented
+
+as
+
+{ϵ
+
+k 0
+
+,
+
+ϵk
+1
+
+,
+
+.
+
+.
+
+.
+
+ϵkT
+
+−
+
+1
+
+}
+
+,
+
+where k is the sequence number of samples. Then, ω(Ek) is
+
+defined as:   
+
+
+
+T −1
+
+
+
+ω Ek = 1 exp  1  − S(V k) + λ uT −1 k  t Σ ϵt −β 
+
+η  λ
+
+t=0
+
+
+
+C(V k)
+
+(11)
+
+K−1
+
+1
+
+k
+
+η = exp − C(V ) − β
+
+(12)
+
+k=0 λ
+
+where K is the number of samples and C(V k) is the cost
+
+of the sampling trajectory. β is the minimum value of the
+
+trajectory cost sequence {C(V 0), C(V 1), . . . C(V K−1)}, to
+
+ensure that at least one trajectory has a non-zero importance
+
+sampling weight. And η is approximated using the Monte-
+
+Carlo
+
+sampling
+
+method.
+
+Using
+
+the
+
+relationship
+
+of
+
+vk
+t
+
+=
+
+ut + ϵkt , the optimal control update law can be obtained:
+
+K−1
+
+K −1
+
+ut∗ = ω(E k)vtk = ut + ω(E k)ϵkt
+
+(13)
+
+k=0
+
+k=0
+
+According to the property of rolling optimization in MPC [26],
+
+the
+
+first
+
+component
+
+u∗
+0
+
+of
+
+the
+
+optimal
+
+solution
+
+is
+
+sent
+
+to
+
+the
+
+system actuator, and the remaining control sequence of length
+
+T − 1 is used for the next prediction cycle.
+
+III. CONSTRAINED SAMPLING-BASED MPC
+
+We now propose the core method of this paper, as shown in Fig. 2. The adaptive noise method adjusts the noise amplitude Σ to enhance the exploration capability of sampling. Then, the equality constraints are handled to obtain the constrained sampling trajectories H. Inequality constraints related to collision avoidance and smooth motion are appropriately added to the trajectory cost C(V ), which is calculated based on H. Finally, the robot executes the result of the optimization update, and its state x0 is passed to the next optimization cycle. In this paper, collision-free robot manipulation in the control-affine system can be modeled as the following optimization problem:
+
+min C(V ) = C(v(·); x0)
+v(·)
+
+s.t. xt=0 = x0
+
+initial state
+
+xt+1 = F(xt, vt)
+
+system dynamics (14)
+
+c1(t) + B1(t)xt = 0
+
+equality constraints
+
+c2(t, xt) + B2(t, xt)vt = 0 equality constraints
+
+h(t, xt) ≥ 0
+
+inequality constraints
+
+where vt ∼ N (ut, Σ) is a sampling input generated by the control input ut and white-noise process, and t ∈ {0, 1, . . . T − 1} is the sequence numbers of the time step. For the equality constraints, c1(t) + B1(t)xt = 0 is the linearization of state-only equality constraints, c2(t, xt) + B2(t, xt)vt = 0 represents the form of state-input equality constraints in the control-affine system. Then, we focus on the treatment of state inequality constraints h(t, xt) ≥ 0 which can be handled in the cost. Moreover, if you want to limit the control variables by control inequality constraints. A simple method is to design a clamping function g(vt) in the system dynamics F(xt, g(vt)) to restrict vt within an allowable input range [10].
+This optimization problem with complex constraints can be decomposed into two levels of sub-problems using Hierarchical Optimization [27]. The upper-level sub-problem focuses on handling the equality hard constraints to obtain constrained sampling trajectories. Within the solution space of the upperlevel sub-problem, the lower-level sub-problem focuses on
+
+JOURNAL OF LATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021
+
+4
+
+Adaptive noise
+
+Hierarchical optimization Upper level
+Sampling trajectories generation
+
+Lower level Inequality constraint:
+smooth motion
+Trajectory cost C(V ) calculation
+
+Control sequence U
+Optimization update
+
+Task execution progress
+
+Equality constraint processing
+
+Inequality constraint: collision avoidance
+
+Robot manipulation scenario Initial state x0
+
+Fig. 2. The framework of the CSMPC algorithm. The gray module represents the main content in Section III. CSMPC is used to control the robot to perform collision-free and precise manipulation in dynamic human-robot interaction scenarios.
+
+handling the inequality soft constraints and obtaining the optimal control update law that satisfies equality and inequality constraints. The proposed hierarchical optimization framework is shown in Fig. 3.
+
+A. Equality constraint processing
+
+The main purpose of this section is to enable the samplingbased MPC to handle equality constraints. We first consider the handling of state-only equality constraints and extend it to the state-input equality constraints. Although we mainly focus on collision-free robot manipulation, the proposed method is also applicable to many other robot tasks. Therefore, we provide a general derivation of the relevant control formulas here.
+
+For state-only equality constraints, we first build the corresponding optimization problem as follows.
+
+min 1 (xt − xt)TW1 (xt − xt) xt 2
+
+s.t. xt = F(xt−1, vt−1)
+
+(15)
+
+c1(t) + B1(t)xt = 0
+
+The purpose of this optimization problem is to find a solution xt near the sampling state xt that satisfies state-only equality constraints. W1 is a symmetric positive definite weighting matrix. xt is obtained from the system dynamics F, where vt−1 is the sampling input at the previous time step. Moreover, if there are state-input equality constraints, then the two types of equality constraints are coupled in optimization. Therefore, the input vt−1 in F needs to be equal to vt−1, which is the solution of the sub-optimization problem for the state-input equality constraints. Now, a quadratic objective function is constructed using the Lagrange Multiplier method:
+
+L1 = 1 (xt − xt)TW1 (xt − xt) 2
+
++ ρ1T (c1(t) + B1(t)xt)
+
+(16)
+
+where ρ1 is an unknown Lagrange multiplier vector. c1(t) and B1(t) are the functions related to state-only equality constraints, which will be simplified to c1 and B1 in the following derivation. By minimizing the quadratic objective
+
+Fig. 3. The hierarchical optimization framework to solve the multi-constraint
+problem in stochastic optimization. In the upper level, state-only and state-
+input equality constraints are handled based on the sampling input and initial state (v(·); x0). In the lower level, inequality constraints are handled based on the solution space (v; x) from the upper level, and importance sampling is used to obtain the optimal solution (u∗; x∗).
+
+function [28], the expression of the optimal solution is listed as follows:
+
+xt = (I − B1†B1)xt − B1†c1
+
+= (I − B1†B1)F(xt−1, vt−1) − B1†c1
+
+(17)
+
+B1† = W1−1B1T B1W1−1B1T −1
+
+(18)
+
+where (I −B1†B1) is the projection of matrix B1 onto its null space. It ensures that the projection of xt onto the null space of the matrix B1 does not violate the equality constraint. Then, based on the optimal expression for xt, constrained sampling trajectories H = {H0, · · · , Hk, · · · , HK−1} are calculated, where k ∈ {0, 1, . . . K − 1} and K is the number of samples.
+These sampling trajectories are mutually independent and all
+satisfy the state-only equality constraints. The expression for
+
+JOURNAL OF LATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021
+
+5
+
+these constrained sampling trajectories is as follows:
+
+
+
+
+
+
+
+ H0  
+
+(
+
+x0
+
+,
+
+x0
+1
+
+,
+
+x0
+2
+
+,
+
+.
+
+.
+
+.
+
+x
+
+0 T
+
+)
+
+
+
+
+
+
+
+
+
+ ..  
+
+..
+
+
+
+ .  
+
+.
+
+
+
+H=
+
+Hk
+
+=
+
+(x
+
+0
+
+,
+
+x
+
+k 1
+
+,
+
+xk
+2
+
+,
+
+.
+
+.
+
+.
+
+x
+
+k T
+
+)
+
+ .  
+
+..
+
+
+
+ ..  
+
+.
+
+
+
+ HK−1   (x0, x1K−1, x2K−1, . . . xTK−1) 
+
+(19)
+
+xtk = (I − B1†B1)F(xt−1 k , vt−1 k ) − B1†c1
+
+(20)
+
+Then, H is utilized by the sub-optimization problem at the lower level to handle inequality constraints and compute the minimum trajectory cost C(V ).
+
+Furthermore, it is necessary to verify whether the optimal
+
+state solution x∗ from the lower level satisfies the state-only
+
+equality constraints of the upper level. Based on the rolling
+
+optimization feature of MPC, we only need to ensure that
+
+x∗
+1
+
+sent
+
+to
+
+the
+
+system
+
+actuators
+
+satisfies
+
+the
+
+above
+
+equality
+
+constraints. Since the optimal state x∗ is determined by the
+
+optimal
+
+control
+
+u∗,
+
+x∗
+1
+
+is
+
+obtained
+
+using
+
+u∗
+0
+
+and
+
+constrained
+
+system dynamics.
+
+x1∗ = (I − B1†B1)F(x0, u∗0) − B1†c1
+
+(21)
+
+It
+
+is
+
+evident
+
+that
+
+x∗
+1
+
+also
+
+satisfies
+
+the
+
+state-only
+
+equality
+
+constraints, as it has the same constraint form as xt in (17).
+
+As x is obtained from the system dynamics F, the treatment
+
+of state-only equality constraints is essentially a treatment of
+
+system dynamics. Based on the constrained system dynamics,
+
+x can strictly satisfy the state-only equality constraints in both
+
+stochastic sampling and optimization updates.
+
+For state-input equality constraints, we also first set up its optimization problem as follows.
+
+min 1 (vt − vt)TW2 (vt − vt) vt 2
+
+s.t. c2(t, xt) + B2(t, xt)vt = 0
+
+(22)
+
+Similar to (15), this optimization problem is also solved to find a solution vt near the sampling input vt that satisfies stateinput equality constraints. W2 is a weighting matrix similar to W1 and xt is the system state. If there are state-only equality constraints, xt needs to be equal to xt, which is the optimal solution of L1. Then, we can build an objective function for this optimization problem.
+
+L2 = 1 (vt − vt)TW2 (vt − vt) 2
+
++ ρ2T (c2(t, xt) + B2(t, xt)vt)
+
+(23)
+
+Using the Lagrange Multiplier method, the optimal solution vt of L2 similar to (17) is obtained.
+
+vt = (I − B2†B2)vt − B2†c2
+
+= (I − B2†B2)(ut + ϵt) − B2†c2
+
+(24)
+
+In the following, based on the obtained vt as described above,
+
+the optimal control u∗ can be calculated. Based on the rolling
+
+optimization
+
+feature
+
+of
+
+MPC,
+
+we
+
+need
+
+to
+
+verify
+
+whether
+
+u∗
+0
+
+sent to the system actuators satisfies the state-input equality
+
+constraints.
+
+Therefore,
+
+the
+
+optimal
+
+control
+
+update
+
+law
+
+of
+
+u∗
+0
+
+is:
+
+K −1
+u0∗ = ω(E k)v0k
+k=0
+K −1
+= ω(Ek)((I − B2(t, x0)†B2(t, x0))(u0 + ϵk0 )
+k=0
+− B2(t, x0)†c2(t, x0)) (25)
+
+where B2(t, x0), B2(t, x0)†, c2(t, x0) and u0 are all independent of k. Based on the mathematical expression of ω(Ek) and
+η in (11) and (12), we can get an equation relationship:
+
+K −1
+
+ω(Ek) = 1
+
+(26)
+
+k=0
+
+so
+
+the
+
+expression
+
+of
+
+u∗
+0
+
+can
+
+be
+
+further
+
+rearranged,
+
+in
+
+which
+
+the dependence on (t, x0) is ignored in the derivation.
+
+K −1
+u0∗ = (I − B2†B2)(u0 + ω(Ek)ϵk0 ) − B2†c2 (27)
+
+k=0
+
+Now,
+
+we
+
+can
+
+find
+
+that
+
+u∗
+0
+
+has
+
+the
+
+same
+
+constrained
+
+form
+
+as
+
+vt
+
+in
+
+(24),
+
+which
+
+means
+
+that
+
+u∗
+0
+
+also
+
+satisfies
+
+state-input
+
+equality
+
+constraints. It can be observed that the treatment of state-
+
+input equality constraints essentially involves constraining
+
+the sampling input vt during sample generation, and this constraint relationship is ultimately transferred to u∗0.
+
+With the method proposed above, the equality constraints
+
+only be handled within the sampling space at the beginning
+
+of the optimization. After optimization updates, the optimal
+
+results still strictly satisfy the constraint conditions. Further-
+
+more, the suboptimization problems related to state-only and
+
+state-input equality constraints can be compatibly handled
+
+through the mutual propagation between xt and vt. Therefore,
+
+the method of this section gives sampling-based MPC the
+
+capability to handle equality hard constraints.
+
+B. Inequality constraint: collision avoidance
+This section is used to construct and handle inequality constraints related to collision-free scenarios. In the proposed hierarchical optimization framework as shown in Fig. 3, the lower level is used to solve the optimization problem related to inequality constraints. This optimization problem is built in the following form.
+
+min C(v(·); x0)
+vt
+
+s.t. h(t, xt) ≥ 0
+
+(28)
+
+where vt and xt are the solutions to the upper-level optimization problem. Then, the inequality constraints are transformed into soft constraints and added to the cost. Finally, the optimal solution to the problem is obtained by weighted summation through importance sampling weights. Therefore, we next focus particularly on the process of transforming the inequality constraints into soft constraints.
+In real scenarios, the robot needs to estimate the distance to dynamic obstacles to avoid collisions [29]. Thus, we propose a
+
+JOURNAL OF LATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021
+
+6
+
+J4
+
+J5
+
++-
+
+J6
+
++-
+
+J3 + - J7
+J2 J1 + -
+
++-
+
+J4
+(Joint 4)
+
+(Obstacle point)
+
+θ
+
+Op
+
+Ol2
+
+J7
+(Joint 7)
+
+rL
+
+J2
+
+rJ
+
+(Joint 2)
+
+EE
+(End effector)
+
+Fig. 4. Schematic diagram of obstacle distance estimation method. Left: 7DOF robot structure. Right: skeleton model of obstacle distance estimation.
+
+simple and efficient collision avoidance method based on the robot’s skeleton model as shown in Fig. 4. We assume that the xt includes the robot’s joint angles, and both ut and vt include the joint velocities. The inequality constraint related to collision avoidance takes the form:
+
+min ∥hr(t, xt) − ho(t)∥ − γ ≥ 0
+
+(29)
+
+where hr and ho represent the position functions of the
+
+robot and obstacles, respectively. γ denotes the safety distance
+
+threshold. The meaning of the collision avoidance inequality
+
+constraint is that the distance between the robot and obstacles
+
+must be greater than the safety threshold.
+
+According to the 7-DOF robot structure, where the robot
+
+model is Diana7, the joint combinations {J1, J2, J3, J4} and
+
+{J4, J5, J6, J7} have motion coaxiality. And the motion coax-
+
+iality enables all joints in the combination to move along a
+
+single axis. Considering the tool size of the end-effector, the
+
+robot can be simplified into a three-link skeleton model. Since
+
+the position of J1 is fixed to the base, J1 is not considered
+
+in the skeleton model. Other robots can also obtain similar
+
+skeleton models based on their structural features.
+
+A random obstacle point Op is considered, whose po-
+
+sition can be obtained by a depth camera. Ol1, Ol2, and
+
+Ol3 are assumed to be the points on the robot’s three-
+
+link skeleton closest to the obstacle, respectively. Thus,
+
+min ∥hr(t, xt) − ho(t)∥ can be transformed into the closest
+
+distance from the obstacle point to the robot’s three-link skele-
+
+ton {∥OpOl1∥ , ∥OpOl2∥ , ∥OpOl3∥}. Next, the calculation
+
+process will be illustrated using ∥OpOl2∥ as an example.
+
+
+
+ ∥J 4Op∥ − rJ , 
+
+σ ≤ 0,
+
+∥OpOl2∥ = J 4Op × J 4J 7 − rL, 0 < σ < 1, (30)
+
+ ∥J 4J 7∥
+
+
+
+∥OpJ 7∥ − rJ ,
+
+σ≥1
+
+σ = J 4Op · J 4J 7 = ∥J 4Op∥ cos(θ) (31) J 4J 7 · J 4J 7 ∥J 4J 7∥
+where θ represents the angle between the vectors J 4Op and J 4J 7. σ is the ratio of the projection of J 4Op onto the direction of J 4J 7 to ∥J 4J 7∥. σ divides the estimation of obstacle distance into three types. When σ ≤ 0, the angle
+
+θ ≥ 90◦, and the nearest obstacle point Ol2 is at the position of J4. When 0 < σ < 1, 0 < θ < 90◦, Ol2 is on the link,
+
+as shown in Fig. 4. When σ ≥ 0, Ol2 is at the position
+
+of J7. It should be noted that the actual size of the robot
+
+needs to be considered when estimating the nearest obstacle
+
+distance. Therefore, we simplify the size of the robot structure
+
+by assuming that the joint is enveloped by a sphere with a
+
+radius of rJ , and the link is enveloped by a cylinder with a
+
+radius of rL. Then, ∥OpOl2∥ is obtained by subtracting the
+
+enveloping radius of the position of Ol2 in (30).
+
+Finally, we design the collision avoidance inequality con-
+
+straint as a cost term ssafe(xt), which is added to the cost
+
+s(xt):
+
+
+
+T 3
+
+
+
+1
+
+, γl ≤ γ,
+
+ssafe(xt) = t=0 i=1 ∥OpOli∥
+
+(32)
+
+
+
+0,
+
+γl > γ
+
+3
+
+γl = min ∥OpOli∥
+
+(33)
+
+i=1
+
+where
+
+∥OpOli∥
+
+is
+
+calculated
+
+using
+
+the
+
+random
+
+state
+
+xk
+t
+
+in
+
+the
+
+sampling trajectory Hk, the superscript k represents the index
+
+of the sample. Furthermore, considering the actual unknown
+
+obstacles, they can be transformed into real-time point clouds,
+
+and ∥OpOli∥ represents the closest distance from the obstacle
+
+point clouds to the robot link.
+
+C. Inequality constraint: smooth motion
+The stochasticity of the sampling process can cause obvious oscillations in the output results over time, increasing the burden on the actuators and leading to system instability. This is a common problem of sampling-based MPC. To address this problem, some authors propose to smooth the output control sequence by fitting local polynomial approximations to the control sequence [10]. Although this external smoothing method has achieved good results, it affects the optimality and destroys the equality constraint relationship of the output results. Recent works have also not considered the equality constraint relationship in smoothing processing [20], [24].
+This section introduces a method of using time series smoothing prediction to smooth robot motion without breaking the equality constraint. Time series smoothing prediction is a key concept in statistics [30]. It refers to using averaging methods to eliminate the negative effects of random fluctuations in discrete time series, smoothing time series to reflect their past trends, and combining certain models to predict their development in the future. We first list the form of the inequality constraint related to smooth motion:
+max X∧ − Hk − µ ≤ 0 (34)
+
+∧
+
+∧
+
+∧
+
+where X = x0, x1, . . . xT is the predicted smooth state
+
+sequence, Hk =
+
+x
+
+0
+
+,
+
+x
+
+k 1
+
+,
+
+.
+
+.
+
+.
+
+x
+
+k T
+
+is the sampling trajectory,
+
+and µ is the smoothing threshold. The purpose of the inequal-
+
+ity constraint is to make Hk as close as possible to X. Since ∧
+
+JOURNAL OF LATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021
+
+7
+
+State value
+Noise magnitude
+
+0.20 0.15 0.10 0.05 0.00
+0
+
+historical state sequence
+
+predicted smooth sequence
+
+100
+
+200
+
+300
+
+400
+
+500
+
+Time points
+
+0.7 0.6 0.5 0.4 0.3 0.2 0.10 1 2 3 4 5 6 7 8 9 10
+Task execution time [s]
+
+Fig. 5. An example of smoothing prediction. The historical state sequence is Xh and the predicted smooth sequence is X∧ , whose parameters T = 50,
+∧
+M = 100, φ = 0.03. The X is generated by sliding forward from the initial
+time through a sliding window of length M .
+
+Hk is essentially a random state sequence generated by the
+
+v through noise driving, smoothing Hk, can further smooth
+
+the optimal result u∗ based on the importance sampling. The
+
+proposed smooth motion method with time series smoothing
+
+prediction is derived as follows.
+
+A
+
+state
+
+sequence
+
+Xh
+
+=
+
+{x
+
+h 0
+
+,
+
+x
+
+h 1
+
+,
+
+.
+
+.
+
+.
+
+x
+
+h M
+
+−
+
+1
+
+}
+
+is
+
+constructed,
+
+which includes the historical state in the past M time points.
+
+The superscript h denotes the historical data. Secondly, to predict future changes in Xh, a triple exponential smoothing
+
+model [31], which is an important time series prediction
+
+method, is used to process the historical state sequence:
+
+ (1)
+
+h
+
+(1)
+
+ STm = φxm + (1 − φ)STm−1
+
+
+
+ STm(2) = φSTm(1) + (1 − φ)STm(2−) 1 (35)
+
+ (3)
+
+(2)
+
+(3)
+
+STm = φSTm + (1 − φ)STm−1
+
+where φ is a constant whose value ranges from (0, 1). The
+
+single, double, and triple exponential smoothing values at time point m in the past are denoted as STm(1), STm(2) and STm(3),
+
+respectively. The smoothing factor can be defined as follows:
+
+
+
+(1)
+
+(2)
+
+(3)
+
+ am = 3STm − 3STm + STm
+
+  bm =
+
+φ
+
+(1)
+
+2 (6 − 5φ) STm − 2(5 − 4φ)
+
+2(1 − φ)
+
+ STm(2) + (4 − 3φ)STm(3) (36)
+
+
+
+  dm =
+
+2 φ STm(1) − 2STm(2) + STm(3)
+
+2(1 − φ)
+
+The triple exponential smoothing prediction model is obtained:
+
+∧
+
+2
+
+xm+t = am + bmt + dmt
+
+(37)
+
+where t represents the number of prediction points from the past m time point, where t ∈ {0, 1, ..., T }. We can set m = 0
+
+and predict from the current time point. Then, a predicted
+∧
+smooth sequence X is obtained, whose predicted smooth effect
+is shown in Fig. 5.
+
+Finally, a quadratic
+motion is added to the   1
+ssmooth(xt) =  2
+
+term ssmooth(xt) related to smooth cost s(xt):
+∧ ∧T
+X −Hk R X −Hk , µs ≥ µ,
+
+0,
+
+µs < µ
+
+(38)
+
+Fig. 6. An example of adaptive noise with parameters Σmax = 0.7, Σmin = 0.1, αΣ = 0.4[s], βΣ = 7, TΣ = 10[s].
+
+µs = max X∧ − Hk (39)
+where R is a positive definite weight matrix. Since the motion is smoothed by the cost, it does not interfere with the handling of equality constraints in the sample generation process.
+
+D. Adaptive noise
+
+In the sampling process, the amplitude Σ determines the
+
+range of noise, which in turn affects the quality of samples and
+
+optimal results. Usually, an appropriate Σ can ensure a good
+
+sampling performance in simple and certain tasks. However,
+
+in the precise tasks of dynamic human-robot interaction, a
+
+fixed Σ may not guarantee a good sampling exploration ability.
+
+Because the exploration speed needs to be increased to ensure
+
+optimization efficiency at the beginning of the task, and re-
+
+duced to ensure optimization accuracy and control stability at
+
+the end. Therefore, we propose a method that can dynamically
+
+adjust the Σ according to the task execution situation, to
+
+smoothly improve the exploration ability.
+
+We rewrite the amplitude Σ of input vt in (1) as:
+
+
+
+
+
+Σmax − Σmin
+
+ 1 + e(−tΣ(2/αΣ)+1)βΣ + Σmin,
+
+
+
+tΣ ≤ αΣ,
+
+Σ=  
+
+Σmax,
+
+αΣ < tΣ ≤ TΣ − αΣ,
+
+Σmax − Σmin
+
++ Σmin, tΣ > TΣ − αΣ
+
+1 + e((tΣ−TΣ)(2/αΣ)+1)βΣ
+
+(40)
+
+where Σmax and Σmin are the bounds of Σ. βΣ is the shape
+
+factor. tΣ is the current time of task execution, αΣ is the time
+
+when Σ approaches Σmax, and TΣ is the final task completion
+
+time. Fig. 6 shows an example of (40).
+
+During the start and end phases of the task, Σ has a smooth
+
+transition, which is beneficial for making the best optimal
+
+strategy under the current state. In the middle of the task, Σ
+
+should be kept as high as possible to improve the exploration
+
+ability and find more useful environmental information. Since
+
+MPC only considers future time steps, the total task execution
+
+time is actually uncertain. Thus, it is best to combine the time
+
+tΣ with the cost of the task. For example, for a reaching task
+
+in Cartesian space, tΣ can be combined with the Euclidean
+
+distance to construct a judgment or functional relationship.
+
+When the distance is less than a certain threshold, the current
+
+task is completed.
+
+Finally, the overall optimization process of the CSMPC
+
+algorithm is shown in Alg. 1.
+
+JOURNAL OF LATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021
+
+8
+
+Algorithm 1: CSMPC algorithm.
+
+Given: F : Dynamics model;
+
+K, T : Number of samples and timesteps;
+
+(u0, u1, . . . uT −1) : Initial control sequence; Σ, λ, ϕ, s, C : Control parameters and cost function;
+
+B1, c1, B2, c2 : Variables about equality constraints; x, v : State and input after equality constraints;
+
+1 while task not completed do
+
+// Obtain the current system state.
+
+2 xt ← SubscribeState() ;
+
+// Compute the noise amplitude. (40)
+
+3 Σ ← AdaptiveNoise(xt) ; 4 for k ← 0 to K − 1 do
+
+// Initial state in optimization.
+
+5
+
+x0 ← xt ;
+
+6
+
+Sample
+
+Ek
+
+=
+
+(ϵk0
+
+.
+
+.
+
+.
+
+ϵkT −1),
+
+ϵk
+t
+
+∈
+
+N (0,
+
+Σ)
+
+;
+
+7
+
+for t ← 0 to T − 1 do
+
+// Compute the input and state
+
+that satisfies the equality
+
+constraints. (24) (20)
+
+8
+
+vk
+t
+
+=
+
+(I
+
+− B2†B2)(ut
+
++
+
+ϵk
+t
+
+)
+
+−
+
+B2
+
+†
+
+c2
+
+;
+
+9
+
+xk
+t+1
+
+=
+
+(I
+
+−
+
+B1†B1)F(xkt ,
+
+vtk )
+
+−
+
+B1†c1;
+
+// Compute the costs of
+
+collision avoidance and
+
+smooth motion. (32) (38)
+
+10
+
+s(x) += ssafe(x) + ssmooth(x) ;
+
+11
+
+C(V k)
+
++=
+
+s(x)
+
++
+
+λuTt
+
+Σ−1
+
+ϵk
+t
+
+;
+
+12
+
+C(V k) += ϕ(xT ) ;
+
+13 ωk ← ComputeWeights(C(V 0), . . . C(V K−1)) ; 14 for t ← 0 to T − 1 do
+// Update the constrained optimal
+
+control results. (13)
+
+K −1
+
+k
+
+15
+
+ut = k=0 ωkvt ; ;
+
+16 SendToActuators(u0) ;
+
+17 for t ← 1 to T − 1 do
+
+18
+
+ut−1 ← ut ;
+
+19 uT −1 ← Initialize (uT −1) ;
+
+IV. SIMULATION RESULTS
+In the simulation, we use a planar three-link robot and a 7DOF robot manipulator to demonstrate the core features of the CSMPC algorithm for collision-free manipulation. Both robots have redundant degrees of freedom in their manipulation workspaces.
+A. Planar three-link robot
+A planar three-link robot system is shown in Fig. 7, where xt ∈ R3 includes three joint angles, vt ∈ R3 and ut ∈ R3 include corresponding joint velocities. The dynamics system is represented as xt+1 = xt + vt∆t, where ∆t = 0.02 s, and the sampling parameters includes K = 200 and T = 5. The constraint types include equality constraints for the endeffector moving along a straight line, as well as inequality constraints for avoiding obstacles.
+
+Obstacle
+
+Planar 3-link Y robot
+
+Goal
+
+X End Constraint effector
+
+(a) Simulation schematic. The endeffector reaches the Goal along the constrained direction without collision.
+
+(b) The comparison simulation process of the upper and lower subfigures. The ability of CSMPC to handle equality constraints is verified.
+
+Fig. 7. Simulation schematic and process for the planar three-link robot.
+
+Firstly, the equality constraint can be described as the
+velocity of the end-effector dEE = [vx, vy]T, being the same as the constrained direction to the Goal dG = [1, 0]T:
+
+dEE TdGv = 0
+
+(41)
+
+dEE = JEEvt∆t, dGv = [0, 1]T
+
+(42)
+
+where JEE ∈ R2×3 is the Jacobian matrix of the end-effector and dvG the orthogonal vector of dG. Then, vt in dEET is eliminated by dynamics xt+1 = xt + vt∆t, and (41) is further
+organized into the form of state-only equality constraint:
+
+−dGv TJEE xt−1 + dGv TJEE xt = 0 (43)
+
+c1
+
+B1
+
+where xt−1 at the last time step is known compared to xt. Secondly, inequality constraints for collision avoidance and
+the cost for reaching the Goal are constructed in the cost s(xt), which is s(xt) += λ1ssafe(xt)+λ2sgoal(xt), where λ1 = 10 and λ2 = 0.02 are constraint coefficients. For ssafe(xt), its mathematical expression can be referred to (32), where the safety distance threshold γ = 0.125[m]. For sgoal(xt), it can be built as follows:
+
+sgoal(xt) = χGE, χGE > 0.5mm, (44) 0, χGE ≤ 0.5mm
+
+where χGE = ∥pG − pEE∥2 is the Euclidean distance from the Goal pG to the end-effector pEE, which is obtained by the robot kinematics. When χGE is less than 0.5mm, the robot is considered to have reached the Goal.
+This simulation validates the feasibility of the equality constraint and inequality constraint for collision avoidance, as shown in Fig. 7. Using ssafe, the robot can reach the Goal without collision in narrow obstacle spaces, which reflects the multi-joint collision avoidance capability of ssafe based on the robot skeleton model. Two subfigures are used to validate the effectiveness of the equality constraint method. The proposed method allows the robot to strictly satisfy the designed equality constraint during the motion, while also satisfying the inequality constraints.
+
+B. 7-DOF robot manipulator
+To validate the ability of the proposed CSMPC algorithm on more complex and higher-dimensional robotic systems, a 7-
+
+JOURNAL OF LATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021
+
+9
+
+(a) Simulation 1 : The robot avoids a static obstacle and reaches the goal accurately without equality constraints.
+
+(b) Simulation 2 : The end-effector draws an "∞" trajectory in the vertical attitude, while avoiding dynamic and static obstacles in real time.
+
+(c) Simulation 3 : The end-effector position is fixed and Joint 6 is rounded in Cartesian space by dealing with multiple equality constraints, which is used to simulate the grinding process of the inner hole of the workpiece.
+
+(d) Simulation 4 : Verify the discrete cost processing capability of CSMPC. The cost is built by a grid map (the bluer the color, the smaller the cost), the end-effector reaches the bluest grid without collision.
+
+Fig. 8. Simulation process of the 7-DOF robot manipulator. The green blocks and spheres represent static and dynamic obstacles, respectively. The simulation video is in the attached material.
+
+TABLE I COMPARISON OF SIMULATION RESULTS OF THREE MPC METHODS.
+
+Method
+
+MPC Type
+
+a
+Time (ms)
+
+Simulation 1 Error (m)b
+
+Simulation 2 Error (m)
+
+Simulation 3 Error (m)
+
+Simulation 4 Error (m)
+
+OCS2 [13]
+
+Gradient 14.83 ± 0.012 4.73 × 10−5 1.61 × 10−5 2.44 × 10−5
+
+d
+
+STORM [20] Sampling 12.54 ± 0.003 8.18 × 10−4 1.12 × 10−2
+
+c Grid resolution
+
+CSMPC(Ours) Sampling 13.12 ± 0.007 3.25 × 10−5 1.56 × 10−5 1.45 × 10−5 Grid resolution
+
+a Time: average optimization time of a control step. b Error: maximum tracking error for the robot end-effector.
+
+c : the robot collides and the task fails. d : the gradient-based MPC cannot deal with discrete costs.
+
+DOF robot manipulator is used for the following simulations. The simulation setup is similar to that of the three-link robot. xt ∈ R7 includes 7 joint angles, vt ∈ R7 and ut ∈ R7 includes the corresponding joint velocities. Fig. 8 shows four simulation processes.
+1) Simulation 1: This simulation demonstrates the basic function of CSMPC in robot manipulation, which is to make the robot safely reach the goal while avoiding obstacles.
+2) Simulation 2: This simulation demonstrates how to achieve precise collision-free manipulation based on equality constraints. While the robot avoids both dynamic obstacles using ssafe, the end-effector needs to follow a ”∞” shaped trajectory in the vertical attitude. The state-input equality constraint applied to the end-effector is:
+
+−vEE + JEE vt = 0
+
+(45)
+
+c2
+
+B2
+
+where vEE is the velocity of the end-effector. vEE includes the linear velocity along the trajectory tangent direction and the zero angular velocity.
+
+3) Simulation 3: This simulation is used to further explore how to apply equality constraints to multiple objects. We consider the manipulation scenario of polishing the inner hole of a workpiece, where the polishing probe needs to be inserted into the hole and polish the hole wall by rotating the probe direction. Here, CSMPC enables the robot to perform this high-precision polishing task. The end-effector serves as the probe, its position remains stationary, and its direction rotates
+
+using Joint 6 to draw a circle in Cartesian space. Therefore, equality constraints are applied to both the end-effector and Joint 6 simultaneously. The constraint form is:
+
+0 JEE pos pos + pos vt = 0
+
+−vJ6
+
+JJ6
+
+(46)
+
+where JEE pos and JJ6 pos are Jacobian matrices related to the endeffector and Joint 6 position, respectively. vJ6 pos is the linear velocity of Joint 6.
+4) Simulation 4: This simulation provides an example of CSMPC for handling discrete cost terms, which cannot be achieved by gradient-based MPC methods. The robot’s workspace is constructed as a three-dimensional grid map. Each grid is a cube with a side length of 0.1m, storing a cost value (the bluer the grid, the smaller the cost value). Therefore, the cost term in stochastic optimization is determined by the cost value in the grid where the robot end effector is located, making it a discrete optimization problem. As shown in Fig. 8, CSMPC successfully enables the robot to avoid multiple obstacles and reach the target (the bluest grid) by handling discrete costs.
+
+C. Comparative analysis
+A comparative analysis is conducted between CSMPC and two popular MPC methods (OCS2 [13], STORM [20]), as shown in Table I. OCS2 is a gradient-based MPC toolbox developed by ETH Zurich, known for its efficient and stable capabilities that have been well-validated in precise manip-
+
+JOURNAL OF LATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021
+
+10
+
+ulation and perceptive locomotion [32], [33]. STORM is a stochastic tensor optimization method based on parallel GPU, which has gained popularity in recent years as a samplingbased MPC method [20]. Thus, these two methods are chosen as representative advanced methods of the two types of MPC for comparison with CSMPC. The comparison simulations are conducted under the same computing environment, where the CPU model is AMD Ryzen 5 3600X 6-Core Processor and the GPU model is NVIDIA GeForce GTX 1660.
+Compared to OCS2, CSMPC achieves shorter optimization times under the same order of magnitude of constraint error. This is because the requirement of high-precision equality constraints reduces the optimal convergence speed of OCS2. Then, OCS2 constructs obstacle avoidance costs by defining the collision body list of the robot’s URDF model, which increases the optimization solving time compared to the proposed robot skeleton model approach. Moreover, as shown in Simulation 4, CSMPC can solve discrete optimization problems, which cannot be achieved by gradient-based MPC methods such as OCS2. Compared to STORM, CSMPC can handle equality constraints with high precision without violating inequality constraints. However, STORM needs to convert equality constraints into costs, which may not be compatible with obstacle avoidance costs in dynamic scenarios, leading to poor tracking effects or potential collisions in Simulations 2 and 3. Although the optimization time of CSMPC is slightly longer than STORM’s due to equality constraint matrix calculations, the manipulation error of CSMPC is 1000 times smaller than STORM’s. In Simulation 1, STORM may face exploration stagnation near the goal due to inappropriate sampling noise. However, CSMPC can solve this problem and improve reaching accuracy by at least ten times using the adaptive noise method. The motion smoothness of CSMPC is guaranteed by the smooth motion method, which can be seen in the video attachment. Therefore, CSMPC solves the problem that sampling-based MPC methods cannot accurately handle equality constraints, and its convergence speed is faster than that of the gradient-based MPC methods.
+V. EXPERIMENT RESULTS
+We further evaluate CSMPC’s performance in real-world environments. We first set up the experimental manipulation scenarios(Section V-A). Then, a visual perception method is used to provide obstacle point clouds for collision-free manipulation(Section V-B). Our method overcomes the shortcomings of stochastic sampling and can better handle various constraints while ensuring safety in the actual robot manipulation (Section V-C).
+A. Experimental Setup
+We set up four experimental scenarios as follows:
+• Experiment 1: The robot grasps and places objects in a space-constrained environment.
+• Experiment 2: The robot tracks an ”∞” trajectory while avoiding human interference.
+• Experiment 3: The robot polishes the inner hole of a workpiece while avoiding obstacles of different shapes.
+
+30Hz 50Hz
+
+40Hz 100Hz
+
+Image acquisition Depth image
+Visual perception Obstacle point cloud
+CSMPC algorithm Optimization result
+Joint control
+
+Fig. 9. Experimental overview. The experiments are conducted by establishing a connection with the environment through deep visual perception and transmitting the results of the CSMPC algorithm to the robot through joint control.
+
+• Experiment 4: The robot performs contact-based medical examination based on force sensors.
+Fig. 9 provides an overview of the experiments. The RGBD camera used is a Kinect V2, which can capture depth images [34]. The servoJ command of the Diana7 robot is used for online joint control.
+B. Visual perception
+In real-world environments, obstacles around the robot are of unknown shape and dynamically changing. Therefore, based on our previous work [29], visual perception is used to provide obstacle point clouds. Firstly, the depth image is converted into raw 3D point clouds. Then, voxel downsampling and a statistical filter are used to improve the point cloud quality. Based on the skeleton envelope in Fig. 4, the robot is removed from the point clouds, leaving only obstacle point clouds. Finally, the closest obstacle distance is estimated to construct collision avoidance constraints.
+C. Robot manipulation experiments
+1) Experiment 1: We migrate the robot grasping and placing manipulation task from Simulation 1 to this experiment. From the perspective of the robot, it grasps the object from the right side of the table and places it in the drawer on the left side. The robot avoids obstacles such as the drawer, table, and clutter during the motion.
+2) Experiment 2: We migrate the task for trajectory tracking from Simulation 2 to this experiment. As shown in Fig. 10, the end-effector needs to track a ”∞” trajectory in a red workpiece. CSMPC makes the robot can quickly avoid the incoming human obstacles during the tracking process. The maximum position and orientation tracking error are less than 4.31 × 10−4 m and 1.29 × 10−4 rad, respectively. Due to the limitation of robot repeatability accuracy (±0.05mm) and the impact of communication delay, the tracking error of this experiment is slightly lower than that of Simulation 2. However, the error below 0.5mm still reflects excellent tracking accuracy and ability to deal with equality constraints.
+3) Experiment 3: We migrate the task of polishing the inner hole of a workpiece from Simulation 3 to this experiment. By solving multiple equality constraints, the end-effector position
+
+JOURNAL OF LATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021
+
+11
+
+Experiment 1
+
+Experiment 2
+
+Experiment 3
+
+Experiment 4
+
+Goal
+
+Z
+
+Z
+
+Z
+
+Z
+
+XY
+
+XY
+
+XY
+
+XY
+
+Force sensor
+
+(a) The experimental process. Experiment 1: grasp and place objects safely. Experiment 2 : track a "∞" trajectory without collision. Experiment 3 : polish a hole and avoid unknown obstacles. Experiment 4 : track straight lines smoothly on the human surface to simulate medical examination.
+
+𝟒. 𝟑𝟏 × 𝟏𝟎−𝟒 𝐦
+
+𝟐. 𝟑𝟏 × 𝟏𝟎−𝟒 𝐦
+
+Tracking path
+
+𝟏. 𝟐𝟗 × 𝟏𝟎−𝟒 𝐫𝐚𝐝
+
+𝟐. 𝟖𝟔 × 𝟏𝟎−𝟒 𝐦
+
+(b) The position and orientation tracking error of the end-effector in Experiment 2.
+
+(c) The position tracking error of the endeffector and Joint 6 in Experiment 3.
+
+(d) The motion trajectory and three-view diagram of the end-effector in Experiment 4.
+
+Fig. 10. The process and results of robot collision-free manipulation experiments. The experiment video is in the attached material.
+
+is unchanged and Joint 6 is drawn in Cartesian space. The robot successfully avoids dynamic unknown obstacles and completes the polishing task. As shown in Fig. 10, the corresponding maximum position errors are less than 2.31 × 10−4 m and 2.86 × 10−4 m, respectively.
+4) Experiment 4: Furthermore, we design a challenging contact-based task to handle dynamic equality constraints. In the context of telemedicine, robotic methods have been proven to enable doctors to provide expert care in remote areas [35], particularly in contact-based examinations such as pulse wave detection. Thus, CSMPC is used to make the robot track a straight line on the human surface to simulate a medical examination. A equality constraint is built similar to (45) for trajectory tracking: −vEE + JEEvt = 0, where vEE = {vx, vy, vz, 0, 0, 0}. Since the human skin surface is uneven and flexible, vz is corrected by the contact force Fcontact:
+vz = vz − 0.005, Fcontact < 0.25N, (47) vz + 0.005, Fcontact ≥ 0.25N.
+As shown in Fig. 10, the maximum tracking error is less than 2.57 × 10−4 m and the maximum contact force is less than 0.45N . Thus, CSMPC enables the robot to achieve safe and accurate manipulation in contact-based human-robot interaction.
+VI. CONCLUSION
+In this paper, we propose a constrained sampling-based MPC (CSMPC) method based on the path integral control framework. The core content of this method is closely related to multi-constraint processing. Firstly, it provides an effective method for handling equality constraints during sampling,
+
+including the processing of multiple or dynamical equality constraints. Secondly, it designs inequality constraints that ensure motion safety and smoothness, improving the control performance on high-dimensional robot systems without violating equality constraints. We apply CSMPC to a 7DOF robot to solve the problem of balancing interaction safety and manipulation efficiency. The experimental results show that based on deep visual perception, the robot can accurately perform tasks while avoiding various obstacles in dynamic environments, including moving people and objects of different shapes. Because of its ability to accurately and safely handle multiple constraints in dynamic environments, CSMPC can be a promising research direction not only in human-robot interaction, but also in robot-robot interaction and environment-robot interaction.
+REFERENCES
+[1] A. Billard and D. Kragic, “Trends and challenges in robot manipulation,” Science, vol. 364, no. 6446, p. eaat8414, 2019.
+[2] J. Nakanishi, R. Cory, M. Mistry, J. Peters, and S. Schaal, “Operational space control: A theoretical and empirical comparison,” The International Journal of Robotics Research, vol. 27, no. 6, pp. 737–757, 2008.
+[3] J. Wong, V. Makoviychuk, A. Anandkumar, and Y. Zhu, “Oscar: Datadriven operational space control for adaptive and robust robot manipulation,” in 2022 International Conference on Robotics and Automation (ICRA). IEEE, 2022, pp. 10 519–10 526.
+[4] S. Karaman, M. R. Walter, A. Perez, E. Frazzoli, and S. Teller, “Anytime motion planning using the rrt,” in 2011 IEEE international conference on robotics and automation. IEEE, 2011, pp. 1478–1483.
+[5] J. D. Marble and K. E. Bekris, “Asymptotically near-optimal planning with probabilistic roadmap spanners,” IEEE Transactions on Robotics, vol. 29, no. 2, pp. 432–444, 2013.
+[6] A. Orthey, C. Chamzas, and L. E. Kavraki, “Sampling-based motion planning: A comparative review,” Annual Review of Control, Robotics, and Autonomous Systems, vol. 7, no. 1, p. null, 2024.
+
+JOURNAL OF LATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021
+
+12
+
+[7] ´I. Elguea-Aguinaco, A. Serrano-Mun˜oz, D. Chrysostomou, I. InziarteHidalgo, S. Bøgh, and N. Arana-Arexolaleiba, “A review on reinforcement learning for contact-rich robotic manipulation tasks,” Robotics and Computer-Integrated Manufacturing, vol. 81, p. 102517, 2023.
+[8] X. Huang, W. Wu, and H. Qiao, “Connecting model-based and modelfree control with emotion modulation in learning systems,” IEEE Transactions on Systems, Man, and Cybernetics: Systems, vol. 51, no. 8, pp. 4624–4638, 2019.
+[9] Y. Chebotar, A. Handa, V. Makoviychuk, M. Macklin, J. Issac, N. Ratliff, and D. Fox, “Closing the sim-to-real loop: Adapting simulation randomization with real world experience,” in 2019 International Conference on Robotics and Automation (ICRA). IEEE, 2019, pp. 8973–8979.
+[10] G. Williams, P. Drews, B. Goldfain, J. M. Rehg, and E. A. Theodorou, “Information-theoretic model predictive control: Theory and applications to autonomous driving,” IEEE Transactions on Robotics, vol. 34, no. 6, pp. 1603–1622, 2018.
+[11] C. Liu, T. Zhang, C. Zhang, M. Liu, and Q. Chen, “Foot placement compensator design for humanoid walking based on discrete control lyapunov function,” IEEE Transactions on Systems, Man, and Cybernetics: Systems, vol. 51, no. 4, pp. 2332–2341, 2019.
+[12] Y. Chen, F. Zhao, and Y. Lou, “Interactive model predictive control for robot navigation in dense crowds,” IEEE Transactions on Systems, Man, and Cybernetics: Systems, vol. 52, no. 4, pp. 2289–2301, 2021.
+[13] F. Farshidian et al., “OCS2: An open source library for optimal control of switched systems,” [Online]. Available: https://github.com/ leggedrobotics/ocs2.
+[14] Y. Wang, H. Li, Y. Zhao, X. Chen, X. Huang, and Z. Jiang, “A fast coordinated motion planning method for dual-arm robot based on parallel constrained ddp,” IEEE/ASME Transactions on Mechatronics, 2023.
+[15] J.-R. Chiu, J.-P. Sleiman, M. Mittal, F. Farshidian, and M. Hutter, “A collision-free mpc for whole-body dynamic locomotion and manipulation,” in 2022 international conference on robotics and automation (ICRA). IEEE, 2022, pp. 4686–4693.
+[16] M. Kobilarov, “Cross-entropy motion planning,” The International Journal of Robotics Research, vol. 31, no. 7, pp. 855–871, 2012.
+[17] G. Williams, N. Wagener, B. Goldfain, P. Drews, J. M. Rehg, B. Boots, and E. A. Theodorou, “Information theoretic mpc for model-based reinforcement learning,” in 2017 IEEE International Conference on Robotics and Automation (ICRA). IEEE, 2017, pp. 1714–1721.
+[18] W. Zhang, H. Wang, C. Hartmann, M. Weber, and C. Schutte, “Applications of the cross-entropy method to importance sampling and optimal control of diffusions,” SIAM Journal on Scientific Computing, vol. 36, no. 6, pp. A2654–A2672, 2014.
+[19] H. J. Kappen, “Path integrals and symmetry breaking for optimal control theory,” Journal of statistical mechanics: theory and experiment, vol. 2005, no. 11, p. P11011, 2005.
+[20] M. Bhardwaj, B. Sundaralingam, A. Mousavian, N. D. Ratliff, D. Fox, F. Ramos, and B. Boots, “Storm: An integrated framework for fast jointspace model-predictive control for reactive manipulation,” in Conference on Robot Learning. PMLR, 2022, pp. 750–759.
+[21] H. Lu, Q. Zong, S. Lai, B. Tian, and L. Xie, “Real-time perceptionlimited motion planning using sampling-based mpc,” IEEE Transactions on Industrial Electronics, vol. 69, no. 12, pp. 13 182–13 191, 2022.
+[22] C. Tao, H.-J. Yoon, H. Kim, N. Hovakimyan, and P. Voulgaris, “Path integral methods with stochastic control barrier functions,” in 2022 IEEE 61st Conference on Decision and Control (CDC). IEEE, 2022, pp. 1654–1659.
+[23] H. Lu, Q. Zong, S. Lai, B. Tian, and L. Xie, “Flight with limited field of view: A parallel and gradient-free strategy for micro aerial vehicle,” IEEE Transactions on Industrial Electronics, vol. 69, no. 9, pp. 9258– 9267, 2021.
+[24] T. Kim, G. Park, K. Kwak, J. Bae, and W. Lee, “Smooth model predictive path integral control without smoothing,” IEEE Robotics and Automation Letters, vol. 7, no. 4, pp. 10 406–10 413, 2022.
+[25] E. A. Theodorou and E. Todorov, “Relative entropy and free energy dualities: Connections to path integral and kl control,” in 2012 IEEE 51st IEEE Conference on Decision and Control (CDC). IEEE, 2012, pp. 1466–1473.
+[26] E. F. Camacho, C. Bordons, E. F. Camacho, and C. Bordons, Model predictive controllers. Springer, 2007.
+[27] Y.-J. Lai, “Hierarchical optimization: a satisfactory solution,” Fuzzy sets and systems, vol. 77, no. 3, pp. 321–335, 1996.
+[28] D. P. Bertsekas, Constrained optimization and Lagrange multiplier methods. Academic press, 2014.
+
+[29] H. Li, X. Wang, X. Huang, Y. Ma, and Z. Jiang, “Multi-joint active collision avoidance for robot based on depth visual perception,” IEEE/CAA Journal of Automatica Sinica, vol. 9, no. 12, pp. 2186–2189, 2022.
+[30] R. G. Brown, Smoothing, forecasting and prediction of discrete time series. Courier Corporation, 2004.
+[31] P. S. Kalekar et al., “Time series forecasting using holt-winters exponential smoothing,” Kanwal Rekhi school of information Technology, vol. 4329008, no. 13, pp. 1–13, 2004.
+[32] J.-P. Sleiman, F. Farshidian, and M. Hutter, “Constraint handling in continuous-time ddp-based model predictive control,” in 2021 IEEE International Conference on Robotics and Automation (ICRA). IEEE, 2021, pp. 8209–8215.
+[33] E. Arcari, M. V. Minniti, A. Scampicchio, A. Carron, F. Farshidian, M. Hutter, and M. N. Zeilinger, “Bayesian multi-task learning mpc for robotic mobile manipulation,” IEEE Robotics and Automation Letters, vol. 8, no. 6, pp. 3222–3229, 2023.
+[34] O. Wasenmu¨ller and D. Stricker, “Comparison of kinect v1 and v2 depth images in terms of accuracy and precision,” in Computer Vision–ACCV 2016 Workshops: ACCV 2016 International Workshops, Taipei, Taiwan, November 20-24, 2016, Revised Selected Papers, Part II 13. Springer, 2017, pp. 34–45.
+[35] C. R. Evans, M. G. Medina, and A. M. Dwyer, “Telemedicine and telerobotics: from science fiction to reality,” Updates in surgery, vol. 70, pp. 357–362, 2018. Xingfang Wang received the B.S. degree from the Beijing Institute of Technology, Beijing, China, in 2021, where he is currently working toward the Ph.D. degree in intelligent robots and Systems with the Intelligent Robotics Institute, School of Mechatronical Engineering. His current research interests include human-robot interaction, motion planning and robot perception.
+Hui Li received the B.S. degree from the Hebei University of Technology, Tianjin, China, in 2005, the M.S. degree from the Harbin Institute of Technology, Harbin, China, in 2007, and the Ph.D. degree from the Beijing Institute of Technology, Beijing, China, in 2011, all in mechatronic engineering. He is currently an Associate Professor with the School of Mechatronical Engineering, Beijing Institute of Technology. His research interests include intelligent robotics, industry robotics, artificial intelligence.
+Dong Wang received the B.S. degree from the Beijing Institute of Technology, Beijing, China, in 2022, where he is currently working toward the Ph.D. degree in intelligent robots and Systems with the Intelligent Robotics Institute, School of Mechatronical Engineering. His current research interests include robot structure design and motion planning.
+Xiao Huang received the B.S. degree in guidance, navigation and control from Central South University, Changsha, China, in 2015, and the Ph.D. degree in control theory and control engineering with Institute of Automation, Chinese Academy of Sciences, Beijing, China, in 2020. He is currently an Assistant Professor with the School of Mechatronical Engineering, Beijing Institute of Technology, Beijing, China. His current research interests include bio-inspired computing, machine learning.
+Zhihong Jiang received the B.S. and M.S. degrees in material processing and manufacturing engineering from the Jilin University of Technology, Changchun, China, in 1998 and 2001, respectively, and the Ph.D. degree in electrical engineering and automation from Tsinghua University, Beijing, China, in 2005. He is currently a Professor with the School of Mechatronical Engineering, Beijing Institute of Technology, Beijing, China. His research interests include space and Bionic intelligent robotics. He is a winner of the Key Project of the National Natural Science Foundation of China and the Key Project of Intelligent Robots in the National Key Research and Development Plan of China.
+
+

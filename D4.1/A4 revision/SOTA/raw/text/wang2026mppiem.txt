@@ -1,0 +1,776 @@
+Generalized Model Predictive Path Integral Control as Expectation–Maximization
+Jiarui Wang, Sina Sharifi and Mahyar Fazlyab
+
+arXiv:2606.00317v1 [eess.SY] 29 May 2026
+
+Abstract— Model Predictive Path Integral (MPPI) control is a powerful sampling-based method for solving stochastic optimal control problems and has enabled real-time control in complex robotic systems. Despite its empirical success, its theoretical understanding remains limited. In this work, we show that MPPI can be interpreted as a special case of the Expectation–Maximization (EM) algorithm applied to a probabilistic inference formulation of optimal control. This perspective leads to a generalized EM-MPPI framework that extends MPPI beyond the commonly used Gaussian parameterization. We analyze the convergence behavior of this algorithm and characterize the local convergence rate in terms of the covariance of the posterior trajectory distribution and the exploration distribution. For exponentialfamily distributions, we establish a sufficient increase property of the log-likelihood when the log-partition function is strongly convex. Specializing the analysis to Gaussian MPPI yields explicit global and local convergence characterizations. The code for the experiments will be available upon acceptance.
+Index Terms— Optimal control, Predictive control for nonlinear systems, Stochastic optimal control
+I. INTRODUCTION
+Model Predictive Path Integral (MPPI) [1, 2] is a widely used sampling-based method for nonlinear optimal control. Its strong empirical performance, together with modern parallel simulation tools such as Mujoco [3] and Isaac Gym [4], has enabled real-time control in a broad range of robotic settings, including whole-body control [5], quadrotor navigation [6], and online policy adaptation [7]. MPPI updates control sequences by sampling noisy trajectories, evaluating their costs, and forming a weighted average of sampled controls, resulting in a simple update rule that can be efficiently parallelized.
+Most existing derivations of MPPI are rooted in stochastic optimal control and control-as-inference viewpoints [1, 2, 8], in which trajectory optimality is recast as an inference problem over trajectories. These perspectives explain the exponential weighting structure underlying the MPPI update, but they do not by themselves provide a general optimization-theoretic characterization of the algorithm or its convergence behavior. Recent works have started to study MPPI convergence properties [9, 10]. However, a general optimization perspective
+Manuscript received 8 April 2024; revised 15 May 2024; accepted 1 June 2024. Date of publication xx xx xxxx; date of current version 14 June 2024.
+J. Wang, S. Sharifi, and M. Fazlyab are with the Department of Electrical and Computer Engineering at Johns Hopkins University, Baltimore, MD 21218, USA. {jwang486, sshari12, mahyarfazlyab}@jhu.edu
+
+that links the MPPI update to a classical iterative optimization algorithm remains lacking.
+Contributions. In this work, we show that MPPI can be interpreted as an instance of the Expectation–Maximization (EM) algorithm. This perspective yields a unified probabilistic and optimization-theoretic interpretation of MPPI, and naturally suggests algorithmic generalizations beyond the standard Gaussian setting. Building on this perspective, we analyze the convergence of a general EM-MPPI algorithm and establish a monotonic improvement condition for exponential-family distributions with strongly convex log-partition functions. We then specialize the analysis to standard MPPI, for which we derive explicit convergence guarantees and characterize the resulting rate in closed form.
+II. RELATED WORK
+Control as Probabilistic Inference. Stochastic optimal control can be formulated as probabilistic inference by introducing optimality variables whose likelihood depends exponentially on trajectory cost or reward [11, 8]. This yields a posterior trajectory distribution proportional to a prior distribution Boltzmann-reweighted by the negative cost, and optimal control can be interpreted as computing or approximating expectations under this posterior. This viewpoint has been developed in control as inference [12] and variational-inference MPC [13], where MPPI [1], the Cross-Entropy Method (CEM) [14], and Covariance Matrix Adaptation Evolution Strategy (CMA-ES) [15] arise under different choices of trajectory distributions and update rules. Closely related to our work, [16] derives a weighted maximum-likelihood projection onto a parametric variational family; For mixture-of-Gaussian families, this projection can be solved using an inner EM algorithm. In contrast, we identify the exact expectation-based MPPI update itself as an EM iteration.
+Expectation–Maximization Methods for Control. The EM algorithm [17, 18], originally developed for latent-variable inference [19], has also been applied to reinforcement learning and optimal control. [20] interpreted certain reinforcementlearning updates as EM by treating actions as latent variables and rewards as observations. [21] proposed an EM approach for solving (Partially Observed) Markov Decision Processes by introducing a random horizon, so that trajectories and horizons are optimized as latent variables. EM has also been used for stochastic optimal control under linear–Gaussian dynamics and policies [22]. These works demonstrate the value of EM in control, but they do not identify standard MPPI itself as an EM
+
+iteration or analyze MPPI convergence from this viewpoint. Our work fills this gap by deriving MPPI as an EM-type algorithm over a parameterized control distribution and using this interpretation to establish convergence guarantees.
+Theoretical Analysis of MPPI. Despite MPPI’s empirical success, its theoretical analysis remains limited. Existing works mainly study the standard sampling-based update. For example, [9] establishes linear convergence rates for quadratic problems, including time-varying LQR, and extends the analysis to nonlinear systems. [10] studies optimality and suboptimality properties of MPPI in stochastic and deterministic settings. These results provide important guarantees for the standard MPPI update under assumptions on the objective, dynamics, and sampling covariance. In contrast, we identify the EM structure underlying MPPI and use it to derive convergence guarantees from a latent-variable maximum-likelihood perspective.
+
+III. PRELIMINARIES A. Optimal Control and MPC
+Consider the finite-horizon optimal control problem
+
+H
+
+min J (u) = ch(xh, uh) + cf (xH+1)
+u h=1
+
+s.t. xh+1 = fh(xh, uh), h = 1, . . . , H.
+
+(1)
+
+Here u = [u1, . . . , uH ] denotes the control sequence, fh : Rnx ×Rnu → Rnx represents the system dynamics, ch : Rnx × Rnu → R is the stage cost, and cf : Rnx → R is the terminal cost. We assume J is bounded below with optimal value J∗ = minu J(u). In MPC, problem (1) is repeatedly solved in a receding-horizon manner. At each time step, the current state is used as the initial state x1, an optimal control sequence is computed, and only the first control action u1 is applied to the system. The horizon is then shifted forward, and the optimization problem is solved again (usually warm-started by shifting the control sequence obtained at the previous MPC step) after measuring the next state.
+
+B. MPPI
+
+While nonlinear programming methods are widely used for solving (1), their applicability may be limited when the dynamics fh are non-differentiable or available only through a simulator. For example, in contact-rich systems, the dynamics may itself be defined implicitly through an optimization problem, making gradient-based methods difficult to apply. In such scenarios, MPPI control provides a sampling-based alternative. Starting from a nominal control sequence u, MPPI generates candidate control sequences by sampling perturbations around u, evaluates their rollout costs, and updates the nominal sequence via a cost-weighted average:
+
+u+ =
+
+i=1 N u[i] exp − τ i.i.d. J(u[i])
+
+N
+
+J(u[i]) , u[i] ∼ N (u, Σ), (2)
+
+i=1 exp − τ
+
+where τ > 0 is a temperature parameter and {u[i]}Ni=1 are sampled control sequences. Each u[i] = [u[i]1, . . . , u[i]H ]
+
+represents a control trajectory drawn from the Gaussian distribution centered at the current nominal control sequence u. In practice, the update (2) may be repeated multiple times within a single MPC step before applying the first control action, as implemented in practical systems (e.g., ROS2 Nav2 MPPI controller1).
+
+IV. GENERALIZED MPPI FROM EM
+
+To formulate problem (1) as an inference problem, instead
+
+of directly searching for a single optimal control sequence
+
+u, we consider a distribution p(u; θ) parameterized by θ. We
+
+introduce an optimality variable O conditioned on U, defined
+
+as a Bernoulli random variable with conditional probability
+
+J (u) − J∗
+
+P (O = 1 | U = u) = exp −
+
+,
+
+(3)
+
+τ
+
+where τ > 0 is a temperature parameter controlling the sharpness of the optimality likelihood: smaller τ concentrates probability on trajectories with costs close to J∗, while larger τ gives broader weight to near-optimal trajectories. This construction ensures P (O = 1 | U = u) ∈ (0, 1] and assigns higher probability to sequences with lower cost. The marginal log likelihood of the optimality event under p(u; θ) is
+
+log P (O = 1; θ) = log
+
+J(u) − J∗
+
+p(u; θ) exp −
+
+du
+
+τ
+
+= log
+
+p(u; θ) exp − J(u) du + const. (4) τ
+
+Provided the integral is finite, this defines a well-posed
+objective over θ, and the constant is independent of θ. This
+objective becomes large when p(u; θ) assigns more proba-
+bility to control sequences that have lower trajectory costs.
+Therefore, instead of solving (1) by directly optimizing a
+single control sequence, we optimize θ so that the induced
+sampling distribution increasingly favors low-cost trajectories.
+This maximum-likelihood viewpoint naturally leads to an EM
+procedure for updating θ. In the probabilistic formulation above, the control sequence
+U plays the role of a latent variable, while the optimality event O = 1 is the observed variable. The goal is to maximize the marginal log likelihood ℓ(θ) := log P (O = 1; θ) with respect to θ. Since this is a latent-variable maximum-likelihood problem, it can be addressed using the EM algorithm. To derive the EM updates, let q(u) be an auxiliary distribution over control sequences. Then from (4) we have
+
+ℓ(θ) = log P (O = 1; θ)
+
+= log
+
+p(u; θ) exp(− J(u) )du + const τ
+
+= log
+
+q(u) p(u; θ) exp(− τ J(u) ) du + const q(u)
+
+= log E p(u; θ) exp(− u∼q(u) τ J(u) ) +const q(u)
+
+≥E p(u; θ) exp(− u∼q(u) log τ J(u) ) +const q(u)
+
+J (u)
+
+p(u; θ)
+
+=Eu∼q(u) −
+
++ Eu∼q(u) log
+
++ const
+
+τ
+
+q(u)
+
+1 = − Eu∼q(u)[J(u)] + τ KL(q∥p(·; θ)) + const, (5)
+τ
+
+1https://docs.ros.org/en/iron/p/nav2_mppi_ controller/
+
+where the inequality follows from Jensen’s inequality applied to the concave logarithm. (5) is the evidence lower bound (ELBO), which is tight when q(u) is chosen as the posterior distribution of U conditioned on the observation O = 1.
+
+A. E-Step
+
+For fixed θ, the ELBO in (5) is maximized
+over q when Jensen’s inequality is tight, i.e., when p(u; θ) exp(− τ J(u) )/q(u) is constant in u. Using Bayes’ rule, the optimal auxiliary distribution that maximizes the
+ELBO for the current θ is
+
+q(u; θ) = p(u | O = 1; θ) =
+
+p(u; θ) exp(− τ J(u) ) . (6) p(u; θ) exp(− τ J(u) )du
+
+Therefore, for a fixed θ, the ELBO (5) is maximized over q by choosing q(u) = q(u; θ), which corresponds to the posterior distribution p(u | O = 1; θ). Thus, the E-step recovers the standard optimal-control posterior obtained by Boltzmann reweighting of the current proposal distribution.
+
+B. M-Step
+Given the ELBO constructed in the previous section, which is tight at the current θ, the M-step updates the parameter by maximizing the ELBO with respect to θ to find the next iterate θ+, while fixing q obtained from the E-step. Since the term Eu∼q[J(u)] in (5) does not depend on θ+, this is equivalent to minimizing the Kullback–Leibler divergence between q and the parametric distribution p(·; θ+):
+
+min KL q(·; θ) ∥ p(·; θ+)
+θ+
+
+⇐⇒ max q(u; θ) log p(u; θ+) du.
+
+(7)
+
+θ+
+
+Thus, the M-step recovers the standard variational projection step: it approximates the Boltzmann-reweighted optimalcontrol distribution by the next proposal p(·; θ+) within the chosen parametric family. Substituting the expression of q(u; θ) from the E-step yields
+
+p(u; θ) exp(− τ J(u) ) log p(u; θ+) du
+
+max
+
+J (u)
+
+.
+
+(8)
+
+θ+
+
+p(u; θ) exp(− τ ) du
+
+which can be approximated using Monte Carlo estimation as
+
+max
+θ+
+
+i=1 N exp(− τ J(u[i]) ) log p(u[i]; θ+) i=1 N exp(− τ J(u[i]) )
+
+N
+
+⇐⇒ max w[i] log p(u[i]; θ+).
+
+(9)
+
+θ+
+
+i=1
+
+(9) is a weighted maximum likelihood estimate, where u[i] are sampled from p(u; θ) and the weights w[i] are computed as
+
+exp(− τ J(u[i]) )
+
+w[i] = N
+
+J(u[j]) .
+
+(10)
+
+j=1 exp(− τ )
+
+Combining the E-step and M-step yields the complete EM algorithm, which we refer to as Generalized MPPI, summarized
+
+Algorithm 1 Generalized MPPI
+Require: : Initial parameter θ0, number of samples N 1: for k = 0, ..., do
+i.i.d.
+2: Sample u[1], ..., u[N ] ∼ p(u; θk) 3: Compute weights using (10) 4: Obtain θk+1 by solving (9) 5: end for
+
+in Algorithm 1. Note that although the E-step has the closedform solution (6), the posterior distribution is never explicitly computed. Instead, it is implicitly used in the M-step through Monte Carlo sampling and weight computation. Importantly, the algorithm naturally generalizes to any parametric distribution p(·; θ) provided that samples can be efficiently drawn from p(·; θ) and the weighted maximum likelihood problem (9) can be efficiently solved.
+
+C. Convergence
+The EM interpretation of MPPI induces the fixed-point iteration
+
+θ+ = M (θ) = argmaxθ+ Q(θ+; θ)
+
+(11)
+
+Q(θ+; θ) = Eu∼q(u;θ)[log p(u; θ+)].
+
+Thus, MPPI can be analyzed through the convergence theory of EM-type algorithms.
+Assumption 1: In this paper, we make the following assumptions
+1) θ ∈ Ω where Ω ⊆ Rnp is a closed set, 2) ∀u s.t. ∥u∥ < ∞, lim∥θ∥→∞ p(u; θ) = 0, 3) ∀M > 0, there exists a constant CM < ∞ such that
+p(u; θ) ≤ CM , ∀θ ∈ Ω, ∀u ∈ Rd with ∥u∥ ≤ M, 4) p(u; θ) is twice continuously differentiable in θ, 5) limM→∞ inf{J(u) : ∥u∥ ≥ M } = ∞, 6) (11) admits a maximizer for every θ. Assumption 1 is mainly a regularity condition on the sampling family and the trajectory cost. The coercivity condition on J (Assumption 1.5) is also natural, since large control sequences are either directly penalized through control effort or lead to large terminal/running costs. The existence of the M-step maximizer (Assumption 1.6) is mild in the fixedcovariance Gaussian case, where the weighted maximumlikelihood problem has a closed-form solution (see (15)). Importantly, Assumption 1 does not require differentiability of the dynamics or of the rollout cost J; it only requires smoothness of the chosen sampling density p(u; θ) with respect to its parameter. Thus, the analysis remains compatible with nonsmooth or simulator-defined robotic tasks, including navigation with obstacle penalties or contact-rich interactions.
+
+Theorem 1 (Convergence of EM-MPPI): Let Assumption 1
+hold and {θk} be the sequence generated by EM-MPPI. Then the following properties hold:
+1) ℓ(θk+1) > ℓ(θk) ∀θk that is not a stationary point, 2) the sequence {ℓ(θk)} converges, 3) every limit point θ∗ of {θk} is a stationary point of the
+log-likelihood, i.e., ∇θℓ(θ∗) = 0,
+
+Proof: Under Assumption 1, we can show that the super level set S = {θ : ℓ(θ) ≥ ℓ(θ0)} is compact, ℓ(θ) is continuously differentiable, and that Q(θ+, θ) is continuous in both argument. Then the result follows directly from classical
+convergence results for the EM algorithm [23, 18], since the
+proposed EM-MPPI update is an instance of an EM iteration. A more detailed proof of the compactness of S will be
+available in the longer version.
+Furthermore, the EM-MPPI iteration enjoys a local linear
+convergence rate.
+Theorem 2 (Local linear convergence): Assume that As-
+sumption 1 holds, and further suppose that
+1) ∇2θℓ(θ∗) ≺ 0, 2) the optimization problem (11) has a unique solution in
+a neighborhood of θ∗, 3) ∇211Q(θ∗, θ∗) is nonsingular, 4) M (θ) is continuously differentiable in a neighborhood
+of θ∗,
+then there exists a neighborhood N of θ∗ such that for any θ0 ∈ N , the sequence {θk} generated by EM-MPPI converges to θ∗. Moreover, the convergence is locally linear:
+
+∥θk+1 − θ∗∥
+
+∗
+
+lim
+
+∗ = ρ(∂M (θ )),
+
+k→∞ ∥θk − θ ∥
+
+where the Jacobian of the EM mapping is
+
+∂M (θ∗) = − ∇11 2 Q(θ∗, θ∗) −1 ∇12 2 Q(θ∗, θ∗), ∇211Q(θ∗, θ∗) = Eq(u;θ∗) ∇θ2 log p(u; θ∗) , ∇212Q(θ∗, θ∗) = Covq(u;θ∗) [∇θ log p(u; θ∗)] ,
+
+with ρ(∂M (θ∗)) < 1. Here ρ(∂M (θ∗)) denotes the spectral radius of the Jacobian of the EM mapping at θ∗, and ∇2ijQ denotes the second derivative of Q with respect to its i-th and
+
+j-th arguments.
+
+The local convergence result follows directly from [18,
+
+Sec 3.9] and Ostrowski Theorem [24, Thm 10.1.3]. A more
+
+detailed proof will be available in the longer version.
+
+Remark 1 (Interpretation of the local assumptions): The
+
+additional assumptions in Theorem 2 are local nondegeneracy
+
+conditions for the EM fixed-point map that describe the
+
+behavior of EM-MPPI once the iterates enter a neighborhood
+
+of a locally attracting solution. In the fixed-covariance
+
+Gaussian case, the M-step is locally unique because the
+
+weighted maximum-likelihood problem is strictly concave
+
+in
+
+the
+
+mean
+
+parameter.
+
+The
+
+nonsingularity
+
+of
+
+∇2
+11
+
+Q(θ
+
+∗
+
+,
+
+θ
+
+∗
+
+)
+
+rules out degenerate local curvature, while differentiability of
+
+M holds locally when the weighted moments vary smoothly
+
+with the current proposal parameter. Thus, Theorem 1 gives
+
+a global monotonic-improvement interpretation under broad
+
+regularity conditions, whereas Theorem 2 characterizes the
+
+local linear rate near a nondegenerate fixed point.
+
+V. EM-MPPI FOR EXPONENTIAL FAMILY A particularly important case is when p(u; θ) belongs to the exponential family, i.e.,
+p(u; θ) = h(u) exp η(θ)⊤T (u) − A(η(θ)) ,
+
+where h(u) is the base density, η(θ) is the natural parameter, T (u) denotes the sufficient statistics, and A(η) is the logpartition function, which is convex in η. Assuming the mapping between θ and natural parameter η is invertible, instead of studying convergence in θ, we can analyze convergence in the natural parameter η. Two useful identities for exponential families are
+
+∇ηA(η) = Ep(u;η)[T (u)], ∇2ηA(η) = Covp(u;η)[T (u)]. (12)
+
+Note that when p(u; θ) belongs to the exponential family, the joint distribution p(u, O = 1; θ) also has an exponentialfamily form with a modified base density. This observation significantly simplifies the analysis. The EM iteration (11) can be written as
+
+η+
+
+=
+
+argmaxη+
+
+Eq
+
+(u;η
+
+)
+
+[η
+
+⊤ +
+
+T
+
+(u)
+
+−
+
+A(η+)]
+
+(13)
+
+q(u; η) = p(u|O = 1; η) ∝ h(u) exp η⊤T (u) − A(η) − J(u) τ
+
+where q(u; η) is the distribution obtained from the E-step. Since A(η) is convex in η, the optimization problem (13) is convex. Combining the optimality condition with (12) yields
+
+Ep(u;η+)[T (u)] = ∇ηA(η+) = Eq(u;η)[T (u)], (14)
+
+which shows that the M-step corresponds to moment matching in the sufficient statistics T (u).
+Theorem 3 (Sufficient Increase in Exponential Family): Assume A(η) is α-strongly convex in η. Then the EM iteration satisfies
+ℓ(η+) − ℓ(η) ≥ α ∥η+ − η∥22. 2
+Proof: See appendix for the proof. Note that this sufficient increase property also holds when Algorithm 1 performs only a single update per iteration, which is commonly done in practice. Remark 2 (Monte Carlo approximation): Theorem 3 is stated for the population EM update. In Algorithm 1, the exact posterior moment Eq(u;η)[T (u)] is replaced by its self-normalized estimate. Repeating the proof of Theorem 3 shows that the sufficient-increase bound holds up to an additional term proportional to the estimation error in this moment. Under finite-second-moment assumptions, this error is O(N −1/2). Thus, the deterministic guarantee is recovered in the large-sample limit, while finite-sample monotonicity is approximate.
+
+VI. SPECIAL CASES
+A. Gaussian MPPI
+In this section, we study the convergence of the commonly used Gaussian MPPI and derive an explicit convergence result using the results from previous sections. In Gaussian MPPI, the control distribution is
+p(u; θ) = (2π)n/2|Σ|1/2 1 exp − 12 (u − µ)⊤Σ−1(u − µ) ,
+where θ = {µ} is the parameter and Σ is a fixed covariance matrix. In this case, p(u; θ) is smooth in µ, locally bounded on compact sets of controls, and satisfies p(u; θ) → 0 for each
+
+fixed u as ∥θ∥ → ∞. The weighted log-likelihood estimation (9) admits a closed-form solution
+
+N
+
+µ+ = wi u[i],
+
+(15)
+
+i=1
+
+which reduces exactly to the standard MPPI update. Using the result from Theorem 2, the Jacobian of the EM mapping at a stationary point is ∂M (θ∗) = Covq(u;θ∗)[u]Σ−1, which characterizes the local convergence rate. This shows that the local convergence is governed by the product of the covariance of the importance-weighted distribution and the inverse exploration covariance.
+Next we study the global sufficient increase property of Gaussian MPPI. A Gaussian distribution with fixed covariance can be written in exponential-family form as
+
+h(u) = exp − 12 u⊤Σ−1u , η(θ) = Σ−1µ,
+
+T (u) = u,
+
+A(η)
+
+=
+
+12 η⊤Ση
+
++
+
+1 2
+
+log det(2πΣ).
+
+The mapping between µ and η is therefore invertible. Moreover, the log-partition function A(η) is α-strongly convex with α = λmin(Σ) where λmin(Σ) is the minimum eigenvalue of Σ. Applying Theorem 3, Gaussian MPPI satisfies the global sufficient increase
+ℓ(η+) − ℓ(η) ≥ λmin(Σ) ∥η+ − η∥22. (16) 2
+
+B. Mixture of Gaussian (MoG) MPPI
+
+A well-known limitation of Gaussian MPPI is its inability to represent multi-modal distributions. For example, in a car navigation scenario with obstacle avoidance, going left and going right around an obstacle may both be valid choices, while their average trajectory may collide with the obstacle. Motivated by this issue, we consider a mixture of Gaussian distributions
+
+L
+p(u; θ) = πlN (u; µl, Σ),
+l=1
+
+L
+πl = 1,
+l=1
+
+where L is the number of Gaussian components and θ = {π1, µ1, . . . , πL, µL} denotes the parameters. For simplicity, we assume that the covariance matrices are fixed and identical across components. In this case, the weighted maximum likelihood estimation (9) can be solved using an inner EM algorithm with the following update rule:
+
+ril = πl+ =
+
+πlN (u[i]; µl, Σ)
+
+k=1 L πkN (u[i]; µk, Σ)
+
+i=1 N wiril , i=1 N wi
+
+µl+ =
+
+i=1 N wirilu[i] . i=1 N wiril
+
+Mixture-of-Gaussian control distributions for MPPI have also been explored in prior work on variational-inference control [16]. This formulation naturally fits into the EM-MPPI framework, where the E-step computes trajectory weights and the M-step updates the mixture parameters.
+
+(a) Sampled trajectories at different iterations
+
+(b) Estimate of log-likelihood
+
+Fig. 1: Convergence of Gaussian MPPI on a simple Dubins-car navigation problem.
+
+VII. EXPERIMENTS
+In this section, we consider a Dubins car navigation problem with obstacle avoidance
+min min{∥xh − d∥2Q + ∥uh∥R2 : h = 1, ..., H}
+U
+s.t. xh+1 = f (xh, uh), ∀h = 1, . . . , H,
+where Q = diag(1, 1, 0.01), R = 0.001, and xh = [xh, yh, θh] contains the planar position and orientation, and d is that goal state. The control input is uh = [ωh], representing the angular velocity, with actuation bound ωh ∈ [− 32 π, 32 π]. The system dynamics are
+xh+1 = xh + δt[v cos(θh), v sin(θh), ωh]⊤,
+where v is a constant forward velocity and δt is the Euler integration step. We sample at least 1024 feasible trajectories for each update.
+A. Sufficient Increase of Gaussian MPPI
+We first verify the sufficient increase property of Gaussian MPPI in (16) by considering a simple navigation problem without obstacles. The car starts from the state x1 = [0, 0, π/2] and the target is d = [2, 1, 0]. We run Algorithm 1 for 20 iterations. In Figure 1, we show the sampled trajectories at different iterations. We also plot the function F (ηk) = log( N i=1 1 N exp(− τ J(u[i]) )), which provides a Monte Carlo estimate of the likelihood (up to a constant), and F (ηk) + 2 λmin(Σ) ∥ηk+1 − ηk∥22, which is the lower bound on F (ηk+1) implied by (16).
+B. Cluttered Environment Navigation
+Next, we consider a more cluttered environment where the car must reach the goal while avoiding multiple obstacles. We compare Gaussian MPPI and MoG MPPI with two Gaussian components. For both methods, we perform either 1 or 5 iterations of Algorithm 1 before executing each action. It can be seen in Figure 2 that, as the car approaches an obstacle, the feasible trajectories split into two modes corresponding to passing the obstacle from the left or the right. MoG MPPI naturally captures these modes through its mixture distribution. In contrast, Gaussian MPPI approximates the bimodal distribution with a single Gaussian and therefore averages the two directions. As a result, the mean control tends to keep
+
+(a) Gaussian, 1 inner iteration
+
+(b) MoG, 1 inner iteration
+
+(c) Gaussian, 5 inner iteration
+
+(d) MoG, 5 inner iteration
+
+Fig. 2: Behavior of Gaussian MPPI and MoG MPPI in a cluttered
+
+environment.
+
+Total Samples Samples Rejected
+
+Gaussian,1 268288 56.11%
+
+Gaussian,5 1083392 45.65 %
+
+MoG,1 239616 50.85%
+
+MoG,5 1092608 46.11%
+
+TABLE I: Total number of sampled trajectories and rejected by MPPI with different distributions and number of iterations
+
+the car moving straight toward the obstacle, producing many infeasible samples. Table I shows the total number of sampled trajectories and the fraction of rejected trajectories.
+VIII. CONCLUSION
+We reinterpret Model Predictive Path Integral (MPPI) control as an Expectation–Maximization (EM) algorithm, showing that repeated MPPI updates perform likelihood ascent on a latent-variable optimality model. This view clarifies the connection between Boltzmann reweighting and weighted maximum-likelihood projection, enables generalized proposal families beyond Gaussians, and yields convergence, local-rate, and sufficient-increase results through classical EM theory. Our analysis focuses on the exact expectation-based iteration; finite-sample Monte Carlo effects and receding-horizon closed-loop behavior remain important directions for future work.
+REFERENCES [1] Grady Williams et al. “Aggressive driving with model pre-
+dictive path integral control”. In: 2016 IEEE international conference on robotics and automation (ICRA). IEEE. 2016, pp. 1433–1440. [2] Grady Williams et al. “Information theoretic MPC for modelbased reinforcement learning”. In: 2017 IEEE international conference on robotics and automation (ICRA). IEEE. 2017, pp. 1714–1721.
+
+[3] Emanuel Todorov, Tom Erez, and Yuval Tassa. “Mujoco: A physics engine for model-based control”. In: 2012 IEEE/RSJ international conference on intelligent robots and systems. IEEE. 2012, pp. 5026–5033.
+[4] Viktor Makoviychuk et al. “Isaac gym: High performance gpu-based physics simulation for robot learning”. In: arXiv preprint arXiv:2108.10470 (2021).
+[5] Juan Alvarez-Padilla et al. “Real-time whole-body control of legged robots with model-predictive path integral control”. In: 2025 IEEE International Conference on Robotics and Automation (ICRA). IEEE. 2025, pp. 14721–14727.
+[6] Yifan Zhai, Rudolf Reiter, and Davide Scaramuzza. “Pa-mppi: Perception-aware model predictive path integral control for quadrotor navigation in unknown environments”. In: arXiv preprint arXiv:2509.14978 (2025).
+[7] Pengcheng Wang et al. “Residual-mppi: Online policy customization for continuous control”. In: arXiv preprint arXiv:2407.00898 (2024).
+[8] Kohei Honda. “Model Predictive Control via Probabilistic Inference: A Tutorial”. In: arXiv preprint arXiv:2511.08019 (2025).
+[9] Zeji Yi et al. “CoVO-MPC: Theoretical analysis of samplingbased MPC and optimal covariance design”. In: 6th Annual Learning for Dynamics & Control Conference. PMLR. 2024, pp. 1122–1135.
+[10] Hannes Homburger et al. “Optimality and suboptimality of MPPI control in stochastic and deterministic settings”. In: IEEE Control Systems Letters (2025).
+[11] Hilbert J Kappen, Vicenc¸ Go´mez, and Manfred Opper. “Optimal control as a graphical model inference problem”. In: Machine learning 87.2 (2012), pp. 159–182.
+[12] Sergey Levine. “Reinforcement learning and control as probabilistic inference: Tutorial and review”. In: arXiv preprint arXiv:1805.00909 (2018).
+[13] Masashi Okada and Tadahiro Taniguchi. “Variational inference mpc for bayesian model-based reinforcement learning”. In: Conference on robot learning. PMLR. 2020, pp. 258–272.
+[14] Zdravko I Botev et al. “The cross-entropy method for optimization”. In: Handbook of statistics. Vol. 31. Elsevier, 2013, pp. 35–59.
+[15] Nikolaus Hansen, Sibylle D Mu¨ller, and Petros Koumoutsakos. “Reducing the time complexity of the derandomized evolution strategy with covariance matrix adaptation (CMAES)”. In: Evolutionary computation 11.1 (2003), pp. 1–18.
+[16] Ziyi Wang et al. “Variational inference MPC using Tsallis divergence”. In: arXiv preprint arXiv:2104.00241 (2021).
+[17] Arthur P Dempster, Nan M Laird, and Donald B Rubin. “Maximum likelihood from incomplete data via the EM algorithm”. In: Journal of the royal statistical society: series B (methodological) 39.1 (1977), pp. 1–22.
+[18] Geoffrey J McLachlan and Thriyambakam Krishnan. The EM algorithm and extensions. John Wiley & Sons, 2008.
+[19] Daphne Koller and Nir Friedman. Probabilistic graphical models: principles and techniques. MIT press, 2009.
+[20] Peter Dayan and Geoffrey E Hinton. “Using expectationmaximization for reinforcement learning”. In: Neural Computation 9.2 (1997), pp. 271–278.
+[21] Marc Toussaint, Amos Storkey, and Stefan Harmeling. “Expectation-Maximization methods for solving (PO) MDPs and optimal control problems”. In: Bayesian Time Series Models (2011), pp. 388–413.
+[22] Prakash Mallick and Zhiyong Chen. “Stochastic optimal control for multivariable dynamical systems using expectation maximization”. In: IEEE Transactions on Neural Networks and Learning Systems 34.9 (2022), pp. 5268–5282.
+[23] CF Jeff Wu. “On the convergence properties of the EM algorithm”. In: The Annals of statistics (1983), pp. 95–103.
+[24] James M Ortega and Werner C Rheinboldt. Iterative solution of nonlinear equations in several variables. SIAM, 2000.
+
+IX. APPENDIX APPENDIX
+A. Proof of Theorem 1 Let ℓˆ(θ) := p(u; θ) exp(−J(u)/τ ) du.
+
+We then derive the Hessian ∇212Q.
+2
+∇12Q(θ+, θ) =∂θEu∼q(u;θ)[∇θ+ log p(u; θ+)] =Eu∼q(u;θ)[∇θ+ log p(u; θ+)∇θ log q(u; θ)⊤] =Eu∼q(u;θ)[∇θ+ log p(u; θ+)∇θ log p(u | O = 1; θ)⊤]. (18)
+
+We show that ℓˆ(θ) → 0 as ∥θ∥ → ∞. Fix M > 0 and decompose
+
+ℓˆ(θ) =
+
+p(u; θ)e−J(u)/τ du+
+
+p(u; θ)e−J(u)/τ du.
+
+∥u∥≤M
+
+∥u∥>M
+
+Let
+J(M ) := inf J(u).
+∥u∥≥M
+
+By Assumption 1, J(M ) → ∞ as M → ∞. Therefore, uniformly in θ,
+
+In the last step, we use the result q(u; θ) = p(u | O = 1; θ)
+
+form E-step (6), and we will use these two interchangeably.
+
+To
+
+evaluate
+
+∇
+
+2 12
+
+Q(θ+
+
+,
+
+θ
+
+)
+
+at
+
+(θ+, θ)
+
+=
+
+(θ∗, θ∗),
+
+we
+
+need
+
+to
+
+use the following intermediate results
+
+Eu∼p(u|O=1;θ∗)[∇θ log p(O = 1, u; θ∗)]
+
+∗ ∇θp(O = 1, u; θ∗)
+
+= p(u | O = 1; θ )
+
+∗ du
+
+p(O = 1, u; θ )
+
+1 = p(O = 1; θ) ∇θ
+
+p(O = 1, u; θ∗)du
+
+=∇θ log p(O = 1; θ∗).
+
+p(u; θ)e−J(u)/τ du ≤e−J(M)/τ
+
+p(u; θ) du
+
+∥u∥>M
+
+∥u∥>M
+
+≤e−J(M)/τ .
+
+Thus the tail term can be made arbitrarily small by choosing M sufficiently large.
+For the compact-region term, fix M . By Assumption 1.2, p(u; θ) → 0 pointwise for every fixed u as ∥θ∥ → ∞. Moreover, by Assumption 1.3, there exists CM < ∞ such that
+
+p(u; θ)e−J(u)/τ ≤ CM e−J(u)/τ ,
+
+∥u∥ ≤ M.
+
+Since J is bounded below, the right-hand side is integrable on {u : ∥u∥ ≤ M }. Hence, the dominated convergence theorem gives
+
+lim
+
+p(u; θ)e−J(u)/τ du = 0.
+
+∥θ∥→∞ ∥u∥≤M
+
+Now let ε > 0. Choose M such that e−J(M)/τ < ε/2, and then
+choose ∥θ∥ large enough so that the compact-region integral is less than ε/2. Therefore, lim∥θ∥→∞ ℓˆ(θ) = 0. Since ℓ(θ) = log ℓˆ(θ) + const, it follows that lim∥θ∥→∞ ℓ(θ) = −∞. Thus the superlevel set S = {θ ∈ Ω : ℓ(θ) ≥ ℓ(θ0)} is bounded. Since ℓ is continuous and Ω is closed, S is closed. Hence S
+is compact.
+
+B. Proof of Theorem 2 Proof: We start with the definition
+
+θ+ = M (θ) = argmaxθ+ Q(θ+; θ)
+
+(17)
+
+Q(θ+; θ) = Eu∼q(u;θ)[log p(u; θ+)].
+
+from (11).
+
+We
+
+first
+
+derive
+
+the
+
+Hessian
+
+∇
+
+2 11
+
+Q(θ+
+
+,
+
+θ
+
+)
+
+and
+
+evaluate
+
+at
+
+(θ+, θ) = (θ∗, θ∗).
+
+∇211Q(θ+, θ) = Eu∼q(u;θ)[∇θ+ 2 log p(u; θ+)] ∇211Q(θ∗, θ∗) = Eu∼q(u;θ∗)[∇θ2 log p(u; θ∗)].
+
+Let S be some random variable with mean µ, we have E[S(S − µ)⊤] = Cov[S].
+
+Let
+S = ∇θ log p(O = 1, u; θ∗), µ = ∇θ log p(O = 1; θ∗),
+
+and using the fact that
+
+∇θ log p(u, O = 1; θ) J (u) − J ∗
+=∇θ log[p(u; θ) exp(− τ )] =∇θ log p(u; θ),
+
+following (18), we have
+
+∇
+
+2 12
+
+Q(θ
+
+∗
+
+,
+
+θ
+
+∗
+
+)
+
+=Eu∼q(u;θ∗)[∇θ∗ log p(u; θ∗)∇θ log p(u | O = 1; θ∗)⊤]
+
+=Eu∼q(u;θ∗)[S(S − µ)⊤]
+
+=Covu∼q(u;θ∗)[∇θ log p(u; θ∗)].
+
+Thus
+
+∇211Q(θ∗, θ∗) = Eu∼q(u;θ∗)[∇θ2 log p(u; θ∗)], ∇212Q(θ∗, θ∗) = Covu∼q(u;θ∗)[∇θ log p(u; θ∗)].
+
+Using the chain rule, it is easy to derive that
+∇θ2 log p(O = 1; θ) =Eq(u;θ)[∇2θ log p(u; θ)]
++ Eq(u;θ)[∇θ log p(u; θ)∇θ log p(u; θ)⊤] − Eq(u;θ)[∇θ log p(u; θ)]Eq(u;θ)[∇θ log p(u; θ)]⊤ =Eq(u;θ)[∇θ2 log p(u; θ)] + Covu∼q(u;θ)[∇θ log p(u; θ)].
+Evaluating at θ = θ∗, we have
+∇θ2 log p(O = 1; θ∗) =Eq(u;θ∗)[∇θ2 log p(u; θ∗)] + Covu∼q(u;θ∗)[∇θ log p(u; θ∗)] =∇11 2 Q(θ∗, θ∗) + ∇12 2 Q(θ∗, θ∗).
+
+Iter 10
+
+Iter 12
+
+Iter 14
+
+Iter 16
+
+Fig. 3: Comparison between Gaussian-MPPI and MoG-MPPI in a cluttered navigation task. The top row shows Gaussian-MPPI, while the bottom row shows MoG-MPPI. At iteration 10, Gaussian-MPPI has already committed to the right-turning mode, whereas MoG-MPPI represents both left- and right-turning modes. Although both methods initially favor the right route, the larger obstacle makes this strategy less favorable at later iterations. MoG-MPPI preserves the left-turning mode, increases its weight, and switches to the left route by iteration 16, while Gaussian MPPI remains concentrated around the initially selected right-turning mode.
+
+For notation simplicity, let
+
+which is the ELBO of ℓ(η1) evaluated at q(·; η2). Hence
+
+H = ∇11 2 Q(θ∗, θ∗),
+
+C
+
+=
+
+∇
+
+2 12
+
+Q(θ
+
+∗
+
+,
+
+θ
+
+∗
+
+).
+
+Therefore,
+
+ℓ(η1) = g(η1, η1) ≥ g(η1, η) ∀η.
+
+Since we assume θ∗ is a strict local maximum, we have ∇2θ log p(O = 1; θ) = H + C ≺ 0. Furthermore, since C is a covariance matrix, it must be positive semi-definite, and H ≺ 0. Thus we have
+∇θ2 log p(O = 1; θ) =H + C =(−H)1/2 − I + (−H)−1/2C(−H)−1/2 (−H)1/2 ≺0,
+from which we can conclude (−H)−1/2C(−H)−1/2 ≺ I. Since (−H)−1/2C(−H)−1/2 and −H−1C are similar matrices, they have the same spectral radius, thus ρ(−H−1C) < 1.
+We finally study the fixed iteration (17). From the optimality condition of (17), we have
+∇1Q(M (θ), θ) = 0 ∀θ,
+by differentiating through the optimality condition with respect to θ, we have
+∇11Q(M (θ), θ)∂M (θ) + ∇12Q(M (θ), θ) = 0 ∀θ.
+At the fixed point θ = θ∗, we have M (θ∗) = θ∗, thus
+∂M (θ∗) = −∇211Q(θ∗, θ∗)−1∇212Q(θ∗, θ∗) = −H−1C,
+and ρ(∂M (θ∗)) < 1 from previous results. Then the convergence result follows directly from [18, Sec 3.9] and Ostrowski Theorem [24, Thm 10.1.3]
+
+C. Proof of Theorem 3
+
+Proof: Define
+
+⊤
+
+J (u)
+
+h(u) exp[η1 T (u)−A(η1)− τ ]
+
+g(η1, η2) = Eu∼q(u;η2) log q(u; η2) ,
+
+ℓ(η+) − ℓ(η) = g(η+, η+) − g(η, η)
+≥ g(η+, η) − g(η, η) = Eu∼q(u;η) (η+ − η)⊤T (u) − A(η+) + A(η) = (η+ − η)⊤Eq(u;η)[T (u)] − A(η+) + A(η).
+Using the moment-matching condition (14),
+ℓ(η+) − ℓ(η) ≥ A(η) − A(η+) − (η − η+)⊤∇ηA(η+) ≥ α ∥η+ − η∥22, 2
+where the last inequality follows from the α-strong convexity of A(η).
+D. Additional Experiments
+To further isolate the benefit of multi-modality beyond simple symmetry-breaking, we conducted the additional experiment shown in Figure 3. At iteration 10, Gaussian MPPI has already collapsed to the right-turning mode, whereas MoGMPPI maintains two distinct trajectory modes corresponding to the left- and right-turning strategies. By iteration 12, both methods assign larger weights to the right-turning direction; however, MoG-MPPI still preserves a non-negligible leftturning component. At iteration 14, the enlarged obstacle causes the right-turning strategy to incur a higher cost than the left-turning alternative. As a result, MoG-MPPI reallocates probability mass toward the left-turning component and eventually commits to the left route at iteration 16. In contrast, once Gaussian MPPI has collapsed to the right-turning mode, the unimodal distribution struggles to recover and transition to the alternative strategy.
+This experiment demonstrates that the advantage of multimodality is not limited to obstacle avoidance or symmetrybreaking. Rather, maintaining multiple modes enables the controller to preserve and adaptively reweight several feasible strategies before making a final commitment.
+
+

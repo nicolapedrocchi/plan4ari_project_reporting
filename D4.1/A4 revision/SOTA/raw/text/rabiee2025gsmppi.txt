@@ -1,0 +1,845 @@
+Guaranteed-Safe MPPI Through Composite Control Barrier Functions for Efficient Sampling in Multi-Constrained Robotic Systems
+Pedram Rabiee and Jesse B. Hoagg
+
+arXiv:2410.02154v1 [eess.SY] 3 Oct 2024
+
+Abstract— We present a new guaranteed-safe model predictive path integral (GS-MPPI) control algorithm that enhances sample efficiency in nonlinear systems with multiple safety constraints. The approach use a composite control barrier function (CBF) along with MPPI to ensure all sampled trajectories are provably safe. We first construct a single CBF constraint from multiple safety constraints with potentially differing relative degrees, using it to create a safe closed-form control law. This safe control is then integrated into the system dynamics, allowing MPPI to optimize over exclusively safe trajectories. The method not only improves computational efficiency but also addresses the myopic behavior often associated with CBFs by incorporating long-term performance considerations. We demonstrate the algorithm’s effectiveness through simulations of a nonholonomic ground robot subject to position and speed constraints, showcasing safety and performance.
+I. INTRODUCTION
+The rapid evolution of robotics has led to autonomous systems operating in increasingly complex environments, necessitating control methods capable of handling nonlinear dynamics and multiple constraints. Model predictive control (MPC) is a powerful tool in this domain [1]–[4] because it offers a framework for optimizing control inputs over a prediction horizon. However, traditional MPC approaches often struggle with highly nonlinear systems and with nonlinear constraints; MPC can become computationally prohibitive for real-time applications. Alternative approaches are the gradient-based methods like the iterative linear quadratic regulator [5], [6], which are efficient but restrictive in handling multiple nonlinear constraints. The challenge is to develop algorithms that balance complex dynamics, multiple constraints, adaptability, and real-time performance without sacrificing safety.
+Model-predictive-path-integral (MPPI) control (e.g., [7]– [11]) is an alternative to traditional MPC. MPPI leverages sampling-based techniques and the parallel processing capabilities of modern GPUs. Utilizing efficient toolboxes [12], MPPI can simulate a vast number of trajectories simultaneously, enabling it to handle a wide range of cost functions, including non-convex and discontinuous ones, making it particularly suited for complex robotic tasks. However, MPPI is not without limitations. A significant challenge lies in its inability to directly incorporate hard constraints, which are crucial for ensuring safety in robotic applications. Additionally, MPPI
+P. Rabiee and J. B. Hoagg are with the Department of Mechanical and Aerospace Engineering, University of Kentucky, Lexington, KY, USA. (email: pedram.rabiee@uky.edu, jesse.hoagg@uky.edu).
+This work is supported in part by the National Science Foundation (1849213, 1932105) and Air Force Office of Scientific Research (FA955020-1-0028).
+
+can suffer from sample inefficiency, particularly when dealing with systems that have strict safety requirements. In such cases, a large proportion of sampled trajectories may violate safety constraints, leading to wasted computational effort and potentially compromising the optimization process.
+Several approaches have been proposed to address these shortcomings [13]–[19]. One method involves augmenting the cost function with penalty terms for constraint violations [20]. However, this approach can fail to improve sample efficiency significantly because the approach still yields many unsafe trajectories that are explored before converging to safe ones. Other techniques attempt to bias the sampling distribution towards safe regions of the state space [21]. Although these methods can improve performance, they do not provide strict safety guarantees and result in the exploration of unsafe trajectories.
+In contrast, CBFs are a computationally efficient tool for safety guarantees [22]–[29]. CBFs are often used in minimumintervention approaches that minimally modify a nominal control input to maintain safety [22]. While effective for safety, CBFs can exhibit myopic behavior, focusing on immediate safety and sacrificing long-term performance. This limitation shifts the burden of optimizing long-term behavior to the nominal control design, which often does not account for safety constraints. To address this shortcoming, [20] uses a 2-layer design that integrates CBFs with MPPI. The approach adds discrete-time CBF constraints to the cost function at each time step of planning, aiming to encourage safety satisfaction throughout the trajectory. Then, the approach filters the output using this discrete-time CBF. However, this method has several limitations. First, it does not significantly improve sample efficiency because the algorithm still explores many unsafe trajectories before converging to safe ones, thus, requiring numerous iterations. More importantly, since the safety constraints are not treated as hard constraints, the method may produce trajectories with good performance cost by slightly violating those safety constraints at multiple points. Finally, the approach is challenging to tune in the presence of multiple safety constraints.
+This paper presents a new guaranteed-safe MPPI (GSMPPI) control algorithm that improves sample efficiency by considering only guaranteed safe trajectories. Our method combines several key ideas to achieve this result. First, in Section IV-A, we utilize the composite CBF technique from [30] to construct a single-barrier constraint from multiple safety constraints with differing relative degrees. This composite CBF constraint is then used in a minimumintervention architecture to modify a desired control in a
+
+minimally invasive manner, resulting in a closed-form safe and instantaneously optimal control. Section IV-B incorporates this closed-form control into the system dynamics to create a guaranteed-safe system. Next, we adopt the MPPI formulation from [10] to plan for desired control given this guaranteedsafe system, extending the formulation to accommodate a more general cost function that includes control costs. Finally, Section V presents the GS-MPPI algorithm. The key innovation of the approach lies in the use of the guaranteed-safe system in the MPPI framework, and this is enabled by the closed-form control for satisfying multiple safety constraints with potentially differing relative degrees. Thus, all safety constraints are satisfied as hard constraints at each time step of the planning process. This feature results in the generation of only safe trajectories, allowing the MPPI planner to optimize control over guaranteed-safe trajectories exclusively. This approach not only improves sample efficiency but also addresses the myopic behavior often associated with CBFs. Specifically, using MPPI to design the desired control and accounting for the existence of inner-loop minimum-intervention CBF control, the approach enables long-term performance optimization with safety guarantees. We demonstrate this new method in simulations of a nonholonomic ground robot subject to position and speed constraints.
+
+II. NOTATION
+The interior, boundary, and closure of A ⊆ Rn are denoted by int A, bd A, cl A, respectively.
+Let η : Rn → Rℓ be continuously differentiable. Then, η′ : Rn → Rℓ×n is defined as η′(x) ≜ ∂η(x) ∂x . The Lie derivatives of η along the vector fields of ψ : Rn → Rn×m is defined as
+Lψη(x) ≜ η′(x)ψ(x).
+If m = 1, then for all positive integers d, define
+Ldψη(x) ≜ LψLdψ−1η(x).
+Throughout this paper, we assume that all functions are sufficiently smooth such that all derivatives that we write exist and are continuous.
+A continuous function a: R → R is an extended class-K function if it is strictly increasing and a(0) = 0.
+Let ρ > 0, and consider softminρ : RN → R defined by
+N
+softminρ(z1, . . . , zN ) ≜ − 1ρ log e−ρzi , (1)
+i=1
+which is the log-sum-exponential soft minimum. Let Ω be a sample space and P be a probability measure
+defined on Ω. Let X : Ω → R be a random variable with probability density function p with respect to the measure P. The expectation of X, assuming it exists, is defined as
+
+EP[X] = xp(x)dx.
+
+(2)
+
+R
+
+Let Ω be a sample space and let P and Q be two probability measures defined on Ω. Suppose p and q are the probability
+
+density function of P and Q, respectively. The KullbackLeibler (KL) divergence from Q to P is defined as
+
+DKL(P∥Q) = p(x) log p(x) dx, (3)
+
+X
+
+q(x)
+
+assuming that p is absolutely continuous with respect to q and the integral is well-defined.
+
+Consider
+
+III. PROBLEM FORMULATION
+
+x˙ (t) = f (x(t)) + g(x(t))u(t),
+
+(4)
+
+where x(t) ∈ Rn is the state, x(0) = x0 ∈ Rn is the initial condition, f : Rn → Rn and g : Rn → Rn×m are locally Lipschitz continuous on Rn, and u : [0, ∞) → Rm is the control, which is locally Lipschitz continuous on Rn.
+Let h1, h2, . . . , hℓ: Rn → R be continuously differentiable, and for all ȷ ∈ {1, 2, . . . , ℓ}, define
+
+Cȷ,0 ≜ {x ∈ Rn: hȷ(x) ≥ 0}.
+
+(5)
+
+The safe set is
+ℓ
+
+Ss ≜ Cȷ,0.
+
+(6)
+
+ȷ=1
+
+Unless otherwise stated, all statements in this paper that
+involve the subscript ȷ are for all ȷ ∈ {1, 2, . . . , ℓ}. We make
+the following assumption:
+(A1) There exists a positive integer dȷ such that for all x ∈ Rn and all i ∈ {0, 1, . . . , dȷ−2}, LgLif hȷ(x) = 0; and for all x ∈ Ss, LgLfdȷ−1hȷ(x)̸ = 0.
+Assumption (A1) implies hȷ has well-defined relative degree dȷ with respect to (4) on Ss; however, relative degrees d1, . . . , dℓ need not be equal.
+Let T > 0 be the time horizon, ϕˆ : Rn → R be the terminal cost function, ψˆ : Rn × Rm → R be the running cost function and define the cost functional
+
+T
+
+Jˆ (u) ≜ ϕˆ(x(T )) + ψˆ(x(t), u(t))dt.
+
+(7)
+
+0
+
+The objective is to find a control law u : [0, T ] → Rm that minimizes the cost functional Jˆ (u) subject to (4) and the safety constraint that for all t ∈ [0, T ], x(t) ∈ Ss.
+
+IV. GUARANTEED-SAFE MODEL PREDICTIVE PATH INTEGRAL
+Figure 1 illustrates the architecture of the proposed method for guaranteed-safe MPPI. The method consists of 3 main components:
+1) Safety Filter: In Section IV-A, we first design a closedform safe and instantaneously optimal control from the safety constraints. This procedure follows the method in [30]. Given a desired control v, the safety filter provides the minimally invasive control—a control that is the closest to v while satisfying the safety constraints. Thus, it is both safe and optimal in the sense that it is as close as possible to a desired control.
+
+Guaranteed-Safe MPPI
+
+Safe System System x
+
+u Safety Filter
+
+MPPI Planner v
+
+Fig. 1. Block diagram of the Guaranteed-Safe Model Predictive Path Integral (MPPI) control architecture, illustrating the interaction between the Safety Filter, Safe System, and MPPI Planner components.
+
+2) Safe System: In Section IV-B, we incorporate this closedform control into the dynamics (4), creating a safe system that accepts arbitrary desired control while ensuring: (a) The underlying system’s safety is maintained, i.e., x(t) ∈ Ss for all t ≥ 0, (b) The implemented control is as close as possible to the desired control v.
+3) MPPI Planner: Also described in Section IV-B, we use this safe system to design the desired control v using an MPPI planner. As the system is inherently safe, all trajectories generated by the MPPI planner are guaranteed to be safe.
+
+A. Closed-Form Safe and Instantaneously Optimal Control
+In this section, we review and adapt the method presented in [30] for constructing a single composite Relaxed Control Barrier Function (R-CBF) from multiple CBFs with potentially different relative degrees. We then utilize this composite soft-minimum R-CBF to derive a closed-form optimal control law that guarantees safety while minimally deviating from a desired control input. The following definition is needed.
+
+Definition 1. Let η: Rn → R be continuously differentiable, and define D ≜ {x ∈ Rn: η(x) ≥ 0}. Then, η is a relaxed control barrier function (R-CBF) for (4) on D if for
+all x ∈ bd D,
+
+sup Lf η(x) + Lgη(x)u ≥ 0.
+
+(8)
+
+u∈Rm
+
+The following result provides sufficient conditions for η to be an R-CBF. The result also provides sufficient conditions for the zero-superlevel set of η to be control forward invariant.
+
+Lemma 1. [30, Lemma 1] Let η: Rn → R be continuously differentiable, and define D ≜ {x ∈ Rn: η(x) ≥ 0}. Assume that for all x ∈ bd D, if Lf η(x) ≤ 0, then Lgη(x)̸ = 0. Then, the following statements hold:
+(a) η is an R-CBF for (4) on D. The following result provides sufficient conditions for η to be an R-CBF. The result also provides sufficient conditions for the zero-superlevel set of η to be control forward invariant.
+(b) If η′ is locally Lipschitz on D, then D is control forward invariant with respect to (4).
+
+Let bȷ,0(x) ≜ hȷ(x). For i ∈ {0, 1 . . . , dȷ − 2}, let αȷ,i: R → R be a locally Lipschitz extended class-K function,
+
+and consider bȷ,i+1 : Rn → R defined by
+
+bȷ,i+1(x) ≜ Lf bȷ,i(x) + αȷ,i(bȷ,i(x)).
+
+(9)
+
+For i ∈ {1 . . . , dȷ − 1}, define
+
+Cȷ,i ≜ {x ∈ Rn : bȷ,i(x) ≥ 0}.
+
+(10)
+
+Next, define
+
+Cȷ,0,
+
+dȷ = 1,
+
+Cȷ ≜
+
+dȷ −2
+
+(11)
+
+i=0 Cȷ,i, dȷ > 1,
+
+and
+ℓ
+
+C ≜ Cȷ.
+
+(12)
+
+ȷ=1
+
+Note that C ⊆ Ss. In addition, note that if d1, . . . , dℓ ∈ {1, 2}, then C = Ss.
+
+Let ρ > 0, and consider the candidate R-CBF h : Rn → R defined by
+
+h(x) ≜ softminρ b1,d1−1(x), b2,d2−1(x), . . . , bℓ,dℓ−1(x) . (13)
+The zero-superlevel set of h is
+
+H ≜ {x ∈ Rn: h(x) ≥ 0}.
+
+(14)
+
+Proposition 2 in [30] demonstrates that H ⊆ ȷ=1 ℓ Cȷ,dȷ−1. Note that H is not generally a subset of Ss or C. In the special case where d1 = · · · = dℓ = 1, it follows that H ⊆ C = Ss, and as ρ → ∞, H → Ss. Next, we define
+
+S ≜ H ∩ C,
+
+(15)
+
+and since C ⊆ Ss, it follows that S ⊆ Ss. Next, define
+
+B ≜ {x ∈ bd H: Lf h(x) ≤ 0} = {x ∈ Rn: Lf h(x) ≤ 0 and h(x) = 0}. (16)
+
+Lemma 1 implies that if Lgh is nonzero on B, then h is an R-CBF. Lemma 1 also implies that if Lgh is nonzero on B and h′ is locally Lipschitz, then H is control forward
+invariant. Proposition 3 in [30] shows that in this case not
+only is H control forward invariant but S is also control
+forward invariant.
+
+Next, we use the composite soft-minimum R-CBF (13) to construct a closed-form optimal control that guarantees safety. Specifically, we design an optimal control subject to the constraint that x(t) ∈ S ⊆ Ss.
+
+Let α : R → R be a locally Lipschitz nondecreasing function such that α(0) = 0, and consider the R-CBF safety constraint function ω : Rn × Rm × R → R given by
+ω(x, uˆ, µˆ) ≜ Lf h(x) + Lgh(x)uˆ + α(h(x)) + µˆh(x) (17)
+where uˆ is the control variable; and µˆ is a slack variable. Next, let v : Rn → Rm denote a desired control designed to satisfy performance specifications, which can be independent of and potentially conflict with safety. Let γ > 0, and consider the minimum-intervention cost function JMI : Rn × Rm × R ×
+
+Rm → R given by
+
+JMI(x, uˆ, µˆ, v) ≜ 12 ∥uˆ − v∥2+ γ2 µˆ2. (18)
+
+The objective is to find the (uˆ, µˆ) that minimizes the cost JMI(x, uˆ, µˆ) subject to the R-CBF safety constraint ω(x, uˆ, µˆ) ≥ 0.
+Proposition 4 in [30] shows that if for all x ∈ B, Lgh(x)̸ = 0, then this problem is feasible on Rn. Then, for all x ∈ Rn, the solution u∗ : Rn → Rm is given by
+
+Lgh(x)⊤ max{0, −ω(x, v, 0)}
+
+u∗(x, v) = v +
+
+⊤ −1 2 . (19)
+
+Lgh(x)Lgh(x) + γ h(x)
+
+The next theorem is the main result on safety using this control.
+
+Theorem 1. [30, Theorem 2] Consider (4), where (A1) is
+satisfied, and consider u given by (9), (13), and (19), with v locally Lipschitz continuous on Rn. Assume that h′ is locally Lipschitz on H, and for all x ∈ B, Lgh(x)̸ = 0. Let x0 ∈ S. Then, for all t ∈ I(x0), x(t) ∈ S ⊆ Ss.
+
+Theorem 1 establishes the safety guarantees for the control law u given by (9), (13), and (19). This result provides a control law that ensures the system remains in the safe set Ss while minimally deviating from the desired control v. We can now proceed to design an optimal control strategy using MPPI methods, which we will explore in the next subsection.
+
+B. Safe Model Predictive Path Integral
+
+In this section, we mirror the approach outlined in [10] to develop our safe MPPI method. However, we extend their formulation by modifying the cost function to allow for control-dependent costs.
+To begin, we construct a safe dynamical system by incorporating the control law from (9), (13), and (19) into the original dynamics (4). This integration yields a new system that inherently satisfies the safety requirements, allowing us to solve the optimization problem while implicitly respecting safety constraints. The resulting safe dynamics are given by
+
+x˙ (t) = f (x(t)) + g(x(t))u∗(x(t), v(t)).
+
+(20)
+
+To facilitate the MPPI derivation, we discretize (20) using the Euler approximation method. Let k ∈ {0, 1, ..., N − 1} denote the discrete time index, where N is the number of time steps in the planning horizon. The discrete-time safe dynamics are given by
+
+xk+1 = F (xk, vk),
+
+(21)
+
+where xk ∈ Rn, vk ∈ Rm, and F : Rn × Rm → Rn is defined as
+
+F (xk, vk) ≜ xk + [f (xk) + g(xk)u∗(xk, vk)]Ts (22)
+where Ts > 0 represents the time step between discrete samples.
+We model the desired control as a sequence of random variables {vk}k=0 N−1, where each vk is sampled from a normal
+
+distribution
+
+vk ∼ N (µk, Σ), k ∈ {0, 1, . . . , N − 1}. (23)
+
+where µk ∈ Rm represent the mean control input at time step k, and Σ ∈ Rm×m is a positive definite matrix covariance matrix. This stochastic formulation captures inherent system
+uncertainties and facilitates state space exploration. Let M = (µ0, µ1, ..., µN−1) ∈ Rm×N denote the mean
+control sequence, and V = (v0, v1, ..., vN−1) ∈ Rm×N represent the sequence of control inputs. The choice of M determines the probability distribution of V .
+Let PM denote the probability measure of V given M . The corresponding density function pM : Rm×N → [0, 1] is defined as
+
+pM (V ) = Z exp
+
+− 1 (vk − µk)⊤Σ−1 N−1 (vk − µk) 2
+k=0
+(24)
+
+where
+
+Z
+
+=
+
+((2π
+
+)
+
+m
+
+|
+
+Σ
+
+|)
+
+−
+
+N 2
+
+is the normalizing constant.
+
+Let x0 ∈ Ss, be the initial state. Define the discrete-time cost function J : Rm×N → R as
+
+N −1
+
+J (V ) ≜ ϕ(xN ) + ψ(xk, vk),
+
+(25)
+
+k=1
+
+where (x1, . . . , xN ) are related to V and x0 by (21) and (22), ϕ : Rn → R is the terminal cost function, and ψ : Rn×Rm → R is the running cost function.
+We formulate our control objective as finding a probability
+measure Q over control sequences that minimizes
+
+EQ[J (V )] + λDKL(Q∥P0)
+
+(26)
+
+where P0 is the probability measure of the uncontrolled system (i.e., M ≡ 0) with density function p0, and λ > 0 is a temperature parameter. By minimizing this objective, we
+seek a control distribution that not only reduces the expected
+cost but also maintains some similarity to the uncontrolled
+system dynamics. This approach encourages exploration in
+the control space, while simultaneously preventing the optimal
+distribution from deviating too far from the natural system behavior. The parameter λ controls the trade-off between minimizing the expected cost EQ[J (V )] (exploitation) and minimizing the deviation from the uncontrolled dynamics as measured by DKL(Q∥P0) (exploration).
+Following the approach in [10], the optimal probability measure P∗ that minimizes (26) has a density function p∗(V ) given by
+
+exp
+
+−
+
+1 λ
+
+J
+
+(V
+
+)
+
+p∗(V ) =
+
+1
+
+p0(V ).
+
+(27)
+
+EP0 exp − λ J (V )
+
+It is important to note that the optimal probability measure
+P∗ does not necessarily have the same structure as our parameterized family of distributions PM . Each PM in this family is constrained to be a multivariate normal distribution with mean sequence M and fixed covariance matrix Σ.
+Our goal is to find the optimal mean control sequence M∗ ∈ Rm×N such that PM∗ is as close as possible to
+
+P∗ within this parameterized family. To achieve this, we determine the optimal mean sequence M∗ by minimizing the
+KL divergence between P∗ and PM . Formally, we express this optimization problem as
+
+M∗ ≜ argmin DKL(P∗∥PM ).
+
+(28)
+
+M ∈Rm×N
+
+This formulation allows us to find the best approximation
+of P∗ within the constrained structure of our parameterized distribution PM .
+To derive the update law for M∗, we begin by expanding the KL divergence expression from (28) as
+
+DKL(P∗∥PM ) =
+
+log p∗(V ) p∗(V ) dV pM (V )
+
+= log p∗(V ) p0(V ) p∗(V ) dV p0(V ) pM (V )
+
+= log p∗(V ) p∗(V ) dV p0(V )
+
+− log p0(V ) p∗(V ) dV. (29) pM (V )
+
+Since the first integral in (29) is independent of M , we can reformulate the optimization problem in (28) as
+
+M∗ = argmax log p0(V ) p∗(V ) dV. (30)
+
+M ∈Rm×N
+
+pM (V )
+
+Note from (24) that
+
+pM (V )
+
+N −1 ⊤ −1
+
+1 ⊤ −1
+
+= exp
+
+µk Σ vk − µk Σ µk , (31)
+
+p0(V )
+
+2
+
+k=0
+
+where p0 is obtained by setting M = (0m, . . . , 0m) in (24). Substituting this in (30) yields
+
+M∗ = argmax
+M ∈Rm×N
+
+N −1 ⊤ −1
+
+1 ⊤ −1
+
+µk Σ vk− µk Σ µk
+
+2
+
+k=0
+
+p∗(V )dV. (32)
+
+Since M does not depend on P∗, we can separate the terms in (32) and use the fact that p∗(V ) dV = 1. This allows
+
+us to rewrite (30) as
+
+1 ⊤ −1 N −1
+
+M∗ = argmax −
+
+µk Σ µk
+
+M ∈Rm×N 2 k=0
+
+N −1
+
++ µk⊤ Σ−1vkp∗(V ) dV . (33)
+
+k=0
+
+The expression in (33) is concave with respect to each µk. To find its maximum, we take the gradient with respect to each µk and set it to zero. Solving for µk, we obtain the optimal mean control
+
+µ∗k = vk p∗(V ) dV = EP∗ [vk].
+
+(34)
+
+The result in (34) provides us with the optimal mean control µ∗k as the expected value of vk under the optimal distribution P∗. However, we cannot directly sample from P∗, so we compute this integral using importance sampling with a
+
+proposal distribution PM as followed
+
+µ∗k =
+
+vk p∗(V ) p0(V ) pM (V ) dV p0(V ) pM (V )
+
+= EPM vk p∗(V ) p0(V ) p . (35) 0(V ) pM (V )
+
+From (27) and (31), the importance sampling weight can be written as
+
+p∗(V ) p0(V ) = 1 exp p0(V ) pM (V ) η
+
+1 ⊤ −1 N −1 − J (V ) + µk Σ vk
+λ
+k=0
+
+− 1 µk⊤Σ−1µk , (36) 2
+
+where η
+
+≜
+
+EP0
+
+exp
+
+−
+
+1 λ
+
+J
+
+(V
+
+)
+
+.
+
+For
+
+each
+
+k
+
+∈
+
+{0, 1, . . . , N − 1}, let εk ∼ N (0, Σ) be independent Gaus-
+
+sian random variables, and define vk = µk + εk. We
+
+denote the sequence of these random variables as E =
+
+(ε0, ε1, . . . , εN−1) ∈ Rm×N . Using this change of variables,
+
+we can rewrite the importance sampling weight from (36) as
+
+p∗(V ) p0(V ) = 1 exp − 1 S(M, E) , (37)
+
+p0(V ) pM (V ) η
+
+λ
+
+where S : Rm×N × Rm×N → R is defined as
+
+λ ⊤ −1 N −1
+
+S(M, E) ≜ J (M + E) +
+
+µk Σ (µk + 2εk). (38)
+
+2
+
+k=0
+
+Moreoever, we can express η as
+
+η = EPM exp − 1λ J (V ) p0(V ) pM (V ) = EPM exp − 1λ S(M, E) . (39)
+
+Substituting (37)–(39) into (35) we obtain
+
+EPM
+
+(µk + εk) exp
+
+−
+
+1 λ
+
+S
+
+(M
+
+,
+
+E
+
+)
+
+µ∗k =
+
+1
+
+.
+
+EPM exp − λ S(M, E)
+
+Separating the terms in the numerator inside the expectation yields
+
+EPM
+
+exp
+
+−
+
+1 λ
+
+S
+
+(
+
+M
+
+,
+
+E
+
+)
+
+εk
+
+µ∗k = µk +
+
+1
+
+. (40)
+
+EPM exp − λ S(M, E)
+
+The expression (40) provides an update rule for the optimal mean control µ∗k. It shows that the optimal mean is the current mean plus a correction term. This theoretical
+framework provides the foundation for our guaranteed-safe
+MPPI approach. The MPPI approach addresses the original control problem
+by discretizing the dynamics and reformulating the cost. While the discrete-time cost J (V ) approximates the continuoustime cost Jˆ (u), our MPPI formulation in (26) introduces an additional term λDKL(Q|P0). This term, reflected in the final cost S(M, E) in (38), balances exploration and exploitation, with λ controlling this trade-off. This formulation allows us to solve the original problem while incorporating the benefits of
+stochastic optimization, all within a framework that inherently
+
+respects the safety constraints defined by Ss. Next section develops a practical algorithm based on these results.
+V. MPPI-CBF: AN ALGORITHM FOR GUARANTEED-SAFE MODEL PREDICTIVE PATH INTEGRAL
+In the preceding section, we have established a framework for guaranteed-safe MPPI. We first developed a composite R-CBF that ensures safety for multiple constraints, potentially with different relative degrees. This allowed us to construct a safe dynamical system that inherently respects these constraints. We then adapted the MPPI method to this safe system, deriving an optimal control law that balances performance optimization with safety guarantees. However, to implement this approach in practical settings, we need to translate these theoretical insights into a concrete algorithm. In the following section, we present MPPI-CBF, an algorithm that realizes our guaranteed-safe MPPI framework.
+To implement our guaranteed-safe MPPI framework in practical settings, we address two key aspects: the approximation of the expectation in the update law (40), and the receding horizon implementation. These are realized in Algorithms 1 and 2.
+First, to make the computation tractable, we approximate the expectation in (40) using a finite number of trajectories K. This leads to the following approximated update law
+
+j=1 K exp − λ1 S(M, E (j)) εk(j)
+
+µ∗k ≈ µk +
+
+K
+
+1
+
+, (41)
+
+j=1 exp − λ S(M, E (j))
+
+where the subscript (j) denotes the j-th sampled trajectory. Second, we employ a receding horizon approach. While
+the original problem has a horizon T , for large T , we use a shorter horizon N Ts < T , where N is the number of time steps and Ts is the planning time step.
+Algorithm 1 describes the MPPI Planner. Given the initial state x0 and a mean control sequence M , it computes the optimal mean control sequence using the MPPI update law (41) for the current horizon. The algorithm returns the optimal mean control sequence and the first desired input corresponding to the best trajectory explored by the MPPI planner. We use this best trajectory (taking a greedy approach) instead of sampling from the optimized distribution. This choice ensures that, even after filtering the desired controls, the resulting safe trajectory will still have a low cost, as it’s derived from the input that yielded the lowest cost during exploration.
+Algorithm 2 implements the overall GS-MPPI framework, featuring a two-level control structure. The outer loop, operating at a coarser time step Ts, calls the MPPI Planner to generate desired control sequences. The inner loop, using a finer time step δt, applies the safety filter (19) to the desired control. This dual-timescale approach allows for faster, more frequent safety filtering while maintaining a computationally feasible planning horizon. At each planning step, the algorithm calls the MPPI Planner, executes the filtered control, updates the state, and shifts the control sequence for the next iteration. This process repeats until the
+
+full time horizon T is covered, ensuring continuous safety while optimizing the trajectory over an extended horizon.
+
+Algorithm 1: MPPI Planner
+
+▷ Global:N , K, λ, Σ, Ts
+
+Input: x0: initial state, M : mean control sequence Output: M∗: optimal mean control sequence, v0(jbest):
+
+first control of the lowest cost trajectory
+
+1 Function MPPI Planner(x0, M ):
+
+▷ Generate K trajectories and compute their costs
+
+2 for j ← 1 to K do
+
+3
+
+J (j) ← 0
+
+4
+
+x ← x0
+
+5
+
+for k ← 0 to N − 1 do
+
+6 εk(j) ∼ N (0, Σ)
+
+7 vk(j) ← µk + εk(j)
+
+8 J (j) ← J (j) + ψ(x, v(j) k )
+
+(j)
+
+9
+
+x ← F (x, vk )
+
+10
+
+end
+
+11
+
+J (j) ← J (j) + ϕ(x)
+
+12 end
+
+▷ Compute importance sampling weights
+
+13 ξ ← min{J (1), J (2), . . . , J (K)}
+
+14 jbest ← argmin{J (1), J (2), . . . , J (K)}
+
+15
+
+η←
+
+K j=1
+
+exp(−
+
+1 λ
+
+(J
+
+(j)
+
+−
+
+ξ))
+
+16 for j ← 1 to K do
+
+17 w(j) ← 1η exp(− 1λ (J (j) − ξ))
+
+18 end
+
+▷ Update mean control sequence
+19 for k ← 0 to N − 1 do 20 µk ← µk + j=1 K w(j)εk(j) 21 end
+22 M∗ ← (µ0, µ1, . . . , µN−1) 23 return M∗, v0(jbest) 24 End Function
+
+VI. NUMERICAL EXAMPLES
+
+Consider the nonholonomic ground robot modeled by (4),
+
+where  
+
+
+
+
+
+ν cos θ
+
+00
+
+qx
+
+f (x) = ν sin θ  , g(x) = 0 0  , x = qy, u = u1 ,
+
+0
+
+10
+
+ν
+
+u2
+
+0
+
+01
+
+θ
+
+and q ≜ [ qx qy ]⊤ is the robot’s position in an orthogonal coordinate system, ν is the speed, and θ is the direction of the velocity vector (i.e., the angle from [ 1 0 ]⊤ to [ q˙x q˙y ]⊤). Consider the map shown in Figure 2, which has 6 obstacles and a wall. For ȷ ∈ {1, . . . , 6}, the area outside the ȷth
+obstacle is modeled as the zero-superlevel set of
+
+hȷ(x) =
+
+ax,ȷ (qx −bx,ȷ ) ay,ȷ (qy −by,ȷ )
+
+− cȷ,
+p
+
+(42)
+
+Algorithm 2: GS-MPPI: An Algorithm for Guaranteed-Safe Model Predictive Path Integral
+
+▷ Global: Ts, δt, N
+
+Input: x0: initial state, T : total simulation time
+
+Output: State and control trajectories
+
+1 Initialize M ← (µ0, µ1, . . . , µN−1) 2 x ← x0 3 ninner ← ⌊Ts/δt⌋ 4 for t = 0 to T with step Ts do
+▷ Plan optimal desired control sequence
+
+5 M, v ← MPPI Planner(x, M )
+
+▷ Execute desired control and update state
+
+6 for i = 1 to ninner do
+
+7
+
+usafe ← u∗(x, v)
+
+▷ Eq. (19)
+
+8
+
+x ← Evolution of (4) under usafe after δt
+
+9 end
+
+▷ Shift mean control sequence for next step
+
+10 for k = 0 to N − 2 do
+
+11
+
+µk ← µk+1
+
+12 end
+
+13 µN−1 ← Initialize()
+
+14 end
+
+Fig. 2. Safe set and closed-loop trajectories using Algorithms 1 and 2
+
+where bx,ȷ, by,ȷ, ax,ȷ, ay,ȷ, cȷ, p > 0 specify the location and dimensions of the ȷth obstacle. Similarly, the area inside the
+wall is modeled as the zero-superlevel set of
+
+h7(x) = c7 − ay,7qy p ax,7qx ,
+
+(43)
+
+where ax,7, ay,7, c7, p > 0 specify the dimension of the space inside the wall. The bounds on speed v are modeled as the
+zero-superlevel sets of
+
+h8(x) = 9 − ν, h9(x) = ν + 1.
+
+(44)
+
+The safe set Ss is given by (6) where ℓ = 9. The projection of Ss onto the qx–qy plane is shown in Figure 2. Note that for all x ∈ Ss, the speed satisfies ν ∈ [−1, 9]. We also note that (A1) is satisfied with d1 = d2 = . . . = d7 = 2 and d8 = d9 = 1.
+Let qd = [ qd,x qd,y ]T ∈ R2 be the goal location, that is, the desired location for q. We consider the cost (25) where N = 20, and
+ϕ(x) = 2 (q − qd)⊤(q − qd),
+ψ(x, v) = (q − qd)⊤(q − qd) + 0.05 v⊤v,
+
+We implement Algorithms 1 and 2 with α1,0(h) = . . . =
+
+α6,0(h) = 2.5h, α7,0(h) = h, and α(h) = 0.5h, ρ = 20,
+
+γ
+
+=
+
+1024,
+
+Σ
+
+=
+
+[ 1.33
+0
+
+0 0.33
+
+].
+
+λ
+
+=
+
+1.0,
+
+K
+
+=
+
+1000,
+
+Ts
+
+=
+
+0.1 s,
+
+δt = 0.05 s.
+
+Figure 2 shows 4 closed-loop trajectories for x0 = [ −1 − 8.5 0 π/2 ]T with 4 different goal locations qd = [ 3 4.5 ]T, qd = [ −7 0 ]T, qd = [ 7 1.5 ]T, and qd = [ −1 7 ]T. In all cases, the robot position converges to
+the goal location while satisfying safety constraints.
+
+Figure 2 also illustrates the MPPI planning trajectories for
+
+two specific scenarios: the goal location qd = [ 3 4.5 ]T at time t = 3 s and the goal location qd = [ −1 7 ]T at time t = 4 s. These planning trajectories demonstrate a crucial feature of our method: all trajectories generated by Algorithm 1 are guaranteed to be safe. This visual representation demonstrates that our MPPI planner explores only within the safe state space. By generating exclusively safe trajectories, our method significantly improves sample efficiency, a key challenge in MPPI. This approach eliminates the need to evaluate or filter out unsafe trajectories, focusing computational resources on optimizing performance within the safe space. Consequently, our method enhances both computational efficiency and safety assurance in the control process.
+Figure 3 show the trajectories of the relevant signals for the case where qd = [ 3 4.5 ]T. Figure 3 shows that h is positive for all time, which implies trajectory remains in Ss. Figure 4 shows that h, min bȷ,i and min hȷ are positive for all time, which implies that x remains in Ss.
+REFERENCES
+[1] K. P. Wabersich, M. N. Zeilinger, Predictive control barrier functions: Enhanced safety mechanisms for learning-based control, IEEE Trans. Autom. Contr. (2022).
+[2] F. Allgo¨wer, A. Zheng, Nonlinear model predictive control, Vol. 26, Birkha¨user, 2012.
+[3] C. E. Garcia, D. M. Prett, M. Morari, Model predictive control: Theory and practice—a survey, Automatica 25 (3) (1989) 335–348.
+[4] K. P. Wabersich, M. N. Zeilinger, Safe exploration of nonlinear dynamical systems: A predictive safety filter for reinforcement learning, arXiv:1812.05506 (2018).
+[5] Y. Tassa, T. Erez, E. Todorov, Synthesis and stabilization of complex behaviors through online trajectory optimization, in: 2012 IEEE/RSJ International Conference on Intelligent Robots and Systems, IEEE, 2012, pp. 4906–4913.
+[6] W. Li, E. Todorov, Iterative linear quadratic regulator design for nonlinear biological movement systems, in: First International Conference on
+
+Fig. 3. qx, qy, ν, θ, u, v for qd = [ 3 4.5 ]⊤.
+Fig. 4. h, min bj,i, and min hj for qd = [ 3 4.5 ]T.
+Informatics in Control, Automation and Robotics, Vol. 2, SciTePress, 2004, pp. 222–229. [7] G. Williams, A. Aldrich, E. A. Theodorou, Model predictive path integral control: From theory to parallel computation, Journal of Guidance, Control, and Dynamics 40 (2) (2017) 344–357. [8] E. Theodorou, J. Buchli, S. Schaal, A generalized path integral control approach to reinforcement learning, The Journal of Machine Learning Research 11 (2010) 3137–3181. [9] E. A. Theodorou, E. Todorov, Relative entropy and free energy dualities: Connections to path integral and kl control, in: 2012 ieee 51st ieee conference on decision and control (cdc), IEEE, 2012, pp. 1466–1473. [10] G. Williams, N. Wagener, B. Goldfain, P. Drews, J. M. Rehg,
+
+B. Boots, E. A. Theodorou, Information theoretic mpc for modelbased reinforcement learning, in: 2017 IEEE international conference on robotics and automation (ICRA), IEEE, 2017, pp. 1714–1721. [11] M. S. Gandhi, B. Vlahov, J. Gibson, G. Williams, E. A. Theodorou, Robust model predictive path integral control: Analysis and performance guarantees, IEEE Robotics and Automation Letters 6 (2) (2021) 1423–1430. [12] B. Vlahov, J. Gibson, M. Gandhi, E. A. Theodorou, Mppi-generic: A cuda library for stochastic optimization, arXiv:2409.07563 (2024). [13] T. Kim, G. Park, K. Kwak, J. Bae, W. Lee, Smooth model predictive path integral control without smoothing, IEEE Robotics and Automation Letters 7 (4) (2022) 10406–10413. [14] I. M. Balci, E. Bakolas, B. Vlahov, E. A. Theodorou, Constrained covariance steering based tube-mppi, in: 2022 American Control Conference (ACC), IEEE, 2022, pp. 4197–4202. [15] Y. Zhang, C. Pezzato, E. Trevisan, C. Salmi, C. H. Corbato, J. AlonsoMora, Multi-modal mppi and active inference for reactive task and motion planning, IEEE Robotics and Automation Letters (2024). [16] J. Yin, Z. Zhang, E. Theodorou, P. Tsiotras, Trajectory distribution control for model predictive path integral control using covariance steering, in: 2022 International Conference on Robotics and Automation (ICRA), IEEE, 2022, pp. 1478–1484. [17] J. Yin, Z. Zhang, P. Tsiotras, Risk-aware model predictive path integral control using conditional value-at-risk, in: 2023 IEEE International Conference on Robotics and Automation (ICRA), IEEE, 2023, pp. 7937–7943. [18] I. S. Mohamed, K. Yin, L. Liu, Autonomous navigation of agvs in unknown cluttered environments: log-mppi control strategy, IEEE Robotics and Automation Letters 7 (4) (2022) 10240–10247. [19] G. Williams, B. Goldfain, P. Drews, K. Saigol, J. M. Rehg, E. A. Theodorou, Robust sampling based model predictive control with sparse objective information., in: Robotics: Science and Systems, Vol. 14, 2018, p. 2018. [20] J. Yin, C. Dawson, C. Fan, P. Tsiotras, Shield model predictive path integral: A computationally efficient robust mpc method using control barrier functions, IEEE Robotics and Automation Letters (2023). [21] C. Tao, H. Kim, H. Yoon, N. Hovakimyan, P. Voulgaris, Control barrier function augmentation in sampling-based control algorithm for sample efficiency, in: 2022 American Control Conference (ACC), IEEE, 2022, pp. 3488–3493. [22] A. D. Ames, X. Xu, J. W. Grizzle, P. Tabuada, Control barrier function based quadratic programs for safety critical systems, IEEE Trans. Autom. Contr. (2016) 3861–3876. [23] P. Rabiee, J. B. Hoagg, Soft-minimum and soft-maximum barrier functions for safety with actuation constraints, arXiv preprint arXiv:2305.10620 (2023). [24] A. Safari, J. B. Hoagg, Time-varying soft-maximum barrier functions for safety in unmapped and dynamic environments, arXiv:2409.01458 (2024). [25] L. Lindemann, D. V. Dimarogonas, Control barrier functions for multiagent systems under conflicting local signal temporal logic tasks, IEEE control systems letters 3 (3) (2019) 757–762. [26] P. Rabiee, J. B. Hoagg, Soft-minimum barrier functions for safetycritical control subject to actuation constraints, in: Proc. Amer. Contr. Conf. (ACC), 2023, pp. 2646–2651. [27] A. Safari, J. B. Hoagg, Time-varying soft-maximum control barrier functions for safety in an a priori unknown environment, arXiv:2310.05261 (2023). [28] P. Rabiee, J. B. Hoagg, Composition of control barrier functions with differing relative degrees for safety under input constraints, in: Proc. Amer. Contr. Conf. (ACC), IEEE, 2024, pp. 3692–3697. [29] X. Tan, W. S. Cortez, D. V. Dimarogonas, High-order barrier functions: Robustness, safety, and performance-critical control, IEEE Trans. Autom. Contr. 67 (6) (2021) 3021–3028. [30] P. Rabiee, J. B. Hoagg, A closed-form control for safety under input constraints using a composition of control barrier functions, arXiv:2406.16874 (2024).
+
+

@@ -1,0 +1,364 @@
+1
+Implementation of Nonlinear Model Predictive Path-Following Control for an Industrial Robot
+Timm Faulwasser Member, IEEE, Tobias Weber, Pablo Zometa, Rolf Findeisen Member, IEEE
+
+arXiv:1506.09084v2 [cs.SY] 18 Aug 2016
+
+Abstract—Many robotic applications, such as milling, gluing, or high precision measurements, require the precise following of a pre-deﬁned geometric path. We investigate the real-time feasible implementation of model predictive path-following control for an industrial robot. We consider constrained output path following with and without reference speed assignment. Finally, we present results of an implementation of the proposed model predictive pathfollowing controller on a KUKA LWR IV robot.
+Index Terms—path following, nonlinear model predictive control, constraints, optimal control, KUKA LWR IV
+I. INTRODUCTION
+Not all control tasks arising in applications ﬁt well into the classical framework of set-point stabilization and trajectory tracking. For instance, consider tasks such as steering an autonomous vehicle along a given reference track, precise machine tooling, or control of autonomous underwater vehicles. All these applications have in common that a system should be steered along a pre-speciﬁed geometric curve in a (position) output space, whereby the speed to move along the curve is not ﬁxed a priori. Such control tasks are typically denoted as path-following problems.
+These problems arise frequently in the context of dynamic motion planning and trajectory generation for mechatronic systems including bi-pedal walking and standard robots [12, 18, 21, 22]. Typically, a dynamic motion is assigned to a geometric reference path by solving an optimal control problem, or via some heuristics, leading to the desired reference motion along the path. The reference motion itself is then tracked by means of some feedback controller. In other words, path-following problems are frequently decomposed into
+TF is with the Institute for Applied Computer Science, Karlsruhe Institute of Technology, Germany. He is also with the Laboratoire d’Automatique, E´ cole Polytechnique Fe´de´rale de Lausanne, Switzerland. TW is with the Institute for Mathematical Optimization, Otto-von-Guericke University Magdeburg, Germany. PZ and RF are with the Institute for Automation Engineering, Otto-von-Guericke University Magdeburg, Germany. E-mails: timm.faulwasser@{epﬂ.ch, kit.edu}; {tobias.weber, pablo.zometa, rolf.ﬁndeisen}@ovgu.de.
+
+trajectory generation and trajectory tracking, i.e., path following is reformulated as trajectory tracking.
+To avoid the reformulation as a tracking problem, different closed-loop path-following control schemes have been proposed, see e.g. [1, 2, 7, 8, 14, 16]. The common underlying idea of these schemes is that the generation of the reference motion along the path, and the computation of inputs to track this motion, are both done in an integrated fashion at the run-time of the controller. In other words, a closed-loop path-following controller directly modulates the reference speed along the geometric path to reduce the path-following error and, at the same time, computes inputs to track this reference motion. Besides geometric feedback designs for path following—e.g. [1, 2, 16]—different model predictive control approaches tailored to path following have been investigated, see [5, 7, 8, 14].
+To this date, only a few laboratory implementations of model predictive control tailored to path-following problems of mechatronic and robotic systems have been reported: Discrete time predictive path-following control of an x-y table is presented in [13]. Real-time implementations of sampled-data predictive path-following controllers have been presented in [5], which is based on differential ﬂatness, and [10], wherein predictive path following of an industrial robot with paths deﬁned in the joint space is discussed.
+In the present paper, we discuss the design and implementation of a sampled-data nonlinear model predictive path-following control scheme in the presence of input and state constraints. Our main contribution is a proof-ofconcept demonstration of predictive path following. The results are obtained from a real-time feasible implementation on a KUKA LWR IV robot in a conﬁguration with three actuated joints, see Figure 1. The implementation relies on a predictive control approach presented in [8], wherein system-theoretic properties, such as stability and path convergence are analyzed, while implementation aspects and experimental results are not discussed. In contrast to the result presented in [10], we use a robot conﬁguration with three joints instead of two. Furthermore, we consider reference paths deﬁned directly in the operational space of the robot, i.e., the Cartesian space.
+
+2
+
+where x ∈ Rnx, u ∈ Rnu, and y ∈ Rnu represent the state, the input and the output. The states are constrained to a closed set, i.e., for all t : x(t) ∈ X ⊆ Rnx. The inputs u : [t0, ∞) → U are piece-wise continuous and take values in a compact set U ⊂ Rnu, which is brieﬂy denoted by u(·) ∈ PC(U ). The maps f : Rnx × Rnu → Rnx and h : Rnx → Rnu are assumed to be sufﬁciently often continuously differentiable and (1a) is considered
+to be locally Lipschitz. Also note that the control system
+is assumed to have a square input-output structure, i.e.,
+dim u = dim y := nu. The solution of (1a) at time t, originating at time t0 from x0, driven by an input u(·), is denoted as x(t, t0, x0|u(·)).
+
+Fig. 1. Considered path-following problem: KUKA LWR IV writing on a white board.
+
+We demonstrate that a suitable numerical implementation allows solving path-following problems achieving a sampling period in the order of 1 ms. A detailed comparison of predictive path-following with predictive trajectorytracking formulations is beyond the scope of this paper, we refer to [5] for such a comparison.
+The remainder of this paper is structured as follows: Section II recalls the formal problems of constrained output path following and speed-assigned path following for general nonlinear systems; additionally we sketch the conceptual ideas of model predictive path-following control used here. Details of the implementation on a KUKA LWR IV are discussed in Section III; experimental results are presented in Section IV.
+
+II. PREDICTIVE PATH FOLLOWING We consider nonlinear systems of the form
+
+x˙ = f (x, u), x(t0) = x0,
+
+(1a)
+
+y = h(x),
+
+(1b)
+
+A. Path-following Problems
+
+Output path-following refers to the task of tracking/following a geometric reference in the output space (1b) [16, 19]. Here, we assume that this reference is given by
+
+P = {y ∈ Rnu | θ ∈ R → y = p(θ)} .
+
+(2)
+
+The scalar variable θ ∈ R is called path parameter, and p(θ) is a parametrization of P. Note that in pathfollowing problems there is typically no strict requirement when to be where on P. In other words, the path parameter θ is time dependent but its time evolution t → θ(t) is not speciﬁed a priori. Rather the system input u(·) and the timing θ(·) are to be chosen such that the path is followed as exactly as possible. Furthermore, note that in some cases, such as ﬁnitely long paths, it can be helpful to restrict the path parameter to [θ0, θ1], where θ0 is the start point of the path and θ1 ∈ [θ0, ∞) denotes the end point of the path.
+Subsequently, we consider the problem of steering the output (1b) to the path P and following it along in the direction of increasing values of θ.
+Problem 1 (Constrained output path following [8]): Given the system (1) and the reference path P (2), design a controller that computes u(·) and θ(·) and achieves:
+i) Path convergence: The system output y = h(x) converges to the set P in the sense that
+
+lim h(x(t)) − p(θ(t)) = 0.
+t→∞
+ii) Convergence on path: The system moves along P in forward direction, i.e.
+θ˙(t) ≥ 0 and lim θ(t) − θ1 = 0.
+t→∞
+iii) Constraint satisfaction: The constraints on the states x(t) ∈ X and the inputs u(t) ∈ U are satisﬁed for all times.
+
+3
+
+Instead of this formulation, one might demand that the path parameter velocity θ˙(t) converges to a pre-speciﬁed evolution θ˙ref (t), cf. [19]. This leads to the following problem.
+Problem 2 (Speed-assigned path following [8]):
+Given the system (1) and the reference path P (2), design a controller that computes u(·) and θ(·), achieves
+part i) & iii) of Problem 1 and guarantees: ii) Velocity convergence: The path velocity θ˙(t) con-
+verges to a predeﬁned proﬁle such that
+
+lim θ˙(t) − θ˙ref (t) = 0.
+t→∞
+
+Remark 1 (Speed-assigned paths and tracking): Note that path following with velocity assignment is not equivalent to trajectory tracking, as speed assignment does not specify a unique output reference p(θ(t)). Rather, the problem with speed assignment admits several reference trajectories p(θi(t)), i ∈ {1, 2, . . . }, with θ˙i(t) = θ˙ref (t) differing with respect to θ, i.e., θi(t) = θj(t), i = j. Furthermore, in case disturbances lead to large path deviations, path following with speed assignment allows adjusting the timing θ(t), while this can be challenging in standard trajectory-tracking formulations.
+
+The conceptual idea of path following is to treat the path parameter θ as a virtual state whereby the time evolution t → θ(t) is inﬂuenced by an extra input, cf. [1, 7, 8, 19]. Usually, the time evolution t → θ(t) is described by an additional differential equation termed timing law. Basically, the timing law is an extra degree of freedom in the controller design. Subsequently, we rely on a simple integrator chain as timing law
+
+θ(rˆ+1) = v,
+
+(3)
+
+where rˆ ∈ N is sufﬁciently large as outlined in Remark 2. We note that more complex timing laws can be considered. The virtual input of the timing law is assumed to be piece-wise continuous and bounded, i.e., v(·) ∈ PC(V), V ⊂ R. Similar to [7, 8], we use the compact notation z := (θ, θ˙, . . . , θ(rˆ))T of (3) to formulate path-following problems via the augmented system
+
+x˙
+
+f (x, u)
+
+x(t0)
+
+x0
+
+=
+
+,
+
+=
+
+, (4a)
+
+z˙
+
+l(z, v)
+
+z(t0)
+
+z0
+
+e
+
+h(x) − p(z1)
+
+=
+
+.
+
+(4b)
+
+z
+
+z
+
+The output (4b) consists of two elements, the path following error e = h(x)−p(θ), and the full virtual state
+
+z. With respect to the augmented system (4) output pathfollowing (Problem 1) requires that the error e converges to zero while the path parameter θ converges to θ1—the ﬁnal path point.
+Remark 2 (Choice of suitable timing laws): How should one choose the parameter rˆ in the timing law (3)? This question can be answered using tools from geometric nonlinear control and the concept of transversal normal forms, see [2, 7, 8, 15]. The main idea is to choose rˆ sufﬁciently large such that one can map the augmented system (4) at least locally into suitable coordinates allowing for characterization of the manifold on which any state trajectory corresponds to an output trajectory traveling along P.
+
+B. Model Predictive Path-following Control
+We tackle output path-following problems with and without speed assignment in presence of input and state constraints (Problems 1 & 2) via a continuous time sampled-data nonlinear model predictive control (NMPC) scheme, denoted as model predictive pathfollowing control (MPFC), [7, 8].
+MPFC is based on the augmented system description (4). As common in model predictive control, the system input is obtained via the repetitive solution of an optimal control problem (OCP). At each sampling instance tk = t0 + kδ, with k ∈ N0 and sampling period δ > 0, the cost functional to be minimized is
+
+J (x(tk), z(tk), u¯(·), v¯(·))
+
+tk +T
+
+=
+
+F (e¯(τ ), z¯(τ ), u¯(τ ), v¯(τ )) dτ. (5)
+
+tk
+
+As usual in NMPC, F : Rnu ×Z ×U ×V → R0+ is called cost function and T ∈ (δ, ∞) denotes the prediction
+horizon. The OCP solved repetitively is:
+
+minimize J (x(tk), z(tk), u¯(·), v¯(·)) (6a)
+(u¯(·),v¯(·))∈PC(U ×V)
+
+subject to the constraints
+
+x¯˙ (τ ) = f (x¯(τ ), u¯(τ )), x¯(tk) = x(tk) (6b) z¯˙(τ ) = l(z¯(τ ), v¯(τ )), z¯(tk) = z(tk) (6c)
+
+e¯(τ ) = h(x¯(τ )) − p(z¯1(τ ))
+
+(6d)
+
+x¯(τ ) ∈ X , u¯(τ ) ∈ U
+
+(6e)
+
+z¯(τ ) ∈ Z, v¯(τ ) ∈ V
+
+(6f)
+
+which have to hold for all τ ∈ [tk, tk + T ]. As common in NMPC we denote predicted variables, i.e., internal variables of the controller, by superscript ¯·. The MPFC scheme (6) is built upon the augmented dynamics (4),
+
+4
+
+and thus they are considered as dynamic constraints in (6b)–(6c).
+At the core of the MPFC scheme is the repeated solution of (6) in a receding horizon fashion at all sampling instants tk. The solution to (6) are optimal input trajectories, denoted as u¯ (·, x(tk)) and v¯ (·, z(tk)). Solving (6) at time tk with ﬁnite horizon [tk, tk + T ], one plans a reference motion t → p(θ(t)) ∈ P and, at the same time, computes the system inputs to track these trajectories. Finally, u¯ (·, x(tk)) is applied to system (1)
+∀t ∈ [tk, tk + δ) : u(t) = u¯ (t, x(tk)).
+At the next sampling instant tk+1 = tk + δ, the OCP (6) is solved again for new initial conditions. While at each sampling instance the measured or observed state x(tk) serves as initial condition for (6b) the initial conditions of the timing law (6c) is the last predicted trajectory evaluated at time tk, i.e. z(tk) = z¯(tk, tk−1, z¯(tk−1)|v¯k−1(·)).1
+Note that in real-time feasible implementations of predictive control schemes one will typically compute an approximation of the optimal solution u¯ (·, x(tk)), i.e., one will apply a feasible but sub-optimal iterate of a numerical solution scheme. It is worth mentioning that the MPFC scheme (6) does not aim at a time-optimal motion along P as it is often considered in robotics [18, 20]. Rather, we aim at a feedback strategy ensuring that the system output converges to the path and moves along the path in forward direction.
+Summarizing, the MPFC scheme is built upon the receding horizon solution of (6), whereby the system model (6b) with the real system input u and the virtual path parameter dynamics (6c) with the virtual input v are part of the optimization problem. Since, the initial condition of (6c) at time tk is based on the previous solution at time tk−1, the variable z can be understood as an internal state of the controller. In other words, the MPFC scheme based on (6) is a dynamic feedback strategy, cf. [8, Remark 1].
+Remark 3 (Convergence conditions for MPFC): It is fair to ask for conditions ensuring that the proposed MPFC scheme solves Problems 1 & 2 or guarantees path convergence. The present paper focuses on the application and implementation of the MPFC scheme. Thus a detailed investigation is beyond its scope. As discussed in [7, 8], one can establish sufﬁcient conditions by adding an end penalty and a terminal constraint to the OCP (6). This way one can ensure path convergence and recursive feasibility in the presence of state constraints.
+1 If no initial condition for the ﬁrst sampling instance k = 0 is given, one can use z(t0) = (θ(t0), 0, . . . , 0)T whereby θ(t0) locally minimizes the distance h(x0) − p(θ) .
+
+C. Problems with and without Speed Assignment
+So far we have put the focus on the general MPFC formulation. Next, we show how to account for problems with and without speed assignment.
+We consider a quadratic cost function F
+F (e, z, u, v) = (e, z1 − θ1, z2 − θ˙ref ) Q2 + (u, v) R2 , (7)
+since this allows efﬁcient computation of approximations of the Hessian of OCP (6). The weighting matrix Q is positive semi-deﬁnite and R is positive deﬁnite while both are diagonal, i.e., Q = diag(we, we, we, wθ, wθ˙) and R = diag(ru, ru, ru, rv). In order to converge to the path, one usually chooses we wθ,θ˙. If the task at hand is a path-following problem without speed assignment— i.e., Problem 1, and one wishes to stop at z1 = θ1— one penalizes z1 − θ1. Hence, wθ > 0 and wθ˙ = 0 are used in this case. If, however, the task at hand is a pathfollowing problem with speed assignment—i.e., Problem 2, and achieving z2 − θ˙ref ≈ 0 is of interest—one uses wθ˙ > 0 and wθ = 0. Besides the parameters of the cost function F also the constraints Z in (6f) differ for Problems 1 and 2. While the former problem calls for Z = [θ0, θ1] × [0, ∞) × Rrˆ−1, in the latter problem one should use Z = [θ0, ∞) × [0, ∞) × Rrˆ−1.
+III. IMPLEMENTATION
+A. Robot Model and MPFC Design
+For simplicity, we consider a robot conﬁguration in which only joints 1, 2 and 4 of the KUKA LWR IV are operated while the other joints are kept ﬁxed. The dynamic model of the robot is given by
+B(q)q¨ + C(q, q˙)q˙ + τF (q˙) + g(q) = τ. (8)
+Here, q = (q1, q2, q4)T is the vector of joint angles. The time derivatives q˙ and q¨, respectively, refer to angular velocities and angular accelerations. The vector τ = (τ1, τ2, τ4)T denotes the actuation torques applied to the coressponding joints; B(q) = B(q)T > 0 is the inertia matrix; C(q, q˙) represents the centrifugal and Coriolis effects. The vectors τF (q˙) and g(q) describe torques in the joints due to friction and gravity, respectively. Note that this model describes the robot moving freely, i.e., contact forces are not explicitly included. They are treated as disturbances. The parameters of the model can be found in [3].
+
+5
+
+First, we rewrite the model in an implicit state-space representation with x1 = q, x2 = q˙, u = τ . This leads to
+
+x˙ 1
+
+x2
+
+E
+
+=
+
+x˙ 2
+
+u − C(x1, x2)x2 − g(x1) − τF (x2)
+
+y = hca(x1),
+
+where E = diag(I, B(x1)) is blockdiagonal. Note that the output y = hca(x1) describes the position of the tip of the robotic arm in a Cartesian coordinate system centered at the base of the robot (the operational space of the robot), cf. Fig. 1. We use this output instead of the ﬂat output y˜ = x1 = q, as path-following tasks are usually formulated in the operational space. Finally, to obtain the augmented system description (4), we choose an integrator chain of length two for (3).
+We express the parametrization p(θ) of the paths as a set of polynomial splines. To this end, we consider an equi-distant partition of [θ0, θ1] given by θ˜i = ∆θ + θ˜i−1, θ˜0 = θ0. We describe P by
+
+NP
+
+No
+
+p(θ) = H θ − θ˜i H θ˜i−1 − θ
+
+ai,j θj .
+
+i=1
+
+j=0
+
+Here, H : R → {0, 1} denotes the Heaviside step function and ai,j are polynomial coefﬁcients. The constants NP and No denote the number of path segments and, respectively, the order of the polynomial on each
+segment. The coefﬁcients ai,j are computed such that p(θ) is continuously differentiable.
+
+B. Interfacing and Real-Time Feasible Optimization
+The considered KUKA LWR IV robot arm [4] is operated via the Fast Research Interface by an external computer via an Ethernet connection [17]. This interface allows sampling rates up to 1 kHz, which is also the sampling rate of the internal control layer [4]. Furthermore, the interface allows to superpose torques on each joint when operated in the so-called joint-speciﬁc impedance control mode. In this mode, the torques commanded to the KUKA LWR IV are composed of torques computed inside the motion kernel (i.e., gravity terms) and the torques computed by an external controller (MPFC) and transferred via Ethernet to the robot. The MPFC scheme is implemented on an external PC workstation running a Linux operating system and a Intel Xeon X5675 CPU with 3.07 GHz clock frequency. The proposed MPFC scheme is written entirely in C/C++.
+For sake of faster computations, we simpliﬁed the model (8). First, note that the friction term τF (q˙) in (8) includes a sign function due to Coulomb friction, which is approximated by an arctan in the OCP. Second,
+
+we rely on internal functionalities of the robot allowing for gravity compensation. Thus, the term g(q) in (8) is neglected in the OCP. The OCP (6) is solved repeatedly at the run-time of the controller using the automatic code generation features presented in [11]. Speciﬁcally, we use a direct single-shooting implementation available in version 1.2.1beta of the ACADO Toolkit. In each iteration we perform one SQP iteration, i.e., we employ a so-called real-time iteration scheme [6, 11]. We use an implicit Gauss-Legendre integrator of order 2 with 10 steps.
+The prediction horizon is T =100 ms and the sampling period of the MPFC scheme is δ =1 ms. It is worth noting that, in contrast to discrete-time formulations of NMPC, in the sampled-data framework of Section II the choice of the input parametrization is independent of the chosen sampling period. Here, the input signals are approximated as piece-wise constant functions with 10 equi-distant intervals of 10 ms. Hence, at each sampling time tk, we solve one SQP iteration with a Hessian of size 40 × 40.
+The research interface of the robot allows to obtain the joint angles x1 from magneto-resistive encoders but not the joint angular velocities x2. We employ ﬁnite differences and low pass ﬁltering of x1 to obtain angular velocities x2. Note that the state z = (θ, θ˙)T is merely an internal variable of the controller; thus it does not need to be estimated.
+The maximum time to solve the OCP (6) is 0.48 ms (mean 0.24 ms, median 0.18 ms). The overall latency, which consists of the time to solve the OCP and the time needed for state estimation, communication, etc., is below 0.92 ms (mean 0.42 ms, median 0.42 ms). Hence, in experiments a sampling rate of 1 kHz can be achieved, which corresponds to the fastest sampling rate available via the research interface.
+IV. EXPERIMENTAL RESULTS
+Two different experiments of drawing paths to a white board are presented: a three-leaved clover path and a path representing the word Hello. The behavior of the robot during the experiments is documented in the videos available at [9]. Note that the experiments shown in these videos correspond to the results depicted in Figures 2–3. The tuning parameters of the MPFC scheme are documented in Table I in the Appendix.
+Clover Path: The experimental results for the clover path with speed assignment are shown in Figure 2. We plot trajectories that correspond to 3 turns on the clover.
+The clover path is a closed curve, the speed assignment along the path leads to periodic behavior of
+
+(a) From top: torques, angular velocity, Cartesian path error.
+
+(b) Virtual system.
+
+1.12
+
+t = 6.8s
+
+1.08
+1.04 t = 2.8s
+t = 4.8s
+1
+
+p (θ) y(t)
+t = 3.8s
+
+y3 position [m]
+
+0.96
+
+Fig. 2.
+
+−0.42
+
+−0.38
+
+−0.34 −0.3 y1 position [m]
+
+−0.26
+
+−0.22
+
+(c) Cartesian position and reference path (1st turn).
+
+Experimental results for the three-leaved clover path.
+
+6
+the inputs and the angular velocities, see Figure 2a. This behavior can be also observed for the virtual path parameter states in Figure 2b as the speed along the path is depending periodically on the curvature of the path. Furthermore, the MPFC schemes accelerates along straight parts of the path while it slows down at sharp corners of the path due to increased curvature. Although we consider path following with speed assignment, it can be seen in Figure 2b that the path parameter velocity z2 = θ˙ does not track its reference value θ˙ref = 250 s−1. The reason for this behavior is the constraint on the angular velocities of the robot, as the bound of the fourth joint is reached, see Figure 2a.
+The path-following errors depicted in Figure 2a are computed via the available kinematic model and the measured joint angles, i.e. eyi(t) = hca,i(q(t))−pi(θ(t)), i = 1, 2, 3. As can be seen in Figure 2a, the initial error of the experiment was rather large especially in the directions y2 and y3. The jump of the error at about t = 1 s is due to switching from position control to gravity compensation of the internal robot control. This gravity compensation cannot compensate exactly the contact forces between pen and board, and therefore the robot arm moves away from the starting point reached before by position control. As soon as the MPFC scheme is switched on at t = 2.5 s, the errors ey1, ey2, ey3 decrease rapidly and stay below 1 mm for the rest of the experiment, see Figure 2a. The behavior of the robot in the operational space is shown in Figure 2c. As one can see the MPFC scheme compensates for the initial path deviation rapidly and follows the path accurately.
+Hello Path: The experimental results for the Hello path are shown in Figure 3. During this experiment we introduced additional disturbances (external forces) by grabbing and holding the robot arm for a short time span. We applied several disturbances during ﬁve different intervals ([4.5, 6.5], [8.5, 9.5], [11.5, 13], [15, 16], [18, 18.5]). The forces applied to the arm change the behavior of the robot completely by stopping it on the path or even moving it away from the path. This leads to large path deviations, see Figure 3a. The disturbance ends by releasing the arm and the MPFC scheme steers the robot tip back to the path. Note that during the disturbance intervals the controller is not switched off. The controller reacts to these disturbances (and to the increased path error) by slowing down and even stopping the reference motion along the path. This can be seen in the plots of the states and input of the virtual system in Figure 3b. When the disturbance ends, i.e., when the external force is no longer applied, the robot tip returns and follows the path as the virtual system speeds
+
+REFERENCES
+(a) From top: torques, angular velocity, Cartesian path error.
+(b) Virtual system.
+(c) Cartesian position and reference. Fig. 3. Experimental results for the Hello path.
+
+7
+up again. In the zoomed-in part of Figure 3c, which corresponds to the disturbance during t ∈ [8.5, 9.5], one can see how the robot tip is forced to move away from the reference during this interval and how it returns as soon as the disturbance ends. The controller stops at the end of the path as for the Hello path z1(t) − θ1 is penalized.
+Note that the experiments have been performed using essentially the same parameters. The only difference is in the choice of wθ and wθ˙ in Q (7) and different box constraints, cf. Table I. These values are passed to the optimization code during run-time, i.e. re-compilation of the auto-generated C/C++ code is not necessary.
+V. SUMMARY AND CONCLUSIONS
+This paper presented results on the design and implementation of continuous time nonlinear model predictive control schemes tailored to constrained path-following problems for robotic manipulators. We considered constrained output path following with and without speed assignment. We demonstrated that one can tackle both problems by changing only a few parameters of the model predictive path-following control scheme. The real-time feasibility of the proposed scheme was illustrated via a laboratory implementation on a KUKA LWR IV robot.
+The proposed model predictive path-following controller is based on an augmented system description of path-following problems allowing for direct consideration of paths deﬁned in Cartesian space as well as input and state constraints. The presented results underpin that the proposed concept is real-time feasible and shows very promising control performance.
+APPENDIX
+REFERENCES
+[1] A.P. Aguiar, J.P. Hespanha, and P.V. Kokotovic. “Pathfollowing for nonminimum phase systems removes performance limitations”. In: IEEE Trans. Automat. Contr. 50.2 (2005), pp. 234–239.
+[2] A. Banaszuk and J. Hauser. “Feedback linearization of transverse dynamics for periodic orbits”. In: Sys. Contr. Lett. 26.2 (1995), pp. 95–105.
+[3] V. Bargsten, P. Zometa, and R. Findeisen. “Modeling, parameter identiﬁcation and model-based control of a lightweight robotic manipulator”. In: Proc. of 2013 IEEE International Conference on Control Applications (CCA). Hyderabad, India, 2013, pp. 134–139.
+[4] R. Bischoff, J. Kurth, G. Schreiber, R. Koeppe, A. AlbuScha¨ffer, A. Beyer, O. Eiberger, S. Haddadin, A. Stemmer, G. Grunwald, et al. “The KUKA-DLR lightweight robot arm-a new reference platform for robotics research and manufacturing”. In: Robotics (ISR), 2010 41st International Symposium on and 2010 6th German Conference on Robotics (ROBOTIK). VDE. 2010, pp. 1–8.
+
+8
+
+TABLE I IMPLEMENTATION PARAMETERS.
+
+Path segments NP Q = diag(q) q = (we, we, we, wθ, wθ˙)
+
+Hello path
+
+clover path
+
+1800
+
+2700
+
+we = 107
+
+wθ = 3 · 10−4 wθ = 0
+
+wθ˙ = 0
+
+wθ˙ = 3 · 10−4
+
+R = diag(ru, ru, ru, rv)
+
+ru = 0.5, rv = 10−7
+
+Ref. values: θ1, θ˙ref
+
+θ1 = 1750
+
+θ˙ref = 250 s−1
+
+X = [−x, x] x = (q, q, q, q˙, q˙, q˙)T
+U = [−u, u] u = (τ , τ , τ )T Z = [z, z], z = (θ0, 0)T z = (θ1, ∞)T V
+
+q = ∞ rad q˙ = 0.5 rad/s
+
+q = ∞ rad q˙ = 0.6 rad/s
+
+τ = 60 Nm
+
+θ0 = 0
+
+θ0 = 0
+
+θ1 = 1750
+
+θ1 = ∞
+
+[−104, 8 · 103]
+
+[16] C. Nielsen, C. Fulford, and M. Maggiore. “Path following using transverse feedback linearization: Application to a maglev positioning system”. In: Automatica 46.3 (2010), pp. 585–590.
+[17] G. Schreiber, A. Stemmer, and R. Bischoff. “The fast research interface for the KUKA lightweight robot”. In: IEEE Workshop on Innovative Robot Control Architectures for Demanding (Research) Applications How to Modify and Enhance Commercial Controllers (ICRA 2010). 2010.
+[18] K. Shin and N. McKay. “Minimum-time control of robotic manipulators with geometric path constraints”. In: IEEE Trans. Automat. Contr. 30.6 (1985), pp. 531 –541.
+[19] R. Skjetne, T. Fossen, and P.V. Kokotovic. “Robust output maneuvering for a class of nonlinear systems”. In: Automatica 40.3 (2004), pp. 373–383.
+[20] J.-J. Slotine and H.S. Yang. “Improving the efﬁciency of timeoptimal path-following algorithms”. In: IEEE Trans. Robot. Automat. 5.1 (1989), pp. 118–124.
+[21] E.R. Westervelt, J.W. Grizzle, C. Chevallereau, J.H. Choi, and B. Morris. Feedback control of dynamic bipedal robot locomotion. Vol. 28. CRC press, 2007.
+[22] P. Wieber and C. Chevallereau. “Online adaptation of reference trajectories for the control of walking systems”. In: Robotics and Autonomous Systems 54.7 (2006), pp. 559–566.
+
+[5] M. Bo¨ck and A. Kugi. “Real-time Nonlinear Model Predictive Path-Following Control of a Laboratory Tower Crane”. In: IEEE Trans. Contr. Syst. Techn. 22.4 (2014), pp. 1461–1473.
+[6] M. Diehl, I. Uslu, R. Findeisen, S. Schwarzkopf, F. Allgo¨wer, H.G. Bock, T. Bu¨rner, E.D. Gilles, J.P. Kienle A.and Schlo¨der, and E. Stein. “Real-time optimization for large scale processes: Nonlinear model predictive control of a high purity distillation column”. In: Online Optimization of Large Scale Systems. Springer, 2001, pp. 363–383.
+[7] T. Faulwasser. Optimization-based Solutions to Constrained Trajectory-tracking and Path-following Problems. Shaker, Aachen, Germany, 2013.
+[8] T. Faulwasser and R. Findeisen. “Nonlinear model predictive control for constrained output path following”. In: IEEE Trans. Automat. Contr. 61.4 (2016), pp. 1026–1039.
+[9] T. Faulwasser, T. Weber, P. Zometa, and R. Findeisen. Implementation of Model Predictive Path-following Control for an Industrial Robot. Video of experimental results. Accessed July 29, 2016. 2016. URL: youtu.be/KMj3cW7-Gfg.
+[10] T. Faulwasser, J. Matschek, P. Zometa, and R. Findeisen. “Predictive Path-following Control: Concept and Implementation for an Industrial Robot”. In: Proc. of 2013 IEEE Conference on Control Applications (CCA). Hyderabad, India, 2013, pp. 128–133.
+[11] B. Houska, H.J. Ferreau, and M. Diehl. “An auto-generated real-time iteration algorithm for nonlinear MPC in the microsecond range”. In: Automatica 47.10 (2011), pp. 2279– 2285.
+[12] V. Kumar, M. Zefran, and J.P. Ostrowski. “Motion planning and control of robots”. In: Handbook of industrial robots. Wiley, 1999, pp. 295–315.
+[13] D. Lam, C. Manzie, and M. Good. “Application of Model Predictive Contouring Control to an X-Y Table”. In: Proc. of 18th IFAC World Congress, Milano, Italy. 2011, pp. 10325– 10330.
+[14] D. Lam, C. Manzie, and M. Good. “Model predictive contouring control”. In: Proc. 49th IEEE Conf. Decision and Control (CDC), Atlanta, GA, USA. 2010, pp. 6137–6142.
+[15] C. Nielsen and M. Maggiore. “On local transverse feedback linearization”. In: SIAM Journal on Control and Optimization 47 (2008), pp. 2227–2250.
+
+

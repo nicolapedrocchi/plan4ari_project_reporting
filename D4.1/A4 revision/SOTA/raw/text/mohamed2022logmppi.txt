@@ -1,0 +1,1494 @@
+IEEE ROBOTICS AND AUTOMATION LETTERS. PREPRINT VERSION. ACCEPTED JULY, 2022
+
+1
+
+Autonomous Navigation of AGVs in Unknown Cluttered Environments: log-MPPI Control Strategy
+Ihab S. Mohamed1, Kai Yin2, and Lantao Liu1
+
+arXiv:2203.16599v2 [cs.RO] 18 Jul 2022 x [m]
+
+Abstract—Sampling-based model predictive control (MPC) optimization methods, such as Model Predictive Path Integral (MPPI), have recently shown promising results in various robotic tasks. However, it might produce an infeasible trajectory when the distributions of all sampled trajectories are concentrated within high-cost even infeasible regions. In this study, we propose a new method called log-MPPI equipped with a more effective trajectory sampling distribution policy which signiﬁcantly improves the trajectory feasibility in terms of satisfying system constraints. The key point is to draw the trajectory samples from the normal log-normal (NLN) mixture distribution, rather than from Gaussian distribution. Furthermore, this work presents a method for collision-free navigation in unknown cluttered environments by incorporating the 2D occupancy grid map into the optimization problem of the sampling-based MPC algorithm. We ﬁrst validate the efﬁciency and robustness of our proposed control strategy through extensive simulations of 2D autonomous navigation in different types of cluttered environments as well as the cartpole swing-up task. We further demonstrate, through realworld experiments, the applicability of log-MPPI for performing a 2D grid-based collision-free navigation in an unknown cluttered environment, showing its superiority to be utilized with the local costmap without adding additional complexity to the optimization problem. A video demonstrating the real-world and simulation results is available at https://youtu.be/_uGWQEFJSN0.
+Index Terms—Autonomous vehicle navigation, sampling-based MPC, MPPI, occupancy grid map path planning.
+I. INTRODUCTION AND RELATED WORK
+Designing a safe, reliable, and robust control methodology for autonomous navigation of autonomous ground vehicles (AGVs) in unknown cluttered environments (such as dense forests, crowded ofﬁces, corridors, warehouses, etc.) has been known as a great challenge. Such a navigation task requires the AGV to navigate safely with full autonomy while avoiding getting trapped in local minima and collision with static and dynamic obstacles while moving towards the goal, as well as respecting various system constraints. To this end, the robot should be capable of perceiving its surrounding environment and then reacting adequately. This subsequently results in a complex optimization control problem that is difﬁcult to be solved in real-time [1].
+One of the well-established and promising control strategies for collision-free navigation is Model Predictive Control (MPC) strategy, owing to its ﬂexibility and ability to compute good control policy in the presence of the hard and soft constraints of the system to be controlled. It leverages a
+Manuscript received: February 24, 2022; Accepted: July 12, 2022. This letter was recommended for publication by Editor Ashis Banerjee upon evaluation of the Associate Editor and Reviewers’ comments.
+1Ihab S. Mohamed (corresponding author) and Lantao Liu are with the Luddy School of Informatics, Computing, and Engineering, Indiana University, Bloomington, IN 47408 USA, {mohamedi, lantao}@iu.edu
+2Kai Yin is with Expedia Group, USA, kyin@expediagroup.com Digital Object Identiﬁer (DOI): see top of this page.
+
+y [m] 00 1 2 3 4 5
+G4
+G1 2
+
+4
+
+G3
+
+6 G2
+(a) Indoor validation-used environment
+
+(b) 2D costmap visualization
+
+Fig. 1: Snapshot of (a) our Jackal robot equipped with a Velodyne VLP-16 LiDAR and located in an unknown cluttered environment (G1, . . . , G4: desired poses), and (b) the corresponding 2D local costmap that represents the surrounding obstacles, where purple and cyan cells represent obstacles and their inﬂation, respectively; while blue line is the planned trajectory by our log-MPPI control strategy.
+
+receding horizon strategy to plan a sequence of optimal control inputs over a prediction time-horizon; then, the ﬁrst control input in the sequence is applied to the system, while the remaining control sequence is used for warm-starting the optimization at the next time-step [2]. The existing MPC-based schemes can be mainly categorized into gradient-based and sampling-based trajectory optimization methods. The gradientbased MPC methods have been successfully applied to real robotic systems, obtaining smooth collision-free trajectories in the presence of obstacles and other constraints [3]–[6]. However, the gradient-based frameworks are typically based on strong assumptions: the cost function, and sometimes system constraints, need to be differentiable in order to leverage the gradient for computing the optimal solution. Unfortunately, in practice, the optimization problem often involves non-convex and non-differentiable objective function with discontinuous collision avoidance constraints, and it can be computationally difﬁcult to be solved in real-time. To alleviate these issues, for example, the non-differentiable system constraints can be reformulated into smooth and differentiable ones as presented in [7]. A promising alternative is the sampling-based optimization methods such as Model Predictive Path Integral (MPPI) control strategy [8] that (i) makes no assumptions or approximations on the objective functions and system dynamics, (ii) can be effectively applied on highly dynamic systems, and (iii) beneﬁts from the parallel nature of sampling and high computational capacities of Graphics Processing Units (GPUs) utilized for speeding up the optimization.
+Recently, MPPI or sampling-based MPC has been successfully applied to a wide variety of robotic applications, starting from aggressive driving [9], [10] and autonomous ﬂight [1], [11] and ending with visual servoing [12] and reactive manipulation [13], showing outstanding performance in the presence of non-convex and discontinuous objectives,
+
+2
+
+IEEE ROBOTICS AND AUTOMATION LETTERS. PREPRINT VERSION. ACCEPTED JULY, 2022
+
+without adding any additional complexity to the optimization problem. Despite the attractive characteristics of MPPI [14], much like any sampling-based optimization method, it might generate an infeasible control sequence (i.e., infeasible trajectory) when the distributions of all sampled trajectories drawn from the system dynamics are unfortunately surrounding some infeasible region. This may inevitably lead to either violating the system constraints or increasing the risk of being trapped in local minima. For tasks such as collision-free navigation in cluttered environments, it has been observed that the collisions may not be avoided, as the intensive simulations demonstrated in Section IV. To mitigate this problem, authors in [15] employed an iterative Linear Quadratic Gaussian (iLQG) control, as an ancillary controller, on top of MPPI for tracking the planned trajectory. Similarly, in [16], MPPI is augmented with a nonlinear L1 adaptive controller to compensate for the model uncertainty. Lately, the covariance steering (CS) principle is incorporated within the MPPI algorithm, aiming to introduce adjustable trajectory sampling distributions [17]. However, the proposed solutions in [16] and [17] have not been experimentally validated on real robotic systems.
+With the aim of mitigating the previous shortcomings and improving the performance of MPPI, we propose a new strategy, called log-MPPI control strategy, that provides more ﬂexible and efﬁcient distributions of the sampled trajectories, without the need for (i) integrating an ancillary controller on top of MPPI [15], [16], or (ii) adding a feedback term along with the injected artiﬁcial noise that requires the system dynamics to be linearized and converts the original optimization problem into a convex one [17]. The key idea of logMPPI is that the trajectories (or, the control input updates) are sampled from the product of normal and log-normal distribution (namely, NLN mixture), instead of sampling from only Gaussian distribution. With such a sampling strategy, a small injected noise variance can be utilized so that violating system constraints can be avoided; yet, we can still get desirable sampled rollout trajectories that are well spread-out for covering large state-space. In summary, the contributions of this work can be summarized as follows:
+1) We provide a new sampling strategy based on normal lognormal mixture distribution. This new sampling method provides more efﬁcient trajectories than the vanilla MPPI variants, ensuring a much better exploration of the statespace of the given system and reducing the risk of getting stuck in local minima, leading the robot to ultimately ﬁnd feasible trajectories that avoid collision, as revealed in Section IV-B.
+2) Then, we show through the cartpole swing-up task given in Section IV-A the robustness of log-MPPI to run with a signiﬁcantly fewer number of trajectories, opening up a new avenue for the sampling-based MPC algorithm to be run on a standard CPU instead of a GPU. We thereafter incorporate the 2D grid map, as a local costmap, into the sampling-based MPC algorithm for performing collisionfree navigation in either static or dynamic unknown cluttered environments, as depicted in Section IV-C.
+3) Finally, in Section V, we experimentally demonstrate our control strategy for a 2D grid-based navigation in an
+
+unknown indoor cluttered environment shown in Fig. 1; to the best of the authors’ knowledge, this is the ﬁrst attempt to experimentally achieve grid-based collisionfree navigation based on sampling-based MPC.
+
+II. PRELIMINARIES
+
+In this section, we deﬁne the optimal control problem to be solved and provide a brief review of MPPI.
+
+A. Constrained Control Problem
+
+Consider a discrete-time system with state xk ∈ Rn, control input uk ∈ Rm, and underlying dynamics xk+1 = f (xk, vk). Let vk = uk + δuk ∼ N (uk, Σu) where δuk ∼ N (0, Σu)
+represents the injected disturbance with a zero-mean and covariance Σu. Let U = (u0, u1, . . . , uN−1) ∈ Rm×N denote the control sequence over a ﬁnite time-horizon N , while X = (x0, x1, . . . , xN−1) ∈ Rn×N denotes the resulting state trajectory. Let Orob (xk) and Oobs be the area occupied by the
+robot and the obstacles, respectively. Our objective is to ﬁnd
+
+a control sequence U that generates a collision-free trajectory
+
+which allows the robot to navigate from the initial state xs to
+
+its desired state xf while minimizing a cost function J. This
+
+optimization problem can be formulated by MPPI as:
+
+N −1
+
+1T
+
+min J = E φ (xN ) +
+
+q (xk) + uk Ruk
+
+U k=0 2
+
+, (1a)
+
+s.t. xk+1 = f (xk, vk) ,
+
+(1b)
+
+Orob (xk) ∩ Oobs = ∅, h(xk, uk) ≤ 0,
+
+(1c)
+
+x0 = xs, uk ∈ U, xk ∈ X,
+
+(1d)
+
+where φ (xN ), q (xk), and R ∈ Rm×m denote the terminal cost, state-dependent running cost, and positive deﬁnite control
+
+weighting matrix, respectively. MPPI solves the problem by
+
+minimizing the objective (1a) subject to system dynamics (1b)
+
+and system constraints such as collision avoidance and control
+
+constraints (1c).
+
+B. Review of MPPI
+
+Unlike the gradient-based MPC methods, MPPI does not
+
+compute gradients to ﬁnd the optimal solution; i.e., it is a
+
+derivative-free trajectory optimization strategy. Moreover, it
+
+makes no assumptions on the objective functions and system
+
+dynamics; i.e., highly nonlinear and non-convex functions
+
+can be easily employed. At each time-step, MPPI draws M
+
+trajectories, in parallel, from the system dynamics using GPU
+
+ensuring a real-time performance. These parallel trajectories
+
+are then evaluated according to its expected cost. The cost-
+
+to-go of each rollout τ over a time-horizon N is given by
+
+N −1
+
+S˜ (τ ) = φ (xN ) + q˜(xk, uk, δuk) ,
+
+(2)
+
+k=0
+
+where q˜(xk, uk, δuk) refers to the instantaneous running cost
+
+which consists of the sum of state-dependent running cost
+
+q (xk) and quadratic control cost; it is deﬁned as [8]
+
+1−ν−1 T
+
+T
+
+1T
+
+q˜= q (xk) +
+
+δuk Rδuk +uk Rδuk + uk Ruk, (3)
+
+2
+
+2
+
+State-dep.
+
+Quadratic Control Cost
+
+MOHAMED et al.: AUTONOMOUS NAVIGATION OF AGVS IN UNKNOWN CLUTTERED ENVIRONMENTS: LOG-MPPI CONTROL STRATEGY
+
+3
+
+where ν ∈ R+ determines how aggressively the state-space is explored. Afterwards, the control sequence is updated based
+on a weighted average cost over all sampled trajectories. As described in [8], the optimal control sequence {uk}k=0 N−1 can be approximated as
+
+m=1 M exp −(1/λ)S˜ (τk,m) δuk,m
+
+uk+1 = uk +
+
+, (4)
+
+m=1 M exp −(1/λ)S˜ (τk,m)
+
+where S˜ (τk,m) ∈ R+ is the cost-to-go of the mth trajectory at kth step and λ ∈ R+ is so-called the inverse temperature which determines how selective the weighted average of the
+trajectories is [10]. The control sequence is then smoothed using a Savitzky-Galoy (SG) ﬁlter. Finally, the ﬁrst control u0 in the sequence is applied to the system, while the remaining control sequence of length N − 1 is used for warm-starting the optimization at the next time-step.
+
+III. log-MPPI CONTROL STRATEGY
+
+Our goal is to design a new sampling and control approach, the log-MPPI, to further improve the classic MPPI performance. Here, we brieﬂy describe the difference between MPPI and log-MPPI: as previously discussed in Section II, MPPI does not update the injected control noise variance Σu, and the state-space exploration is carried out by adjusting ν (see Eq. (3)). However, if ν is too large, MPPI produces control inputs with signiﬁcant chatter [8]. Similarly, as stated in [15], a higher value of Σu might result in violating the system constraints and eventually state diverging. One solution could be updating, at each iteration, the variance [13]. Instead, we inject the log-normal along with normal distribution ensuring much better state exploration with a low variance value which well respects the system constraints and providing better performance with a fewer number of samples.
+
+A. Log-normal Distribution
+
+In probability theory, a positive random variable X is lognormally distributed, i.e., X ∼ LN (µ, σ2), if the natural
+logarithm of X has a normal distribution with mean µ and variance σ2, i.e., ln X ∼ N (µ, σ2). Thus, the probability
+density function (pdf ) of the random variable X is given by
+
+1
+
+(ln x − µ)2
+
++
+
+fX (x) = √ exp −
+
+2
+
+, x ∈ R , (5)
+
+xσ 2π
+
+2σ
+
+where the mean and variance of a LN (µ, σ2) distribution are
+
+given by
+
+E(X) = e(µ+0.5σ2) and Var(X) = e(2µ+σ2)(eσ2 − 1). (6)
+
+In spite of the fact that both normal and log-normal distributions are unbounded distributions, the log-normal distribution is asymmetric and positively skewed to the right, where the range of values lies in an interval of [0, +∞[. Therefore, the pdf, fX (x), starts at zero and increases to its mode, then decreases thereafter. The degree of skewness increases as σ increases, for a given µ. Similarly, for the same σ, the pdf ’s skewness increases as µ increases. In addition, the most attractive feature of such distribution compared to the alternative default distributions (such as normal, gamma, and Weibull distributions) is its capability of capturing a large
+
+fX (x) fY (y) fZ (z)
+
+8
+
+Hist. 0.6
+
+Hist. 3
+
+6
+
+pdf
+
+0.4
+
+pdf 2
+
+4
+
+2
+
+0.2
+
+1
+
+Hist. pdf
+
+0 −0.1 0.0 0.1
+
+0.0 2 3 4 5
+
+0 −0.3 0.0 0.3 0.6
+
+x
+
+y
+
+z
+
+(a) X ∼ N (0, 0.002) (b)Y∼ LN (1.023, 0.048) (c) Z ∼ N LN (0, 0.017)
+
+Fig. 2: Histogram and pdf of 2500 random samples generated from: (a) normal, (b) log-normal, and (c) NLN mixture, with µn = µnln = 0, µln = 1.023, σn2 = 0.002, σln 2 = 0.048, and σnln 2 = 0.017.
+
+range with a long right-tail, making it convenient to model large values and hence large uncertainties [18].
+
+B. Normal Log-normal (NLN) Mixture
+
+Broadly speaking, if X and Y are two independent random
+
+variables, described by probability density functions fX (x) and fY (y), then the probability density function of the product Z = XY is given by
+
+∞1
+
+fZ (z) =
+
+fX (x)fY (z/x) dx.
+
+(7)
+
+−∞
+
+|x|
+
+More speciﬁcally, suppose that X
+
+∼
+
+N
+
+(µn
+
+,
+
+σ2
+n
+
+)
+
+and
+
+Y
+
+∼
+
+LN
+
+(
+
+µl
+
+n
+
+,
+
+σ2
+ln
+
+).
+
+Then,
+
+the
+
+random
+
+variable
+
+Z
+
+= XY
+
+∼
+
+N
+
+LN
+
+(µnl
+
+n
+
+,
+
+σ2
+nl
+
+n
+
+)
+
+can
+
+be
+
+labelled
+
+as
+
+normal
+
+log-normal
+
+(NLN)
+
+mixture,
+
+where
+
+its
+
+mean
+
+µnln
+
+and
+
+variance
+
+σ2
+nln
+
+are
+
+given by [19]
+
+µnln = E(XY ) = E(X)E(Y ) = µne(µln+0.5σl2n),
+
+2
+σnln
+
+=
+
+Var(X Y
+
+)
+
+=
+
+E(X 2 )E(Y
+
+2)
+
+−
+
+(EX Y
+
+)2,
+
+(8)
+
+2
+
+2 (2µln+2σl2n)
+
+2 (2µln+σl2n)
+
+= µn + σn e
+
+− µne
+
+.
+
+Let
+
+us
+
+consider
+
+the
+
+case
+
+where
+
+µn
+
+=
+
+0,
+
+i.e.,
+
+X
+
+∼
+
+N
+
+(0
+
+,
+
+σ2
+n
+
+)
+
+,
+
+which is commonly used in sampling-based MPC strategies.
+
+Thus, the pdf of Z, given in (7), is deﬁned as
+
+1∞
+
+z2
+
+(ln x − µln)2
+
+fZ =
+
+exp − 2 2 −
+
+2
+
+2πσnσln 0
+
+2σnx
+
+2σln
+
+1 dx, (9) x2
+
+which can be solved analytically [20]. It is noteworthy that
+
+fZ (z) = fZ (−z), indicating a symmetric distribution around 0 as shown in Fig. 2(c). In addition, Z can be written as
+
+a smooth function of two independent normal distributions,
+
+i.e., Z
+
+= XY
+
+= XeW ,
+
+where W
+
+∼
+
+N
+
+(µl
+
+n
+
+,
+
+σ2
+ln
+
+)
+
+.
+
+When σn
+
+becomes smaller, X places the mass around 0. This makes
+
+the tail of Z lighter than the lognormal distribution. Fig. 2
+
+illustrates different distributions with differing parameters.
+
+C. log-MPPI Control Strategy
+
+We develop our method on top of the MPPI in [8] for
+
+integrating the NLN mixture sampling. Although the original
+
+derivation of MPPI is based on the controlled dynamics driven
+
+by Brownian motion noise, it can be approximately applied
+
+to the NLN mixture, particularly for small σn. We provide
+
+a discussion on the effect of NLN mixture noise on the
+
+dynamics in Appendix A. The major difference is that the
+
+trajectories, drawn from the discrete-time dynamics system
+
+xk+1, are sampled from the NLN policy, rather than from
+
+the Gaussian policy. Accordingly, the control input updates
+
+δuk
+
+is
+
+deﬁned
+
+as
+
+δuk
+
+=
+
+δunk
+
+· δuln
+k
+
+∼
+
+N LN (0, Σu),
+
+where
+
+δunk
+
+∼
+
+N (0, Σn),
+
+δuln
+k
+
+∼
+
+LN (µln, Σln),
+
+Σu
+
+=
+
+σn2 ln Im ,
+
+Σn = σn2 Im, Σln = σl2nIm, and Im denotes an m×m identity
+
+4
+
+IEEE ROBOTICS AND AUTOMATION LETTERS. PREPRINT VERSION. ACCEPTED JULY, 2022
+
+matrix.
+
+To
+
+ensure
+
+that
+
+δuln
+k
+
+is
+
+stochastically
+
+independent
+
+from
+
+δunk , Eq. (6) is employed in order to compute µln and Σln,
+
+considering µ = 0 and σ2 = σn (namely, standard deviation
+
+of δunk ). Similarly, Eq. (8) is utilized for computing µnln and
+
+σ2 ,
+nln
+
+taking
+
+into
+
+account
+
+that
+
+µnln
+
+=
+
+0
+
+as
+
+µn
+
+=
+
+0.
+
+0.8
+
+0.8
+
+0.4
+
+0.4
+
+y [m] y [m]
+
+0.0
+
+0.0
+
+−0.4 MPPI −0.8 0 2 4 6 8
+x [m] (a) δuk ∼ N (0, 0.002I2)
+
+−0.4 log-MPPI −0.8 0 2 4 6 8
+x [m] (b) δuk ∼ N LN (0, 0.017I2)
+
+Fig. 3: Distribution of 2500 sampled trajectories generated by (a)
+MPPI with δuk ∼ N (0, 0.002I2) and (b) log-MPPI with δuk ∼
+N LN (0, 0.017I2), where the robot is assumed to be located at x = [x, y, θ]T = [0, 0, 0]T in ([m], [m], [deg]) with a commanded control input u = [v, ω]T = [1.5, 0]T in ([m/s], [rad/s]).
+
+To demonstrate the advantages of sampling from the NLN
+
+distribution on the performance of the MPPI algorithm, here
+
+we provide a concrete example. The basic idea is to use a small
+
+variance (so that we can avoid violating system constraints);
+
+yet, we can still get desirable sampled trajectories that are
+
+well spread-out for covering large state-space. Speciﬁcally,
+
+(i) we ﬁrst draw random samples, namely, X ≡ δunk , from
+
+a
+
+normal
+
+distribution
+
+with
+
+µn
+
+=
+
+0
+
+and
+
+σ2
+n
+
+=
+
+0.002
+
+(see
+
+Fig. 2(a)); (ii) then, another set of random samples, namely,
+
+Y
+
+≡
+
+δuln,
+k
+
+are
+
+generated
+
+from
+
+the
+
+corresponding
+
+log-normal
+
+distribution
+
+with
+
+µln
+
+=
+
+1.023
+
+and
+
+σ2
+ln
+
+=
+
+0.048,
+
+as
+
+illustrated
+
+in Fig. 2(b); (iii) ﬁnally, the random variable Z ≡ δuk that
+
+represents the product of those two independent variables is
+
+generated from the NLN distribution with µnln = 0 and
+
+σ2
+nln
+
+=
+
+0.017.
+
+Now,
+
+let
+
+us
+
+draw
+
+M
+
+sampled
+
+trajectories
+
+from
+
+δuk ∼ N (0, 0.002I2), as depicted in Fig. 3(a), considering
+
+the discrete-time kinematics model of the robot given in (11)
+
+and control schemes parameters listed in Section IV-B1, where
+
+M = 2500. In a similar way, Fig. 3(b) shows the sampled trajectories from δuk ∼ N LN (0, 0.017I2). It is interesting
+
+to observe in Fig. 3 that the distributions of the sampled
+
+trajectories generated by the log-MPPI algorithm are more
+
+ﬂexible and efﬁcient than the ones generated by the classical
+
+MPPI, resulting in (i) better exploration of the state-space, and
+
+(ii) reducing the probability of getting trapped in local minima.
+
+One might argue that injecting the same control variance
+
+to the normal distribution can lead to similar results. Here,
+
+we provide the advantages of the NLN distribution through
+
+(i) an analysis from the dynamics perspective in Appendix A
+
+where we show that even with the same variance, the proposed
+
+scheme can be more efﬁcient due to the random drift term in
+
+dynamics, and (ii) the extensive simulation results carried out
+
+in the next section which show a much better exploration with more than 30% reduction in the injected noise variance Σu1.
+
+IV. SIMULATION-BASED EVALUATION
+
+We evaluated and compared the two control strategies on
+
+1Unlike in [17], the proposed method explores the environment and samples trajectories more efﬁciently than MPPI for the same injected noise Σu.
+
+a simulated cartpole system and a goal-oriented AGV autonomous navigation task in 2D cluttered environments.
+A. Cartpole Swing-up Task
+To demonstrate the impact of drawing trajectories from the NLN distribution policy, instead of Gaussian policy, on the behavior of the sampling-based MPC algorithm and assess the practical stability of our proposed control strategy, especially with a signiﬁcantly fewer number of trajectories, we applied MPPI and log-MPPI on a simulated cartpole system.
+1) Simulation Setup: The main objective is to swing up and stabilize the cartpole for 12 s. The cartpole dynamics model are taken from [8] with assigning the same values to the system variables, while the pole length l is set to 1 m and the instantaneous running cost function is formulated as:
+q(x) = 10x2 + 103(1 + cos(θ))2 + 2θ˙2 + 2x˙ 2, (10)
+where x and x˙ are the horizontal position and velocity of the cart, while θ and θ˙ denote the angle and angular velocity of the pole. For both control schemes, the simulations were performed with a time prediction tp of 2 s, a control frequency of 50 Hz (sequentially, N = 100), a 1000 sampled rollouts at each time-step ∆t, an exploration variance ν of 1000, an inverse temperature λ of 0.07, and a control weighting
+λ − 21
+matrix R of 2 Σn with Σn = 0.0225 for log-MPPI. The Savitzky-Galoy (SG) convolutional ﬁlter, which is utilized for smoothing the control sequence {uk}k=0 N−1 computed by Eq. (4), is applied with a quintic polynomial function, i.e., nsg = 5, and a window length lsg of 51.
+2) Simulation Results: We tested the robustness of our proposed algorithm by changing the noise variance Σu, and number of sampled trajectories M , as illustrated in Fig. 4. In Figs. 4(a) and 4(b), the simulations are carried out considering two different values of M (namely, M = 1000 and 5), while keeping the injected noise variance the same, namely, Σu = 0.283. We can notice from Fig. 4(a) that our control scheme achieves a slightly faster convergence; the cartpole converges to the desired conﬁguration (i.e., x = 0 m and θ = π rad) within 3.9 s compared to 4.8 s when MPPI is used. Figure 4(b) demonstrates that the impact of decreasing M on the behavior of MPPI is appreciably higher than its impact on log-MPPI, as the former produced control input that ultimately leads to a higher transient overshoot of θ and higher positioning error (about 7.6 cm). On the other side, logMPPI still performs well with a very slightly positioning error, without compromising its robustness level and convergence rate, which opens up a new avenue for sampling-based MPC algorithm to be run on a standard CPU instead of a GPU, with a fewer number of samples. Furthermore, it is noteworthy that MPPI can achieve similar or better performance of logMPPI by increasing Σu at least 73%, as depicted in Fig. 4(c)2. However, assigning higher values might result in violating the system constraints if they are applied and added to the optimization control problem of the MPPI algorithm.
+2Empirically, we observed that the lower the R, the better the performance. Accordingly, the behavior of MPPI will be slightly worse if R is assigned to a high value as that in log-MPPI, which is R = 0.233.
+
+MOHAMED et al.: AUTONOMOUS NAVIGATION OF AGVS IN UNKNOWN CLUTTERED ENVIRONMENTS: LOG-MPPI CONTROL STRATEGY
+
+5
+
+x [m] & θ [rad.] x [m] & θ [rad.] x [m] & θ [rad.]
+
+1 x [m], θ [rad], MPPI, Σu = 0.283
+x [m], θ [rad], log-MPPI, Σu = 0.283
+
+0 0.02 ·10−2
+
+−1
+
+0.00
+
+−0.02 9 10 11 −2 −3.13
+−3.14
+
+−3.15
+
+−3
+
+9 10 11
+
+x [m], x [m],
+3 2 1 0 −1 −2 −3
+
+θ [rad.], MPPI, θ [rad.], log-MPPI,
+
+Σu = 0.283 Σu = 0.283
+
+0.1
+0.0 −0.1
+9
+
+10 11
+
+−3.13 −3.14 −3.15 9
+
+10 11
+
+x [m], x [m], x [m],
+1
+
+θ [rad.], MPPI, θ [rad.], MPPI, θ [rad.], log-MPPI,
+
+Σu = 0.49 Σu = 0.81 Σu = 0.283
+
+0
+
+−1
+
+−2
+
+−3
+
+0 2 4 6 8 10 12 Time [s]
+(a) MPPI vs log-MPPI for the same noise variance Σu = 0.283, while M = 1000
+
+0 2 4 6 8 10 12 Time [s]
+(b) MPPI vs log-MPPI for the same noise variance Σu = 0.283, while M = 5
+
+0 2 4 6 8 10 12 Time [s]
+(c) Performance of MPPI for higher values of Σu, while M = 1000
+
+Fig. 4: Performance comparison of MPPI and log-MPPI for the cart–pole swingup task, considering: (a) the same sampling variance, namely, Σu = 0.283, while M = 1000, (b) the same sampling variance, i.e., Σu = 0.283, while M = 5, (c) higher variances in the case of MPPI.
+
+B. Autonomous Navigation in Cluttered Environments
+
+With the aim of demonstrating the prospective advantages
+
+of our proposed log-MPPI control strategy compared to the
+
+classical MPPI, extensive simulations are conducted in goal-
+
+oriented AGV autonomous navigation tasks in 2D cluttered
+
+environments.
+
+1) Simulation Setup: In this work, we consider the kine-
+
+matics model of a differential wheeled robot. The kinematics
+
+equations that govern the motion of the robot is expressed as
+
+ 
+
+
+
+x˙
+
+cos θ 0
+
+ y˙  =  sin θ 0  v ⇔ x˙ = R(θ)u, (11)
+
+θ˙
+
+01 ω
+
+where x = [x, y, θ]T ∈ R3 represents the pose of the robot expressed in the world frame, θ is the rotation (or, heading) angle, the control u = [v, ω]T ∈ R2 denote the linear and
+angular velocities of the robot.
+
+The parameters of both control strategies were set as fol-
+
+lows: tp = 5 s (i.e., N = 250), M = 2500, ν = 1200, and R = λΣ− 1 n 2 . However, for MPPI, the inverse tempera-
+
+ture
+
+λ
+
+and
+
+the
+
+control
+
+noise
+
+variance
+
+Σu
+
+=
+
+Diag
+
+σ2
+v
+
+,
+
+σ2
+w
+
+(herein, Σu ≡ Σn) are set to 0.572 and Diag (0.023, 0.028),
+
+respectively, while in the case of log-MPPI they are set to
+
+much lower values, namely, 0.169 and Diag (0.017, 0.019),
+
+respectively. In fact, those two hyperparameters were chosen
+
+based on the intensive simulations carried out in Tests #1 and
+
+#2 in Table I. It can be noticed that Σu, in the case of log-
+
+MPPI, is basically computed from a normal distribution with
+
+a variance of Σn = Diag (0.002, 0.0022). For the SG ﬁlter parameters, we set nsg and lsg to 3 and 51, respectively. The
+
+real-time execution of MPPI and log-MPPI is carried out on
+
+an NVIDIA GeForce GTX 1660 Ti laptop GPU, where all
+
+algorithms were written in Python and were implemented on
+
+a differential wheeled robot, namely, ClearPath Jackal robot,
+
+integrated with the Robot Operating System (ROS) framework.
+
+Within this work, trajectories are sampled on a GPU using
+
+the discrete-time kinematics model given in Eq. (11), where
+
+the state-dependent cost function of the 2D navigation task is
+
+simply formulated as
+
+q(x) = qstate(x) + qobs(x),
+
+(12)
+
+where qstate(x) = (x − xf )TQ(x − xf ) is a quadratic cost
+
+function utilized for enforcing the robot current state x to reach
+
+its desired state xf , and Q = Diag(5, 5, 2) ∀vdes ≤ 1 m/s, otherwise Q = Diag(2.5, 2.5, 2). qobs(x) = 107Ccrash heavily
+
+penalizes trajectories that collide with obstacles, where Ccrash
+
+is a Boolean variable that indicates the collision with obstacles.
+
+2) Simulation Scenarios: We considered four various sce-
+
+narios for evaluating the performance of the proposed control
+
+framework in cluttered environments. In Scenario #1, the
+
+intensive simulations (namely, NT = 100 tasks) are carried out by taking into account different values of λ and Σu, with
+
+the aim of (i) choosing the best sets of hyperparameters that
+
+respect the control constraints, then (ii) assessing the perfor-
+
+mance in the following scenarios. We choose λ ∈ [0.01, 10]
+
+and Σu ∈ [0.0004, 0.16], while a cluttered environment,
+
+with obstacles placed 2 m away, has been used for assessing
+
+the performance. In the last three scenarios, we randomly
+
+generated three different types of forests, each type has 50
+
+forests, i.e., NT = 50 tasks, and each forest represents a 50 m × 50 m cluttered environment. In the ﬁrst type (i.e.,
+
+Scenario #2), the obstacles were, on average, 1.5 m apart
+
+(namely,
+
+dobs
+min
+
+=
+
+1.5 m),
+
+whilst
+
+in
+
+the
+
+second
+
+(Scenario
+
+#3)
+
+and third (Scenario #4), they placed 2 m and 3 m away,
+
+respectively. For the ﬁrst three scenarios, the maximum desired
+
+velocity vdes of the robot is set to 1.5 m/s, while in the latter it
+
+is allowed for the robot to navigate with its maximum velocity
+
+which is 2 m/s.
+
+3) Performance Metrics: To achieve a fair performance
+
+comparison of the two control schemes: (i) ﬁrst, in all
+
+simulations, the robot has to reach the same desired pose, namely, xf = [50, 50, 0]T , from the predeﬁned initial pose x0 = [0, 0, 0]T (in [m], [m], [deg]); (ii) second, we deﬁne a
+
+set of metrics so as to assess the overall performance such as
+
+the number of successful tasks ST , success rate SR, average robot trajectory length lav to reach xf from x0, number of
+
+successful tasks with a shorter route (i.e., robot trajectory)
+
+towards the goal Nlmin , and average traveling speed vav. The
+
+task is considered to be successful if the robot successfully
+
+reaches the desired goal without colliding with obstacles. Note
+
+that lav, Nlmin , and vav are only computed for successful tasks ST that are successfully completed by both control schemes.
+
+4) Simulation Results: The general performance of our pro-
+
+posed control schemes are summarized in Table I, considering
+
+6
+
+IEEE ROBOTICS AND AUTOMATION LETTERS. PREPRINT VERSION. ACCEPTED JULY, 2022
+
+TABLE I: Overall performance of the two control schemes, where the gray cells represent better results.
+
+Test Scheme NT ST SR [%] lav [m] (Nlmin ) vav [m/s]
+
+Scenario #1: vdes = 1.5 m/s & dmin obs = 2 m
+
+#1 MPPI 100 48 48
+
+−
+
+−
+
+#2 log-MPPI 100 61 61
+
+−
+
+−
+
+#1 MPPI 60 21 35
+
+−
+
+−
+
+#2 log-MPPI 60 43 71.7
+
+−
+
+−
+
+Scenario #2: vdes = 1.5 m/s & dmin obs = 1.5 m #3 MPPI 50 42 84 76.52 (9/40) 1.27 ± 0.18
+
+#4 log-MPPI 50 48 96 75.19 (31/40) 1.34 ± 0.12
+
+Scenario #3: vdes = 1.5 m/s & dmin obs = 2 m #5 MPPI 50 46 92% 76.19 (13/46) 1.32 ± 0.14
+
+#6 log-MPPI 50 50 100 75.29 (33/46) 1.33 ± 0.11
+
+Scenario #4: vdes = 2 m/s & dmin obs = 3 m #7 MPPI 50 50 100 72.17 (21/50) 1.82 ± 0.039
+
+#8 log-MPPI 50 50 100 72.09 (29/50) 1.84 ± 0.037
+
+the four scenarios deﬁned previously and controllers’ parame-
+
+ters given in Section IV-B1. It is worthy to notice in Scenario
+
+#1 (i.e., Tests #1 and #2), where different values of λ and Σu
+
+are considered, that log-MPPI signiﬁcantly outperforms MPPI
+
+as its success rate SR is noticeably higher than that in MPPI,
+especially for the ﬁrst 60 tasks (i.e., NT = 60) where lower values are assigned to Σu (see Tests #1 and #2)3. In practice,
+
+this clearly indicates that log-MPPI is largely compatible
+
+with a wide range of acceptable parameters values, reducing
+
+the time taken for ﬁne-tuning those parameters that play an
+
+important role in determining the behavior of sampling-based
+
+MPC scheme. For Scenario #2 (i.e., Tests #3 and #4), where
+
+dobs
+min
+
+=
+
+1.5 m,
+
+it
+
+can
+
+be
+
+clearly
+
+noticed
+
+that
+
+our
+
+method
+
+experimentally exhibits better performance not only due to its
+
+higher success rate (SR = 96%), but also due to the fact that: (i) lav is lightly shorter (roughly, 1.33 m shorter than that for MPPI), (ii) Nlmin is quite higher (totally, 31 tasks compared to 9 for MPPI), and (iii) vav is slightly better and closer to vdes
+
+with a very low standard deviation. Similarly, in the remaining
+
+tests
+
+with
+
+high
+
+values
+
+of
+
+dobs ,
+min
+
+log-MPPI
+
+performs
+
+well
+
+with
+
+a
+
+high capability of successfully complete all given tasks while
+
+avoiding obstacles; thanks to the NLN distribution policy that
+
+provides more ﬂexible and efﬁcient trajectories, we ensure a
+
+much better exploration of the state-space of the given system
+
+with more than 30% reduction in the injected noise variance
+
+and reduce the risk of getting stuck in local minima when
+
+MPPI is employed.
+
+In Fig. 5, we show an example of the robot trajectories
+
+generated by MPPI and log-MPPI in a cluttered environment,
+
+where
+
+dobs
+min
+
+=
+
+2 m,
+
+i.e.,
+
+Scenario
+
+#3.
+
+We
+
+can
+
+clearly
+
+ob-
+
+serve that although both control schemes achieve successfully
+
+collision-free navigation through the cluttered environment
+
+with an average traveling speed vav of 1.33 m/s which respects the control constraints as the robot linear velocity v ≤ vdes = 1.5 m/s as shown in Figs. 5(b) and 5(c), log-MPPI provides
+
+a shorter route towards the goal as shown in Fig. 5(a). More
+
+precisely, the length of the robot trajectory l in the case of log-
+
+3The motive behind considering the ﬁrst 60 tasks (namely, Tests #1 and #2) is that we empirically observed that assigning higher values to Σu increases the possibility of violating the control constraints.
+
+y [m]
+
+50
+
+xf
+
+1.5
+
+v [m/s]
+
+1
+
+40
+
+0.5
+
+0
+
+MPPI
+
+30
+
+0 20 40 60
+
+Time [s]
+
+20
+
+(b) Linear velocity (MPPI)
+
+1.5
+
+v [m/s]
+
+10
+
+0 x0
+
+0
+
+10
+
+1
+
+MPPI
+
+0.5
+
+log-MPPI 0
+
+log-MPPI
+
+20
+
+30
+
+40
+
+50
+
+x [m]
+
+0 20 40 60 Time [s]
+
+(a) Robot trajectories generated by MPPI and log-MPPI; red dots represent random obstacles
+
+(c) Linear velocity (log-MPPI)
+
+Fig. 5: Behavior of MPPI and log-MPPI in a 50 m × 50 m cluttered environment, where obstacles were 2 m apart.
+
+MPPI is 77.8 m compared to 79.92 m for the classical MPPI.
+C. Autonomous Navigation in Unknown Environments
+In Section IV-B, where autonomous navigation in cluttered environments is performed, it is assumed that the costmap that represents the environment is priorly known, limiting the applicability of the control schemes as unknown or partially observed environments are the most dominant in robotics applications [1]. To this end, a 2D costmap created by the costmap_2d ROS package is utilized for storing information about the robot’s surrounding obstacles [21] (see Fig. 6(b)). It employs the sensor data acquired from the environment to build a 2D or 3D occupancy grid of the data, where each cell of the occupancy is typically expressed as occupied, free, or unknown; in our case, a 2D occupancy grid map is sufﬁcient for 2D robot navigation. Thereafter, this occupancy grid is utilized as a local costmap to be fed directly into the samplingbased MPC algorithm, for achieving collision-free navigation in either static or dynamic unknown environments.
+
+(a) Gazebo forest-like environment (b) Rviz costmap visualization
+Fig. 6: Snapshot of (a) our Jackal robot located in a forest-like environment, and (b) the corresponding 2D local costmap.
+1) Simulation Setup: We considered the same simulation setup previously described in Section IV-B1, where the collision indicator function qobs(x), given in (12), is herein computed based on the local costmap (i.e., 2D grid map) built by the robot on-board sensor; in this work, the Clearpath Jackal robot is endowed with a Velodyne VLP-16 LiDAR sensor. The size of the robot-centered 2D grid map is set to 240 cell × 240 cell with a resolution (grid size) of 0.05 m/cell.
+2) Simulation Scenarios: For the benchmark, two types of 50 m × 50 m forest-like maps in Gazebo environment are utilized, as depicted in Fig. 6(a). The ﬁrst type (namely, Forest #1) contains tree shaped obstacles with a density of 0.1 trees/m2, while the latter (i.e., Forest #2) with a density
+
+MOHAMED et al.: AUTONOMOUS NAVIGATION OF AGVS IN UNKNOWN CLUTTERED ENVIRONMENTS: LOG-MPPI CONTROL STRATEGY
+
+7
+
+of 0.2 trees/m2. In the case of Forest #1, vdes is set to 2 m/s, while it is reduced to 1.5 m/s in the case of Forest #2. Another scenario (namely, Corridor #1) is considered in which the robot navigates along a 6 m × 20 m corridor, with vdes = 1.5 m/s, in the presence of 8 pedestrians, each pedestrian holding a maximum velocity of vref = 0.3 m/s.
+3) Performance Metrics: Here, we conduct a comparison
+between the two control schemes in the aspect of the number of collisions Ncrash, average trajectory length lav, average execution time per iteration tmppi of the control algorithm. The desired poses (in ([m], [m], [deg])) are deﬁned as follows: G1 = [0, 0, 0]T , G2 = [20, 20, 45]T , G3 = [−18, 2, 0]T , G4 = [20, −21, 90]T , then G5 = [20, 20, 0]T . For the sake of simplicity, for Forest #2, the robot navigates autonomously from G1 to only G3, then stops.
+4) Simulation Results: Table II summarizes the perfor-
+mance statistics of the two proposed control strategies in Forest
+#1 and Forest #2, considering 10 trials for each. As anticipated,
+the obtained results demonstrate that log-MPPI has a more
+ﬂexible and efﬁcient trajectories sampling distribution policy,
+resulting in (i) reducing the probability of getting stuck in a local minima (e.g., in Forest #2, Ncrash = 1 compared to Ncrash = 7 when MPPI is used), and (ii) improving the quality of the generated trajectory as lav is appreciably shorter, especially in Forest #2. Furthermore, we can emphasize that
+both control schemes guarantee a real-time performance (as tmppi < 20 ms), showing the superiority of the sampling-based MPC algorithm to be deployed with 2D grid maps without
+adding any additional complexity to the optimization problem. For a 2D grid-based navigation in the dynamic environment
+(namely, Corridor #1), the simulation results demonstrate that
+the autonomous vehicle successfully avoids moving agents, as
+shown in the supplementary video. However, we empirically
+noticed that the more the deployed agents, the noisier the 2D
+costmap, increasing the risk of being trapped in local minima.
+
+TABLE II: Performance comparisons of MPPI and log-MPPI.
+
+Indicator
+
+Forest #1
+
+MPPI
+
+log-MPPI
+
+Forest #2
+
+MPPI
+
+log-MPPI
+
+Ncrash
+
+2
+
+0
+
+7
+
+1
+
+lav [m] 158.71 ± 1.54 157.91 ± 0.54 76.12 ± 3.31 72.64 ± 0.80
+
+tmppi [ms] 13.72 ± 1.34 13.98 ± 0.68 13.70 ± 4.26 13.47 ± 1.46
+
+V. REAL-WORLD DEMONSTRATION
+We experimentally demonstrate the applicability of the proposed control strategies for achieving a 2D grid-based collision-free navigation in an unknown indoor cluttered environment.
+1) Experimental Setup: The simulation setup formerly described in Sections IV-B1 and IV-C1 is also employed for the experimental validation. However, as the indoor environment size is tiny compared to that used for the simulation scenarios, we set vdes = 0.75 m/s and tp = 8 s, while the 2D grid map size is decreased to half of its nominal value (i.e., 120 cell × 120 cell) to ensure a real-time implementation of the control strategies. Our experimental platform is a fully autonomous Clearpath Jackal robot equipped with a 16-beam Velodyne LiDAR sensor utilized for (i) generating the local costmap, and (ii) estimating the robot’s pose using LOAM [22].
+
+Fig. 7: Planned trajectory by log-MPPI using the 2D costmap previously described in Fig. 1(b) (left to right) at t = 8 s (G1 → G2), t = 20 s (G2 → G3), t = 31 s (G3 → G4), and t = 47 s (G4 → G2).
+
+2) Validation Environment: A 7 m × 5.5 m indoor cluttered environment with random boxes as obstacles is utilized for experimental validation, as depicted in Fig. 1(a), where obstacles were, on average, 1.3 m apart. Herein, the desired poses (in ([m], [m], [deg])) are given as follows: G1 = [0, 0, 0]T , G2 = [7, 5.1, 45]T , G3 = [5.5, 1.5, 0]T , G4 = [0, 3, 45]T , G2, then G1 (see Fig. 1(a)).
+3) Experimental Results: The performance statistics for three trials in our indoor environment is summarized in Table III. We can clearly observe, for all trials, that both control schemes provide real-time collision-free navigation, since Ncrash = 0 and tmppi < 20 ms, in the cluttered environment with an average traveling speed vav of 0.56 m/s, regardless of the limited perception range. In addition, the quality of the generated trajectories by log-MPPI is considerably better than that generated by MPPI, as lav is noticeably shorter especially considering the scale of the environment and the density of random obstacles in it. Figure 7 shows a snapshot of the collision-free and predicted optimal trajectories generated by log-MPPI at different time instants while the robot navigates to the desired poses. More details about the experimental results are included in this video: https://youtu.be/bLrQWYLgocw.
+
+TABLE III: Performance statistics of the two control strategies.
+
+Scheme MPPI log-MPPI
+
+Ncrash 0 0
+
+lav [m] 40.25 ± 0.13 38.95 ± 0.17
+
+vav [m/s] 0.55 ± 0.13 0.57 ± 0.14
+
+tmppi [ms] 11.43 ± 0.24 11.18 ± 0.08
+
+VI. CONCLUSION AND FUTURE WORK
+In this work, we proposed an extension to the classical MPPI algorithm (namely, log-MPPI) in which the control input updates δuk are sampled from the normal log-normal (NLN) mixture distribution, rather than from Gaussian distribution. We also presented a sampling-based MPC framework for collision-free navigation in either static or dynamic unknown cluttered environments, by directly integrating the occupancy grid as a local costmap into the sampling-based MPC algorithm. We empirically demonstrated that the trajectory samples generated by log-MPPI are more ﬂexible and efﬁcient than the ones generated by MPPI, with a more than 30% reduction in the injected noise variance Σu when MPPI is employed. This subsequently results in exploring much better the state-space of the controlled system and reducing the risk of getting stuck in local minima. We demonstrated in real-world environment the possibility of feeding directly the local costmap into the optimal control problem without adding any additional complexity to the control problem, as well as ensuring a real-time performance of the proposed control strategy. In the future, we plan to implement our
+
+8
+
+IEEE ROBOTICS AND AUTOMATION LETTERS. PREPRINT VERSION. ACCEPTED JULY, 2022
+
+control scheme on standard CPUs rather than GPUs, aiming to reduce the computational burden. Furthermore, we will explore methods for vanishing the possibility of getting stuck in local minima and studying the theoretical stability of samplingbased MPC.
+ACKNOWLEDGEMENT
+The authors would like to thank Grady Williams, Ziyi Wang, and Evangelos Theodorou for the fruitful discussions for improving the work.
+REFERENCES
+[1] I. S. Mohamed, G. Allibert, and P. Martinet, “Model predictive path integral control framework for partially observable navigation: A quadrotor case study,” in 16th Int. Conf. on Control, Automation, Robotics and Vision (ICARCV), Shenzhen, China, Dec. 2020, pp. 196–203.
+[2] D. Q. Mayne, J. B. Rawlings, C. V. Rao, and P. O. Scokaert, “Constrained model predictive control: Stability and optimality,” Automatica, vol. 36, no. 6, pp. 789–814, 2000.
+[3] M. Gaertner, M. Bjelonic, F. Farshidian, and M. Hutter, “Collision-free MPC for legged robots in static and dynamic scenes,” in IEEE Int. Conf. on Robotics and Automation (ICRA), 2021, pp. 8266–8272.
+[4] B. Lindqvist, S. S. Mansouri, A.-a. Agha-mohammadi, and G. Nikolakopoulos, “Nonlinear MPC for collision avoidance and control of UAVs with dynamic obstacles,” IEEE robotics and automation letters, vol. 5, no. 4, pp. 6001–6008, 2020.
+[5] B. Brito, B. Floor, L. Ferranti, and J. Alonso-Mora, “Model predictive contouring control for collision avoidance in unstructured dynamic environments,” IEEE Robotics and Automation Letters, vol. 4, no. 4, pp. 4459–4466, 2019.
+[6] M. A. Abbas, R. Milman, and J. M. Eklund, “Obstacle avoidance in real time with nonlinear model predictive control of autonomous vehicles,” Canadian journal of electrical and computer engineering, vol. 40, no. 1, pp. 12–22, 2017.
+[7] X. Zhang, A. Liniger, and F. Borrelli, “Optimization-based collision avoidance,” IEEE Transactions on Control Systems Technology, vol. 29, no. 3, pp. 972–983, 2020.
+[8] G. Williams, A. Aldrich, and E. A. Theodorou, “Model predictive path integral control: From theory to parallel computation,” Journal of Guidance, Control, and Dynamics, vol. 40, no. 2, pp. 344–357, 2017.
+[9] G. Williams, P. Drews, B. Goldfain, J. M. Rehg, and E. A. Theodorou, “Aggressive driving with model predictive path integral control,” in IEEE Int. Conf. on Robotics and Automation (ICRA), 2016, pp. 1433–1440.
+[10] ——, “Information-theoretic model predictive control: Theory and applications to autonomous driving,” IEEE Transactions on Robotics, vol. 34, no. 6, pp. 1603–1622, 2018.
+[11] H. Lu, Q. Zong, S. Lai, B. Tian, and L. Xie, “Real-time perceptionlimited motion planning using sampling-based MPC,” IEEE Transactions on Industrial Electronics, 2022.
+[12] I. S. Mohamed, G. Allibert, and P. Martinet, “Sampling-based MPC for constrained vision based control,” in IEEE/RSJ Int. Conf. on Intelligent Robots and Systems (IROS), 2021, pp. 3753–3758.
+[13] M. Bhardwaj, B. Sundaralingam, A. Mousavian, N. D. Ratliff, D. Fox, F. Ramos, and B. Boots, “STORM: an integrated framework for fast joint-space model-predictive control for reactive manipulation,” in Conference on Robot Learning. PMLR, 2022, pp. 750–759.
+[14] I. S. Mohamed, “MPPI-VS: Sampling-based model predictive control strategy for constrained image-based and position-based visual servoing,” arXiv preprint arXiv:2104.04925, 2021.
+[15] G. Williams, B. Goldfain, P. Drews, K. Saigol, J. M. Rehg, and E. A. Theodorou, “Robust sampling based model predictive control with sparse objective information,” in Robotics: Science and Systems, 2018.
+[16] J. Pravitra, K. A. Ackerman, C. Cao, N. Hovakimyan, and E. A. Theodorou, “L1-adaptive MPPI architecture for robust and agile control of multirotors,” in IEEE/RSJ Int. Conf. on Intelligent Robots and Systems (IROS), 2020, pp. 7661–7666.
+[17] J. Yin, Z. Zhang, E. Theodorou, and P. Tsiotras, “Improving model predictive path integral using covariance steering,” arXiv preprint arXiv:2109.12147, 2021.
+[18] N. L. Johnson, S. Kotz, and N. Balakrishnan, “Lognormal distributions,” in Continuous univariate distributions, volume 2. John wiley & sons, 1995, vol. 289.
+
+[19] V. K. Rohatgi and A. M. E. Saleh, An introduction to probability and statistics, 3rd ed., D. J. Balding, N. A. Cressie, G. M. Fitzmaurice, G. H. Givens, H. Goldstein, G. Molenberghs, D. W. Scott, A. F. Smith, R. S. Tsay, and S. Weisberg, Eds. John Wiley & Sons, 2015.
+[20] P. K. Clark, “A subordinated stochastic process model with ﬁnite variance for speculative prices,” Econometrica: journal of the Econometric Society, pp. 135–155, 1973.
+[21] E. Marder-Eppstein, D. V. Lu!!, and D. Hershberger. Costmap_2d package. [Online]. Available: http://wiki.ros.org/costmap_2d
+[22] J. Zhang and S. Singh, “LOAM: Lidar odometry and mapping in realtime.” in Robotics: Science and Systems, vol. 2, no. 9. Berkeley, CA, 2014, pp. 1–9.
+
+APPENDIX A ANALYSIS OF THE NEW SAMPLING STRATEGY ON MPPI
+
+In this appendix, we provide a brief interpretation for the trajectory rollout behavior using the proposed sampling method. Let us examine the effect on the dynamics due to the change of noise. The original dynamics of MPPI reads (i.e., Eq. (53) in [15], ignored constant)
+
+dxt = f (xt, t) dt+G(xt, t)u(xt, t) dt+G(xt, t) dB(t), (13)
+
+where B(t) is Brownian motion.
+
+In the discrete version, if in the sampling is replaced by
+
+Z = Y = eW , where W is an independent Gaussian vector
+
+of , we may consider this randomness as a new disturbance
+
+to the original dynamics. Although it is difﬁcult to obtain an
+
+exact dynamics corresponding to the proposed method, we
+
+may use the following approximation. Assume that the original
+
+dB(t) is replaced by d B(t)eµlnt+σlnB1(t) , where B1(t) is
+
+a standard Brownian motion, independent of B(t). To simplify
+
+notation, denote µlnt+σlnB1(t) by W1, and κ
+
+1 2
+
+σ
+
+2 ln
+
++
+
+µl
+
+n
+
+.
+
+By Ito’s formula, we can get the following computation for
+
+d B(t)eW1(t) :
+
+eW1(t)dB(t) + B(t)deW1(t) + d[B(t), eW1(t)]
+
+= eW1(t)dB(t)+B(t) σlneW1(t)dB1(t)+κeW1(t)dt . (14)
+
+Thus, the sampling dynamics can be viewed as a modiﬁed one
+
+dxt = f (xt, t) dt + G(xt, t)u(xt, t) dt + G(xt, t) d B(t)eW1(t)
+
+= f (xt, t) dt + G(xt, t) u(xt, t) + κB(t)eW1(t) dt
+
++ G(xt, t) eW1(t)dB(t) + σlnB(t)eW1(t)dB1(t) . (15)
+
+We have two observations. First, the drift term (the term with dt) is modiﬁed to f (x, t) + G(x, t)u(xt, t) + κG(x, t)B(t)eW1(t). This can be thought of a random drift term, compared to the deterministic counterpart in the original dynamics. But the mean of the drift term remains the same with the original one. Since the drift term can be viewed as the “trend" of the path for each sample path, the proposed scheme has more diverse “trends" of the trajectories than the original one. The new sampled trajectories turn to spread out much more than that in the original dynamics, indicating that this scheme can explore more spaces than the original one. This leads to a more efﬁcient sampling scheme than the normal distribution, even with the similar variance. Second, the noise term can be much more ﬂexible to tune the variance of the sampling trajectories as it contains more parameters.
+
+

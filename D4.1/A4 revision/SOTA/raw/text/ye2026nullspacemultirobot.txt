@@ -1,0 +1,2939 @@
+Article
+Path-constrained trajectory planning for multi-robot manufacturing systems using null-space descent optimization with reduced Hessian
+
+The International Journal of Robotics Research
+2026, Vol. 45(11) 1648–1681 © The Author(s) 2026 Article reuse guidelines:
+sagepub.com/journals-permissions DOI: 10.1177/02783649251400381
+journals.sagepub.com/home/ijr
+
+Xin Ye1, Max Grobbel1, Tobias Schürmann1, Stefan Schwab1 and So¨ ren Hohmann2
+
+Abstract In a multi-robot manufacturing system, several robotic manipulators can be physically coupled and collaborate on a process along a given path. Due to the high degrees of freedom and the high-dimensional constraints for path tracking and physical coupling, it remains challenging to plan the motion trajectories for the robots toward the maximization of their collective capabilities, such as load capacity and stiffness. The state-of-the-art methods face conﬂicts between the optimality and computational complexity, as well as between constraint satisfaction and convergence speed. To resolve the conﬂicts, this paper proposes a single-stage optimization method set in order to solve for the optimal robot placement and the joint motion simultaneously under a given manufacturing path on the work-piece. This method set is centered upon a reduced Hessian optimization method that descends orthogonally to all the path and coupling constraints in a robot-speciﬁc null-space of reduced dimension, while also considering the motion limits. The convergence of the reduced Hessian method is proved mathematically. Furthermore, we verify the reduced Hessian method statistically against existing methods in numerical experiments of pulling a spring. To make the algorithm applicable to real-world robot-driven manufacturing processes with paths of arbitrary geometric complexity, the method set is extended with a parallel computing technique that deals with multiple connected path segments. Through real-world multi-segment milling experiments, we validate the concept of capability enhancement for the multi-robot manufacturing system under the usage of the proposed method set.
+
+Keywords path planning for manipulators, dual arm manipulation, cooperative manipulation, optimization-based motion planning, constrained motion planning, loop-closure constraints, trajectory-placement planning
+Received: 16 January 2025; revised: 5 June 2025; accepted: 18 October 2025 Senior Editor: Ron Alterovitz Associate Editor: Neil Dantam
+
+Introduction
+Robotic manipulators are utilized in various manufacturing processes thanks to their ﬂexibility and versatility (Perzylo et al., 2019). In robot-driven 3D-printing, laser cutting, and welding, a high accuracy should be achieved on a predeﬁned path; in metal bending, robots should possess high load capacity; in milling processes, high path accuracy and high stiffness under large process forces are required (Abele et al., 2006). In these manufacturing processes, paths are pre-given which deﬁne the relative movement of a tool to a work-piece. Robots should manipulate either the tool or the work-piece to realize the pre-deﬁned relative movement. This relative movement may constrain all three translational and up to three rotational dimensions, but it speciﬁes neither
+
+the absolute movement of robots, nor their placement to the work-piece. Consequently, no start or end conﬁgurations are given, which prohibits the use of point-to-point trajectory generation methods. To make the robots execute the relative movement, both the placement and the joint trajectories of the robots should be planned within their reachable limits. Meanwhile, capabilities of robots such as accuracy, load
+1FZI Research Center for Information Technology, Karlsruhe, Germany 2Karlsruhe Institute of Technology (KIT), Karlsruhe, Germany
+Corresponding author: Xin Ye, FZI Research Center for Information Technology, Haid-und-NeuStr. 10–14, Karlsruhe 76131, Germany. Email: ye@fzi.de
+
+Ye et al.
+
+1649
+
+capacity, manipulability, and stiffness should be enhanced according to process requirements.
+When maximal achievable capabilities of a single robot are still insufﬁcient for a given task, a multi-robot system with physical coupling can be created. Figure 1 shows such a setup for a milling process, which is our major use case. In the related research, it has been anticipated in Mühlbeier et al. (2021) that physically coupled robots, analogue to coupled springs, exhibit higher stiffness which is essential for milling processes. In the research ﬁeld of cooperative manipulation, it has been shown that the load bearing capability of the multi-robot system is enhanced if multiple robots form a physical coupling by grasping a common object (Erhart and Hirche, 2016). We are willing to optimize these capabilities further toward the limits to leverage the full potentials of the physically coupled robots. Such an idea is illustrated in the two steps in Figure 2. Since the capabilities of robots are highly dependent on the joint conﬁgurations (Chiu, 1988), the redundant degree of freedom (DOF) in placement and joint conﬁgurations should be exploited for the optimization. As such, the problem setting of a path-constrained trajectory planning algorithm is the optimization of redundant DOFs toward the maximization of a conﬁguration-dependent capability of the multi-robot system, while satisfying the physical coupling and path following constraints, as well as the motion limits.
+The analysis of the state-of-the-art shows that the problem of multi-robot trajectory planning with path and coupling constraints is not solved with high performance. Most trajectory planning methods return sub-optimal results, because they do not exploit the redundant DOFs in the placement variables (Kalakrishnan et al., 2011; Zucker et al., 2013). Otherwise, the redundant DOFs are optimized separately, facilitating a complicated multi-level optimization problem (Nicola et al., 2018). To deal with the high-
+
+Figure 2. The idea with two steps to enhance capabilities of the robotic system. A physical coupling is achieved in the ﬁrst step, while the redundant DOFs in placement and joint conﬁgurations are exploited in the second step.
+dimensional path and coupling constraints, the available methods still suffer from slow convergence or laborintensive multi-stage reﬁnements (Kabir et al., 2021) (leading to 7.2 times longer computing time than our method in our test case), unless the optimality is partially sacriﬁced (Weingartshofer et al., 2023). These trade-offs have to be accepted in the existing methods.
+We argue that a single-stage optimization algorithm can exhibit a high performance despite high dimensional decision variables and constraints. Such an algorithm conducts the gradient-based search in the feasible subspace that corresponds to the redundant DOF, where no local constraint violation occurs.
+Accordingly, this paper builds upon the preliminary work (Ye et al., 2022) and makes the following contributions:
+· An effective trajectory approximation method that requires neither feasible initial solutions nor trajectory reﬁnements in post-processing
+· A more rigorous reduced Hessian optimization method compared to Ye et al. (2022) for pathconstrained placement and trajectory planning with a mathematically guaranteed convergence
+· A parallel computing scheme to deal with multiple solution candidates and multi-segment manufacturing paths with high geometrical complexity
+· The veriﬁcation of the solution method with statistically high success rate, as well as the validation of the multi-segment stiffness-optimized trajectory planning for the real-world milling experiments.
+
+Figure 1. Two robots execute the milling process in a physically coupled conﬁguration. The same image ﬁrst appeared in Ye et al. (2025), and is reused under the authors’ retained rights.
+
+The paper is organized as follows. After the introduction, the related work of path-constrained trajectory planning methods is investigated. Afterwards, we provide the preliminaries in the kinematic modeling of the multirobot system, and then formulate the optimization problem
+
+1650
+
+The International Journal of Robotics Research 45(11)
+
+for the trajectory planning. The solution method set is illustrated afterwards with a convergence guarantee. Finally, we present extensive test results, before the conclusion is given.
+
+starting point. A further disadvantage is the difﬁculty in dealing with the bounding constraints on the velocity and acceleration. A smoothening operation is needed after the sampling.
+
+Related work
+In this section, the focus is on the solution approaches for trajectory planning and optimization for high DOF multirobot systems. Especially, the suitability for manufacturing processes is analyzed.
+Basic approaches for trajectory planning
+The two most common approaches for trajectory planning are based on sampling and optimization, respectively.
+Sampling-based approach. Methods belonging to the sampling-based approach start from a given conﬁguration and search for collision-free via-points toward a goal conﬁguration or goal set. Along these via-points, path and coupling constraint functions deﬁne a constraint manifold within the conﬁguration space, as described in Sintov et al. (2018) and Kingston et al. (2019). The sampling is conﬁned to the constraint manifold by either projection- or continuation-based methods. In projection-based sampling methods, a point is originally sampled in the conﬁguration space without constraints by a general method such as Probabilistic Roadmap (Kavraki et al., 1996) or Rapidly-exploring Random Tree (Jaillet and Porta, 2012; LaValle and Kuffner Jr., 2001). This point is then projected back to the constraint manifold, as in Han (2001) and Kingston et al. (2019). In continuation-based methods, the locally approximated tangent space of the constraint manifold is constructed, where the sampling takes place (Yakey et al., 2001).
+In the basic problem setting of these sampling-based methods, collision avoidance and ﬁnding the shortest path, instead of the enhancement of robots’ capabilities, are the focus, which are not aligned with the objective of the present paper. Moreover, the starting and ending points are determined separately (possibly optimized) prior to the sampling of via points in most samplingbased methods such as Diaz Posada et al. (2017); Lu et al. (2021). Determining different parts of decision variables in different stages makes the ﬁnal result suboptimal. Speciﬁcally, the optimization of, for example, the starting point is less meaningful for manufacturing processes as the robots might only start to but not fully engage the tool into the work-piece. At the following via points, however, the robots need a higher capability after the full engagement of the tool, but are already moving away from the optimal conﬁguration occupied by the
+
+Optimization-based approach. Representative optimizationbased methods with path and coupling constraints include Stochastic Trajectory Optimization for Motion Planning (Kalakrishnan et al., 2011), Covariant Hamiltonian Optimization for Motion Planning (Zucker et al., 2013), and Sequential Convex Optimization (Bonalli et al., 2019; Schulman et al., 2014). However, these methods assume a pre-given starting conﬁguration and a ﬁxed placement, wasting the valuable DOFs for optimization. A few other optimization-based methods given as follows do leverage these DOFs by means of sampling, but still do not integrate them as decision variables of optimization. For 6-axis robots with a ﬁxed placement, up to eight discrete starting conﬁgurations are acquired in De Maeyer et al. (2017). For robots with additional redundant joints in Tang et al. (2023), the angles of redundant joints are sampled in their movement range to ﬁnd the conﬁgurations with the highest end-effector stiffness. In Weingartshofer et al. (2023), after sampling the possible placements and the ﬁrst point on the path, a set of feasible initial conﬁgurations is obtained by solving the analytical inverse kinematics (AIK). Starting from this set, optimization problems toward the second way-points, from the second to the third, and so on are solved by parallel computing. These methods that sample the redundant DOFs have the common draw-back of a lack of possibility to further adjust the previously sampled DOFs in the phase of optimization. Consequently, a large number of samples are taken. For complicated manufacturing paths, those samples that later lead to nonreachable path points cannot be adjusted but only be discarded. As such, these methods suffer from a low scalability w.r.t. number of redundant DOFs and a low success rate.
+Different from the above, the multi-stage optimization method in Kabir et al. (2021) optimizes the whole joint trajectories of all robots, including their starting points. This is done by parameterizing the trajectories with B-splines and taking all the control points as decision variables for an optimization problem. However, at least one initial solution of the joint trajectory must be obtained, whose feasibility is difﬁcult to ensure in a highly constrained multi-robot system for complicated paths. Moreover, the multistage method requires more tuning efforts in multiple stages, and exhibits a low computational efﬁciency (14.6 s for one stage and 15 way-points in Kabir et al. (2021)).
+Furthermore, the optimization-based approach has the common problem of running into local optima, which is
+
+Ye et al.
+
+1651
+
+tackled by multiple random starts (Ugray et al., 2007) or more complicated meta-heuristic methods (Nicola et al., 2018).
+Finally, we determine to select and improve the optimization-based approach despite all its challenges, because this basic approach is aligned with the objectives of the present paper in terms of optimizing robots’ capabilities, leveraging all available DOFs, and integrating smooth trajectory parameterization techniques. The necessary aspects of improvement are further investigated in view of the state-of-the-art methods as follows.
+Handling path and coupling constraints
+In the optimization-based planning approach, simply giving constraint equations on discretized trajectory points to an optimization solver does not always work (leading to a success rate of only 33.26% in our test case). This is because of the nonlinearity of the robot kinematics in constraint equations, as well as the lack of control of trajectories between the discretized points. The following methods exist to mitigate those issues.
+Manifold operations. The constraint equations of coupling and path tracking for multiple robots deﬁne manifolds in the joint space. When all constraints are satisﬁed, the joint motion stays within the corresponding constraint manifold. If this constraint manifold is endowed with a metric deﬁning the distance between two points on it, one can leverage efﬁcient operations of the Riemannian geometry, namely the exponential and logarithmic maps, as well as parallel transport (Pennec et al., 2006). Equipped with these operations, the manifold optimization methods such as Newton-Raphson, Conjugate Gradient, and Trust Region are highly efﬁcient with available toolboxes (Boumal, 2023; Boumal et al., 2014). The manifold optimization has been utilized in parameter tuning within non-Euclidean spaces, such as learning impedance control parameters or optimizing the end-effector orientation for manipulability (Jaquier et al., 2020; Jaquier and Rozo, 2020). But path constraints inherently possess neither a Riemannian metric nor the efﬁcient operations. In Zucker et al. (2013), a projection similar to the exponential map (without logarithmic map) is conducted in every iteration of trajectory planning to move the decision variables back to the constraint manifold after an unconstrained step. However, without being directed by the logarithmic map near the optimal trajectory, the unconstrained step might be nearly orthogonal to the constraint manifold, which leads to a smaller optimization progress and
+
+causes chatters that has to be constantly canceled out. This impedes the convergence speed of the optimization.
+Penalty functions. Beside the actual goal of enhancing capabilities in the manufacturing process such as stiffness, the objective function is already populated with terms to penalize abrupt joint angle changes, singularity, and collision with the environment. However, adding the path and coupling constraints into the objective function as penalty terms is still a common practice as in, for example, Kalakrishnan et al. (2011), Schulman et al. (2014), and Kabir et al. (2019). Cost weight scheduling, as proposed in Zucker et al. (2013), is thus indispensable. This has been developed into the penalty scaling in the sequential convex optimization for collision avoidance (Schulman et al., 2014), and further into the multi-stage successive constraint reﬁnement for coverage-oriented placement planning in Malhan et al. (2019) and Kabir et al. (2021). In the latter case, the solution process is divided into two or more stages. In the ﬁrst stage, only a part of the penalties that have fewer but unambiguous attraction regions, such as collision avoidance, are applied. Other penalty terms whose attraction regions have a scattered landscape such as position constraints are enabled in a later stage. For a case of traversing a small ring through a big one, the highest success rate of 63.28% is achieved, if the best penalty sequence among four penalty terms is chosen (Kabir et al., 2021). But for an inexperienced user, the multi-stage tuning is time-consuming with no guaranteed success rate, although a remedy with adaptive search on potentially more costly real experiments is proposed (Kabir et al., 2018).
+Manifold learning. Most learning-based methods for trajectory planning with manifold constraints trade timeconsuming ofﬂine training for fast online planning capabilities. Zha et al. (2018) learn the metric of the manifold represented by a graph, so as to select promising sampling direction for online planning. Combined with the projection operation, it results in a high success rate. Qureshi et al. (2021) implement an end-to-end learning from an environment encoding to the next sampling step. However, the above sampling-based manifold learning methods all face restrictions in the free determination of the placement and the starting conﬁguration, which sacriﬁces the whole-path optimality. There exists an exception using an optimizationbased method (Kicki et al., 2023). In this method, manifold constraints are relaxed as penalty terms, whose Lagrange multiplier is learned so as to facilitate fast planning and replanning in dynamic environments such as air hockey. This method does not handle constraint manifolds of path tracking.
+
+1652
+
+The International Journal of Robotics Research 45(11)
+
+Dealing with process-robot speciﬁcations
+In manufacturing processes of complex work-piece geometry, the path given by Computer-Aided Manufacturing software can be arbitrarily long with large number of direction changes. After a discretization, with high amount of way-points on the Cartesian path to be tracked, the joint trajectories must also be parameterized with comparable amount of decision variables, owing to the limited approximation capabilities of the trajectory using, for example, B-splines (Lyche et al., 2018b; Takacs and Takacs, 2016). Due to the nonlinear scalability of most parameter optimization methods w.r.t. number of decision variables, it is no more economical to plan the corresponding trajectory as a whole. To allow a linear scalability, Weingartshofer et al. (2023) solve a series of simpliﬁed optimization subproblems sequentially at the cost of the whole-path optimality. An alternative method proposed in Kabir et al. (2021) is to split the path into segments and to optimize for each, subjected to additional inter-segment continuity constraints. These constraints are then converted to a penalty term which serves as the guiding heuristic for a branch-and-bound search. These methods either suffer from computational complexity or sacriﬁce the whole-path optimality by simplifying the computation.
+Due to the characteristics of robotic manipulators, the mapping from task space to joint space is not unique. The robots’ capabilities, for example, stiffness, are often a measure in task space but dependent on joint conﬁgurations, which in turn depend on the robots’ placement w.r.t. the work-piece. Several distant conﬁgurations with different placements might exhibit local optimality in desired capabilities. A genetic algorithm is applied in Bachmann et al. (2021) to determine the robot-workpiece placement considering reachability and collision avoidance. The intertwined placement and trajectories are considered in Menasri et al. (2013), Nicola et al. (2018), and Mutti et al. (2021) by means of nested meta-heuristic algorithms, leading to a high number of iterations and a prolonged computation time. The multi-start strategy by sampling random seeds of initial guesses and carrying out the optimization multiple times is utilized in Schulman et al. (2014), De Maeyer et al. (2017), Kabir et al. (2021), and Weingartshofer et al. (2023) to deal with the non-convex nature of the planning problem. However, for complex manufacturing paths, a random generation of initial solutions, even with the help of analytical inverse kinematics, results mostly in non-feasible ones, because not every point of the highly complex path can be reached by all robots.
+
+Conclusion
+Existing methods face trade-offs between the computational complexity and the whole-path optimality on the one hand, as well as between an accurate constraint satisfaction and a high convergence speed on the other hand. To the best of our knowledge, there is no method that utilizes both exponential and logarithmic map in the path-constrained trajectory optimization for robots, so as to facilitate a fast convergence with high accuracy of constraint satisfaction. An analogy to these mappings does exist as the horizontal and vertical step in Gabay (1982) and Kupfer (1996), which show the unexplored potential in our preliminary work (Ye et al., 2022). In addition, there exists no method dealing with multiple path segments that leverages parallel computing by means of the promising alternative direction method of multipliers (ADMM) (Boyd et al., 2011).
+Preliminaries and system modeling
+This section ﬁrst deals with the preliminaries in the kinematic modeling for the trajectory planning of multi-robot manufacturing systems. Afterward, the stiffness of such systems, as one of their crucial capabilities in manufacturing processes, is modeled so that it can be later integrated in the optimization-based planning approach.
+Basic geometry and kinematics
+Suppose a multi-robot system of a number of robots nrob has nJ joints in total. The trajectories of joint j = 1, …, nJ can be represented as qj(u) with the parameter u, progressing in u 2 [0, 1]. The trajectories of all joints are denoted as the vector qðuÞ ¼ ½q1ðuÞ, …, qnJðuÞT 2 RnJ. Apart from the joints, the placement of robot bases is represented by up to three translational and three rotational variables. The work-piece, either ﬁxed in a stationary manner or on a robots’ gripper, has its placement also represented by no more than six variables. So we deﬁne the static placement variables y 2 Rnprþnpw , where npr denotes the DOF for robot base placement and npw denotes that of the work-piece. We denote θðuÞ ¼ ½qT ðuÞ, yT T 2 RnJþnprþnpw ¼ Rnθ as the conﬁguration space trajectory, a combination of all the joint trajectories and the static placement variables.
+The kinematics of path tracking and coupling are shown in Figure 3. A path sðÁÞ : ½0; 1→Rnpath with the dimension npath ≤ 6 deﬁnes the relative movement of the Tool Center Point (TCP) to a work-piece, dependent on u 2 [0, 1]. The path error vector function epath (u) = epath (θ (u), s(u)) of
+
+Ye et al.
+
+1653
+
+qmin ≤ qmðuÞ ≤ qmax, 8u 2 ½0; 1:
+
+(4)
+
+By demand, (4) can be extended by its time derivatives up to any given order.
+
+Figure 3. The kinematics with the path s(u), the path tracking error epath(u), and the coupling error ecp in the special case of nrob = 2. The coupling error ecp is deﬁned between the body
+frames {tcp1} and {tcp2}.
+
+dimension npath deﬁnes the deviation of the real TCP from the path. Hereby, the forward kinematics of the robots is necessary to transform θ (u) from the conﬁguration space toward the TCP pose in the Cartesian space so that the pose can be compared with s (u). Physical couplings with a coupling unit, that is, a coupler, also denoted as cp, constitute kinematic loop-closure constraints. A body frame of one robot should keep a prescribed relative pose of dimension ncp to a body frame of the other robot. The coupling error vector function ecpðθðuÞÞ 2 Rncp deﬁnes the deviation of the relative pose to the prescribed one. We denote the vector concatenation of epath and ecp as pose constraint errors:
+eposeðθðuÞ, sðuÞÞ ¼ ½ecpðθðuÞÞT , epathðθðuÞ, sðuÞÞT T : (1)
+
+The constraints for the path tracking and the physical coupling are deﬁned as a system of equations epose (θ(u), s(u)) = 0.
+In processes with a complex path, the path can be divided in nseg segments as sm (Á), m 2 {1, …, nseg}, either manually or by algorithms such as those in Kabir et al. (2021) if required. In each segment m, the conﬁguration space trajectory θmðuÞ ¼ ½qTmðuÞ, ymT T is deﬁned. The pathconstrained trajectory planning problem is stated as fol-
+lows for each individual segment:
+
+Problem 1. (Path-constrained trajectory planning)
+Given a path smðÁÞ : ½0; 1→Rnpath from segment m 2 {1, …, nseg}, ﬁnd a feasible conﬁguration space trajectory θmðÁÞ ¼ ½qTmðÁÞ, ymT T : ½0; 1→RnJþnprþnpw , satisfying the path
+following and loop-closure constraints:
+
+eposeðθmðuÞ, smðuÞÞ ¼ 0, 8u 2 ½0; 1
+
+(2)
+
+while being kept within bounds:
+
+ymin ≤ ym ≤ ymax
+
+(3)
+
+Across segments, the robots and the work-piece should not change their placements, and joint trajectories should exhibit continuity to ensure a smooth transition. Therefore, the multi-segment planning problem is deﬁned as follows:
+
+Problem 2. (Multi-segment planning)
+Given an inter-connected multi-segment path s1ðÁÞ, …, snsegðÁÞ, ﬁnd feasible conﬁguration space trajectory segments θ1ðÁÞ, …, θnsegðÁÞ, satisfying the intra-segment constraints (2)–(4) 8m 2 {1, …, nseg}, as well as the intersegment constraints:
+
+y1 ¼ y2 ¼ ⋯ ¼ ynseg
+
+(5)
+
+qmð1Þ ¼ qmþ1ð0Þ, 8m 2 f1; 2, …, nseg À 1g: (6)
+
+By demand of continuity, (6) may be extended by its time derivatives up to any given order.
+Further, by considering metrics in the planning, one achieves an optimal solution that exploits the capabilities of multi-robot systems. In our major use case of the robotdriven milling, the stiffness against disturbances of process forces is the crucial capability.
+
+Static stiffness
+This subsection illustrates the modeling of the TCP static stiffness considering the elasticity of the robotic joints and of the coupler. We apply a torsional spring model (Abele et al., 2007; Busson et al., 2017) for the robot joints, and a spring network model (Curtin and Scher, 1990; Pan et al., 2019) on the coupler. Afterward, we analytically illustrate the inﬂuence of unknown coupler elasticity on the accuracy of the resulting TCP stiffness. This is due to the complexity of identifying the 3D elasticity parameters of the coupler. In the later formulation of the trajectory planning problem, we stay with the simple model of a rigid coupler and the elastic joints, as introduced in Ye et al. (2022). Nevertheless, the analysis provides an insight on the cause of differences between the predicted TCP stiffness and the reality from milling experiments.
+Figure 4 shows the spring network model with an example of nrob = 2. On the coupler, three points of interest are the two ﬂanges connecting to the two robots and the TCP. The springs between these points possess 3D rotational and 3D translational elasticity. We derive
+
+1654
+
+The International Journal of Robotics Research 45(11)
+
+the analytical expression of the TCP stiffness depending
+on the elasticity of these abstracted springs. A further simpliﬁcation of the spring network is
+possible considering the mechanical construction of the
+real coupler, as shown in Figure 5(a). Because of the geometry of the proﬁle, there are two weakest sections,
+as marked with the red dashed ovals. Only these two
+sections of the coupler are modeled with springs, as
+shown in the two-spring model in Figure 5(b). This
+makes the derivation of the TCP stiffness tractable under
+limited modeling error.
+In each individual rigid-body tree of robot r = 1, 2, a TCP frame is deﬁned as {tcpr}. In the idle situation
+without any external loads (but with arbitrary internal
+preload and the corresponding deformation), {tcpr}, 8r = 1, 2 should overlap due to the physical coupling. In the situation with an external load, a wrench wext 2 R6 is exerted on the real TCP. Due to the connection with
+robots, additional constraint wrenches w1, w2 occur in the static case. Under w1 and w2, the robots with elastic joints undergo joint deformation, denoted with vectors δq1 and δq2. This leads to the deviation of the frames {tcp1} and {tcp2} from the rigid-body model, denoted as J1δq1 and J2δq2, respectively. Jr is the Jacobian matrix of robot r w.r.t. {tcpr}. The coupler also experiences a deformation δp1 from the rigid-body frame {tcp1} and a deformation δp2 from the rigid-body frame {tcp2}. With all the above deformation, the real TCP
+frames from the view point of each robot still overlap,
+which is expressed by the following loop-closure
+condition:
+
+J1δq1 þ δp1 ¼ J2δq2 þ δp2:
+
+(7)
+
+The analysis up till now can be extended to any number of physically coupled robots nrob > 1. While
+
+multiple robots are coupled in parallel, the connection of
+each individual robot to the potentially elastic section between the ﬂange and TCP is serial. By applying the
+loop-closure condition and Hooke’s law, and by eliminating the variables δqr and δpr, the following result of TCP-stiffness is obtained:
+
+X nrob
+
+À
+
+À1
+
+ÁÀ1
+
+Ktcp ¼ Krob, r I6 þ Kc, r Krob, r ,
+
+(8)
+
+r¼1
+
+whereby I6 is the identity matrix of dimension 6. The matrix
+
+
+
+À1
+
+Krob, r ¼ JrKÀ1 q J Tr stands for the stiffness of a single
+
+robot with Kq representing the constant joint stiffness and Jr = Jr (θ(u)) the Jacobian depending on the conﬁguration
+space trajectory. The matrix Kc,r denotes the world-frame stiffness matrix of the coupler between TCP and the ﬂange
+
+connected to the r-th robot. The world-frame stiffness matrix
+
+is calculated from the constant TCP-body-frame one b Kc, r 2 R6×6 as follows:
+
+"w Rtcp
+Kc, r ¼
+
+# w Kc, r b , Rtcp
+
+Figure 4. The coupler elasticity is modeled by a spring network,
+while the elasticity of robots is modeled with torsional springs in
+the joints. Without process wrench, the robots are at the conﬁguration of dash-double-dotted lines. Under process wrench wext, the conﬁguration is at the solid lines.
+
+Figure 5. The illustrations of the simpliﬁed coupler elasticity for the derivation of the analytical stiffness expression.
+
+Ye et al.
+
+1655
+
+whereby wRtcp = wRtcp (θ(u)) is the rotation matrix
+between the two frames. Therefore, Ktcp is only dependent on the conﬁguration θ(u), the constant stiffness of the robotic joints Kq and that of the coupler bKc,r (r = 1, …, nrob), but is not inﬂuenced by the internal preload tension. With a given wext and Ktcp, one obtains the TCP-deviation δptcp ¼ KÀtc1pwext. It is the pose difference between the cases with and without wext, but it does not
+represent the deviation from the path set-point s(u). If the coupler is rigid, Kc, r À1 ¼ O, 8r ¼ 1, …, nrob.
+Equation (8) is reduced to the additivity expression of in-
+dividual robot stiffness matrices:
+
+X nrob
+
+X nrob 
+
+À1
+
+Ktcp ¼ Krob, r ¼ JrKqÀ1J rT : (9)
+
+r¼1
+
+r¼1
+
+The resulting stiffness is always higher than the case with a non-rigid coupler.
+
+Formulation of the optimization problem
+The planning problem is formulated mathematically as a constrained optimization problem in this section based upon the model derived in the last section.
+The objective of the planning in the present paper is to enhance the capability Ktcp against wext along all the path segments. An objective function J 2 R is added to Problem 2 to formulate the following problem:
+
+Problem 3. (Optimized Path-Constrained Conﬁgura-
+
+tion Planning)
+
+Given an inter-connected multi-segment path
+
+s1ðÁÞ, …, snsegðÁÞ, ﬁnd feasible conﬁguration space trajectory segments θ1*ðÁÞ, …, θn*seg ðÁÞ, satisfying the intra-segment constraints (2)–(4) for 8m 2 {1, …, nseg}, as well as the inter-segment constraints (5) and (6), such that the value of
+
+J 2 R,
+
+represented
+
+in
+
+segments
+
+as
+
+À
+
+Á Pnseg
+
+J θ1ðÁÞ, …, θnsegðÁÞ ¼ m¼1J mðθmðÁÞÞ, is optimized as:
+
+
+
+
+
+J θ1*ðÁÞ, …, θn*seg ðÁÞ ¼ minJ .
+
+The remainder of this subsection undertakes necessary modiﬁcations to Problem 3 to mathematically formulate
+the optimization problem in a solvable and light-
+weight form.
+
+Decision variables
+In Problem 3, the conﬁguration space trajectory θmðÁÞ ¼ ½qTmðÁÞ, ymT T , m ¼ 1, …, nseg is taken as decision variables. We use a B-spline to approximate each joint trajectory in qm (Á) with ﬁnite number of parameters. For executing path segment m, we deﬁne a B-spline of the order κ and
+the control point number lm. The latter can be set
+
+adaptively among segments of different lengths. In the following formulation of B-spline trajectories, the segment index m is omitted for better readability. The B-spline is deﬁned using the array of knots (Kunoth et al., 2018):
+γ ¼ ½γ0, …, γlþκT 2 Rlþκþ1 0 ¼ γ1 ¼ ⋯ ¼ γκþ1 < γκþ2 < … … < γl < γlþ1 ¼ ⋯ ¼ γlþκþ1 ¼ 1:
+
+The knots between 0 and 1 are chosen with equal
+
+distance.
+
+The base function of a B-spline is represented by gi,κ(u) with i denoting the sequence, κ the order, and u 2 [0, 1].
+
+Given below is the recursive formulation of the base
+
+functions (Lyche et al., 2018):
+
+( 1,
+gi, 1ðuÞ ¼ 0,
+
+if γi ≤ u < γiþ1 otherwise
+
+gi, κðuÞ
+
+¼ u À γi gi, κÀ1ðuÞ þ γiþκþ1 À u giþ1, κÀ1ðuÞ:
+
+γiþκ À γi
+
+γiþκþ1 À γiþ1
+
+In the latter equation, a term is set to zero if the
+denominator has value zero. The trajectory of each joint j = 1, …, nJ is approximated with a B-spline which is determined by the vector of control points xj 2 Rl. The joint angle qj 2 R can thus be represented as:
+
+qjðu, xjÞ ¼ gT ðuÞxj
+
+(10)
+
+whereby, gðuÞ ¼ ½g1, κðuÞ, …, gl, κðuÞT :
+
+(11)
+
+The property of B-spline ensures the l1-norm kg(u)k1 = 1.
+All control points xj, j = 1, …, nJ are concatenated in a vector x 2 RnJl. We denote z ¼ ½xT1 , …, xTnJ , yT T 2 RnJlþnprþnpw ¼ Rnz as the collective control point vector that governs not
+
+only the joint trajectories, but also the placement of robots and the work-piece. Therefore, the conﬁguration space
+
+trajectory is represented as follows:
+
+!
+
+!
+
+θðu, zÞ ¼ qðu, xÞ ¼ GðuÞ x ¼ GðuÞz, (12)
+
+y
+
+y
+
+whereby GðuÞ 2 Rnθ×nz is constructed from GeðuÞ 2 RnJ×lnJ and identity matrix I 2 RðnprþnpwÞ×ðnprþnpwÞ as follows:
+
+2T gκ ðuÞ
+
+!6
+
+Ge ðuÞ
+
+6
+
+⋱
+
+GðuÞ ¼
+
+¼6
+
+T
+
+I4
+
+gκ ðuÞ
+
+3 7 7 7: (13) 5
+
+I
+
+The optimization problem to be formulated can thus be
+parameterized into one with decision variables being zm for each segment m = 1, …, nseg.
+
+1656
+
+The International Journal of Robotics Research 45(11)
+
+Constraints
+After the parameterization of decision variables into ﬁnitedimensional vectors zm, m = 1, …, nseg by (12), Problem 3 has a semi-inﬁnite nature with inﬁnite dimensional equality constraints (2). These constraints can only be approximately satisﬁed (Martin and Bobrow, 1999), but there exists no exact solution. A discretization of (2) in lm points for segment m is undertaken:
+eposeðθmðu, zmÞ, smðuÞÞ ¼ 0, 8u ¼ u1, …, ulm: (14)
+
+The number of points is set to be lm, because the gradient of the discretized ne = lm × (ncp + npath) dimensional function epose w.r.t. decision variables zm is surjective according to Kupfer (1996). This means that at least one solution of zm exists that brings the discretized constraint functions exactly to a zero vector as in (14).
+In order to take over (4) in the problem formulation after the parameterization with B-splines, the strong convex hull property of B-splines (Piegl and Tiller, 2012) is applied. The joint trajectory is contained in the convex hull of its control point polygon. As long as the control points are inside the bounds, the joint trajectory is guaranteed to be contained inside. Therefore, (4) gets more conservative by an approximation qmin ≤ xm ≤ qmax. Combined with (3), one obtains:
+
+θmin ≤ zm ≤ θmax,
+
+(15)
+
+whereby the bounds of non-placement joints are duplicated lm times inside θmin and θmax to match the dimension of zm.
+The time derivatives of (4) up to any given order are less trivial to be taken into account. Although B-splines of order κ ensures the continuity of its κ À 1-th differentiation w.r.t. u, the
+magnitude of time derivatives depends on the positioning of control points xm and the proﬁle of u along the time axis. With unknown time proﬁle of u given only after the phase of tra-
+jectory planning, it is still necessary in the planning phase to
+adjust the positioning of control points to limit the joint ve-
+locities. This is done by adding penalty terms in the object
+function. One undesirable behavior in velocity and acceleration
+is due to singularities, which are commonly close to stiff conﬁgurations (Aginaga et al., 2012). Around singularities, an
+extremely high joint velocity might be needed to achieve a slow
+Cartesian velocity of TCP. The sum of kinetostatic conditioning
+indices (Lin et al., 2017; Ranjbaran et al., 1996) for all robots is
+utilized for this penalty:
+
+nrob rﬃﬃﬃﬃﬃﬃﬃﬃﬃﬃﬃﬃﬃﬃﬃﬃﬃﬃﬃﬃﬃﬃﬃﬃﬃﬃﬃﬃﬃﬃﬃﬃﬃﬃﬃﬃﬃﬃﬃﬃﬃﬃ X À T Á À T ÁÀ1
+
+J sing, mðθðu, zmÞÞ ¼
+
+tr JrJ r tr JrJ r : (16)
+
+r¼1
+
+The other undesirable behavior is the ﬂuctuation of a trajectory between its neighboring control points, which might occur since the equality constraint (14) is not imposed between the discretized points. Therefore, the following penalty term inspired by Kabir et al. (2021) is used inside of each segment (thus omitting segment index m):
+
+" XnJ X lÀ1 1
+
+#2 xj, iþ1 À xj, i
+
+J flcðzÞ ¼
+
+Á
+
+:
+
+j¼1 i¼1 q_ maxj uiþ1 À ui
+
+(17)
+
+The inter-segment constraints (5) remain without change in the problem formulation, while (6), according to the B-spline property of endpoint interpolation (Piegl and Tiller, 2012), is equivalent to:
+
+xm, j, lm ¼ xmþ1, j, 1
+
+(18)
+
+8m ¼ 1; 2, …, nseg À 1, 8j ¼ 1, …, nJ:
+
+The ﬁrst time derivatives of (6) can be re-deﬁned, assuming that du/dt at u = 1 of segment m is equal to du/dt at u = 0 of segment m + 1. Using the property of B-splines being tangent to the control polygon at the endpoints (Hoschek and Lasser, 1993), we have:
+
+xm, j, l À xm, j, lÀ1 ¼ xmþ1, j, 2 À xmþ1, j, 1
+
+γm, lþ1 À γm, l
+
+γmþ1, kþ2 À γmþ1, kþ1
+
+8m ¼ 1; 2, …, nseg À 1, 8j ¼ 1, …, nJ:
+
+(19)
+
+Higher derivative orders of (6) can be obtained similarly.
+
+Remark 1. Any further constraints such as the collision avoidance can be implemented as penalty terms in the objective function.
+
+Objective function
+We assume that the process wrench wext,m(u) along u 2 [0, 1] is a known function for all segments m = 1, …, nseg. The objective is to enhance Ktcp against wext,m(u). Therefore, the preeminent term in the objective function in segment m is a stiffness index J stf, mðuÞ of the multi-robot system. Inspired by Chiu (1988), such a stiffness index can be expressed as:
+
+J stf, mðθðu, zmÞ, wext, mðuÞÞ
+
+8 >< 0,
+
+if wext, mðuÞ ¼ 0
+
+¼ > T À1
+
+wext, mðuÞ
+
+: wext, mðuÞ Á Ktcp ðθðu, zmÞÞ Á
+
+, otherwise:
+
+kwext, mðuÞk
+
+(20)
+
+Ye et al.
+
+1657
+
+This stiffness index is proportional to the magnitude of wext,m(u). Stiffness Ktcp (θ(u, zm)) is obtained from (9) which is dependent on robots’ Jacobian matrices and thus on the conﬁguration θ(u, zm).
+Weighted by constants wstf , wsing, wflc 2 R, and combined
+with (16) and (17), the objective function for path segment m
+is expressed as follows:
+
+J mðzm, wext, mðÁÞÞ
+
+¼ wflcJ flc, mðzmÞ
+
+1 X lm
+
+þ
+
+wstf J stf, mðui, zm, wext, mðuiÞÞ
+
+lm i¼1
+
+1 X lm
+
+þ
+
+wsingJ sing, mðui, zmÞ:
+
+lm i¼1
+
+(21)
+
+In (21), u 2 [0, 1] is discretized at lm points to facilitate the summations. The discretization ui, i = 1, …, lm is done at the identical points as in (14).
+
+Overview of the solution procedure
+The algorithm to solve Problem 4 is shown in Algorithm 1. The solution procedure consists of the parallel generation of multiple initial solutions (initGuess), parallel optimization of every single segment of all initiated solutions (optimizeSingleSegment), coordinated intersegment constraint error update (coordinateSegments), and pruning of unfavorable solutions (pruneCandidates). After convergence, one candidate of interconnected trajectory segments is chosen (selectBestCandidate). The residual inter-segment constraint error of this candidate is eliminated in the end (eliminateSegmentResidue) so that it can be executed on the real robots with a B-spline interpolator.
+
+Mathematical formulation
+With the illustration above, Problem 3 can be formulated mathematically as the following optimization problem:
+
+Problem 4. (Parameter Optimization Problem for PathConstrained Conﬁguration Planning)
+Given an interconnected multi-segment path s1ðÁÞ, …, snsegðÁÞ and the corresponding nominal process wrench wext, 1ðÁÞ, …, wext, nsegðÁÞ, ﬁnd the solution to:
+
+X nseg
+
+min J ¼ J mðzm, wext, mð Á ÞÞ
+
+z1, …, znseg
+
+m¼1
+
+s:t: pose constraints ð14Þ, 8m ¼ 1, …, nseg
+
+(22)
+
+configuration bounds ð15Þ, 8m ¼ 1, …, nseg
+
+inter À segment continuity ð5Þð18Þð19Þ:
+
+Such a formulation enables the utility of solution methods for constrained parameter optimization problems.
+
+Solution method set
+This section illustrates the solution to Problem 4 with the reduced Hessian optimization in core and the parallel computation. An overview of necessary steps is given, before the parallel computation and the ADMM are illustrated. Afterward, in each individual thread of the parallel computation, the reduced Hessian optimization method is used, whose convergence guarantee is provided.
+
+In such a solution procedure, multiple local optima of the trajectory planning problem can be tackled efﬁciently with multiple initial guesses being generated, optimized, compared, and pruned in parallel computation. For a complex multi-segment path, the decentralized optimization in segments has a better scalability w.r.t. path length than solving for the whole trajectories. Moreover, due to the complexity of the path, initial guesses either by random sampling or by manual speciﬁcation of robot-workpiece placement are unlikely to be feasible in terms of whole-path reachability within bounds of joint angles. Infeasible initial guesses are nevertheless accepted, because the joint conﬁgurations at the starting and ﬁnishing path points as well as the placements are all decision variables that can be adjusted in the later optimization process. If
+
+1658
+some placement dimensions must be ﬁxed at a value, one provides an equal upper and lower bound. After convergence of the optimization, the only postprocessing is the elimination of a slight amount of residual conﬁguration jumps between segments (eliminateSegmentResidue).
+
+The International Journal of Robotics Research 45(11)
+
+Parallelization with multiple initial solutions
+Inspired by Matlab multi-start and global search algorithms (Ugray et al., 2007), multiple initial solutions
+are generated in parallel. In the generation of initial solutions, as shown in Algorithm 2, conﬁgurations corresponding to the starting point on the ﬁrst segment
+of the path s1 (0) are determined by analytical inverse kinematics (AIK) (Shimizu et al., 2008). The corre-
+sponding function aInvKin only accepts a single 6-axis
+robot model, so any redundant joint qred,0 of each individual robot as well as its further DOFs in
+the placement y0 must be determined beforehand from function getRandom. For each robot r = 1, …, nrob, AIK outputs at most eight solutions, which lead to up to 8nrob combinations for all robots by function combiConﬁg.
+After collecting all sampled conﬁgurations Θ for the starting point of the ﬁrst path segment, the following
+computations are independent from each other and can be parallelized for different starting points θ1,1 2 Θ. By solving the iterative inverse kinematics using function invKin with the solution of the last point θm,iÀ1 as an input, the way-points of the conﬁguration space trajectories are created. If invKin ﬁnds no reachable so-
+lution within joint limits, the solution of the last way-
+point replaces the current one. The resulting infeasibility
+can be corrected during the optimization later, because
+the placements of the robots and the work-piece are
+decision variables that are adjusted along with the conﬁguration space trajectories until the reachability is satisﬁed. An alternative is to exploit this correction of
+infeasible solutions by setting all way-points identical to the starting point θ1,1. In this case, the more timeconsuming function invKin in Algorithm 2 is replaced by θm,i ←∅.
+After obtaining the way-points of the conﬁguration space trajectories, an approximation by B-splines with
+the function approximateSpline is conducted, creating
+the collective control point vector zkseed, m that is stored in Z. The seed index set I s ¼ f1, …, kseedg with kseed being the cardinality of Θ is also returned for use in
+Algorithm 1.
+
+The initial solutions are optimized in parallel in Algorithm 1. After each step of optimization, pruneCandidates reduces the number of further considered solutions. The solutions that remain in the active set I s are further optimized. The last comparison of object function values is carried out by selectBestCandidate to ﬁnd the global optimum.
+Inter-segment coordinated descend using ADMM
+Simultaneous to the parallel optimization of multiple initial solutions, the segments of Problem 4 are decentrally optimized in a parallel manner in Algorithm 1, so that the scalability w.r.t. path length is enhanced.
+For the decentralization among segments, methods such as ADMM (Boyd et al., 2011) and optimality condition decomposition (OCD) (Conejo et al., 2006) are considered. With OCD, equality constraints (5), (18), and (19) partially remain in subproblems. In Algorithm 1, optimizeSingleSegment may have difﬁculties handling these inter-segment equality constraints with the pose constraints (14) together. On the contrary, ADMM relaxes these equality constraints into the objective function (Wang et al., 2017), allowing optimizeSingleSegment fully exploit the kinematic structure of equality constraints (14).
+
+Ye et al.
+
+1659
+
+The residual constraint error due to the relaxation can be
+eliminated in the end. Between adjacent path segments m = 1, …, nseg of one
+active solution candidate is 2 I s, there are nseg À 1 connections. For each connection, the continuity constraints (5),
+(18), and (19) are of dimension ncc. Therefore, in Algorithm 1, the dual variables Λis 2 RðnsegÀ1Þ×ncc are deﬁned and set to zero initially, whereas Λ collects all dual variables for all solution candidates in I s. Constraints (5), (18), and (19) can be combined into the matrix form:
+
+Cm, 1zm À Cmþ1;0zmþ1 ¼ 0, 8m ¼ 1, …, nseg À 1,
+
+whereby Cm, 0, Cm, 1 2 Rncc×nzm , m ¼ 1, …, nseg are constant matrices with the subscript 0 standing for the extraction of
+control points from the segment start, and the subscript 1 for the segment ﬁnish.
+Therefore, Problem 4 can be decentralized into nseg subproblems with the augmented Lagrangian. Accordingly,
+the function optimizeSingleSegment in Algorithm 1 is
+mathematically formulated as follows:
+
+min J~ m ¼ J mðzm, wext, mð Á ÞÞ
+zm
+
+þ 1kCmÀ1;1~zmÀ1 À Cm, 0zm þ λmÀ1kP2 2
+þ 1kCm, 1zm À Cmþ1;0~zmþ1 þ λmkP2 2
+
+(23)
+
+s:t: pose constraints ð14Þ
+
+configuration bounds ð15Þ,
+
+whereby the symbol kakP2 for any vector a represents the operation aTPa with P being a diagonal matrix with constant coefﬁcients. The vector of dual variables λm 2 Rncc is the transpose of the m-th row of Λis, with is 2 I s being the index of the active solution candidate. Vectors ezmÀ1 and ezmþ1 are the last solutions of zmÀ1 and zm+1 which are updated from other subproblems. For
+subproblems of segment m = 1 and m = nseg without a
+neighboring segment on one side, the second or the third
+term in (23) vanishes, respectively.
+In Algorithm 1, optimizeSingleSegment solves the subproblem (23) and returns zis, m ðnewÞ which is then used to update the dual variables in coordinateSegments as follows:
+
+λmðnewÞ ←λm þ Cm, 1zmðnewÞ À Cmþ1;0zmþ1 ðnewÞ, 8m ¼ 1, …, nseg À 1:
+Afterward, Λis is updated with these entries. After the convergence and the selection of a single best candidate, function eliminateSegmentResidue eliminates the tiny amount of residual error of inter-segment continuity (5), (18), and (19) as follows. The average values among decision variables across neighboring segments are taken as the inter-segment target of correction. These include the
+
+average of placement results, as well as the average between the last and the ﬁrst control point of two B-spline corresponding to sm (1) and sm+1 (0) on path. The affected decision variables z1, …, znseg are corrected to the inter-segment target individually, resulting in z1, …, znseg. Such individual adjustments cause violations of intra-segment constraints (14), resulting in eposeðθmðu, zmÞ, smðuÞÞ ≠ 0. To restore the intra-segment constraints, the necessary adjustment of all joint conﬁgurations δθm(u) at any u 2 [0, 1] can be obtained with the help of the pseudo inverse of the Jacobian =θeposeðu, zmÞ 2 RðnJþnprþnpwÞ×ðncpþnpathÞ:
+δθmðuÞ ¼ À=θeposeðu, zmÞT Áþeposeðθmðu, zmÞ, smðuÞÞ:
+Using the adjusted joint conﬁgurations, the decision
+variables are computed again by B-spline approximation according to the relation (12) so as to generate z1*, …, znse*g . This result should be close to the values before executing
+eliminateSegmentResidue because the residual error of inter-
+segment continuity is already tiny by ADMM.
+
+Solving optimization problem with reduced Hessian method
+The reduced Hessian method is utilized to solve each single subproblem (23) for each of the individual segments. This corresponds to the function optimizeSingleSegment in Algorithm 1. So in the current section, segment index m is sometimes neglected for better readability. Subproblem (23) is solved in a Sequential Quadratic Programming (SQP) manner iteratively as follows in the k-th iteration:
+
+min
+d2Rnz
+
+eT
+
+1T
+
+=zJ mðzk Þd þ d Bk d
+
+2
+
+(24a)
+
+s:t: eposeðzk Þ þ =zepose T ðzk Þd ¼ 0,
+
+(24b)
+
+θmin ≤ zk þ d ≤ θmax,
+
+(24c)
+
+whereby eposeðzkÞ 2 Rne is the concatenation of eposeðu, zk Þ, 8u ¼ u1, …, ulm from (14). The gradient of epose (zk) w.r.t. zk is represented by =zepose 2 Rnz×ne. The gradient
+of the objective function in the optimization problem (23) is =zJe m 2 Rnz which has a dependency on λmÀ1 and λm. The matrix Bk 2 Rnz×nz represents the Hessian. Problem (24a, b, c) is an optimization w.r.t. the descent step d 2 Rnz , repre-
+senting the adjustment of the original decision variables zk. In the reduced Hessian setting, d consists of a vertical and a
+horizontal step, expressed as follows:
+
+d ¼ v þ αh,
+
+(25)
+
+whereby the vertical step v is a solution of (24b) and eliminates the pose error epose (zk), so as to maintain the path tracking and coupling:
+
+1660
+
+The International Journal of Robotics Research 45(11)
+
+eposeðzk Þ þ =zepose T ðzk Þv ¼ 0,
+
+(26)
+
+whereas the horizontal step h, with 0 < α ≤ 1 as the step length in the line search, enables the descent of the objective function (23) that improves the capabilities of robots without changing the values of epose (zk). This can be achieved if zero matrix O is obtained from:
+
+=zepose T ðzk Þh ¼ O:
+
+(27)
+
+This means that the horizontal step does not vanish only
+in the null-space of =zepose (zk), so a null-space basis Zzðzk Þ 2 Rnz×ðnzÀneÞ is to be constructed that satisﬁes:
+
+=zepose T ðzk ÞZzðzk Þ ¼ O,
+
+(28)
+
+
+
+þ
+
+Zzðzk ÞZzðzk Þþ þ =zepose T =zepose T ¼ I :
+
+(29)
+
+Equation (28) guarantees that all column vectors of Zz (zk) lie inside the null-space of =zepose (zk) while (29) guarantees that Zz (zk) spans the complete null-space of =zepose (zk) without losing ranks. Any type of pseudoinverse can be applied in (29), here denoted with the
+superscript +. The horizontal descending step h is a
+linear combination of columns of Zz (zk):
+
+h ¼ ZzðzkÞd:
+
+(30)
+
+whereby d 2 RnzÀne represents the null-space descent. The null-space basis Zz (zk) maps the null-space descent into the space of all decision variables. One may substitute (25) and (30) into (24a, b, c), and take d as the new decision variable, so as to reformulate the problem as follows:
+
+min
+d
+s:t:
+
+eT
+
+T
+
+1T
+
+=zJ mZzðzk Þd þ v Bk Zzðzk Þd þ d Bk d
+
+2
+
+" Zzðzk Þ # " θmax À zk À v #
+
+d≤
+
+,
+
+ÀZzðzk Þ
+
+Àðθmin À zk À vÞ
+
+(31a) (31b)
+
+whereby Bk ¼ ZzðzkÞT BkZzðzkÞ is the reduced Hessian matrix of a dimension RðnzÀneÞ×ðnzÀneÞ. The cross term vT BkZzðzk Þd can be ignored as long as v in this term
+converges more quickly to zero than d does (Schmid and Biegler, 1994). If Zz (zk) and =zJe ðzkÞ are provided, problem (31a, b) becomes solvable by updating Bk with the Broyden-Fletcher-Goldfarb-Shanno (BFGS) algorithm (Nocedal and Wright, 1999).
+After solving both v and h for (25), an iteration is made with zkþ1 ¼ zk þ dðzk , Bk Þ.
+The following subsections are devoted to the construction of the necessary variables epose (zk), =zepose (zk), Zz (zk),
+
+and =zJe m, which guarantees the convergence of the reduced Hessian method.
+
+Vertical step. To obtain v, one needs to determine epose (zk) and =zepose (zk), before solving the system of equation (26). The vector epose (zk) represents the pose difference between frames. Its components are shown in Figure 3. For the physical coupling between robot i and j at step u 2 [0, 1], this pose difference is calculated between the homogeneous
+transÀformation matrices of {tcpi} aÁnd {tcpj}, denoted as diff Tiðqðu, xkÞ, ykÞ, Tjðqðu, xkÞ, ykÞ . For the path tracking by robot i, the pose difference is between the homogeneous
+transformation matrices of tÀhe way-point on the path (TwpÁt) and {tcpi}, denoted as diff TwptðsðuÞ, ykÞ, Tiðqðu, xkÞ, ykÞ . The operator diff ðÁ, ÁÞ is deﬁned as follows:
+diff ðT R 1, T2Þ ¼ 2 Á ΦÀðR2ÞT R1Á !, (32) t2 À t1
+
+whereby the rotation matrices R and the translation vectors t
+are extracted !from the homogeneous transformation matrix T ¼ TR t . The conversion from rotation matrix to
+01 Euler angle is denoted as Φ(Á).
+W.l.o.g., the complete pose error epose at a given u 2 [0, 1] consists of the following errors:
+
+eposeðu, zk Þ
+
+2À
+
+Á3
+
+diff TwptðsðuÞ, ykÞ, T1ðqðu, xkÞ, ykÞ
+
+6
+
+7
+
+6 ¼ 66 diff ðT2ðqðu, xkÞ, ykÞ, T1ðqðu, xkÞ, ykÞÞ 777: (33)
+
+6
+
+…
+
+7
+
+4
+
+5
+
+diff ðTnrobðqðu, xk Þ, yk Þ, T1ðqðu, xk Þ, yk ÞÞ
+
+Finally, epose (zk) is the concatenation of u ¼ u1, …, ulm in
+
+increasing sequence with u1 = 0 and ulm ¼ 1:
+
+2
+
+3
+
+eposeðu1, zk Þ
+
+eposeðzk Þ ¼ 4 ⋮ 5:
+
+eposeðulm, zk Þ
+
+The synchronization between the path s(u) and the joint
+trajectories q(u, zk) must be ensured. This means, at any u 2 [0, 1], s(u) and q(u, zk) should progress equally. If, for example, q(u, zk) progresses faster than s(u) at start as shown in Figure 6, q(u, zk) might move more than necessary (usually in a twisting manner) between u1 and u2, before being forced by the vertical step update to meet
+with the slow moving s(u) at point u2, leading to ﬂuctuations.
+To achieve the synchronization, s(u) is approximated by a B-spline s0(u, zs) in Cartesian space with the same order and control point number as the joint space B-splines q(u,
+x). This replacement brings a cost of less accurate path
+tracking on the way-points due to the approximation error
+
+Ye et al.
+
+1661
+
+of the B-spline, but we get rid of the phenomenon in
+Figure 6.
+The next step is to determine =zepose (zk). As shown in Figure 7, two mappings are incorporated in =zepose (zk), one
+between the Cartesian space adjustments to eliminate epose (zk) and the conﬁguration space adjustments Δθ(u, zk) on way-points ui, i = 1, …, lm, the other between Δθ(u, zk) and the adjustment of control points zk, that is, the vertical step v.
+The ﬁrst mapping is done by the Jacobian:
+2 JwptðsðuÞ, yÞ À J1ðqðu, xÞ, yÞ 3T = 6 θeposeðu, zÞ ¼ 6 J 4 1ðqðu, xÞ, yÞ À J2ðqðu, xÞ, yÞ 775 , (34)
+… J1ðqðu, xÞ, yÞ À Jnrobðqðu, xÞ, yÞ
+
+whereas the second mapping is made with the help of the basis functions G(u) from (13) of B-splines:
+
+=zeposeðu, zk Þ ¼ GT ðuÞ=θeposeðu, zk Þ:
+
+(35)
+
+Finally, by concatenating u ¼ u1, …, ulm, one gets:
+
+=zeposeðzk Þ ¼ ½=zeposeðu1, zk Þ, …, =zeposeðulm, zk Þ: (36)
+
+After obtaining epose (zk) and =zepose (zk), the solution of
+
+(26) follows that for an under-determined linear system of
+
+equations. One may solve (26) with Moore-Penrose inverse that satisﬁes the equation exactly while minimizing kvk:
+
+
+
+þ
+
+v ¼ À =zepose T ðzk Þ eposeðzk Þ
+
+
+
+À1
+
+¼ À=zepose =zepose T =zepose eposeðzk Þ:
+
+(37)
+
+Remark 2. If =zepose(z) has high condition number in case of using high-order basis functions in G(u), kvk can still be large, causing strong ﬂuctuation in the resulting conﬁguration space trajectories. A trade-off between the
+accuracy of the equality in (26) and the stability of v is
+achieved by solving an over-determined linear system of
+
+equations using the regularization method (Neumaier,
+
+1998):
+
+~v ¼ À =zepose T ðzk Þ !þ eposeðzk Þ !
+
+εI
+
+O
+
+=zepose T ðzk Þ !T =zepose T ðzk Þ !!À1
+
+¼ À εI εI (38)
+
+Á =zepose T ðzk Þ !T eposeðzk Þ !
+
+εI
+
+O
+
+ð0 < ε≪1Þ:
+
+Null-space basis. We present a method to ﬁnd
+
+Zzðzk Þ 2 Rnz×ðnzÀneÞ that not only satisﬁes (28), but is also
+
+kinematically interpretable and continuous w.r.t. changes of zk. Such a new robotics-speciﬁc null-space basis is
+
+necessary, because the commonly used decomposition
+
+methods, for example, orthonormal null-space basis ob-
+
+tained from the singular value decomposition or QR de-
+
+composition of =zepose (zk), guarantee no continuity w.r.t. zk
+
+and thus no convergence with projected quasi-Newton
+
+algorithms such as BFGS can be proved (Coleman and
+
+Sorensen, 1984). On the contrary, our Zz (zk) allows the
+
+provable convergence of the reduced Hessian method.
+
+To build such Zz (zk), we interpret each column as the
+
+necessary adjustment of the entire zk to achieve a singlepoint adjustment of a redundant conﬁguration without
+
+changing the pose error. On the one hand, redundant con-
+
+ﬁgurations include, if a robot possesshes more than isiTx joints,
+
+those redundant joints of θðu, zkÞ ¼
+
+q
+
+ð
+
+u
+
+,
+
+x
+
+k
+
+Þ
+
+T
+
+,
+
+y
+
+T k
+
+that do
+
+not occur in a conventional 6-axis robot. Each of these
+
+redundant joints makes up lm single-point adjustments,
+
+because it can be adjusted individually at lm sampled points
+
+along the discretized path. On the other hand, each place-
+ment variable y that occurs in θ(u, zk) is regarded as one single-point adjustment of redundant conﬁguration. There
+
+are totally nz À ne possible single-point adjustments of redundant conﬁgurations, corresponding to the columns of
+
+Zz. Their linear independence ensures the full column rank
+
+of Zz and thus (29). The single-point adjustment of a redundant conﬁg-
+uration is denoted as δθred, j 2 Rnθ , with only the entry of the redundant conﬁguration being one and all others
+
+zero. The value of j ranges from one to the total number
+
+Figure 6. Asynchronization between s(u) and q (u, zk), u 2 [0, 1] results in the ﬂuctuation of the robot movement. The path s(u) and the joint trajectory q (u, zk) are visualized here in the
+Cartesian space after transformations by the forward kinematics.
+
+Figure 7. The two mappings incorporated in =zepose (zk).
+
+1662
+
+The International Journal of Robotics Research 45(11)
+
+of redundant conﬁgurations nred,θ = nθ À ncp À npath. If we denote nred,joint = nθ À ncp À npath À npr À npw, then j = 1, …, nred,joint corresponds to the redundant joints and j = nred,joint + 1, …, nred,θ the placement variables.
+Afterward, one should determine the corresponding
+error-free single-point reactive adjustment of the whole conﬁguration (including non-redundant joints) δθN, jðu, zkÞ 2 Rnθ that neither changes the pose error nor the other redundant conﬁgurations. For example, when the redundant joint of a robot is adjusted, only the joint conﬁgu-
+ration of this single robot is allowed to react, but the
+placements do not. Generally, one can use the result from (34) to build the error Jacobian Je ¼ =θeTposeðu, zÞ. To make the error-free single-point reactive adjustment of the whole conﬁguration have no inﬂuence on other redundant conﬁg-
+urations, one can set the columns of Je that correspond to other redundant conﬁgurations to zero. Afterward, one can
+construct a projector as follows:
+Njðθðu, zkÞÞ ¼ I À ðJeðu, zkÞÞþJeðu, zkÞ: (39)
+By projecting the single-point adjustment of the redundant conﬁguration, the error-free adjustment of the whole conﬁguration is obtained:
+
+j ¼ nred,joint þ 1, …, nred,θ:
+Remark 3. In case of ill-conditioning of the pseudo inverse in (41) and (42), the regularization technique as in Remark 2 can be applied.
+The above steps that generate the columns of the nullspace basis are summarized in Algorithm 3.
+
+δθN, jðu, zk Þ ¼ Njðθðu, zk ÞÞδθred, j:
+
+(40)
+
+Lemma 1. The error-free adjustment of the whole conﬁguration δθN,j(u, zk) induces no change to the path and coupling errors, that is:
+=θepose T δθN, jðu, zk Þ ¼ 0:
+Proof. See Appendix A. Finally, the entire z should be adjusted according to the mapping of G(u) (12) to enable this error-free adjustment. A case distinction is made here. When a column of Zz (zk) corresponds to the adjustment δzwpt,j(u) that aims at changing the angle of a redundant joint at one of the lm sampled waypoints along the discretized path, this column is computed as:
+
+δzwpt, jðu, zk Þ ¼ GðuÞþδθN, jðu, zk Þ, j ¼ 1, …, nred,joint: (41)
+when a column of Zz (zk) corresponds to the adjustment δzplc,j that aims at changing the placement variable, it is computed as follows, which considers all the adjustments along the discretized path but results in a single adjustment of a static placement variable:
+
+2 Gðu1Þ 3þ2 δθN, jðu1, zk Þ 3
+
+6
+
+76
+
+7
+
+δzplc, jðzk Þ
+
+¼
+
+6 4
+
+⋮
+
+76 54
+
+⋮
+
+75,
+
+(42)
+
+GðulmÞ
+
+δθN, jðulm, zk Þ
+
+It can be proved that the last columns of Zz (zk) that represent the adjustment of placements δzplc,j (42) are orthogonal to =zepose (u, zk):
+Lemma 2. =zeTposeδzplc, j ¼ 0.
+
+Proof. See Appendix A. Unfortunately, δzwpt,j (u, zk) from (41) is closely but not strictly orthogonal to =zepose (zk), because 0 ≤ gT (ui)g (uj) ≤ gT (uj)g (uj). Nevertheless, δzwpt,j (u, zk) can be slightly shaped to make it lie completely in the null-space of =zepose
+(zk) by the following projection:
+
+δezwpt, jðu, zk Þ
+
+
+
+þ
+
+
+
+T
+
+T
+
+(43)
+
+¼ I À =zeposeðzk Þ =zeposeðzk Þ δzwpt, jðu, zk Þ:
+
+As such, all the columns δzplc,j (zk) and δezwpt, jðui, zk Þ with i = 1, …, lm and j = 1, …, nred,θ constitute the null-space basis Zz (zk) that satisﬁes (28).
+It can be concluded that all the columns of the null-space
+basis Zz (zk) are continuous w.r.t. zk if the Jacobians in (39) are non-singular. The singularity is avoided by the penalty
+
+Ye et al.
+
+1663
+
+(16). This conclusion of the continuity is drawn by examining the dependency on zk of the equations as follows:
+ð39Þ ð40Þ
+zk →Je → Nj → δθN, j→ ð41Þ ð43Þ 9
+δθN, j → δzwpt, j → δezwpt, j = ð42Þ ;Zzðzk Þ:
+δθN, j → δzplc, j
+With the continuity property, the reduced Hessian approximation Bk by BFGS possesses sufﬁcient accuracy (Coleman and Sorensen, 1984).
+
+Full-dimensional gradient. In order to solve (31a, b), the gradient of the objective function =zJe m 2 Rnz should be provided. In Ye et al. (2022), a ﬁnite difference for ZzðzkÞT =zJe m 2 Rnz is the computation bottle-neck of the whole optimization method. The present paper achieves a higher computation efﬁciency with the full-dimensional
+gradient by exploiting the automatic differentiation (AD)
+(Andersson et al., 2012). Before using the AD, we divide Je m into Je analy, m and
+Je AD, m. The gradient of the former can simply be solved analytically, while that of the latter cannot:
+
+Je m ¼ Je analy, m þ Je AD, m,
+
+(44)
+
+=zJe m ¼ =zJe analy, m þ =zJe AD, m:
+
+(45)
+
+The AD only applies to the latter term Je AD, m. An observation on (23), (21), and (17) reveals what of Je m should be incorporated in Je analy, m and Je AD, m, respectively:
+
+Je analy, m ¼ wflcJ flc, mðzmÞ
+
+(46)
+
+þ1kCmÀ1;1ezmÀ1 À Cm, 0zm þ λmÀ1kP2 , 2
+
+þ1kCm, 1zm À Cmþ1;0ezmþ1 þ λmkP2 2
+
+1 X lm
+
+Je AD, m ¼
+
+Je AD, m, iðθðui, zÞÞ
+
+lm i¼1
+
+(47)
+
+1 X lm À
+
+Á
+
+¼
+
+wstf J stf, mðui, zÞ þ wsingJ sing, mðui, zÞ :
+
+lm i¼1
+
+The major reason that the gradient of (47) cannot simply be solved analytically are the Jacobians Jr(θ), r = 1, …, nrob inside J stf, m and J sing, m. It is difﬁcult and computationally inefﬁcient to obtain an analytical solution to dJr(θ)/dθ.
+However, by providing the symbolic expression of the Jacobians using θ as the symbolic variable, the whole
+
+Je AD, m, i which is dependent on the Jacobians can be processed by the AD at each sampled point along the discretized path ui, i = 1…, lm. The output of the AD is =θJe AD, m, iðθðui, zÞÞ, the gradient of Je AD, m, iðθðui, zmÞÞ w.r.t. θ. Finally, the gradient of (47) w.r.t. z is as follows, con-
+sidering the parametrization with B-splines:
+
+=zJe AD, mðθðui, zÞÞ
+
+1 X lm
+
+¼
+
+GT ðuiÞ=θJe AD, m, iðθðui, zÞÞ:
+
+lm i¼1
+
+Local convergence. Up till now, all the essential components
+
+to solve (24a, b, c) and consequently (31a, b) have been ob-
+
+tained. To update Bk of (31a) with the BFGS algorithm, the
+
+necessary secant equations are provided in Byrd and Nocedal
+
+(1990) which are no longer discussed here. Under the assumption of sufﬁciently accurate approximation of Bk with the
+
+available algorithms, the focus of the current sub-section is on
+
+the convergence of the reduced Hessian method in the robotic
+
+application.
+
+As Byrd and Nocedal (1990) prove convergence with
+
+the help of merit functions in the line search, others such as
+
+Kupfer (1996) utilize the Lipschitz continuity and the mean
+
+value theorem in the horizontal and vertical steps. The
+
+former is not further considered because the optimization exhibits good convergence behavior when α = 1 is achieved
+
+for (25) in the late stage, without relying on the line search
+
+operation. The present paper follows the latter idea but ex-
+
+tends (Kupfer, 1996) by the bounding constraints of (15).
+
+These bounds remain in the linear inequality constrained
+
+quadratic programming (QP) problem (31b).
+
+Problem (31a, b) is solved with the standard active-set method (Nocedal and Wright, 1999) which ﬁnds the indices of the activated constraints. If a number of na ≥ 0 among the
+
+total 2nz inequality constraints (31b) are activated at indices
+ia 2 I a, the activated constraints can be selected by the activation matrices A1, A2 2 Rnz×na which contain all zero but
+
+a single one at the ia-th entry in each row. The activated
+
+constraints are expressed as follows:
+
+Â T T Ã Zzðzk Þ ! Â T T Ã θmax À zk À v !
+
+A1 A2
+
+d ¼ A1 A2
+
+ÀZzðzk Þ
+
+Àθmin þ zk þ v
+
+or by deﬁning A = A1 À A2: AT Zzðzk Þd ¼ A1ðθmax À zk À vÞ À A2ðθmin À zk À vÞ: (48)
+
+Then the solution of (31a, b) and (30) can be expressed in
+
+the explicit form when the active set I a is found and no longer changes after sufﬁcient iterations:
+
+ÀÁ
+
+h zk , Bk ¼ Zzðzk Þd Â
+
+À ÁÃ
+
+(49)
+
+¼ Zzðzk Þ vqpðzk Þ þ hqp zk , Bk ,
+
+whereby the QP-vertical step
+
+1664
+
+The International Journal of Robotics Research 45(11)
+
+vqp ðzk Þ ¼ ÀAT Zzðzk Þ (50) Áþ Á½A1ðθmax À zk À vÞ À A2ðθmin À zk À vÞ
+
+is the ﬁrst step of the active set algorithm that ﬁnds a feasible
+
+point with respect to the activated bounds by solving (48).
+
+The QP-horizontal step
+
+
+
+À1
+
+hqpðzk , Bk Þ ¼ ÀZqp ZqpT Bk Zqp
+
+Z
+
+T qp
+
+Zz
+
+ð
+
+z
+
+k
+
+ÞT
+
+=
+
+z
+
+Je
+
+m
+
+(51)
+
+ﬁnds the QP-descent in the direction without violating
+(48) with the help of the QP-null-space basis Zqp ¼ Zqpðzk Þ 2 RðnzÀneÞ×ðnzÀneÀnaÞ. Zqp is created using the QR decomposition of ðAT ZzðzkÞÞT and taking the (na + 1)-th to the last columns of the orthonormal matrix Q. Although
+the resulting Zqp might not be continuous w.r.t. zk due to the algorithms in the QR decomposition, it is usable because Zqp does not inﬂuence the approximation of Bk in BFGS. Similar to (28) and (29), Zqp satisﬁes:
+
+AT Zzðzk ÞZqp ¼ O,
+
+(52)
+
+ZqpZqpþ þ ÀAT Zzðzk ÞÁþAT Zzðzk Þ ¼ I : (53)
+
+To prove the convergence as in Kupfer (1996), we ob-
+
+serve the optimum point bz, where both the vertical and
+
+horizontal step vanish but =zJe m of (51) does not. The only
+
+possibility
+
+is
+
+that
+
+Z
+
+T qp
+
+Zz
+
+ð
+
+z
+
+k
+
+Þ
+
+T
+
+=
+
+z
+
+Je
+
+m
+
+¼
+
+0
+
+and
+
+vqp
+
+(zk)
+
+=
+
+0.
+
+Therefore, hðbz, BÞ ¼ 0, regardless of B. Furthermore, we
+
+formulate the derivative of (25) w.r.t. z at bz:
+
+=dðbz, BÞ ¼ =vðbzÞ þ α=hðbz, BÞ:
+
+(54)
+
+The derivatives of the vertical and horizontal step are
+
+given as follows according to (37) and (49):
+
+
+
+þ
+
+=vðbzÞ ¼ À =zeTposeðbzÞ =zeTposeðbzÞ,
+
+(55)
+
+À
+
+Á
+
+=hðbz, BÞ ¼ ZzðbzÞ =vqpðbzÞ þ =hqpðbz, BkÞ : (56)
+
+According to (50) and (51), we further derive:
+
+=vqpðbzÞ ¼ ÀAT ZzðzkÞÁþAT ½ÀI À =vðbzÞ, (57)
+
+ÀÁ
+
+ À1 T
+
+=hqp bz, B ¼ ÀZqp ZqpT BZqp ZqTpZzðbzÞ Bb, (58)
+
+whereby Bb 2 Rnz×nz is the true Hessian at bz. Now we simplify =d by combining (29) and (53) with (54)–(58). After some
+lengthy calculations, we get:
+
+ÀÁ
+
+þ
+
+þ
+
+=d bz, B ¼ αZ Z þ ð1 À αÞZzðbzÞZzðbzÞ
+
+
+
+À1
+
+(59)
+
+À αZ ZqpT BZqp ZT Bb À I ,
+
+whereby we denote Z ¼ ZzðbzÞZqpðbzÞ and Z þ ¼ ZqpðbzÞþZzðbzÞþ. The inverse of =dðbz, BÞ is crucial for
+the later proof of convergence. This is also the case in
+Kupfer (1996) Lemma 3.2, but it considers neither the step length α, nor the activated inequality constraints. Therefore,
+the following lemma is necessary:
+
+Lemma 3. The matrix =dðbz, BÞ as given by (59) is invertible, and the inverse is given as follows:
+
+=dðbz, BÞÀ1
+
+
+
+À1
+
+1
+
+
+
+(60)
+
+¼ Z Z T BbZ
+
+Z T Bb À ZqpT BZqpZ þ À I :
+
+α
+
+Proof. For 0 < α ≤ 1 as the step length, both =dðbz, BÞÀ1=dðbz, BÞ ¼ I and =dðbz, BÞ=dðbz, BÞÀ1 ¼ I can be veriﬁed merely using the property of the pseudo-inverse
+Z þZ ¼ I. This also indicates that =dðbz, BÞ is invertible. □
+
+We further introduce the iteration function of the decision variable and its derivative:
+
+ζ ðz, BÞ ¼ z þ dðz, BÞ,
+
+(61)
+
+=ζ ðz, BÞ ¼ I þ =dðz, BÞ:
+
+(62)
+
+It applies iteratively zkþ1 ¼ ζ ðzk , Bk Þ. Finally, bz is a ﬁxed point with ζ ðbz, BÞ ¼ bz regardless of B. The convergence can be proved if we ﬁrst establish the relation between
+iterates zkÀ1, zk, zk+1 and bz. For that, the following assumptions of Lipschitz continuity are made as in Kupfer
+(1996).
+
+Assumption 1. (Lipschitz Continuity)
+For all B and all z sufﬁciently close to a local optimum bz, there exists a constant μ > 1:
+
+k=dðz, BÞ À =dðbz, BÞk ≤ μkz À bzk,
+
+(63)
+
+kdðz, BÞ À dðbz, BÞk ≤ μkz À bzk,
+
+(64)
+
+kζ ðz, BÞ À ζ ðbz, BÞk ≤ μkz À bzk,
+
+(65)
+
+k=dðbz, BÞk ≤ μ,
+
+(66)
+
+k=dðbz, BÞÀ1k ≤ μ:
+
+(67)
+
+As a further preparation for the establishment of the relation between iterates, the so-called mean value theorem is proved here (named but not explained in Kupfer (1996)).
+
+Ye et al.
+
+1665
+
+Figure 8. Two robots are physically coupled. The spring is connected to the ﬁxture {fx} and the coupler. The connecting point between the spring and the coupler is denoted as TCP. The robots pull the spring-loaded TCP along the path in one loop. The starting point is {p0}. The TCP is currently at {p0}. The black arrow marks the starting direction of the path. {p1}, {p2}, and {p3} are the corners of the path, forming a parallelogram on the horizontal plane. The path is rounded at the corners.
+Theorem 4. (The So-Called Mean Value Theorem)
+For all z 2 Rnz , B 2 RðnzÀneÞ×ðnzÀneÞ, there is: kζ ðz, BÞ À ζ ðbz, BÞ À =ζ ðbz, BÞðz À bzÞk≤μkz À bzk2: (68)
+2
+Proof. See Appendix A. Now we are ready to establish the relation between iterates zkÀ1, zk, zk+1 and bz, similar but extended from Lemma 3.3 of Kupfer (1996) by the QP and line search.
+
+Lemma 5. (Relation between zkÀ1, zk, zk+1, and bz)
+
+If the step length of the line search takes α = 1 after sufﬁcient number of iterations, there exists a constant β > 0 such that:
+
+À
+
+Á
+
+2 k =vðbzÞ þ ZzðbzÞ=vqpðbzÞ ðzkþ1 À zkÞk (69)
+
+≤βkzkÀ1 À bzk :
+
+Proof. See Appendix A. By applying the intermediate inequality of Lemma 5, the following theorem of convergence is proved.
+
+Theorem 6. (Two-Step Linear Convergence of the Reduced Hessian Method)
+
+Table 1. Coordinates of points.
+
+Point
+
+x in m
+
+{p0}
+
+0
+
+{p1}
+
+0.1
+
+{p2}
+
+0.15
+
+{p3}
+
+0.05
+
+{fx}
+
+0
+
+y in m
+0 0.18 0.18 0 À0.08
+
+z in m
+0 0 0 0 À0.12
+
+Figure 9. The placement of the virtual work-piece and the path with npw = 4 DOFs is sampled in the initial solutions and illustrated here. The robot placements and the redundant joints (marked as the third joints) are also sampled in a similar manner, but not illustrated.
+
+After sufﬁcient number of iterations, if the active set I a of
+the QP-subproblem is found and no longer changes from iteration to iteration, and if the step length takes α = 1, then for each given constant 0 < ρ < 1, there exist a radius ε1 > 0 and a reduced Hessian approximation accuracy ξ > 0 such that for kzkÀ1 À bzk≤ε1, and for
+
+kZzðbzÞT BbZzðbzÞ À Bkk < ξ,
+
+(70)
+
+the following applies:
+
+kzkþ1 À bzk≤ρkzkÀ1 À bzk:
+
+(71)
+
+Remark 4. The null-space basis Zz(zk) is continuous w.r.t. zk. According to Byrd and Nocedal (1990), under the condition of the continuity, sufﬁcient approximation accuracy of Bk, as given by (70), can be reached using the BFGS algorithm.
+Proof. See Appendix A. If the sequence zk with k = 0, …, ∞ converges to bz, then the two-step superlinear convergence follows:
+Corollary 7. (Two-Step Superlinear Convergence) After sufﬁcient number of iterations, if the active set I a of the QP-subproblem is found and no longer changes from iteration to iteration, if the step length takes α = 1, and if the reduced Hessian approximation has
+
+Table 2. Weights both for the new reduced Hessian method and for active set method of Matlab fmincon.
+
+Max. iterations
+
+wstf
+
+wsing
+
+wﬂc
+
+40
+
+16.67
+
+0.002
+
+0.01
+
+1666
+
+The International Journal of Robotics Research 45(11)
+
+Table 3. Weights for the multi-stage successive constraint reﬁnement.
+
+Max. iterations
+
+wstf
+
+wsing
+
+wﬂc
+
+wpose
+
+30
+
+0
+
+0.002
+
+0
+
+4.0
+
+4
+
+3.33
+
+0.002
+
+0.01
+
+1.0
+
+40
+
+16.67
+
+0.002
+
+0.01
+
+4.0
+
+140
+
+0
+
+0.002
+
+0
+
+4.0
+
+sufﬁcient accuracy as ξ in (70) approaches zero, then the following applies:
+limkzkþ1 À bzk ¼ 0: (72) k→∞kzkÀ1 À bzk
+Proof. See Appendix A.
+
+has {p0} as the origin, line {p0}–{p3} as the x-axis, and the vertical upward direction as the z-axis. The coordinates of the points related to the path are shown in Table 1. The spring has an original length 0.14 m and stiffness 600 N mÀ1. It reaches the highest force of 141 N near {p2} in Figure 8.
+Generation of initial solutions. Multiple initial solutions are generated according to Algorithm 2. In the current test case, nseg = 1. In the current and the next subsection, the joint trajectories are approximated by B-splines of order κ = 3, ensuring the continuity of angles, angular velocities and accelerations. Considering the length and
+
+Results
+To illustrate the effectiveness of the trajectory planning, the following test cases are experimented with two physically coupled KUKA LBR iiwa 14 R820 robots:
+(i) pulling a spring (ii) multi-segment milling
+Speciﬁcally, test case (i) veriﬁes the core of the developed reduced Hessian method while utilizing the parallelization with multiple initial solutions. Test case (ii) utilizes the reduced Hessian method and further validates the ADMM intersegment coordinated descend, as well as the stiffness model, so as to demonstrate the usability of the whole method set in reality. All the computations are conducted on a machine with the processor AMD Ryzen 7 PRO 6850U at 2.70 GHz.
+
+Pulling a spring
+The test case of pulling a spring imitates manufacturing processes with slowly varying process force such as sheet metal bending. This test case is also described in Ye et al. (2022) where the result with enhanced stiffness and reduced joint load after the optimization is shown. We use the same test case here to examine the robustness of the proposed reduced Hessian method with convergence guarantee in a statistical manner, as well as to show the improvement of efﬁciency compared to Ye et al. (2022).
+
+Settings of the test case. Two robots should pull the spring along a given TCP path with the optimal stiffness against the force of the spring. The placement of the spring and the path w.r.t. the robots as well as the joint trajectories of robots are free for optimization, while the geometry of the path is pre-given. Figure 8 shows the settings. The given path is ﬁxed to a work-piece frame. This work-piece frame
+
+Figure 10. Visualization of representative results solved from the identical initial guess using the three methods. Only the reduced Hessian method shows both optimal work-piece placement and low path tracking errors.
+
+Ye et al.
+
+1667
+
+Figure 11. Distributions of path tracking errors and distribution of objective function change with the reduced Hessian method.
+
+complexity of the TCP path, each joint trajectory has l1 = 30 control points.
+The conﬁguration space of θðu, zÞ ¼ ½qðu, zÞT , yT T includes qðu, zÞ 2 R14 of the two robots and y 2 Rnprþnpw ¼ R5. The dimension npr = 1 is the placement distance between the robots’ bases. The dimensions npw = 4 include the 3D translational and the z-rotational placement of the path so
+that the path is kept on a horizontal plane. There are six
+dimensions of coupling constraints and six dimensions of path tracking constraints. Therefore, 14+5À6À6 = 7 DOFs are available for the random sampling of initial solutions, including y 2 R5 and two dimensions of redundant joints. The redundant joints are chosen to be the third joints, as
+shown in Figure 9, because they are at a position that does
+not exist in conventional 6-axis robots.
+
+By sampling nseed = 5000 and computing the function aInvKin in Algorithm 2, we get 478 initial solutions in which at least the starting point {p0} of the path is reachable by both robots. The positions of the path in the initial solutions, which correspond to npw = 4 elements of y0 2 Rnprþnpw , are shown in Figure 9. In the current test case, function invKin in Algorithm 2 is not executed for subsequent way-points along the path to reduce the computation overhead, so in the initial solution, the robots have infeasible joint trajectories of constant values obtained from the function aInvKin, making the TCP stay static at {p0}. This violation of the path tracking constraint (2) is only dealt with afterward in the optimization process.
+Comparison of methods. Three methods are tested with the 478 initial solutions, namely the proposed reduced Hessian
+
+Figure 12. Distributions with the active set method from Matlab fmincon. The translational errors at middle points between the sampled points are large, indicating ﬂuctuations as shown in Figure 10(b). These errors lead to a low success rate despite the signiﬁcant reduction of the objective.
+
+1668
+
+The International Journal of Robotics Research 45(11)
+
+Figure 13. Distributions with the multi-stage successive constraint reﬁnement method (Kabir et al., 2021). The errors are mostly kept small, similar to the ones of the reduced Hessian method. However, there is the difﬁculty in reducing the value of the objective function, which is also indicated in the difference of the work-piece placement in Figure 10(c).
+
+method, the active set method in the Matlab built-in function fmincon (Nocedal and Wright, 1999), and the multi-stage successive constraint reﬁnement (Kabir et al., 2021). The new reduced Hessian method is compared to the old one in Ye et al. (2022). The weights of (21) are given in Tables 2 and 3 for the three methods. In Table 3, the additional weight wpose is the penalty weight for the pose error (14), since it is not handled as a constraint of the optimization problem.
+From the 478 initial solutions, each method returns 478 results of the optimized placements and joint trajectories. From each method, one representative result is visualized in Figure 10, where the joint trajectories of both robots are transformed to the Cartesian TCP trajectories using the forward kinematics. These are compared against the path. The result of the reduced Hessian method has negligible errors at sampled points and small errors between sampled points. The result of the Matlab active set method has less error at, but larger error between sampled points. The result of the multi-stage successive constraint reﬁnement method has small to medium errors both at and between sampled points. Moreover, in the multi-stage method, the placement of the work-piece is not optimized toward the position and orientation as in the other two methods, rendering the stiffness of robots suboptimal. The statistical results in Figures 11–13 conﬁrm that the examples of Figure 10 are not rare individual cases.
+Furthermore, the change of the objective function values between the initial and ﬁnal solutions is captured in the histograms at the right of Figures 11–13. In all these evaluations of the objective function change, the weights in Table 2 apply. The medians of the change of the objective function values are given in Table 4. The objective function
+
+value does not decrease signiﬁcantly in most solutions of the multi-stage successive constraint reﬁnement method and can even increase, although the errors are not larger than the reduced Hessian method. On the contrary, the Matlab active set method reduces the objective function value signiﬁcantly, but the large errors render a large portion thereof unusable. Only the reduced Hessian method achieves a balance between the errors and the reduction of the objective function value. The success rates of the methods are given in Table 4. The optimization is deemed successful, if the rotational errors at and between sampled points are always below 0.01 rad, the translational errors at and between sampled points are always below 10 mm, and if the objective function value is reduced.
+The reduced Hessian method also exhibits a shorter computing time of 8.08 s on average, as shown in Table 4. This computing time is acceptable for practical applications of manufacturing processes, if the planning and the motion control are separated in two stages, one ofﬂine in advance and the other in real-time. The computing time of the multistage successive constraint reﬁnement method is 7.2 times
+
+Table 4. Performance of methods among 478 results.
+
+Methods
+
+Objective function, %
+
+Success rate, %
+
+Computing time in s
+
+Active set Multi-stage New red. Hess. Old red. Hess. (Ye
+et al., 2022)
+
+À51.14 À1.76 À39.94 À36.82
+
+33.26 53.97 78.87 n.a.
+
+9.46 71.3 8.08 65.89
+
+Ye et al.
+
+1669
+
+Table 5. Ablation studies among 478 results.
+
+Ablations of differentiation
+
+Parallel computation
+
+Computing time in s on average
+
+No ablation, with AD Replacing AD by full ﬁnite
+difference Replacing AD by reduced
+ﬁnite difference With AD Replacing AD by reduced
+ﬁnite difference
+
+Turned on Turned on
+Turned on
+Turned off Turned off
+
+8.08 17.46
+13.53
+33.45 50.26
+
+longer than our method, rendering it unacceptable in the current scenario.
+The computing time sees a signiﬁcant reduction compared to the old reduced Hessian method from Ye et al. (2022). The inﬂuencing factors for this reduction can be the differentiation methods, the parallel computation, and the improved convergence. The impacts of these factors are investigated in an ablation study as shown in Table 5. In the ablation of differentiation methods, AD is replaced by the full dimensional ﬁnite difference and the reduced ﬁnite difference. Compared to the AD, the full dimensional ﬁnite difference takes 116.1% longer time, and the reduced dimensional ﬁnite difference 67.5% longer. The inﬂuencing factor of the parallel computation contributes to an acceleration factor of four according to the comparison with the last two ablations in Table 5. The inﬂuence factor of the improved convergence is indicated by a comparison between the last row of Table 4 with the last row of Table 5 where the reduced ﬁnite difference and the lack of parallel computation are identical to the old testing conditions in Ye et al. (2022). But the computing time 50.26 s using the new reduced Hessian method is still 23.7% shorter than the result 65.89 s of the old one.
+As a conclusion, the trade-offs in existing methods between the computational complexity and the whole-path optimality, as well as between the accurate constraint satisfaction and a high convergence speed are resolved by our method. We reach both a light computational complexity (embodied in the shorter computing time) and an improved whole-path optimality (reduction of objective function). Meanwhile, we also achieve an accurate constraint
+
+Table 7. Cost reduction in minus percentage against control point numbers l1 and B-spline orders κ.
+
+satisfaction (high success rate in terms of limited constraint errors), as well as a high convergence speed.
+
+Sensitivity of spline representation. To examine the robustness of the reduced Hessian method, a sensitivity analysis of spline representation is conducted analogue to Kabir et al. (2021). For the test case of pulling a spring, a range of number of control points l1 from 20 to 85 and a range of B-spline order κ from two to ten are tested. For such a wide range, the regularizations for the vertical and horizontal steps in Remark 2 and Remark 3 contribute the greatest to the following results without large variations. The sensitivity tests are recorded in the color-mapped Tables 6–8. The background color
+
+corresponds to a value with high performance,
+
+while the background color
+
+with a value in
+
+red corresponds to a critical one.
+
+The position errors of the TCP from the given path are
+
+computed both at and between sampled points, among
+
+which the maximal value is given in Table 6. The position
+
+errors are kept below 2 mm for all cases except when the
+
+number of control points is at the lowest l1 = 20 due to the lack
+of approximation capability of B-spline for the Cartesian path with insufﬁcient control points. The cost reduction in Table 7
+
+shows that the capability of the reduced Hessian method
+
+weakens gradually for high number of control points and high
+
+number of B-spline order. In one exceptional case with the
+
+lowest number of control points and the highest B-spline
+
+order, the method fails to descend. This can be explained due to the difﬁculty in the line search. As the step length does not approach α = 1, no guarantee of Theorem 6 is provided. The computing time in Table 8 shows the general high efﬁciency
+
+Table 6. TCP position error in mm against control point numbers l1 and B-spline orders κ.
+
+Table 8. Computing time in second against control point numbers l1 and B-spline orders κ.
+
+1670
+
+The International Journal of Robotics Research 45(11)
+
+Figure 14. The path for the milling process.
+
+To validate the ADMM inter-segment coordinated descend method, we split the path into three segments which are labeled with numbers in Figure 14. Inter-segment constraints are set to be (5) and (18) only. We compare the multi-segment planning results against the singlesegment baseline. A variation of B-spline order between 3 and 4 is also made. For all these test instances, two robots are physically coupled and the TCP stiffness is optimized. No feasible initial solution guess is provided, since a feasible one is unlikely to be found manually or randomly in view of the complexity of the path. Instead, the optimization process starts with an arbitrary placement that renders the areas around the second and the ninth corner of the path unreachable within the joint limits.
+
+of the method for number of control points lower or equal to
+40 and B-spline order lower or equal to eight. The compu-
+tations with less cost reduction generally require more computing time because of the difﬁculty in line search and
+consequently more iterations.
+To further improve TCP tracking accuracy toward sub-
+millimeter region, one should leverage the online path tracking control (Ye et al., 2024) instead of reﬁning the ofﬂine trajectory planning in the present paper. The error
+correction during the online tracking control works effec-
+tively as long as the position error is under 2 mm during the ofﬂine planning.
+
+Multi-segment milling
+To generate the milling trajectories, the proposed ADMM inter-segment coordinated descend is utilized and validated against the single-segment baseline. By executing the generated trajectories in the real-world milling, we demonstrate that the physical coupling and the trajectory optimization method set achieve a signiﬁcant stiffness improvement.
+Settings for ADMM validation. As shown in Figure 14, the three-dimensional path for the milling process consists of 11 straight lines and ten corners. On three of the straight lines, the milling head engages on the material, resulting in process forces. To approximate this path with sufﬁcient accuracy, B-splines with 75 control points are used.
+
+Table 9. Performance of the test instances after 30 iterations.
+
+Number of B-spline Computing segments order time in s
+
+Cost
+
+Max.
+
+reduction, % error
+
+1
+
+3
+
+138.2
+
+À18.76
+
+12.68 mm
+
+1
+
+4
+
+173.1
+
+À12.89
+
+0.342 mm
+
+3
+
+3
+
+204.1
+
+À19.47
+
+0.088 mm
+
+3
+
+4
+
+209.1
+
+À19.47
+
+0.085 mm
+
+ADMM computational results. The computational results of the aforementioned test instances are shown in Table 9. The single-segment planning with third-order B-splines results in a large error in path tracking and coupling, meaning it fails to ﬁnd a feasible solution starting from the infeasible initial solution. The single-segment planning with fourthorder B-splines ﬁnds a feasible solution with inadequate cost reduction. The two results of the single-segment planning can be explained by the high complexity of the path, as well as the lack of an inter-segment slackness while pushing the solution toward a feasible optimum. Both of the two results of the 3-segment planning with the ADMM inter-segment coordinated descend are feasible and exhibit a larger cost reduction. There is no signiﬁcant difference between the two results with different B-spline orders. However, comparing the computing time of Tables 8 and 9, the parallel computing of ADMM does not increase the computational efﬁciency due to the following reasons. To ensure the inter-segment continuity, the coordination between the three parallel threads requires additional computation. Despite the 30 iterations of the reduced Hessian method in all test instances, ADMM leads to a slower convergence rate of QPsubproblems and thus more iterations for QP and line search in the inner loop.
+To reduce the computing time, we improve the convergence behavior using the fast ADMM with the Nesterov acceleration, as given in Algorithm 7 of Goldstein et al. (2014). However, our fast ADMM algorithm differs from Goldstein et al. (2014) in the use of the parallel computation, instead of the sequential one. This means, when calling the function optimizeSingleSegment and solving (23) for the m-th segment, the solution of, for example, the (m À 1)-th segment ezmÀ1 is not the newest result but is from the last iteration. The Nesterov interpolation is only carried out if the augmented Lagrangians (23) of all segments decrease in the last iteration.
+As a result, a faster cost reduction is achieved as shown in Table 10. We stop the iteration when the cost reduction is greater than the original ADMM method in Table 9. Instead
+
+Ye et al.
+
+1671
+
+of 30 iterations there, the fast ADMM method is ﬁnished after 19 iterations. The computing time is halved despite the slight increase of the maximal error.
+Further potential improvements are possible in the reﬁnement of initial guesses, the adjustment of the frequency ratio between the updates of functions optimizeSingleSegment and coordinateSegments (see Algorithm 1), as well as tuning the coefﬁcients of P in (23).
+Further settings for the real milling. To demonstrate that the physical coupling and the trajectory planning method set achieve a signiﬁcant stiffness improvement, we formulate and test the following two hypotheses:
+Hypothesis 1. Compared to a joint trajectory without stiffness optimization, the physically coupled robots moving along the optimized trajectory have a higher TCP stiffness.
+Hypothesis 2. The physically coupled robots moving along their optimized joint trajectories have a higher TCP stiffness, compared to the TCP stiffness of a single robot moving along its own optimized trajectory.
+In the following real-world milling, the path for the milling process in Figure 14 still applies. All trajectories are generated by the 3-segment ADMM method with thirdorder B-splines.
+To test Hypothesis 1, the placement and trajectories for the milling process with two physically coupled robots as in Figure 1 are optimized, once with and once without the nonzero stiffness term in the objective function, as given in (21) and (22). To test Hypothesis 2, the robot on the right-handside is detached from the coupler. The TCP stiffness of the remaining single-robot system with the coupler is optimized, as in Figure 15(a). The coupler attached to the single robot brings a disadvantageous lever arm from the TCP to the robot. To make a fair comparison, an additional stiffness optimized milling experiment with a shorter adapter is conducted, as shown in Figure 15(b).
+In the milling experiments, joint space impedance control is used with the controller stiffness set to its maximum at 2000 N m radÀ1 for all joints. The resulting joint stiffness is analogue to the stiffness of two serially connected springs, one for the controller and the other for the mechanical joint. With the mechanical stiffness
+
+identiﬁed in Busson et al. (2017), the resulting joint stiffness is shown in Table 11. The proportional-derivativetype impedance control mode is chosen against the proportional–integral–derivative-type position control for the quantitative experimental validation, because the stiffness values of the latter are unknown, nonconﬁgurable, and non-constant due to the integral term.
+Remark 5. We are aware that an accuracy-oriented setpoint compensation for joint angles or TCP pose is possible in the practice (Ye et al., 2024), but this is not done in the milling experiments because the enhancement of absolute accuracy is not the purpose of the present paper and does not inﬂuence the result of stiffness evaluations. We focus on the stiffness enhancement which is the reduction of deviation under the process wrench.
+In the experiments, the process wrench is estimated with the joint torque sensors of the robots. After ﬁnding the difference of joint torques between a run with and a run without milling, this difference is transformed into the Cartesian space as the process wrench on TCP.
+For two physically coupled robots, the resulting process wrench is the sum obtained from the two robots. The deviation under process wrench is estimated from the difference of link-side joint angles of robot r = 1 between a run with and a run without milling. This difference is then transformed into the Cartesian space to obtain the deviation on TCP. This estimation does not involve robots other than r = 1, because in this way, the small error in the placement of
+
+Table 10. Performance of the Nesterov-accelerated fast ADMM for the three segments.
+
+B-spline
+
+Computing
+
+order Iterations time in s
+
+Cost
+
+Max.
+
+reduction, % error
+
+3
+
+19
+
+102.0
+
+4
+
+19
+
+102.2
+
+À19.50 À19.51
+
+0.117 mm 0.087 mm
+
+Figure 15. Settings of single-robot milling to compare against Figure 1 in testing Hypothesis 2.
+
+Table 11. Resulting joint stiffness in kN m radÀ1.
+
+Joint 1
+
+2
+
+3
+
+4
+
+5
+
+6
+
+7
+
+Value 1.91 1.90 1.72 1.82 1.60 1.31 1.41
+
+1672
+
+The International Journal of Robotics Research 45(11)
+
+Figure 16. Experimental results with two robots in a physically coupled conﬁguration after the optimization of TCP stiffness.
+
+the second robot w.r.t. the ﬁrst one has no inﬂuence on the estimation.
+Milling results. Due to the variation of work-piece placement among different experiments, all the milling results are given in the work-piece coordinate system for a better comparability. Even in the same coordinate, the process wrench is not identical among the experiments, because the different TCP stiffness values lead to different deviations away from the material. As the TCP is engaged at different depth, the process wrench is also different. Despite this, the
+
+TCP stiffness in different experiments, as a quotient between process wrench and deviation, is still comparable.
+It is observed that the rotational components of the process wrench range from 0.5 N m to 2.0 N m for all the experiments, depending on the TCP stiffness and the depth of material engagement. Since this magnitude of the process torque is insigniﬁcant compared to that of the process force, we only compare the translational components in the following plots.
+Hypothesis 1 is validated with a comparison between the milling experiment of Figure 16, Table 12 and that of
+
+Table 12. Decision variables and stiffness values (in N mmÀ1) from the milling experiment of Figure 16.
+
+xwp
+
+ywp
+
+zwp
+
+fwp
+
+q13 (t = 0)
+
+q23 (t = 0)
+
+Kxx1
+
+Kxx2
+
+Kxx3
+
+Kzz1
+
+Kzz2
+
+Kzz3
+
+0.642 À0.049 0.349 m À0.491 rad 0.343 rad 0.283 rad 146 27.0 37.2 31.9 30.0 30.0
+
+Figure 17. Experimental results with two robots in a physically coupled conﬁguration without optimizing TCP stiffness.
+
+Table 13. Decision variables and stiffness values (in N mmÀ1) from the milling experiment of Figure 17.
+
+xwp
+
+ywp
+
+zwp
+
+fwp
+
+q13 (t = 0)
+
+q23 (t = 0)
+
+Kxx1
+
+Kxx2
+
+Kxx3
+
+Kzz1
+
+Kzz2
+
+Kzz3
+
+0.722 À0.155 0.350 m À0.763 rad 0.242 rad 0.349 rad 16.8 14.8 30.8 21.5 19.4 22.2
+
+Ye et al.
+
+1673
+
+Figure 18. Experimental results with a single robot using the same coupler after the optimization of TCP stiffness.
+
+Figure 17, Table 13. These two experiments both cor-
+respond to Figure 1, only with different work-piece placement and joint conﬁgurations. The different workpiece placements are given in the four parameters y ¼ ½xwp, ywp, zwp, fwpT in Tables 12 and 13. The different joint conﬁgurations are characterized by the angles of the
+redundant joints, here designated as the third joint q13 of the ﬁrst robot and q23 of the second robot. Only their values at t = 0 are given in the tables. As the robots move along the milling path with changing joint conﬁgurations,
+the TCP stiffness is non-constant. Therefore, average
+values of directional stiffness Kxx,m (x-force component to x-deviation, in direction of feed) and Kzz,m (z-force component to z-deviation, in direction of cutting depth)
+are taken in work-piece coordinate system for the three
+milling segments m = 1, 2, 3 separately.
+
+The results show that all the stiffness values in the optimized case are higher than the ones without optimization by at
+least 20.8% in x-direction and at least 35.1% in z-direction.
+Therefore, Hypothesis 1 is valid in the current test case. Hypothesis 2 is validated with a comparison between the
+milling experiment of Figure 16, Table 12 and that of Figure 18, Table 14. In both experiments, the coupler is used, as shown in Figures 1 and 15(a). Additionally, a comparison between the milling experiment of Figure 16, Table 12 and that of Figure 19, Table 15 is provided, corresponding to Figures 1 and 15(b), where the coupler is replaced by a shorter adapter. The results show that the optimized stiffness of two physically coupled robots compared to a single robot using the same coupler is higher by at least 9.8% in x-direction, at least 136% in z-direction. Apart from one exception in x-direction, the stiffness is more than
+
+Table 14. Decision variables and stiffness values (in N mmÀ1) with a single robot using the same coupler after the optimization of TCP stiffness.
+
+xwp
+
+ywp
+
+zwp
+
+fwp
+
+q13 (t = 0)
+
+q23 (t = 0)
+
+Kxx1
+
+Kxx2
+
+Kxx3
+
+Kzz1
+
+Kzz2
+
+Kzz3
+
+0.324 0.024 0.342 m À1.106 rad 0.256 rad n.a.
+
+13.1 24.6 15.2 11.4 12.7 11.1
+
+Figure 19. Results with a single robot using a shorter adapter after the optimization of TCP stiffness.
+
+1674
+
+The International Journal of Robotics Research 45(11)
+
+Table 15. Decision variables and stiffness values (in N mmÀ1) with a single robot using a shorter adapter after the optimization of TCP stiffness.
+
+xwp
+
+ywp
+
+zwp
+
+fwp
+
+q13 (t = 0)
+
+q23 (t = 0)
+
+Kxx1
+
+Kxx2
+
+Kxx3
+
+Kzz1
+
+Kzz2
+
+Kzz3
+
+0.309 0.016 0.271 m À1.327 rad 0.222 rad n.a.
+
+11.1 13.3 11.9 17.8 16.8 12.9
+
+doubled. Compared to a single robot using the shorter adapter, the optimized stiffness of two physically coupled robots is still always higher. Therefore, Hypothesis 2 is valid in the current test case. Moreover, there exists a correlation between the y-component of translational deviation and the process force in x and z directions for a single robot, which is less signiﬁcant for physically coupled robots.
+The stiffness optimization in all above experiments is carried out assuming that the coupler is a rigid body, with Kc, r À1 ¼ O, r ¼ 1; 2 in (8), because its stiffness values are difﬁcult to determine. In the test instance of Table 12, the theoretical TCP stiffness values for two physically coupled robots in z-direction should be Kzz1 = 38.9 N mmÀ1, Kzz2 = 47.5 N mmÀ1, and Kzz3 = 36.9 N mmÀ1.
+Remark 6. The real-world stiffness is lower than the theoretical calculation, indicating the inﬂuence of the unmodeled coupler elasticity on the resulting TCP stiffness. This elasticity can be afﬁrmed by the experimental observation. On average among three milling segments in the experiment after the stiffness optimization, the process force induces an internal torque in the coupler of 28.1 N m, resulting in the rotational deformation of 2.07 × 10À3 rad. This rotational compliance of the coupler lowers the translational TCP stiffness. In case of the coupler used in Ye et al. (2022) with even lower stiffness, the TCP stiffness of two physically coupled robots can be lower than that of a single robot in Figure 15(b).
+Conclusion
+Methodologically, the constrained trajectory planning using our reduced Hessian method resolves the conﬂict in existing methods between computational complexity and whole-path optimality, as well as between accurate constraint satisfaction and high convergence speed. Practically, in robot-driven manufacturing processes, the present paper gives a positive answer to the feasibility question on the concept of physically coupling multiple robots for capability enhancements. The concept is made feasible in practice, if the complete method set provided in the present paper is applied.
+The proposed method set consists of an efﬁcient reduced Hessian optimization method in its core for the constrained trajectory planning, as well as various supporting techniques to evaluate the collective capabilities, approximate smooth motion trajectories, consider motion limits of robots, deal with highly complex manufacturing paths, and to handle multiple local
+
+optima in the robot conﬁgurations. The core reduced Hessian method is developed with the adaptation to robotic use cases where path and coupling constraints, B-spline trajectory approximation and motion limits are integrated. With these changes, the convergence guarantee in the literature does not apply anymore, but is newly given in the present paper, constituting a theoretical contribution. This advancement in theory is accompanied by an intensive empirical study of the proposed optimization method in comparison with the stateof-the-art, demonstrating the highest success rate of 78.87%, a large reduction of the objective function, low errors in coupling and path tracking, as well as reasonably low correlations of its performance w.r.t. variations in the trajectory parameterization. The practical problem of physical coupling is addressed in the real-world test case of robot-driven milling process. Despite the challenges in the complex path and the multiplicity of solutions in robotic conﬁgurations, the trajectory planning is made possible by the method set with an extension of ADMM parallel computing. Finally, it is shown that the capability of physically coupled robots is enhanced signiﬁcantly with the proposed method set.
+Acknowledgments The authors thank Robert Wilbrandt for valuable comments and suggestions and Yuying Zhao for the assisting work in the research.
+ORCID iDs Xin Ye  https://orcid.org/0000-0001-8067-2613 Tobias Schürmann  https://orcid.org/0000-0002-1967-7076 Stefan Schwab  https://orcid.org/0000-0002-2646-7755
+Author contributions Xin Ye conceptualized the research, developed the methods, did the formal analysis and proofs, and wrote the original draft. Max Grobbel and Tobias Schürmann provided critical reviews and corrections to the manuscript. Stefan Schwab provided critical reviews and corrections and revised the manuscript prior to the publication. So¨ren Hohmann conceptualized the research, revised the formal analysis and proofs, and provided critical reviews and corrections to the manuscript.
+Funding The authors disclosed receipt of the following ﬁnancial support for the research, authorship, and/or publication of this article: This work was funded by the Federal Ministry of Education and Research (BMBF) and the Baden-Württemberg Ministry of Science as part of the Excellence Strategy of the German Federal and State Governments. This work was conducted within the
+
+Ye et al.
+
+1675
+
+KIT Future Fields project Wertstromkinematik (www. wertstromkinematik.de) of the DFG Excellence Initiative.
+Declaration of conﬂicting interests The authors declared no potential conﬂicts of interest with respect to the research, authorship, and/or publication of this article.
+References
+Abele E, Weigold M and Kulok M (2006) Increasing the accuracy of a milling industrial robot. Production Engineering 13(2): 221–224.
+Abele E, Weigold M and Rothenbücher S (2007) Modeling and identiﬁcation of an industrial robot for machining applications. CIRP Annals 56(1): 387–390.
+Aginaga J, Zabalza I, Altuzarra O, et al. (2012) Improving static stiffness of the 6-RUS parallel manipulator using inverse singularities. Robotics and Computer-Integrated Manufacturing 28(4): 458–471.
+Andersson J, A˚ kesson J, and Diehl M. CasADi: A Symbolic Package for Automatic Differentiation and Optimal Control. In: Recent Advances in Algorithmic Differentiation. Edited by Forth S, Hovland P, Phipps E, Utke J, and Walther A, 297–307 Berlin, Heidelberg: Springer, 2012.
+Bachmann T, Nottensteiner K and Roa MA (2021) Automated planning of workcell layouts considering task sequences. In: 2021 IEEE International Conference on Robotics and Automation (ICRA), Xi’an, China, 30 May 2021–05 June 2021, pp. 12662–12668. IEEE.
+Bonalli R, Bylard A, Cauligi A, et al. (2019) Trajectory optimization on manifolds: a theoretically-guaranteed embedded sequential convex programming approach. ArXiv Preprint arXiv:1905.07654.
+Boumal N (2023) An Introduction to Optimization on Smooth Manifolds. Cambridge University Press.
+Boumal N, Mishra B, Absil PA, et al. (2014) Manopt, a Matlab toolbox for optimization on manifolds. Journal of Machine Learning Research 15(1): 1455–1459.
+Boyd S, Parikh N, Chu E, et al. (2011) Distributed optimization and statistical learning via the alternating direction method of multipliers. Foundations and Trends® in Machine learning 3(1): 1–122.
+Busson D, Bearee R and Olabi A (2017) Task-oriented rigidity optimization for 7 DOF redundant manipulators. IFAC-PapersOnLine 50(1): 14588–14593.
+Byrd RH and Nocedal J (1990) An analysis of reduced hessian methods for constrained optimization. Mathematical Programming 49(1): 285–323.
+Chiu SL (1988) Task compatibility of manipulator postures. The International Journal of Robotics Research 7(5): 13–21.
+Coleman TF and Sorensen DC (1984) A note on the computation of an orthonormal basis for the null space of a matrix. Mathematical Programming 29(2): 234–242.
+Conejo AJ, Castillo E, Minguez R, et al. (2006) Decomposition Techniques in Mathematical Programming: Engineering and Science Applications. Springer Science & Business Media.
+
+Curtin W and Scher H (1990) Mechanics modeling using a spring network. Journal of Materials Research 5(3): 554–562.
+De Maeyer J, Moyaers B and Demeester E (2017) Cartesian path planning for arc welding robots: evaluation of the descartes algorithm. In: 2017 22nd IEEE International Conference on Emerging Technologies and Factory Automation (ETFA), Limassol, Cyprus, 12–15 September 2017, pp. 1–8. IEEE.
+Diaz Posada JR, Schneider U, Sridhar A, et al. (2017) Automatic motion generation for robotic milling optimizing stiffness with sample-based planning. Machines 5(1): 3.
+Erhart S and Hirche S (2016) Model and analysis of the interaction dynamics in cooperative manipulation tasks. IEEE Transactions on Robotics 32(3): 672–683.
+Gabay D (1982) Minimizing a differentiable function over a differential manifold. Journal of Optimization Theory and Applications 37: 177–219.
+Goldstein T, O’Donoghue B, Setzer S, et al. (2014) Fast alternating direction optimization methods. SIAM Journal on Imaging Sciences 7(3): 1588–1623.
+Han L (2001) A kinematics-based probabilistic roadmap method for closed chain systems. Algorithmic and Computational Robotics: New Directions: 233–246.
+Hoschek J and Lasser D (1993) Fundamentals of Computer Aided Geometric Design. AK Peters, Ltd.
+Jaillet L and Porta JM (2012) Path planning under kinematic constraints by rapidly exploring manifolds. IEEE Transactions on Robotics 29(1): 105–117.
+Jaquier N and Rozo L (2020) High-dimensional bayesian optimization via nested riemannian manifolds. Advances in Neural Information Processing Systems 33: 20939–20951.
+Jaquier N, Rozo L, Calinon S, et al. (2020) Bayesian optimization meets riemannian manifolds in robot learning. Proceedings of the Conference on Robot Learning. Proceedings of Machine Learning Research (PMLR), 100, 233–246.
+Kabir AM, Langsfeld JD, Kaipa KN, et al. (2018) Identifying optimal trajectory parameters in robotic ﬁnishing operations using minimum number of physical experiments. Integrated Computer-Aided Engineering 25(2): 111–135.
+Kabir AM, Kanyuck A, Malhan RK, et al. (2019) Generation of synchronized conﬁguration space trajectories of multi-robot systems. In: 2019 International Conference on Robotics and Automation (ICRA), Montreal, QC, Canada, 20–24 May 2019, pp. 8683–8690. IEEE.
+Kabir AM, Thakar S, Malhan RK, et al. (2021) Generation of synchronized conﬁguration space trajectories with workspace path constraints for an ensemble of robots. The International Journal of Robotics Research 40(2-3): 651–678.
+Kalakrishnan M, Chitta S, Theodorou E, et al. (2011) STOMP: stochastic trajectory optimization for motion planning. In: 2011 IEEE international conference on robotics and automation, Shanghai, China, 09–13 May 2011, pp. 4569–4574. IEEE.
+Kavraki LE, Svestka P, Latombe JC, et al. (1996) Probabilistic roadmaps for path planning in high-dimensional conﬁguration spaces. IEEE Transactions on Robotics and Automation 12(4): 566–580.
+
+1676
+
+The International Journal of Robotics Research 45(11)
+
+Kicki P, Liu P, Tateo D, Bou-Ammar H, Walas K, Skrzypczyn´ski P and Peters J (2023) Fast kinodynamic planning on the constraint manifold with deep neural networks. IEEE Transactions on Robotics 40: 277–297.
+Kingston Z, Moll M and Kavraki LE (2019) Exploring implicit spaces for constrained sampling-based planning. The International Journal of Robotics Research 38(10-11): 1151–1178.
+Kline M (1998) Taylor’s theorem and inﬁnite series. Calculus: An Intuitive and Physical Approach. Mineola, New York: Dover Publications, Inc., 637–642.
+Kunoth A (2018) Adaptive multiscale methods for the numerical treatment of systems of pdes. In: Splines and PDEs: From Approximation Theory to Numerical Linear Algebra. Edited by Kunoth A, Lyche T, Sangalli G, Serra-Capizzano S, Manni C, and Speleers H,77–159 Springer.
+Kupfer FS (1996) An inﬁnite-dimensional convergence theory for reduced sqp methods in hilbert space. SIAM Journal on Optimization 6(1): 126–163.
+LaValle SM and Kuffner JJJ (2001) Randomized kinodynamic planning. The International Journal of Robotics Research 20(5): 378–400.
+Lin Y, Zhao H and Ding H (2017) Posture optimization methodology of 6r industrial robots for machining using performance evaluation indexes. Robotics and ComputerIntegrated Manufacturing 48: 59–72.
+Lu L, Zhang J, Tian X, et al. (2021) Tool path optimization for robotic surface machining by using sampling-based motion planning algorithms. Journal of Manufacturing Science and Engineering 143(1): 011002.
+Lyche T, Manni C and Speleers H. (2018) Foundations of spline theory: B-splines, spline approximation, and hierarchical reﬁnement. In: Splines and PDEs: From Approximation Theory to Numerical Linear Algebra. Edited by Kunoth A, Lyche T, Sangalli G, Serra-Capizzano S, Manni C and Speleers H. (pp. 1–76), Springer, 2018.
+Malhan RK, Kabir AM, Shah B, et al. (2019) Identifying feasible workpiece placement with respect to redundant manipulator for complex manufacturing tasks. In: 2019 International Conference on Robotics and Automation (ICRA), Montreal, QC, Canada, 20–24 May 2019, pp. 5585–5591. IEEE.
+Martin BJ and Bobrow JE (1999) Minimum-effort motions for open-chain manipulators with task-dependent end-effector constraints. The International Journal of Robotics Research 18(2): 213–224.
+Menasri R, Nakib A, Oulhadj H, et al. (2013) Path planning for redundant manipulators using metaheuristic for bilevel optimization and maximum of manipulability. In: 2013 IEEE international conference on Robotics and Biomimetics (ROBIO), Shenzhen, China, 12–14 December 2013, pp. 145–150. IEEE.
+Mühlbeier E, Go¨nnheimer P, Hausmann L, et al. (2021) Value stream kinematics. In: Production at the leading edge of technology: Proceedings of the 10th congress of the german academic association for production technology (WGP), Dresden, 23–24 September 2020, pp. 409–418.
+
+Mutti S, Nicola G, Beschi M, et al. (2021) Towards optimal task positioning in multi-robot cells, using nested meta-heuristic swarm algorithms. Robotics and Computer-Integrated Manufacturing 71: 102131.
+Neumaier A (1998) Solving ill-conditioned and singular linear systems: a tutorial on regularization. SIAM Review 40(3): 636–666.
+Nicola G, Pedrocchi N, Mutti S, et al. (2018) Optimal task positioning in multi-robot cells, using nested meta-heuristic swarm algorithms. Procedia CIRP 72: 386–391.
+Nocedal J and Wright SJ (1999) Numerical Optimization. Springer. Pan Z, Wang D, Deng H, et al. (2019) A virtual spring method for the
+multi-robot path planning and formation control. International Journal of Control, Automation and Systems 17: 1272–1282. Pennec X, Fillard P and Ayache N (2006) A riemannian framework for tensor computing. International Journal of Computer Vision 66: 41–66. Perzylo A, Rickert M, Kahl B, et al. (2019) Smerobotics: smart robots for ﬂexible manufacturing. IEEE Robotics and Automation Magazine 26(1): 78–90. Piegl L and Tiller W (2012) The NURBS Book. Springer Science & Business Media. Qureshi AH, Dong J, Baig A, et al. (2021) Constrained motion planning networks x. IEEE Transactions on Robotics 38(2): 868–886. Ranjbaran F, Angeles J and Kecskeme´thy A (1996) On the kinematic conditioning of robotic manipulators. Proceedings of IEEE International Conference on Robotics and Automation 4: 3167–3172. Schmid C and Biegler LT (1994) Quadratic programming methods for reduced hessian sqp. Computers & Chemical Engineering 18(9): 817–832. Schulman J, Duan Y, Ho J, et al. (2014) Motion planning with sequential convex optimization and convex collision checking. The International Journal of Robotics Research 33(9): 1251–1270. Shimizu M, Kakuya H, Yoon WK, et al. (2008) Analytical inverse kinematic computation for 7-dof redundant manipulators with joint limits and its application to redundancy resolution. IEEE Transactions on Robotics 24(5): 1131–1142. Sintov A, Borum A and Bretl T (2018) Motion planning of fully actuated closed kinematic chains with revolute joints: a comparative analysis. IEEE Robotics and Automation Letters 3(4): 2886–2893. Takacs S and Takacs T (2016) Approximation error estimates and inverse inequalities for b-splines of maximum smoothness. Mathematical Models and Methods in Applied Sciences 26(07): 1411–1445. Tang Y, Shen W, Mamaev I, et al. (2023) Towards ﬂexible manufacturing: motion generation concept for coupled multirobot systems. In: 2023 IEEE 19th international Conference on Automation Science and Engineering (CASE), Auckland, New Zealand, 26–30 August 2023, pp. 1–7. IEEE. Ugray Z, Lasdon L, Plummer J, et al. (2007) Scatter search and local nlp solvers: a multistart framework for global optimization. INFORMS Journal on Computing 19(3): 328–340. Wang Y, Wang S and Wu L (2017) Distributed optimization approaches for emerging power systems operation: a review. Electric Power Systems Research 144: 127–135.
+
+Ye et al.
+
+1677
+
+Weingartshofer T, Bischof B, Meiringer M, et al. (2023) Optimizationbased path planning framework for industrial manufacturing processes with complex continuous paths. Robotics and Computer-Integrated Manufacturing 82: 102516.
+Yakey JH, LaValle SM and Kavraki LE (2001) Randomized path planning for linkages with closed kinematic chains. IEEE Transactions on Robotics and Automation 17(6): 951–958.
+Ye X, Majer N, Schwab S and Hohmann S (2025) Real-world accuracy improvement for cooperative manipulation using model predictive control. IFAC-PapersOnLine 59(17): 209–214.
+Ye X, Schwartz M and Hohmann S (2022) Stiffness optimized multi-robot behavior planning using reduced hessian method. IFAC-PapersOnLine 55(38): 55–60.
+Ye X, Handwerker K and Hohmann S (2024) Adaptive model predictive control for differential-algebraic systems towards a higher path accuracy for physically coupled robots. In: 2024 IEEE/RSJ international conference on Intelligent Robots and Systems (IROS), Abu Dhabi, United Arab Emirates, 14–18 October 2024, pp. 8497–8503. IEEE.
+Zha F, Liu Y, Guo W, et al. (2018) Learning the metric of task constraint manifolds for constrained motion planning. Electronics 7(12): 395.
+Zucker M, Ratliff N, Dragan AD, et al. (2013) Chomp: covariant hamiltonian optimization for motion planning. The International Journal of Robotics Research 32(9-10): 1164–1193.
+
+Appendix Appendix A: Proofs
+Lemma 1. =θeTposeδθN, jðu, zk Þ ¼ 0.
+
+Proof. Denote =θeTposeðu, zkÞ ¼ Je, therefore,
+
+=θepose T δθN, jðu, zk Þ ¼ JeÀI À J eþJeÁδθred, j
+
+¼ JeðI À ½J eT ðJeJ eT ÞÀ1JeÞδθred, j
+
+
+
+
+
+T
+
+T À1
+
+¼ Je À JeJ e ðJeJ e Þ Je δθred, j ¼ 0: □
+
+2
+
+3
+
+Gðu1Þ
+
+Denoting 4 ⋮ 5 ¼ G 2 Rlnθ×nðlnθ > nÞ, then the
+
+Gðul Þ
+
+middle part of (73) is represented by the orthogonal projection matrix P ¼ G Á G þ. Considering the structure of G(u) in (13),
+
+there exists a permutation matrix H that transforms G into the
+
+block-diagonal matrix Gb, such that:
+
+2 Geðu1Þ
+
+6 6
+
+⋮
+
+G ¼ HGb ¼ H666 GeðulÞ
+
+6
+
+4
+
+3 7 7 7 7 I 77: ⋮5
+
+I
+
+The pseudo inverse of the block-diagonal Gb can be calculated separately for the blocks, one for the nJ joints of robots and the other for the npr + npw placement variables. The upper-left block of Gb that consists of l concatenation of matrix GeðuÞ 2 RnJ×lnJ is invertible due to the B-spline basis. Therefore, the following applies:
+
+G Á G þ ¼ HGb Á H G  b ¼ H G þ bGbþH T
+
+G 2 2 eðu1Þ 32 Geðu1Þ 3À1
+
+66 6
+
+76
+
+7
+
+6 64
+
+⋮
+
+76 54
+
+⋮
+
+7 5
+
+6
+
+6 6
+
+Ge ðul Þ
+
+Ge ðul Þ
+
+¼ H666
+
+6
+
+6
+
+6
+
+4
+
+3
+
+7
+
+7
+
+7
+
+7
+
+7
+
+7 7
+
+T
+
+2 32 3þ 7H
+
+I I7
+
+7
+
+6 76 7 7
+
+6 ⋮ 76 ⋮ 7 7
+
+4 54 5 5
+
+II
+
+2 IlnJ
+6 6 6 ¼ H6 6 4
+
+3 2 32 3þ 7 I I 7 6 76 7 77HT : 6 ⋮ 76 ⋮ 7 7 4 54 5 5
+
+II
+
+Lemma 2. =zeTposeδzplc, j ¼ 0.
+
+Proof. According to (35) and (36),
+
+2 =θepose T ðu1ÞGðu1Þ 32 Gðu1Þ 3þ2 δθN, jðu1Þ 3
+
+T
+
+6
+
+76
+
+76
+
+7
+
+=zeposeδzplc, j ¼ 4
+
+⋮
+
+54 ⋮ 5 4 ⋮ 5
+
+=θeTposeðulÞGðulÞ GðulÞ
+
+δθN, jðulÞ
+
+2 =θepose T ðu1Þ 32 Gðu1Þ 32 Gðu1Þ 3þ2 δθN, jðu1Þ 3 (73)
+
+6
+
+76
+
+76
+
+76
+
+7
+
+¼4
+
+⋱
+
+54 ⋮ 54 ⋮ 5 4 ⋮ 5:
+
+=θepose T ðulÞ GðulÞ GðulÞ
+
+δθN, jðulÞ
+
+1678
+
+The International Journal of Robotics Research 45(11)
+
+Then it follows:
+
+2
+
+2 δθN, jðu1Þ 3
+
+IlnJ 6
+
+þ6
+
+7
+
+6 6
+
+G ÁG
+
+6 4
+
+⋮
+
+7 5
+
+¼
+
+H
+
+6
+
+6 4
+
+δθN, jðulÞ
+
+3 2 δθN,Jjðu1Þ 3
+
+6
+
+7
+
+2
+
+32
+
+3þ 7
+
+6 6
+
+δθ
+
+N,P
+
+j
+
+ð
+
+u
+
+1
+
+Þ
+
+7 7
+
+I
+
+I
+
+7 7
+
+T6
+
+7
+
+6
+
+76
+
+7
+
+7H
+
+6 6
+
+⋮
+
+7 7
+
+6 ⋮ 76 ⋮ 7 7 4 54 5 5
+
+6
+
+7
+
+6 4
+
+δθN,Jj ðul Þ
+
+7 5
+
+II
+
+δθN,Pj ðul Þ
+
+2 δθN,Jjðu1Þ 3
+
+2
+
+36
+
+7
+
+δθN,Jjðu1Þ
+
+6
+
+⋮
+
+7
+
+2
+
+36
+
+7
+
+6 6
+
+7 7
+
+IlnJ
+
+6⋮7
+
+6
+
+7
+
+6 2 32 3þ 76
+
+7
+
+6 6
+
+δθN,Jj ðul Þ
+
+7 7
+
+6
+
+7
+
+6 6 ¼ H6
+
+I
+
+I
+
+76 76
+
+δθN,Jj ðul Þ
+
+7 7
+
+6 1 Xl
+
+7
+
+6 76 7 76
+
+7
+
+¼
+
+H
+
+6 6
+
+δθ
+
+N,P
+
+j
+
+ð
+
+u
+
+i
+
+Þ
+
+7 7
+
+6 4
+
+6 ⋮ 76 ⋮ 7 4 54 5
+
+7 5
+
+6 6
+
+δθ
+
+N,P
+
+j
+
+ðu
+
+1
+
+Þ
+
+7 7
+
+6 l i¼1
+
+7
+
+6
+
+76
+
+7
+
+(74)
+
+I I 64 ⋮ 75 666 ⋮ 777
+
+6 Xl
+
+7
+
+δθN,Pj ðul Þ
+
+41
+
+5
+
+δθN,PjðuiÞ
+
+l i¼1
+
+2 δθN,Jjðu1Þ 3
+
+6 6
+
+Xl
+
+7 7
+
+61 6
+
+δθ
+
+N,P
+
+j
+
+ðu
+
+i
+
+Þ
+
+7 7
+
+6 l i¼1
+
+7
+
+6
+
+7
+
+¼ 666 ⋮ 777:
+
+666 δθN,JjðulÞ 777
+
+6 4
+
+1
+
+Xl
+
+7 5
+
+δθN,PjðuiÞ
+
+l i¼1
+
+Since δθN, jðuÞ 2 Rnθ is a basis for the adjustment of the j-th placement variable, δθN,j(u) changes no other
+placement variables. Moreover, the entry of the j-th placement in δθN, jðuÞ 2 Rnθ is one, so δθN,Pj (ui) are equal to each other for all i = 1, …, l. Consequently, we have:
+
+1 Xl
+
+1
+
+δθN,PjðuiÞ ¼ Á l Á δθN,PjðuiÞ ¼ δθN,PjðuiÞ, 8i ¼ 1, …, l:
+
+l i¼1
+
+l
+
+2 =θepose T ðu1Þ 3
+
+6
+
+7
+
+=zepose T δzplc, j
+
+¼
+
+6 4
+
+⋱
+
+7 5
+
+2 δθN, jðu1Þ 3
+
+6
+
+7
+
+6⋮7
+
+4
+
+5
+
+=θepose T ðulÞ
+
+δθN, jðulÞ
+
+¼ 0:
+
+□
+
+Thus, (74) can be further written as:
+
+2
+
+3
+
+δθN,Jjðu1Þ
+
+2
+
+3
+
+2 δθN, jðu1Þ 3
+
+6 6
+
+δ
+
+θ
+
+N,P
+
+j
+
+ð
+
+u
+
+1
+
+Þ
+
+7 7
+
+δθN, jðu1Þ
+
+G Á G þ4 ⋮ 5 ¼ 6 ⋮ 7 ¼ 4 ⋮ 5:
+
+6
+
+7
+
+δθN, jðulÞ
+
+4 δθN,JjðulÞ 5
+
+δθN, jðulÞ
+
+δθN,Pj ðul Þ
+
+Afterward, Lemma 1 can be utilized to ﬁnish the proof:
+
+Theorem 4. (The So-Called Mean Value Theorem)
+For all z 2 Rnz , B 2 RðnzÀneÞ×ðnzÀneÞ, there is: kζ ðz, BÞ À ζ ðbz, BÞ À =ζ ðbz, BÞðz À bzÞk≤ μkz À bzk2: 2
+Proof. We utilize Taylor’s theorem for vector-valued functions with the Lagrange mean value form of the remainder (Kline, 1998). Taylor’s theorem is applied for ζ ðz, BÞ at the point of expansion bz:
+
+Ye et al.
+
+1679
+
+ÀÁ ÀÁ ÀÁ ζ z, B À ζ bz, B À =ζ bz, B ðz À bzÞ
+
+¼ 1ðz À bzÞT ζ 00ÀηL, BÁðz À bzÞ, (75) 2
+
+whereby ζ 00ðηL, BÞ is the three-dimensional Hessian tensor.
+
+The value of ηL is between z and bz. Due to (62), we denote
+
+À
+
+Á0
+
+ζ 00ðηL, BÞ ¼ =dðηL, BÞ . Inequality (68) is proved by
+
+taking norms of (75) and combining with (63). □
+
+Lemma 5. (Relation between zkÀ1, zk, zk+1, and bz)
+
+If the step length of the line search takes α = 1 after sufﬁcient number of iterations, there exists a constant β > 0 such that:
+kÀ=vðbzÞ þ ZzðbzÞ=vqpðbzÞÁðzkþ1 À zkÞk≤βkzkÀ1 À bzk2:
+
+Proof. We formulate the left side of (69) to reach a form comparable to the left side of (68) in Theorem 4. As a preparation, we calculate:
+À=vðbzÞ þ ZzðbzÞ=vqpðbzÞÁ=dðbz, BkÞ=ζ ðbz, BkÀ1Þ:
+
+This is done by expanding the expression with products
+
+between =vðbzÞ, =vqpðbzÞ, =hqpðbz, BkÞ and =hqpðbz, BkÀ1Þ us-
+
+ing (54)–(58) and (62). These products have the following
+
+properties:
+
+=vðbzÞ=vðbzÞ ¼ À=vðbzÞ,
+
+(76)
+
+=vðbzÞZzðbzÞ ¼ O,
+
+(77)
+
+=vqpðbzÞZzðbzÞ ¼ ZqpZqpþ À I ,
+
+(78)
+
+ÀÁ ZzðbzÞ=vqpðbzÞZzðbzÞ=hqp bz, Bκ ¼ O, for κ ¼ k À 1, k
+
+(79)
+
+whereby (76) is a direct result of (55); (77) is a direct result of (55) and (28), whereas (28) is guaranteed by Lemma 2 and (43); (78) is a result of (57), (53), and (77); (79) is a result of (78) and (58). After some lengthy calculation using (76)–(79), it is veriﬁed:
+À=vðbzÞ þ ZzðbzÞ=vqpðbzÞÁ=dðbz, BkÞ=ζ ðbz, BkÀ1Þ ¼ αð1 À αÞ=vðbzÞ: (80)
+
+If the step length of the line search can take α = 1 after sufﬁcient iterations, (80) is equal to the zero matrix.
+
+Now we reformulate the left side of (69):
+
+À
+
+Á
+
+=ÀvðbzÞþZzðbzÞ=vqpðbzÞ ðÁzkÂþ1 ÀzkÞ
+
+Ã
+
+¼À=vðbzÞþZzðbzÞ=vqpðbzÞÁÂζ ðzk,BkÞÀbzÀðzk ÀbzÞ
+
+¼ =ÀvðbzÞþZzðbzÞ=vqpðbzÞ ζ ðzÁk,BkÞÀζÃðbz,BkÞ
+
+ÀÀ I þ=dðbz,BkÞÀ=dðbzÁ,ÂBkÞ ðzk ÀbzÞ
+
+¼ =vðbzÞþZzðbzÞ=vqpðbzÞ ζ ðzk,BÀkÞÀζ ðbz,BkÞ
+
+ÁÃ
+
+À=ζ ðbz,BkÞðzk ÀbzÞþ=dðbz,BkÞ ζ ðzkÀ1,BkÀ1ÞÀζ ðbz,BkÀ1Þ :
+
+The last equality is valid because of (62). We multiply
+
+(80) by zkÀ1 À bz in case of α = 1 and add it to the last part:
+
+À
+
+Á
+
+=vðbzÞ þ ZzðbzÞ=vqpðbzÞ ðzkþ1 À zkÞ
+
+¼ À=vðbzÞ þ ZzðbzÞ=vqpðbzÞÁÂζ ðzk, BkÞ À ζ ðbz, BkÞ
+
+À=ζ ðbz, BkÞðzk À bzÞ þ=dðbz, Bk ÞÀζ ðzkÀ1, BkÀ1Þ À ζ ðbz, BkÀ1Þ
+
+À=ζ ðbz, BkÀ1ÞðzkÀ1 À bzÞÞ:
+
+Finally, norms are taken and Theorem 4 is applied twice:
+
+À
+
+Á
+
+k =vðbzÞ þ ZzðbzÞ=vqpðbzÞ ðzkþ1 À zkÞk
+
+≤k=vðbzÞ þ ZzðbzÞ=vqpðbzÞk
+
+hμ
+
+2
+
+μ
+
+i
+2
+
+Á kzk À bzk þ k=dðbz, BkÞk kzkÀ1 À bzk :
+
+2
+
+2
+
+With the assumption (65) and (66), we further derive:
+
+À
+
+Á
+
+k =vðbzÞ þ ZzðbzÞ=vqpðbzÞ ðzkþ1 À zkÞk
+
+≤k=vðbzÞ þ ZzðbzÞ=vqpðbzÞkhμμ2kzkÀ1 Àbzk2 þ μ μkzkÀ1 Àbzk2i
+
+2
+
+2
+
+μ2ð1 þ μÞ
+
+2
+
+¼
+
+k=vðbzÞ þ ZzðbzÞ=vqpðbzÞkkzkÀ1 Àbzk :
+
+2
+
+We choose β ¼ μ2ð1 þ μÞ=2k=vðbzÞ þ ZzðbzÞ=vqpðbzÞk. □
+
+Theorem 6. (Two-Step Linear Convergence of the Reduced Hessian Method)
+
+After sufﬁcient number of iterations, if the active set I a of the QP-subproblem is found and no longer changes from iteration to iteration, and if the step length takes α = 1, then for each given constant 0 < ρ < 1, there exist a radius ε1 > 0 and a reduced Hessian approximation accuracy ξ > 0 such that for kzkÀ1 À bzk≤ε1, and for
+kZzðbzÞT BbZzðbzÞ À Bkk < ξ,
+
+the following applies: kzkþ1 À bzk≤ρkzkÀ1 À bzk:
+
+Proof. The difference between both sides of (71) lies only in
+the two steps of iteration, so we aim at representing the left side of (71) using ðzkÀ1 À bzÞ and some descending steps. We have the following two different expressions for the left side of (71):
+
+zkþ1 À bz ¼ ζ ðzk, BkÞ À ζ ðbz, BkÞ,
+
+(81)
+
+zkþ1 À bz ¼ ðzk À bzÞ þ ðzkþ1 À zk Þ:
+
+(82)
+
+The following way of combining (81) and (82) constitutes the left side of (68):
+
+1680
+
+The International Journal of Robotics Research 45(11)
+
+ÀI À =ζ ðbz, BkÞÁðzkþ1 À bzÞ ¼ ζ ðzk, BkÞ À ζ ðbz, BkÞ À =ζ ðbz, BkÞðzk À bzÞ
+À =ζ ðbz, Bk Þðzkþ1 À zkÞ:
+
+Combined with (62), one obtains:
+
+À =dðbz, BkÞðzkþ1 À bzÞ ¼ ζ ðzÀk, BkÞ À ζ ðbz, BkÁÞ À =ζ ðbz, BkÞðzk À bzÞ
+À I þ =dðbz, BkÞ ðzkþ1 À zkÞ
+
+Lemma 3 provides the inverse:
+
+zkþ1 Àbz À1Â Ã
+
+¼ À=dðbz, BkÞ ζ ðzk, BkÞ À ζ ðbz, BkÞ À =ζ ðbz, BkÞðzk ÀbzÞ
+
+À
+
+À1 Á
+
+þ =dðbz, BkÞ þ I ðzkþ1 À zkÞ:
+
+(83)
+
+The last term can be extended using Lemma 3, (29), and (53) to reach the form of (69) in Lemma 5:
+
+=dðbz, BkÞÀ1 þ I ¼ Z Z T B  bZ Z T B À1 b À  1ZTqpBkZqpZ þ
+α ¼ Z Z B  T bZ Z B À1 T bÀZzðbzÞZzðbzÞþ À =vðbzÞÁ
+
+À 1α Z Z T B  bZ ZTqpBk ZqpZ À1 þ
+
+
+
+À1
+
+¼ Z Z T BbZ Z T Bb
+
+Á ZzðbzÞ ZqpZ  h þqp þ ÀAT Zzðzk ÞÁþAT Zzðzk Þ ZzðbzÞ i þ À =vðbzÞ
+
+À 1α Z Z T B  bk Z ZTqpBk ZqpZ À1 þ ¼ Z Z T B  bZ ZTqp ZzðbzÞ À1 T BbZzðbzÞ À  1Bk ZqpZ þ 
+α À Z Z T B  bZ Z T B À1 bÀ=vðbzÞ þ ZzðbzÞ=vqpðbzÞÁ:
+
+(84)
+
+After combining (84) into (83), we take norms and use the triangle inequality:
+kzkþ1 Àbzk ≤k=dðbz,BkÞÀ1Âζ ðzk,BkÞÀζ ðbz,BkÞÀ=ζ ðbz,BkÞðzk ÀbzÞÃk þkZ Z T B  bZ ZTqp ZzðbzÞ À1 T BbZzðbzÞÀ  1Bk ZqpZ þðzkþ1 ÀzkÞk 
+α þkZ Z T B  bZ Z T B À1 bÀ=vðbzÞþZzðbzÞ=vqpðbzÞÁðzkþ1 ÀzkÞk:
+
+The ﬁrst term is handled with (68) of Theorem 4, the second one with (70, and the third one with (69) from Lemma 5, so we get:
+
+kzkþ1 À bzk
+
+≤μk=dðbz, BkÞÀ1kkzk À bzk2
+
+2
+
+
+
+À1
+
+þ ξkZ Z T BbZ ZqpT kkZqpZ þkkzkþ1 À zk k
+
+
+
+À1
+
+þ βkZ Z T BbZ Z T BbkkzkÀ1 À bzk2:
+
+The ﬁrst term is further estimated by (67), the second
+
+term
+
+by
+
+(64)
+
+with
+
+kzkþ1 À zk k ¼ kdðzk, BkÞk ¼ kdðzk, BkÞ À dðbz, Bk Þk:
+
+kzkþ1 À bzk
+
+≤ μ kzk À bzk 2 2
+
+2
+
+
+
+À1
+
+þ ξμkZ Z T BbZ ZTqpkkZqpZ þkkzk À bzk
+
+
+
+À1
+
+þ βkZ Z T BbZ Z T BbkkzkÀ1 À bzk2:
+
+With (65), we get an expression only dependent on kzkÀ1 À bzk as follows:
+
+kzkþ1 À bzk
+
+μ4
+
+
+
+À1
+
+!
+
+≤ þ βkZ Z T BbZ Z T Bbk kzkÀ1 À bzk2
+
+2
+
+(85)
+
+
+
+À1
+
+þ ξμ2kZ Z T BbZ ZTqpkkZqpZ þkkzkÀ1 À bzk:
+
+We choose an intermediate constant:
+
+
+
+À1
+
+c1 ≥ kZ Z T BbZ k Á maxfkZqpT kkZqpZ þk, kZ T Bbkg:
+
+For an arbitrary 0 < ρ < 1, the reduced Hessian approximation accuracy can be assumed to be ξ = ρ/2c1μ2 according to Remark 4, and the radius can be chosen as ε1 = ρ/μ4 + 2c1β with β from Lemma 5. Substituting these choices
+of constants into (85), we get:
+
+kzkþ1 À bzk ≤ μ þ βc1 ε1kzkÀ1 À bzk þ ξμ2 4 ! c1kzkÀ1 À bzk
+2 ¼ ρkzkÀ1 À bzk:
+
+Therefore, we have the two-step linear convergence for
+
+the reduced Hessian method in the robotic case with
+
+bounding constraints.
+
+□
+
+Corollary 7. (Two-Step Superlinear Convergence) After sufﬁcient number of iterations, if the active set I a of the QP-subproblem is found and no longer changes from iteration to iteration, if the step length takes α = 1,
+and if the reduced Hessian approximation has
+
+Ye et al.
+
+1681
+
+sufﬁcient accuracy as ξ in (70) approaches zero, then the following applies:
+limkzkþ1 À bzk ¼ 0: k→∞kzkÀ1 À bzk
+Proof. By manipulating (85), we obtain:
+
+kzkþ1 À bzk ≤ μ þ βc1 kzkÀ1 À bzk þ ξμ2 4 ! c1: (86) kzkÀ1 À bzk 2
+Due to the convergence, there is limk→∞kzkÀ1 À bzk ¼ 0. Also considering Remark 4, ξ approaches zero. Therefore, by taking limits on both sides of (86), we obtain (72). □
+
+

@@ -1,0 +1,515 @@
+Available online at www.sciencedirect.com
+ScienceDirect
+IFAC PapersOnLine 56-2 (2023) 3048–3053
+
+A Dual-Robot Cooperative Arc Welding Path Planning Algorithm A Dual-Robot Cooperative Arc Welding Path Planning Algorithm
+based on Multi-Objective Optimization A Dual-Robobt aCsoeodpoenraMtivueltAi-OrcbWjeecltdivinegOPpatitmh iPzlaatnionning Algorithm
+
+Qichao Tbaansge*d, LoeinMMa*u, Dltui-oOZbhajoe*c,tYivoengOkupitSiumni*z, aQtiinognyi Wang*
+Qichao Tang*, Lei Ma*, Duo Zhao*, Yongkui Sun*, Qingyi Wang*
+
+* School of Electrical Engineering, Southwest Jiaotong University, Chengdu, * SQchiocholCaohfiTnEaalne(cget-*rm,icLaaielli:EMqnigcaih*na,eoeD_ruitnaognZg, @Shoa1uo6t*h3,w.YceoosmtnJ;gimkauoaitloeSniu@gnsU*w,njQitvuie.nergsdiyutyi.c,WnC;ahnengg*du,
+China (zeh-maoadilu:oq@icshwajotu_.teadnug.@cn1;6y3k.scuonm@; smwajlteui.@edsuw.cjntu.).edu.cn; * School of EleczthraicoadluEo@ngsinwejetur.iendgu, .Sconu; tyhkwsuesnt@Jisawojttoun.egdUu.ncinv.e)rsity, Chengdu,
+China (e-mail: qichao_tang@163.com; malei@swjtu.edu.cn; Abstract: In this paper a novzehlaiomdpuroo@vesdwmjtuu.letdi-uo.bcjne;cytikvseung@ensewtijctua.legdour.icthnm.) (R-NSGA-Ⅱ) is proposed to Asoblvsetrathcet:pIrnobthleismpoapf edruaaln-roovbeoltimarpcrwoveelddinmgulptai-tohbpjelacntinviengg.enWeteicstarligvoerittohmfin(dRa-NloSwG-Aco-Ⅱst), ifsasptroapndosmedortoe esofflivceietnhtesporloubtiloenmfoorf dlauragle-rocobmotpalercx wcoemldpinognepnattsh. pFliarsntnlyin, ga. Wmueltsit-roibvjeectotivfeindopatimloiwza-ctioosnt, mfaosdt ealnodfmpoatrhe peAflbfainsctnireianncgttis:soIelnustttiahobinslispfhoaerpdelrabryagcenoocnvoseimldpeimrlienpxgrocvvoaemrdiopmuosnuevltnaitr-sioa.bbFjleiecrsstitavlnyed, gcaeonmnesuttirlctaii-anoltgbsojierncittthhivmeea(coRtpu-taNimlSwiGzeaAltdi-oiⅡnng) mpisroopdcreeolspsoo.fsTephdaetntho, tpsholealvnRen-itNnhgSeiGspAreos-btⅡalbeimlnistrhooefddudbcuyeaslc-aoronrbesiocdotemarirbncignwvaetailrodinoinumgsevpcaahrtaihanbpilslemasnantonindrgec.polWnasceterastihtnreitvsmeinuttotahtfeiionandctouapaellorwawtei-olcdnoinsotgf, pNfarSostGceaAsns-d.ⅡTm;htoehrnies, ctehafefnicRiine-cNnrtSeasGsoeAlut-thⅡioeindnitfvrooerdrsuliactryegsoeaf cironemdcoipvmliedbxuinacalsotimaonnpdomnpeeocnphtusal.naFitsiiomrnststl,oya,rneadplmfaicnuedlttith-hoeebmgjeluocttbaivtaileoonopoptiptmiemraailztsiaootinlouontifomNnoSwdGietAlh o-gⅡfr;epatahtteihsr pcparlaonnbinanibcnirgleitaiyss.eeFsttihanebaldlilisyvh,eeirdnsibotyyrdcoeofrnitnsoiddvieveriridinfugyavlfseaaraisnoidbuisplivotaypruailanabdtlieoesnffsae,ncadtnicvdoenfnisentsdrsatiohnfetstghilneotbphareol apocoptstueiamdl awallegsloodlriuintthgiompnr,owitcieitshssug.sTreehdaettenor, ppthlreaonbRas-boNimlSiteGyt.AyFp-iⅡincaailnlltywr,oeidlnduiconergdsesarerateomcovsmeorbfifiaynalfateiraogsneibmcioleimtcyhpaalennxdiscmeoffmteocprtoievnpeelnancet,eststhhoeefNmthSueGtpaAtrio-oⅡpnoaosnepdderOaaltMgiooOnriPothfSmON,SaiGtreiAsu-usⅡsee;ddtfhotiosr cpcoalanmnipnsaocrrmiesaeosntey. pTthihceeadlsiiwvmeeurlsdliaitntyigoonsfedianemdmisvooindfsutaraalltsaerasgnetdhcapotomRpp-uNlleaSxtGiocAnosm-,Ⅱpaoncnadnefniontb,dttahtiheneNbgeSltoGtebAralP-ⅡoarpaetntiomdfaOrloMsnotOltuhPtaiSonOnthwaerietohtuhgseerredtawftoeorr acplorgomobpraiabthriilmsitosyn...PFTainhrtaeilcsluyiml,airunllyao,tritdohenerdRteo-mNvoSenrGisftAyra-ftⅡeeasrsetihdbauiltciRteys-NatnhSdeGweAfaf-eiⅡtcintcigvaentniomebsetsaboinyf b4the2et.t3ep9rr%oPpaoarenstedodtfharoelgnnotorti-htlhaomnadt,hidetiiossttahunescreedtwbtooy 1apl0lga.on5r0si%tohmmceos.mtyPppaaircrteaicdluwwlaeirltldhyi,NntgShesGeRAam--NⅡsS.oGf Aa -lⅡargreedcuocmespltehxe cwoamitpinognetnimt,ethbeyN4S2G.3A9%-ⅡaannddthOeMnOo-PloSaOd adriestuasnecde fboyr 1co0m.5p0a%riscoonm. pTahreedsiwmiuthlaNtioSnGdAe-mⅡo.nstrates that R-NSGA-Ⅱ can obtain better Pareto front than the other two aKCleogypowyrirotihrgdmhsts:.©PPa2at0rht2ip3cluTahlnaenrlAiynu,gtht,hoderusR.aTl-h-NriosSbisGoatAn, a-oⅡrpcernwedaeculcdceiensssgat,hrmteicuwleltauii-ntoidbnegjretcthitmeivCeeCboBypYt-4iNm2C.i3-zN9aD%tiolicnaen,ndlsaerthgee cnoom-lopaledxdistance by Kc(hoetmtypwpsoo:/nr/cdersne:tasPt.iavthecpolmanmnoinngs,.odruga/lli-croenbsoet,s/abryc-wnce-lnddin/4g.,0m/)ulti-objective optimization, large complex 10.50% compared with NSGA-Ⅱ. components. Keywords: Path planning, dual-robot, arc welding, multi-objective optimization, large complex
+
+components.
+
+Some research in recent years has focused on the path planning
+
+1. INTRODUCTION 1. INTRODUCTION
+
+Sproombelermessefaorrchroibnortewceenldt iynega,rsithcaasnfboecursoeudgohnlythdeivpidatehdpinlatnontiwnog
+
+In recent years, the welding of large and complex components pasrpoebcletsm: ssfpoortrowbeoldt iwnegldainndg,aitrccawnebledirnogug(hZlhyoduiveidt eadl.i,n2to02tw2)o.
+
+Ihnasremceonret yaneadrms,othreeewx1et.elIdnNisnTivgReoOnfeDleaUdrgsC.eTHaInoOdwNceovemrp, mleaxncuoaml wpoenldeinntgs aSGsoepmneecertarsel:lsyse,patorhctehywinewlrdeericneegnmtaoyndedealrlaserdhcaaswsfeotlrcdauivnsegeldin(oZgnhsotahuleespemtataahnl.p,olra2nm0n2ui2nl)tgi.
+
+hhaass musoerdebayndmmosotrfeaecxtoterinessi,vwe hniecehdhs.aHs tohweedviesar,dmvaanntuaaglews oelfdlionwg Gptrraeovnbeellreianmlglsy,fsotahrleeroysmbwoaetnrweepmlrdooibndlgee,lmlietsdc,aansanbtrdeavrotehuliegnnhglyssaodlleivvseimddeadnbyionrtoumstuiwnltogi
+
+hIenfafsriceuicseeenndctyby,yeamrpsoo,sotthrfeacwwtoeerldiledisnin,ggwohficqlahuraghleaitsaytnhdeacdnoidsmapdlvpeaoxnoctraogmewpsooornfkelionnwtgs tahrseapuvereiclstitsni:cgsspesoaatlrecwshmealadlnginogrpirtahonmbdle(maWrsc,anwagenleddtinathgl.e, n(2Z0hs1oo5ul)v.eeFdt oarbl.yt,h2eu0ps2ia2nt)gh.
+
+heenfafsvicimrioeonnrcmeyae,nndt,pmoitoorries
+
+euxwrtegelnednsiitnvgetonequesudeasl.irHtoyboowtaesnvdteor,
+
+mpoaonrual replace
+
+wwmoearlkdniiunnaggl
+
+hGpeleaunnrenisritanilcglys,eptahrroecbyhlewamlegroeromifthomdseplo(lWet dawansgeltderaitnvagell.i,nr2go0bs1oa5lte,).smFitoasnr towhreemldpuianlttghi
+
+hwenaesvldiurisonengdmb(eDyntim,nogist teiftsacautlor.,griee2ns0t,1w5toh).icuMhsehoasrstobtshoientsgdlietsoadrorvebaponlttasacgeceasmnoafonlnuolawyl ptcrolaanvnsentlriianniggntssparaloreebslmermealnatiopvfreolybslpewomtesa,kw,aenfldodirntgehxeanrmobpsoloetl,,vetdihtesrbeywaeruledsiinnnggo
+
+eewfnefgilcdaigienengciyn(,Dsinipmgopoelret aawln.,edld2ri0en1pg5e)a.tqeMduaoltsiattyskssinaginnlde aropfboioxoetrsd cwwanoorrkkoiinnnlgyg chcooeunnrssittsrrataiiicnnttsssearaerrcleahteraedllgatotoirviwtehlemyldwi(nWegaakdn,igrefoectrtioaelnx..,aZ2m0hp1al5ne,)g. teFhtoearrel.tha(e2re0p1an9tho)
+
+eeennnvvgiiarrgooennmmineennstt,.imiItpnliesoraudnregdrenrtteopteomateueesdte ttrahosebkosrtesiqnutoiarermefipxelneadtcse womofarkntaiunsakgl cpdoliasncnsuntsriansiegndtsaprmreoolbatltieeomdn ptoloafnwneislndpgionmtgedwthieroelddcitoniofgnsp. orZothbwaonet,lgdieinttgsailn.wd(eu2ls0dtr1ini9ag)l
+
+wceonevmldipriolnengxmit(eyDnti.nagInndetoaridln.e,terl2l0itgo1e5nm)t. eMeot opstehtreastiinroegnqleuirirneomboeuntsntssctraounfctuotarnesldky dcrooisbncosuttsr.asAienditmsaimanrgoetiaortenltaphtleiavnecnloyionrgwdimenaaektti,hoonfdortoafseskxpaoomtfpwmleelu,dlittnihgerroienbdoautrsestrpinoaotl
+
+eecnnogvmiaprgoleenxmiinteynstsim,anptdwleoainnotdrellrimegpeoenraettedroopbteaorstasktsiosnhinowainfaidxuvenadnsttrwaugocertsukrineindg rcwooebnlodsttir.nagAinitomsnirnetghlaetaetsditdhteoe owcfoeolBdridInWigna,dtiHioroencuttiaoestnk.aoZl.fh(am2n0ug1lt7eit)raosltb.uod(t2ie0sd1p9oa)t
+
+epennevvrfiiorroormnnmmineegnnstt.su,cIhntwtaoosrkdsoetrrhrtmoouogrmhe emerutotbutohatelscorseohqpouewirraetmiaodenvn.atTsnhtaeogrfeesftoarsienk, wdwieesllcdduiisnnsggedpoaanthmthopetliaonsnnidipnelganoanflignBogIrWimth,emthHbooadusoeefdtsopanol.tawn(2te0lcd1oi7lno)gnsiyntudpdauirsettdircilaael
+
+ctphoeermfdopurlmaelxiirntogybsoutacsnhydsttaesmkinstiteshlgrliorgauedgnuhtamllyouptiuneatrrlaotcidoouoncpeedrianitnitoonut.nhTsethrweurceeltfduorirneedg, wrsowebalodrtmi.ngAoppimtaitmihnigpzalaatintonntih;netghceaolrgoeorsdruiiltnthsamtsihobonawsteeaddskothnoaftantmhteucoaltlligoonroryibtphoamtrtsicpcaolnet
+
+epthnreovcidreuosanslmrooefnbtolsat,rsgyetwstaeonmdoirscogmmraopdrlueeaxllrycoobinmottrpsoodnsuehcnoetwds itnoatdoivmtahnpetrawogveeelsditnhinge swewfefealdcrmitnivgoeploytinmimtihzpearotivsoiend;tehtheoefwreeBlsdIuWilntsg, seHhfoofiwucieeedntcthayla..tWt(h2ae0n1ga7leg)toasritltu.h(dm2ie0dc1a7na)
+
+pwpereorlfcdoeirnsmsgiqnougf asllauitrcygheatnaadsnkpdsrotchdoruomcutpgiolhenxmefucfotiucmaielpnocconyoenp(Wtesraattnoigoniem.tTaplhr.oe, vr2ee0f2ot1rhe)e,. ewmfeofelddceitlnilvgeedlpyathtihme ppplaraotnhvnepintlhagnenawligneogldrpiitnrhogmbelfebfmaicsieoedfncosypn.oaWtnwtaenclogdlieontngaylr.po(ab2ro0tit1c7ales)
+
+tIwhneetlhddeiunarglorqbouobatolsittyyssytaesnmtedm,ptrhiosedgfuircrastditoupnarleolyfbfliiecnmiterontdcoyubc(eeWdsoainnlvtgoeedtthiaesl.wt,h2ee0ldt2ai1ns)kg. msawtoradarevmlelleoidnpgttihmseailzpeaasttmihoanpn;latphnrenoibrnelgesumplrt;soabsnlhdeomwa eloedfvtsyhpaPottStOwheealadllgignoogrriitrthohmbmowtcaaanss
+
+paInlrlootchceeastsrioonboof (tolsaryrgspteeamtahn, dtphleacnofnmirisnptglep)xroocbfolemmmpuolttonipeblneetssrootlobvoeitdms,ipsritothviees tatthhskee aepfrtforepacvotiesveliednlygtoismsaolpelvrsoemvtaehnethpoerpowtibmelledamlins;goalneufdtfiioacnileeonvfcywy.PeWlSdOianngaglpgeaottrahilt.hth(m2ro0wu1g7ahs)
+
+wpalreleolmdciainstiegofqnoura(roloirtbyopatanstdhtoppprloeadrnfunocirtnmigo)nalelofsffuicbmiseuenlqctuiypel(neWt traaonsbkgoset.stA,atli.tp, r2ies0s2et1nh)te,. pmthroeodpseotulsldeedyd totohfesdopilsavcterhethtpeelaLonpenvtiinymgfalpligrsoohbltulaetnimodnodofifsscwproeettledwiPnegSldOpianatghlgrtoohrbrioothutmgahs.
+
+Itphnreetmhoefifs-reloifbnooertprsolaybnsotnetismntgo, btphaeesreffdoirrsomtnpamrlolabsnuluebamsleitqsoumebonetssttloaylsvkuessd.edAisttotphrreeeastelainsztke, taFhoterrastvthueedlipynagothfsapdllieasscnmrneiatnnegLpprerovobybllefemlmig; hoatnf adanracd lwdeievslycdriPentSgeOrPoaSblOogto,arilitgthiosmrimtwhomares.
+
+atthhlleeoocpafaftt-ihloinnpela(pnolnrainnpngaitnhogf bpdaluasanelnd-rionongb)omtoaifnnutmahleuilsptimrpolodesutrcloytibouonstesfd,ietilotdrie(sFaletinhzgee Fpcoroomrptpohlseeexpdaattnohdspodlliavfnfeinctihunelgtotpoprtosiobmllavelmesbooelfucaatiruocsnewoietflhwdaienslgdmirnaongbypocat,othintstihtsrramoiunogtrshe.
+
+pethtreeamlp.,ias2teh02fpo0lr)a.rnHonbionowgtseovtoferdp,uelarafrlog-rreomcbooamtllipsnluebtxhseecqopumreopndotuntcaetsnioktsns.hfAaievtledpra(eFgsreeennatgt, ctChohemesnptuleedtxyaalon.fd(2dd0iisf1cf6rice)utpeltrLotopevosysoelfvdleiagbhpetacatahnu-dspedlaiitnshcnraienstgemaPalnSgyOorciaothlngmsotrruaitishnimntsg..
+
+tqehtueaalon.,tfif2t-y0li2no0ef)p. Hlwaonewnldieninvggebr,aslseaeardgmeosnc, omamnapdnluetaxhlecirosemmpaorosentleymnutassnehydavtcoeoramegaprllieezaxet CFimoharegntheeetppraaolt.che(p2ssl0ai1nn6gn)infpogrropptrhoorsbeelede-mdaimopfaetanhrsc-ipowlnaeanllndiiannrggc rawolgbeooldrti,itnihtgmisoumfsoitnhrgee
+
+tcqhouenanspttariatthyinptoslfanbwneitenwlgdeieonnfgdwsueaealldm-riosnb,goatsneidnamtthhsee, rpesruocadhruecatmisoansnyyfniecclhdormo(Fnpeolneugxs icamoutmaogpmelaeptxircaonwcdeesdlsdiifinfngigcufrolotrbtoothtsrsoeylevs-tedeimbme.ceZanuhssiooeunitaelthaaaslr.cm(2aw0ne2yl1dc)ionpngrsetsoreafnintthetsde.
+
+ewctoeanllds.t,irn2ag0in2ct0so)n.bsHterotawwineetesvn,ewr,welaeldrldgineingcgodmisreepaclemtixosnc, ocsmounpcshotnraeainsnttssshyaannvcdehrasopgnaroteiuaaslt aCauhtpeoonmineatttiaccll.wo(ue2dl0d1ibn6ag)serpodrbooprotobsseyodstitceamps.yaZsththe-ompulaenfotnrainl.ag(r2ca0lgw2o1er)iltdphirmnegs,uensaitnnedgd
+
+qawcuecalednstisintigybicloiotfynswtrceaolindnsitnstr,gawinsetelsadminosgf, draionrebdcottitsoh;nertechoinsasretmramainkatesnsyantcdhoesmpppatalietahxl aiinmtparoogdienutcpercodlcoeussdesvinbegraaslfeodrmrteohtbrheooetd-icdsimsfyeosnrtesimoefnfafelocrtaivracercwwewledeldlidninignggo,fpaatnhthde
+
+cpaoclacnnesnstrsianibigniltoistfybdeuctaowln-esreotnrbaoinwttesmldooirnfegcroosmebaopmtlses;x, tashnuisdchdmiafasfkicesusyltnctthoherosonploavutehs. iapnultatrononmdiuanctgiec.dwWesalednvigenrgaelrtobamlo.etts(h2yo0sdt1es5m)f.otZorhookeuffteehtcetailv.me(a2n0wu2ae1ll)dpihnrygedsreapnuatletihdc
+
+wCploealnndsnieinqngugeconoftnlsydt,uraatihln-ertso,obwfoft-ellmidnioenrgepadctiohrmecpptlilaoenxnncianongndsmtdriaefiftnhictosudlatnbtdoassespodaltvioaenl. patrlaapnnosnpiinontrgt.cflroWaumadengbasaesteht dearlre.osbe(a2or0tci1ch5o)sbytsjoeteocmtk, trtfahonersfmaorracmnuewdaelMldhTiynSdgPr,aiuanlntiodc
+
+amCcoacnnesusesaqilbuiiselindtytilfyf,iccotuhnletsttrooafimfn-telsienteothfpeanrtohebeopdtlssa;onfntiahncigtsuamml epatrhkooedsducbtthiaoesne;dpiatotihns tiTrnaStrnPosdpbuoycritendftrraomsdeuevcaeisnragtlhveimrrteuesatehlaoprdcoshinotfsbo,jreacntde,fttfrheaecntasifrvoteirfmicweiadellMbdeiTnegScPolpionantthoy
+
+mpurlaagnneunnaitnltgoisosdtfiufddfiuycauall-trkotiobnodmtoemeftodtruheaelc-noreomebdposlteoxafuaatocnmtduaadtliifpcfripocadutulhtcttpioloansn;onliivtneigs. TpallSgaPonnrbiitynhgmin. tbrWoadsaeundcgionngetvstiaarltt.uea(tlr2ap0no1si5int)tiso,tnoaonstkdratthtehegeayrmtwifaaincsuiaualslebdeheytodcrosalouollnviyce
+
+uCalroggnoesrneittqhtumoensfttoulryd,wyteahldekiinongfdft-aolisfnkedsuopafal-tlrhaorbgpoelatcnaonumitnopgmleaxmticecothpmoapdthonbpealnsaetnsdn. inogn attrhlagenogsrpliotohbrmat lfrboaapmsteiemdaaoslntwhseetalrdteeisnetgraarpncahstihtoi.obnjecsttr,atrteagnysfowramseudsMedTtSoPsoinlvtoe
+
+amlganoruiathl mis dfoifrfiwceulldt itnogmtaesekt sthoef nlaeregdescoofmacptlueaxlcpormodpuocnteionnts;.it is tThSePglboybianltoropdtiumcianlgwveilrdtuinagl ppoaitnht.s, and the artificial bee colony
+
+urgent to study a kind of dual-robot automatic path planning algorithm based on state transition strategy was used to solve
+
+2a4lg05o-r8i9th63mCofopyrrwighetld©in2g02t3aTshkesAoufthlaorrsg.eThcisoims apnleoxpecnoamccpeossnaerntitcsle. under ththeeCCgBloYb-NaCl-oNpDtliimceanlsew. elding path.
+
+Peer review under responsibility of International Federation of Automatic Control.
+
+10.1016/j.ifacol.2023.10.1433
+
+Qichao Tang et al. / IFAC PapersOnLine 56-2 (2023) 3048–3053
+
+3049
+
+At present, although there are some research results on the path planning of multi robot coordinated welding, it is mainly focused on the spot welding robot, and the research on the path planning of arc welding robot is relatively few. Moreover, many existing studies only consider a single objective, or convert multi-objective problem into a single objective optimization problem for solution, and the consideration of the problem is not comprehensive. In addition, large complex components have many welding seams and complex constraints, the existing algorithms cannot always guarantee the efficiency and accuracy. It is still necessary to study a dualrobot welding path planning algorithm with high efficiency and strong robustness.
+Motivated by the aforementioned discussion, the purpose of this paper is to propose a dual-robot cooperative arc welding path planning algorithm based on NSGA-Ⅱ (Deb et al., 2002) with faster convergence rate and stronger robustness. The main contribution of the work is summarized as follows:
+(1) Aiming at the dual-robot arc welding problem of large complex components, considering multiple constraints and objectives, a multi-variable, multi-constraint and multiobjective optimization model is established. (2) An improved multi-objective genetic algorithm (RNSGA-Ⅱ) is proposed to solve this optimization problem, it introduces a recombination mechanism to replace the mutation operation of NSGA-Ⅱ. (3) The R-NSGA-Ⅱ is used to solve the welding path planning problem of dual robots, similarly, the NSGA-Ⅱ and OMOPSO (Babu et al., 2007) are used for comparison.
+The article consists of five sections including introduction (Section 1). Section 2 establishes the optimization model of dual-robot welding. Section 3 proposes the R-NSGA-Ⅱ algorithm and it is used to solve the welding path planning problem of dual robots in Section 4. Section 5 briefly describes the obtained results and future works.
+2. PATH PLANNING MODELING
+This section introduces the description and modeling of the dual-robot welding problem for large and complex components.
+2.1 Problem description
+For the path planning problem of spot welding robot, if the collision between robots is not considered, it can be simplified as a traveling salesman problem. In the traditional traveling salesman problem, the city to be visited can often be simplified as a point, and the route between two adjacent cities is definite and unique. However, the welding seam has practical significance and cannot be simplified into a single point in the dual-robot cooperative welding problem. In addition, there are some complex constraints between the welding seams, and there are many cooperative and competitive relationships between the two robots. Therefore, the traditional traveling salesman model is not suitable for the traversal of the welding seams.
+The three-dimensional schematic diagram of a large complex component is shown in Fig. 1. The welding path combination
+
+of dual-robot welding system is a complex problem for large complex components, it includes the relationship between cooperation and competition of robots. For example, some welds require two robots to weld synchronously to prevent deformation; some welding seams are located in the common accessible area of the two robots, and the robots compete for welding according to the optimization objectives; some seams cannot be welded at the same time due to process requirements, and the welding time of each other needs to be staggered. Therefore, it is necessary to establish a more reasonable task planning model to realize the cooperative welding of the two robots, and to ensure a shorter welding time and welding path. It can be seen that this problem is a multi-variable and multiconstraint optimization problem. The welding area is divided into the exclusive welding area and the competitive welding area of each robot, the division of welding area is shown in Fig. 2. A dual robot cooperative welding path planning model is established by extracting information such as the ID, length, type, starting point and ending point posture of the welding seam.
+
+2.2 Variable selection and definition
+The selection of variables is the first step of path planning modeling, the known constants and welding variables are defined as follows.
+
+2.2.1 Definition of known constants
+
+First, the welding seam set is defined as follows:
+
+W  [1, 2,3,..., m] ,
+
+(1)
+
+where the number in brackets represents the ID of each seam, the corresponding starting point coordinate set is
+
+S  [s1, s2 ,..., sm ] ,
+
+(2)
+
+and the ending point coordinate set is
+
+E  [e1, e2 ,..., em ] ,
+
+(3)
+
+each point contains three coordinates: x, y and z. The length of the welding seam is a constant value, defined as:
+
+Fig. 1. Schematic diagram of a large complex component.
+
+Fig. 2. Schematic diagram of welding area division
+
+3050
+
+Qichao Tang et al. / IFAC PapersOnLine 56-2 (2023) 3048–3053
+
+l  [l1,l2 ,l3 ,..., lm ] ,
+
+(4)
+
+where lm is the length of welding seam m. In addition, the
+
+robot set is defined as r  [1, 2] , and the speed of the robot is
+
+defined as:
+
+v  [v1, v2 ] ,
+
+(5)
+
+where v1 and v2 are the welding speed and no-load speed of
+
+the robot respectively.
+
+2.2.2 Definition of robot variables
+
+The exclusive welding seam set of robots 1 and 2 are defined as w1  [w11, w12 ,..., w1m1 ] , w2  [w21, w22 ,..., w2m2 ] respectively, where m1 and m2 are the exclusive welding seam numbers of robot 1 and robot 2 respectively. In addition, the competitive welding seam set is defined as s  [s1, s2 ,..., sn ] , where n is the number of competitive seams. After task allocation, the final welding sequence obtained by the two robots are p1  [ p11, p12 ,..., p1o1 ] and p2  [ p21, p22 ,..., p2o2 ] ,
+where o1 and o2 are the number of welding seams finally assigned to robot 1 and robot 2, and m  o1  o2 . For a welding seam wi , its starting point is si , the time required for the robot j to reach the si is defined as ti,1j , and the time after welding all the seams is ti,2j , i. e tij  [ti,1j , ti,2j ] , hence the time for robot j to weld all welding seams is T  ti,1j  ti,2j , where j [1, 2]
+
+i [1, o1], if j=1
+
+and 
+
+. The time for robot j to reach each
+
+i [1, o2 ], if j=2
+
+seam is t j  [t1,1j , t2,1j ,..., toj ,1 j ] . When the welding is completed,
+
+the total waiting time of the robot is Tw , and the total no-load
+
+distance is Dnd .
+
+2.3 Optimization objectives and constraints
+
+There will be welding waiting time between the two robots when some welding seams need synchronous or asynchronous welding. Higher welding efficiency expects shorter waiting time and shorter no-load distance. Consequently, the non-load distance and waiting time of the dual-robot system in the welding process are selected as the optimization objectives. According to the intermediate variables of the dual robot in the welding process, the following equations are derived: non-load distance:
+
+  Dnd  2 oj 1 j1 i1 (epji (1)  spj(i1) (1))2  (epji (2)  spj(i1) (2))2  (epji (3)  spj(i1) (3))2
+
+(6) waiting time:
+
+Tw  (T1 _ new  T1)  (T2 _ new  T2 )
+
+(7)
+
+where T1 and T2 are the welding time of robots 1 and 2
+
+without considering various constraints, correspondingly,
+
+T1 _ new and T2 _ new are the actual welding time of robots 1
+
+and 2 after considering various constraints such as synchronous welding, welding direction and collision constraints.
+
+The following constraints are included:
+
+(1) Synchronous welding constraint 1
+
+For two simultaneous welding seams wi and wj , it is
+
+necessary to meet:
+
+i   j , i   j ,
+
+(8)
+
+where wi  w1, wj  w2 , i and i are the start and end
+
+times of welding seam wi , respectively.
+
+(2) Welding direction constraint 2
+Some welding seams have a fixed welding direction:
+
+0, forward welding
+
+dj  
+
+, j W
+
+(9)
+
+1, reverse welding
+
+(3) Collision constraint 3
+
+Ri (qi )  Rj (q j )   ,
+
+(10)
+
+where qi is the joint vector of robot i , i, j  r , and Ri (qi ) is the space occupied by the robot in this pose.
+
+2.4 Path planning problem modelling
+Therefore, the multi-objective dual-robot cooperative arc welding path planning model is established as follows:
+
+min F  [Dnd ,Tw ]
+
+1 : i   j , i   j (i, j W )
+
+
+
+
+
+0, forward welding
+
+(11)
+
+s.t.2 : d j  
+
+(j W )
+
+
+
+1, reverse welding
+
+3 : Ri (qi )  Rj (q j )  
+
+(i, j  r)
+
+3. THE PROPOSED PATH PLANNING ALGORITHM
+This section introduces the proposed dual robot welding path planning algorithm (R-NSGA-Ⅱ), including the main process and algorithm details. This method is proposed based on NSGA-Ⅱ, and improved it according to the characteristics of dual robot welding problem. The diversity among individuals is increased by introducing recombination operator to replace the previous mutation operator, and the algorithm can converge to the global optimal solution more accurately.
+
+3.1 Main procedure of the proposed algorithm
+The main procedure of the proposed algorithm is described in Algorithm 1. First, population P0 with N individuals is initialized (line 1). Then the main loop started until the termination criteria are satisfied. The objective values of all individuals are calculated (line 4), and the non-dominated solution set At is generated by using fast non-dominated sorting method (line 5), and they are regarded as the parent population. Next, N offspring individuals are generated through crossover and recombination operations (lines 6~7). In order to preserve the excellent characteristics in the process of evolution, the offspring and parent populations are combined into population Qt1 (line 8), and the best N
+individuals are selected as the new population Pt1 (line 9). A cycle ends here. When the algorithm reached the termination criteria, approximate pareto set At is output as the welding motion path of dual-robot.
+
+Qichao Tang et al. / IFAC PapersOnLine 56-2 (2023) 3048–3053
+
+3051
+
+Algorithm 1: Main procedure of the proposed algorithm Input: Set W , start point set S , end point set Ε , length set l ,
+direction set d , robot speed v , population size N Output: approximate pareto set At 1 P0  Generate an initial population 2 t 1 3 while termination criteria are not satisfied do 4 Ft  Calculate fitness values for all individuals 5 At  Generate non-dominated solution set from Pt 6 Q1t1  Call crossover algorithm to generate N
+individuals 7 Q t2 1  Call recombination algorithm 8 Qt 1  Pt  Q t 1 1  Q t 1 2 9 Pt1  Select the best N individuals 10 t  t  1 11 end while 12 Return At
+
+3.2 Initialization
+
+The purpose of initialization is to generate an initialized population, and provide an initial solution for population evolution. An individual is generated with the ID of the welding seam as the variable as follows:
+
+p  [ p11, p12 ,..., p1m1 , p21, p22 ,..., p2m2 , s1, s2 ,..., sn ]
+
+(12)
+
+where pi  W , p1m1  w1 , p2m2  w2 , and sn  s , and they
+
+do not repeat, i. e. m1  m2  n  m , i [1, m] . The
+
+competitive welding seams s  [s1, s2 ,..., sn ] are located in the
+
+common workspace of two robots, so they are necessary to compete for welding according to the optimization objectives.
+
+In the initialization phase, sn  s is randomly assigned to
+
+robot 1 or robot 2. Finally, the initial population P0  [p1,p2 ,...,pN ]' with size N is generated.
+
+3.3 Fitness assignment and individual selection
+In order to compare the advantages and disadvantages of two individuals, it is necessary to assign appropriate fitness values to them. The fitness assignment algorithm is list in Algorithm 2. At iteration t, firstly, the function values of each individual in Pt are calculated according to formulas (6) and (7) (lines
+1~2). Then, Pt can be divided into l levels by using the fast non-dominated sorting algorithm (Deb et al., 2002) (line 3), and the individuals in the first level are stored in At as the non-dominated solution set (line 4). In addition, the individuals in At are also regarded as elite individuals to generate the next generation of population. Next, two fitness values are selected: one is the number of levels l (line 6), because the individuals in level l can dominate the individuals in level (l+1). And the other is the crowding distance of each individual in the population (line 7), the individual with greater crowding distance is preferred for the individual selection on the same level. Finally, a fitness matrix Ft and an elite
+solution set At are output.
+
+Algorithm 2: Fitness assignment algorithm Input: Current population Pt with size N Output: Fitness matrix Ft , archive set At 1 Dnt  Calculate the non-load distance of each individual 2 Twt  Calculate the waiting time of each individual
+3 Pt is divided into l levels by using fast non-dominated sorting
+4 At  Individuals in the first level as non-dominated solutions
+5 for i  1 to N do 6 Fti,1  l , the number of the individuals on l-th level 7 Fti,2  The crowding distance of the individual on l-th
+level 8 end for 9 Return Ft , At
+
+3.4 Crossover operation
+
+The offspring population
+
+1
+Qt 1
+
+is generated through individual
+
+crossover operation when elite solution set At is selected. The
+
+specific algorithm is listed in Algorithm 3. The size of archive
+
+At is N ' , and M individuals are randomly selected as the
+
+parent population for cross operation (line 2), and the rest as
+
+the mother population (line 3). The algorithm sets the
+
+crossover probability  , randomly selects the crossover point
+
+pc (line 1), and performs the crossover operation (lines 6~7).
+
+After removing the repeated variables (lines 8~9), a new
+
+offspring
+
+population
+
+1
+Qt 1
+
+is
+
+generated.
+
+3.5 Recombination operation
+Cross operation is to generate new children by exchanging information between different individuals. The mutation operation of NSGA-Ⅱ is to randomly change some gene values of some individuals within a certain range, this still cannot effectively realize the information exchange within individuals.
+
+Algorithm 3: Crossover operation Input: Elite archive At with size N ' , welding seam set W
+with size m, crossover probability 
+
+Output: Offspring population Q t1 1
+
+1 pc  (m 1)  rand  , (   means rounding up)
+
+2 Ptf  Randomly select N ' / 2 individuals from At
+
+3 Ptm  At  Pt f
+
+4 r1  Generate a random number of [0,1]
+
+5 if r1   then
+
+6 Qt1 f  [Ptf (( c  1) : m), Ptm ]
+
+7 Qt1 m  [Ptm (( c  1) : m), Ptf ]
+
+8 Qt1 f  Remove duplicate variables
+
+9 Qt1 m  Remove duplicate variables
+
+10 end if
+
+1
+
+f
+
+m
+
+11 Q t 1  Qt 1  Qt 1
+
+12 Return Q t 1 1
+
+3052
+
+Qichao Tang et al. / IFAC PapersOnLine 56-2 (2023) 3048–3053
+
+Moreover, welding ID is a discrete integer variable and cannot be repeated with each other, the variation operation cannot meet the requirements. Therefore, this paper proposes a recombination operation, which can realize the information interaction within individuals while satisfying the mutation operation, and increase the diversity of individuals and population.
+
+The recombination algorithm is listed in Algorithm 4. 2  N ' individuals are selected for recombination operation by setting recombination probability 1 . Firstly, m integers are randomly arranged and stored in r1 and r2 averagely (lines 3~5). Then, for the individuals to be recombined in the population Q t1 1 , the variables at r1 and r2 are exchanged to complete the individual reorganization (lines 6~10). Finally, Q t1 2 is exported as the recombined population.
+
+Algorithm 4: Recombination algorithm
+
+Input: Population Q t1 1 with size N ' , recombination rate 1 ,
+
+recombination ratio 2 , number of variables m
+
+Output: Offspring population Q t1 2
+
+1 r2  Generate a random number from [0,1]
+
+2 if r2  1 then
+
+3 r  Randomly generate m different integers from [1, m]
+
+4 r1  Randomly select m / 2 elements from r
+
+5 r2  r  r1
+
+6 Q t 1 2  Q t 1 1
+
+7 for i  1 to N '  2 do
+
+8
+
+for j  1 to m / 2 do
+
+2
+
+1
+
+9
+
+Q t1(i,r1( j))  Q t1(i,r2 ( j))
+
+2
+
+1
+
+10
+
+Q t1(i,r2 ( j))  Q t1(i,r1( j))
+
+12
+
+end for
+
+13 end for
+
+14 end if
+
+15 Return Q t 1 2
+
+3.6 Elite individual retention strategy
+In order to retain the excellent characteristics in the process of evolution, the parent and the offspring population are combined, and then individual selection is carried out again. That is Qt1  Pt  Q t1 1  Q t1 2 . Obviously, the size of Qt1 must be greater than N, and N individuals need to be selected as the new population Pt1 for the next iteration.
+
+3.7 Termination criterion
+Generally, the maximum number of generations or objective function evaluations is set as the termination criterion. The algorithm terminates after the termination criterion is satisfied, and the individuals saved in At are output as the approximate optimal solution set.
+
+4. EXPERIMENTS AND RESULTS ANALYSIS
+In this section, a series of experiments are performed to evaluate the proposed R-NSGA-Ⅱ algorithm in solving the
+
+dual-robot cooperative welding path planning problem. Its performance is mainly evaluated by Pareto results, welding time and welding path. In addition, NSGA-Ⅱ and OMOPSO are selected for comparison.
+4.1 Typical welding seam selection and parameter setting
+Several typical welding seams of large and complex components shown in Fig. 1 are selected for experiment, and the specific results are shown in Fig. 3. The details of these seams are listed in Table 1.
+The R-NSGA-Ⅱ, NSGA-Ⅱ and OMOPSO are selected as competitors in the path planning experiment of these typical welding seams. The detailed parameters of R-NSGA-Ⅱ mentioned in Section 3 are listed in Table 2. The above algorithms and experiments are implemented in MATLAB 2021b environment. The hardware environment is Intel i9@2.3 GHz CPU and 32G memory.
+4.2 Comparison of solution distribution of three algorithms
+The solution distribution diagrams of R-NSGA-Ⅱ, NSGA-Ⅱ and OMOPSO are listed in Fig. 4 through a series of experiments. It can be seen from the figure that the solutions obtained by using R-NSGA-Ⅱ can completely dominate the solutions obtained by applying the other two algorithms. It has obvious advantages in both waiting time and no-load distance. This shows that the R-NSGA-Ⅱ algorithm has a better effect on the dual-robot arc welding path planning problem. A solution [7.23,5.37 103 ] is selected for dual-robot path
+planning, and the solution of NSGA-Ⅱ at the same location is [12.55, 6.00103 ] . It can be obtained that the R-NSGA-Ⅱ
+reduces the waiting time by 42.39% and the no-load distance by 10.50% by introducing the recombination strategy.
+4.3 Welding path planning results of dual-robot
+According to the selected solution [7.23,5.37103] , that is the waiting time is 7.23 seconds, and the non-load distance is 5.37 103 millimeters. The path of robot 1 is path1  17  18  19  16  6  13  5  4  1  2  3  15  26  14, and the path of robot 2 is path2  12  22  25  24  23  20  21  27  11  10  7  8  9. The competitive welding seam 13 is assigned to robot 1, and the specific results are shown in Fig. 5. In addition, robot 2 waits for robot 1 for 7.23 seconds at the position of welding seam 7, and then they work together to complete seams 3 and 7.
+5. CONCLUSIONS
+In this paper, a novel improved multi-objective genetic algorithm (R-NSGA-Ⅱ) is proposed by introducing a recombination strategy. The purpose is to solve the problem of collaborative welding path planning of dual-robot for large complex components. To verify the effectiveness of R-NSGAⅡ algorithm, 27 typical welding seams are selected from a large complex component, and a series of experiments are carried out by using the proposed algorithm and NSGA-Ⅱ, OMOPSO. The simulation show R-NSGA-Ⅱ can get better pareto front and better path planning effect. Particularly, the
+
+Qichao Tang et al. / IFAC PapersOnLine 56-2 (2023) 3048–3053
+
+3053
+
+R-NSGA-Ⅱ can reduce 42.39% of waiting time and 10.50% of no-load distance compared with NSGA-Ⅱ.
+However, the algorithm proposed in this paper still needs further research. Firstly, there are more optimization objectives need to be considered, for example, the balance of welding time. Secondly, whether the existing various adjustment parameters are appropriate needs to be further studied. Thirdly, the effect of the algorithm on more complex problems also needs to be tested. Therefore, a series of works need to be continued in the future to solve the above problems.
+ACKNOWLEDGMENTS
+This work was partially supported by the Sichuan Province Science and Technology Support Program (No. 2020ZDZX0015).
+
+Fig. 3. Typical welds of large and complex components.
+
+Table 1. Details of typical welds.
+
+Parameters Exclusive welds of robot 1 Exclusive welds of robot 2
+Synchronous welds Asynchronous welds
+Competitive weld
+
+Welding ID 1~6, 14~19, 26 7~12, 20~25, 27
+3 and 7 26 and 27
+13
+
+Table 2. The parameters setting for R-NSGA-Ⅱ.
+
+Parameters Population size Welding speed of robot No-load speed of robot Crossover probability Recombination probability Recombination ratio
+
+Values N  100 v1  10 mm/s v2  20 mm/s   0.7 1  0.3 2  0.5
+
+Fig. 4. Solution distribution diagrams of three algorithms
+
+Fig. 5. Path planning results of dual-robot welding
+REFERENCES
+Babu, B., and Gujarathi, A. (2007). Multi-objective differential evolution (mode) for optimization of supply chain planning and management. IEEE Congress on Evolutionary Computation, 25-28.
+Chen, K., Cao, G.Z, Sun, J.D., et al. (2016). A path-planning algorithm of the automatic welding robot system for three-dimensional arc welding using image processing. 13th International Conference on Ubiquitous Robots and Ambient Intelligence (URAI), 692-697.
+Deb, K., Pratap, A., Agarwal, S., and Meyarivan, T. (2002). A fast and elitist multi-objective genetic algorithm: NSGAII, IEEE Transactions on Evolutionary Computation, 6(2), 182–197.
+Ding, D., Pan, Z., Cuiuri, D., and Li, H. (2015). Wire-feed additive manufacturing of metal components: technologies, developments and future interests. The International Journal of Advanced Manufacturing Technology, 81, 465-481.
+Feng, Z., Hu, G., and Sun, Y. (2020). An Overview of Collaborative Robotic Manipulation in Multiple-robot Systems. Annual Reviews in Control, 49(1), 113-127.
+Hou, Y., Wang, T., Li, L., et al. (2017). Path Planning of Spot Welding Robots in Sides of BIW Based on ACO-PSO. China Mechanical Engineering, 28(24): 2990.
+Wang, X.W., Wei, J.B., Zhou, X., Xia, Z.L., and Gu, X.S. (2021). Dual-Objective Collision-Free Path Optimization of Arc Welding Robot. IEEE Robotics and Automation Letters, 6(4), 6353-6360.
+Wang, X.W., Yan, Y.X, and Gu, X.S. (2017). Welding robot path planning based on Levy-PSO. Control and Decision, 32(2), 373-377.
+Wang, Z.L., Feng, Z.L., Ye, G.Y., Xu, Y.T., and Fu, J.Z. (2015). Analysis of dual-robot path planning based on artificial bee colony algorithm. Transactions of the China Welding Institution, 36(2), 97-100.
+Zhou, P., Peng, R., Xu, M., Wu, V., and Navarro-Alarcon, D. (2021). Path planning with automatic seam extraction over point cloud models for robotic arc welding. IEEE Robotics and Automation Letters, 6(3), 5002-5009.
+Zhang, R.X., Li, X.J., and Gao, H. (2019). Research on Cooperative Path Planning of Double Welding Robots. Modular Machine Tools and Automatic Processing Technology 1(06), 81-85.
+Zhou, X., Wang, X.W., Xie, Z.H., Li, F., and Gu, X.S. (2022). Online obstacle avoidance path planning and application for arc welding robot. Robotics and ComputerIntegrated Manufacturing, 78, 102413.
+
+

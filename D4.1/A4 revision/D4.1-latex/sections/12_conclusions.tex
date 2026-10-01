@@ -1,0 +1,19 @@
+\section{Conclusions and approved updates}\label{sec:conclusions}
+
+\subsection{Retained and modified methods}
+\begin{itemize}
+\item Retained: informed sampling-based planning with mixed sampling and multi-path reuse (T4.2); MPC micro-interpolation in the Core IPC (T4.3); ISO/TS 15066 safety-aware cost.
+\item Added: MPPI look-ahead with multiple goals over the task null space; explicit optimal task localisation (stations, base, rail); deterministic segment planner providing cost-to-go and fallbacks; robot-agnostic kinematic abstraction.
+\item Modified: the Core-IPC MPC is specified as a path--velocity layer with process speed band; the sampling-based planner is also used for transfer motions and station-level checks.
+\end{itemize}
+
+\subsection{Approved benchmark and integration plan}
+Application catalogue of Section~\ref{sec:bench}, with welding on real hardware and all other applications in simulation; KPIs and OMPL baseline as in the proposal, GPU variants in a separate track; benchmark repository within T4.6/T4.7.
+
+\subsection{Open scientific questions and technology watch}
+Horizon length versus number of restarts for the look-ahead; mode selection stability (hysteresis) among solution classes; certification argument for the MPPI + Core-IPC chain; scaling to tightly coupled multi-robot tasks; updates of fast sampling-based planners and of MPPI theory (gradient and expectation--maximisation interpretations~\cite{fazlyab2026mppigd,wang2026mppiem}).
+
+\subsection{Consortium approval record}
+\begin{planbox}
+To be completed after the consortium review (date, participants, decisions).
+\end{planbox}

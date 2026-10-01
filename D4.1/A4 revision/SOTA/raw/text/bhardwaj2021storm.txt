@@ -1,0 +1,1354 @@
+STORM: An Integrated Framework for Fast Joint-Space Model-Predictive Control for Reactive Manipulation
+
+Mohak Bhardwaj1,2, Balakumar Sundaralingam1, Arsalan Mousavian1, Nathan Ratliff1,
+
+Dieter Fox1,2, Fabio Ramos1,3, Byron Boots1,2
+
+1NVIDIA
+
+2University of Washington
+
+3 University of Sydney
+
+arXiv:2104.13542v2 [cs.RO] 14 Sep 2021
+
+Abstract: Sampling-based model-predictive control (MPC) is a promising tool for feedback control of robots with complex, non-smooth dynamics, and cost functions. However, the computationally demanding nature of sampling-based MPC algorithms has been a key bottleneck in their application to high-dimensional robotic manipulation problems in the real world. Previous methods have addressed this issue by running MPC in the task space while relying on a lowlevel operational space controller for joint control. However, by not using the joint space of the robot in the MPC formulation, existing methods cannot directly account for non-task space related constraints such as avoiding joint limits, singular conﬁgurations, and link collisions. In this paper, we develop a system for fast, joint space sampling-based MPC for manipulators that is efﬁciently parallelized using GPUs. Our approach can handle task and joint space constraints while taking less than 8ms (125Hz) to compute the next control command. Further, our method can tightly integrate perception into the control problem by utilizing learned cost functions from raw sensor data. We validate our approach by deploying it on a Franka Panda robot for a variety of dynamic manipulation tasks. We study the effect of different cost formulations and MPC parameters on the synthesized behavior and provide key insights that pave the way for the application of sampling-based MPC for manipulators in a principled manner. We also provide highly optimized, open-source code to be used by the wider robot learning and control community. Videos of experiments can be found at: https://sites.google.com/view/manipulation-mpc
+1 Introduction
+Real-world robot manipulation can greatly beneﬁt from real-time perception-driven feedback control [1, 2]. Consider an industrial robot tasked with stacking boxes from one pallet to another or a robot bartender moving drinks placed on a tray [3]. In both cases, the robot must ensure object stability via perception while respecting joint limits, avoiding singular conﬁgurations and collisions, and handling task constraints such as maintaining orientation during transfer. This leads to a complex control problem with competing objectives that is difﬁcult to solve in real-time.
+Classic approaches to solving these tasks rely on operational-space control (OSC) [4, 5, 6], where the different task costs are formulated in their respective spaces and then projected into the joint space (i.e., the control space of the robot) via a Jacobian map. OSC methods are inherently local as they only optimize for the next time step while ignoring future actions or states.
+MPC based approaches attempt to ﬁnd a locally-optimal policy over a ﬁnite horizon starting from the current state using a potentially imperfect dynamics model. An action from the policy is executed on the system and the optimization is performed again from the resulting next state which can overcome the effects of model-bias. MPC has been successfully applied on real robotic systems allowing them to rapidly react to changes in the environment [7, 8, 9, 5, 10]. Existing MPC methods that operate in the joint space of a manipulator are limited to gradient-based approaches [11, 12] which require the cost and dynamics to be differentiable. However, manipulation tasks often involve
+
+Figure 1: Our sampling-based model-predictive control framework operates in the joint space to enable a robot to achieve manipulation objectives such as tracking a moving target or balancing a ball on a plate while respecting constraints such as joint limits, singularity avoidance and collision avoidance via learned collision checking from raw sensor data.
+discontinuous phenomena such as contact and complex cost terms that are hard to differentiate analytically. Sampling-based methods such as Model-Predictive Path Integral (MPPI) [13] and Cross Entropy-Method (CEM) offer a promising alternative. Here, control sequences are sampled using a simple policy followed by rolling out the dynamics model to compute a sample-based gradient of the objective function. These algorithms make no restrictive assumptions about the cost, dynamics or policy class, are straightforward to parallelize and can be effectively applied on highly dynamic systems [10, 14]. These properties have also been a major factor in the increased adoption of sampling-based MPC by the Model-based RL community in recent years [15]
+However, a key question still remains to be answered - how well do these control algorithms transfer to high-dimensional robots like manipulators? In this work, we describe an integrated system for sampling-based MPC that aims to answer this question. Our proposed framework, Stochastic Tensor Optimization for Robot Motion (STORM) implements a highly-parallelized control architecture that can optimize complex task objectives while simultaneously ensuring desirable properties such as smoothness, constraint satisfaction, and low control latency.
+A major criticism of sampling-based MPC algorithms for full joint space control has been their inability to produce smooth (low-jerk) trajectories [16]. To address this challenge, we study different sub-components of sampling-based MPC and make several novel contributions such as low discrepancy action sampling, smooth interpolation and cost-function design, and demonstrate their effectiveness in scaling sampling-based methods to real robot manipulators. We also demonstrate that STORM can incorporate learned components in the control loop, by using learned self and environment collision costs. We integrate our system on a real Franka Panda robot arm where we demonstrate that feedback driven sampling-based MPC is able to solve complex and dynamic manipulation tasks with simple models. In summary, our major contributions are
+1. A novel sampling-based MPC with the introduction of low discrepancy sampling, smooth trajectory generation and behavior-based cost functions that are key for producing smooth, reactive, and precise robot motions.
+2. A feedback control framework that directly integrates learned perception components into the control loop in the form of a learned self collision cost and a discrete collision checker between the robot links and raw environment pointcloud from [17].
+3. An open-source and highly optimized implementation of sampling-based joint-space MPC, which achieves a control rate of 125Hz on a single GPU, a speedup of 100x compared to existing MPPI based manipulation implementations [17].
+4. Empirical evaluation in simulation and a real-world Franka Panda robot on dynamic control tasks.
+2 Problem Deﬁnition
+We consider the problem of generating a feedback control law (or policy) for a robot manipulator with d joints performing user-speciﬁed tasks in an unstructured environment where it is subject to non-linear constraints and must react in real-time to overcome errors due to its internal dynamics model, state estimation, and perception. The problem can be modelled as optimal control of
+2
+
+Variable
+θt, θ˙t, θ¨t xt = [θt, θ˙t, θ¨t] ut
+h ∈ [0, H) n ∈ [0, N ) K dt dt
+φt = {φt,h} πφt µt = µt,h Σt = Σt,h u = un,h
+xˆ = xˆn,h ˆc = ˆcn,h L
+
+Description
+joint position, velocity, acceleration robot state at time t joint space command at time t
+number of steps in horizon H batch of control sequences iterations of optimization change in time between steps in horizon vector of dt [0, H)
+parameters of policy at time t. distribution over control given state sequence of H Gaussian means sequence of H Gaussian Covariances batch of N control sequences of length H batch of N state sequences of length H batch of N cost sequences of length H MPC loss function
+
+Algorithm 1: Sampling-Based
+
+MPC
+
+Input : θ0,
+
+Parameter: H, N, K
+
+1 for t = 1 . . . T do
+
+2 xt ← GET STATE()
+
+3 πθ ← SHIFT()
+
+4 for i = 1 . . . K do
+
+5
+
+u ← SAM-
+
+PLE CONTROLS(πφt , H, N )
+
+6
+
+xˆ, ˆc, qˆ ← GENER-
+
+ATE ROLLOUTS(xt, H)
+
+7
+
+φt ←
+
+UPDATE DISTRIBUTION(
+
+ˆc, u)
+
+8 end
+
+9 ut = NEXT COMMAND(πφ)
+
+10 EXECUTE COMMAND(ut)
+
+11 end
+
+Figure 2: We summarize the notations used on the left and the sampling based MPC algorithm on the right.
+
+a discrete-time stochastic dynamical system described by the equation, xt+1 ∼ P (xt+1|xt, ut),
+
+where P (xt+1|xt, ut) deﬁnes the probability of transitioning into state xt+1 conditioned on xt and control input ut ∈ Rd. The robot chooses controls using a deterministic or stochastic closed-loop policy ut ∼ π (·|xt), incurs an instantaneous cost c(xt, ut) and transitions into the next state, and the
+
+process continues for a ﬁnite horizon T . The goal is to design a policy that optimizes a task-speciﬁc
+
+objective function, π∗ = arg minEπ,P
+π∈Π
+
+t=0 T −1 c(xt, ut) where Π is the space of all policies.
+
+The above setup is akin to optimizing a ﬁnite horizon Markov Decision Process (MDP) with con-
+tinuous state and action spaces as done in reinforcement learning approaches [18]. Solving for a complex globally optimal policy is a hard problem especially since the task objective c could be
+sparse or difﬁcult to optimize. MPC can be viewed as a practically motivated strategy that simpliﬁes the overall problem by focusing only on the states that the robot encounters online during execution and rapidly re-calculating a “simple” locally optimal policy. At state xt, MPC performs a lookahead for a shorter horizon H < T using an approximate model Pˆ(xˆt+1|xˆt, at), approximate cost function cˆ(xt, at) and a parameterized policy πφ to ﬁnd the optimal parameters φ∗ that minimize an objective function L
+
+φ∗ = arg min L(cˆ, qˆ, πφ, Pˆ, xt)
+
+(1)
+
+φ
+
+where qˆ(·) is a terminal cost function that serves as a coarse approximation of the cost-to-go beyond the horizon. An action is sampled from πφ∗ and the optimization is performed again from the resulting state after applying the action to the robot. The optimization is hot-started from the solution at the previous timestep by using a shift operator, which allows MPC to produce good solutions with few iterations of optimization (usually 1 in practice).
+
+In the next section, we ﬁrst introduce a sampling-based MPC technique to solving the optimization in Eq. 1 and discuss the objective function, policy class, and update equations. We then present our approach for applying it to manipulation problems. An overview of the notation used in the paper is presented in Fig. 2.
+
+3 Sampling-Based Model Predictive Control
+Sampling-based MPC iteratively optimizes simple policy representations such as time-independant Gaussians over open-loop controls with parameters φt such that πφt = h=0 H−1 πφt,h . Here, φt represent the sequence of means µt = [µt,0 . . . µt,H−1] and covariances Σt = [Σt,0 . . . Σt,H−1] at every step along the horizon H. A standard algorithm is shown in Fig. 2. At every iteration, the optimiza-
+
+3
+
+tion proceeds by sampling a batch of N control sequences of length H, un∈[0,N),h∈[0,H), from the current distribution (Line 5), followed by rolling out the approximate dynamics function using the sampled controls to get a batch of corresponding states xˆn∈[0,N),h∈[0,H) and costs ˆcn∈[0,N),h∈[0,H) (Line 6). The policy parameters are then updated using a sample-based gradient of the objective function (Line 7). After K ≥ 1 optimization iterations we can either sample an action from the
+resulting distribution or execute the ﬁrst action from the mean (Line 9). We next describe how the distribution is updated. Consider the function Cˆ(·),
+
+H −2
+
+Cˆ(xt, ut) =
+
+γhcˆ(xˆt,h, ut,h) + γH−1qˆ(xˆt,H−1, at,H−1).
+
+(2)
+
+h=0
+
+where γ ∈ [0, 1] is a discount factor that is used to favor immediate rewards. A widely used objective function is the exponentiated utility or the risk-seeking objective,
+
+−1 ˆ
+
+L = Eπθ,Pˆ exp
+
+C(xt, ut) xˆ0 = xt
+
+(3)
+
+β
+
+where β is a temperature parameter. For this choice of objective, the mean and covariance are updated using a sample-based gradient as,
+
+i=1 N wiut,h
+
+µt,h = (1 − αµ)µt−1,h + αµ N
+
+(4)
+
+i=1 wi
+
+i=1 N wi(ut,h − µt,h)(ut,h − µt,h)
+
+Σt,h = (1 − ασ)Σt−1,h + ασ
+
+N
+
+(5)
+
+i=1 wi
+
+where αµ and ασ are step-sizes that regularize the current solution to be close to the previous one
+
+and,
+
+H −2
+
+−1
+
+h
+
+H −1
+
+wi = exp β γ cˆ(xˆh,i, ah,i) + γ qˆ(xˆH−1,i, aH−1,i) . (6)
+
+h=0
+
+The update equation for the mean is the same as the well-known Model-Predictive Path Integral
+
+Control (MPPI) algorithm [13]. We refer the reader to [19] for the connection and derivation of
+
+update equations. While covariance adaptation has previously been explored in the context of Path
+
+Integral Policy Improvement [20] to automatically adjust exploration, standard implementations of
+
+MPPI on real systems generally do not update the covariance [13, 19]. However, we observed that
+
+updating the covariance leads to better performance with a fewer number of particles, such as stable
+
+behavior upon convergence to the goal. Once an action from the updated distribution is executed on
+
+the system, the mean and covariance are shifted forward with default values appended at the end to
+
+warmstart the optimization at the next timestep (Line 3).
+
+The above formulation of MPC offers the ﬂexibility to extract different behaviors from our algorithm by tuning different knobs such as the choice of approximate dynamics, running cost, terminal cost, the policy class and parameters such as the horizon length, number of particles, step sizes and discount factor γ. Next, we switch our focus to the domain of robot manipulation and build our approach for sampling-based MPC by systematically evaluating the effects of a subset of key design choices on the overall performance of the controller.
+
+3.1 Approximate Model
+
+The MPC paradigm allows us to effectively leverage simple models that are both computationally
+cheap to query and easy to optimize, as re-optimizing the control policy at every timestep can help to
+overcome the effects of errors in the approximate model. We leverage this error correcting property
+of MPC and utilize the kinematic model of the manipulator as our approximate transition model. Let the robot state be deﬁned in the joint space as x = [θ, θ˙, θ¨] ∈ R3d and the commanded action be the joint acceleration u ∈ Rd. At every optimization iteration, we compute the state of the robot across the horizon (xˆ = [Θn,h, Θ˙ n,h, Θ¨ n,h], h ∈ [0, H), n ∈ [0, N )) by integrating the sampled control sequences un∈[0,N),h∈[0,H) from the robot’s initial state xinit = [θinit, θ˙init, θ¨init] (i.e., current state of the real robot). This can be efﬁciently implemented as a tensor product followed by a sum:
+
+Θ¨ = u
+
+Θ˙ = θ˙init + Sl(1) diag(dt)Θ¨
+
+Θ = θinit + Sl(1) diag(dt)Θ˙ (7)
+
+4
+
+where Sl(1) is a lower triangular matrix ﬁlled with 1, and dt is a vector of delta timesteps across the horizon. We use variable timesteps, with a smaller dt for the earlier steps along the horizon for higher resolution cost near the robot’s current state and larger ones for later steps to get a better approximation of cost-to-go, similar to [8]. We intentionally write Θn,h as Θ to highlight the fact that we compute the states across the batch and horizon with a tensor operation without the need to iteratively compute the states across the horizon. This signiﬁcantly speeds up the computation and is key to achieving the 8ms control latency.
+
+Given a batch of states xˆ, the Cartesian poses X ∈ SE(3), velocities X˙ , and accelerations X¨ of the
+
+end-effector are obtained by using forward kinematics F K(Θ), the kinematic Jacobian J(Θ), and its derivative J˙(Θ) as
+
+X = F K(Θ)
+
+X˙ = J(Θ)Θ˙
+
+X¨ = J˙(Θ)Θ˙ + J(Θ)Θ¨
+
+(8)
+
+We can compute the forward kinematics in batch as they depend only on the current state. This provides an easily parallelizable formulation of the robot model that is amenable to GPU acceleration.
+
+3.2 Cost Function
+The cost function cˆ(s, a) encodes high-level robot behavior directly into the MPC optimization. This can be viewed as a form of cost-shaping that allows MPC to achieve sparse task objectives while also satisfying auxillary requirements such as avoiding joint limits, ensuring smooth motions and safety. We consider cost functions that are a weighted sum of simple cost terms, where each individual term encodes a desired robot behavior that can be easily implemented in a batched manner.
+
+3.2.1 Reaching Goal Poses
+Given the desired and current Cartesian poses for the end-effector wXg, wXee ∈ SE(3) respectively in the world frame w, we compute a task-space cost term that penalizes their distance
+cˆpose(wXee, wXg) = ||α1(I − wRg wRee)||2 + ||α2(wRg wdee − wRg wdg)||2 (9) where wRee, wRg are the rotation components and wdee, wdg are translation components of the current and goal end-effector pose respectively. The weight vectors α1, α2 ∈ R3 allow us to weigh errors in different directions and orientations with respect to each other and can be set to different values to obtain qualitatively different behavior such as partial pose reaching or enforcing partial pose constraints. For example, we can set a high weight in α1 along a desired axes to maintain the goal orientation throughout the motion of the robot as we demonstrate in our experiments.
+
+3.2.2 Stopping for Contingencies
+
+The ﬁnite horizon makes MPC myopic to events that can occur further in the future. Thus, it is
+
+desirable to ensure that the robot can safely stop within the horizon in reaction to events that might
+
+be observed at timestep H − 1, especially in dynamic environments. We encode this behavior by computing a time varying velocity limit θ˙max ∈ RH for every timestep in the horizon based on a user-specifed maximum acceleration θ¨max and the time until H −1. This means the joint velocity of
+
+the robot must allow it to come to a stop at the end of the horizon by applying the max acceleration.
+
+Any state that exceeds this velocity is penalized by a cost which is expressed as
+
+˙
+
+¨
+
+˙
+
+||θ˙max,t − |θ˙|||2 if θ˙max,t − |θ˙| > 0.0
+
+θmax = Su(1)θmaxdt
+
+cˆstop(θt) =
+
+(10)
+
+0,
+
+otherwise
+
+where Su(1) is an upper triangular matrix ﬁlled with 1.
+
+3.2.3 Joint Limit Avoidance
+
+Given minimum and maximum limits on joint state θmin, θmax respectively, we penalize the joint state θt only if it exceeds a safety threshold deﬁned by a kjl ratio of its full range.
+
+θˆmin = θmin + kjl(θmax − θmin)  ||θt − θˆmin||2 if θt < θˆmin
+
+cˆjoint(θt) = ||θˆmax − θt||2 0
+
+else if θt > θˆmax otherwise
+
+θˆmax = θmax − kjl(θmax − θmin) (11)
+
+5
+
+where θˆmin, θˆmax adds a safety threshold from the actual bounds of the robot. In our experiments, we chose kjl = 0.1.
+
+3.2.4 Avoiding Cartesian Local Minima
+
+The manipulability score describes the ability of the end-effector to achieve any arbitrary velocity from a given joint conﬁguration. It measures the volume of the ellipsoid formed by the kinematic Jacobian which collapses to zero at singular conﬁgurations. Thus, to encourage the robot to optimize control policies that avoid future kinematic singularities, we employ a cost term that penalizes small manipulability scores [21, 22]
+
+cˆmanip(θt) = 1.0 − J (θt)J (θt) , if J (θt)J (θt) < km (12)
+
+0.0,
+
+otherwise
+
+3.2.5 Self Collision Avoidance
+
+Computing self-collision between the links of the robot for a large number of conﬁgurations can be computationally expensive [23, 17]. Hence, similar to previous approaches [23, 17], we train a neural network that predicts the closest distance 1 between the links of the robot given a joint conﬁguration (θ). One difference in our approach is the use of positional encoding (i.e.,[sin(θ), cos(θ)]) as we found this to improve the accuracy of the distance prediction [24]. Our network (which we call jointNERF) has three layers with [256, 128, 64] neurons and ReLU activations. We compute a cost term as shown below,
+
+cˆself-coll(θt) = max(0, jointNERF(θt))
+
+(13)
+
+3.2.6 Environment Collision Avoidance
+Safe operation in cluttered environments requires a tight coupling between perception and control for collision avoidance. Gradient-based approaches [25] generally rely on either known object shapes or pre-computed signed distance ﬁelds that provide gradient information for optimization. However, our sampling-based approach can handle discrete costs and as such we explore collision avoidance without using signed distances. Speciﬁcally, we use a learned collision checking function from Danielczuk et al. [17] that operates directly on raw pointcloud data and classiﬁes if an robot link pointcloud pcl is in collision with the environment pointcloud pcenv given the robot link’s pose Xl.
+cˆcoll(pcl, pcenv, Xl) = 1, if collision, (14) 0, otherwise.
+
+Finally our running cost function is given by
+
+cˆ(xt, ut) = αpcˆpose + αscˆstop + αj cˆjoint + αmcˆmanip + αc(cˆself-coll + cˆcoll)
+
+(15)
+
+3.3 Sampling Strategy for Control Sequences
+
+The method used for sampling controls from the Gaussian policy can have a great impact on the
+
+convergence of the optimization and can help embed different desirable behaviors such as ensuring
+
+smoothness. Pseudorandom sequences typically used in Monte Carlo integration exhibit an un-
+
+desirable clustering of sampled points which results in empty regions. Whereas low-discrepancy
+
+sequences, where low discrepancy refers to the degree of deviation from perfect uniform sam-
+
+pling, alleviate this problem by deﬁning deterministic samplers that correlate each point to avoid
+
+groupings [26]. Halton sequences [27] are a widely used form of low discrepancy number gener-
+
+ators that attempt to improve the rate of convergence of Monte Carlo algorithms, and are reported
+
+to achieve superior performance in high-dimensional problems [28]. In particular, the Halton se-
+
+quence uses the ﬁrst pi, . . . , pd prime numbers to deﬁne a sequence, w1, w2, . . ., for integers i ≥ 0
+
+and b ≥ 2 where wi = (φp1 (i), . . . , φpd (i)) and φb(i) =
+
+∞ a=1
+
+iab−a,
+
+with
+
+i
+
+=
+
+∞ a=1 iaba−1 for
+
+i0, i1, · · · ∈ {0, 1, . . . , b − 1} 2. We incorporate Halton sequences for sampling controls that can
+
+1Distance is positive when two links are penetrating and negative when not colliding. 2See http://extremelearning.com.au/unreasonable-effectiveness-of
+-quasirandom-sequences/ for a visualization of different low-discrepancy methods.
+
+6
+
+Figure 4: We shtow a sequence from our collision avoidance experiment where the robot has to move between
+thin walls to reach the orange ball held by the human. The robot tries to reach the ball but moves only as close
+as possible as any further motion would cause the elbow to hit the right book.
+
+provide a better estimate of the objective function gradient. Controls from the Halton sequence are
+
+sampled once at the beginning and then transformed using the mean (µt) and Covariance Σt of the
+
+current Gaussian policy.
+
+Random Comb
+0.5
+
+Halton Comb
+0.5
+
+Furthermore, we explore two different strategies for en-
+
+forcing smoothness in sampled control sequences. The 0.4
+
+0.4
+
+ﬁrst method is a comb ﬁlter that uses user-speciﬁed coef- 0.3
+
+0.3
+
+ﬁcients [c1, c2, c3] to ﬁlter out each sampled control tra- 0.2
+
+0.2
+
+jectory along the horizon as ut,h = c1ut,h + c2ut,h−1 + 0.1
+
+0.1
+
+c3ut,h−1 This method has previously been used with
+
+sampling-based control techniques [30, 31], however, it
+
+0.0
+
+0.0
+
+0.0
+
+0.1
+
+0.2
+
+0.3
+
+0.4
+
+0.5
+
+0.0
+
+0.1
+
+0.2
+
+0.3
+
+0.4
+
+0.5
+
+requires extensive tuning and the ﬁltered trajectories are 0.5 Random B-Spline
+
+Halton B-Spline
+0.5
+
+not guaranteed to be smooth as neighboring samples in 0.4
+
+0.4
+
+the horizon can have large difference in magnitude.
+
+0.3
+
+0.3
+
+We propose an alternate strategy to enforce smoothness 0.2
+
+0.2
+
+by ﬁtting B-splines of degree 3 to controls sampled using 0.1
+
+0.1
+
+a Halton Sequence. The resulting curve is sub-sampled
+
+at a ﬁner resolution to obtain smooth joint acceleration
+
+0.0 0.0
+
+0.1
+
+0.2
+
+0.3
+
+0.4
+
+0.0
+
+0.5
+
+0.0
+
+0.1
+
+0.2
+
+0.3
+
+0.4
+
+0.5
+
+samples which are then integrated to obtain correspond- Figure 3: We compare our sampling scheme
+
+ing joint velocity and position trajectories using Eq 7. In Fig. 3 we show a qualitative comparison between different combinations of sampling and smoothing strategies for a planar robot trying to reach a goal while avoiding obstacles where we see that our Halton + B-Spline sampling strategy is able to better explore the action space while maintaining smoothness (see supplementary for de-
+
+on a planar robot reacher task [29]. The holonomic robot must move from its initial position (green cross) to the desired position (red cross) while avoiding obstacles shown as the grey regions. The path taken by the robot is given by the black dot-dashed line and red circles are positions of the robot after every 30 timesteps. The blue lines are
+
+tails).
+
+the rolled out trajectories of the top 5 parti-
+
+Covariance Parameterization:
+
+Conventionally,
+
+sampling-based MPC algorithms such as MPPI param-
+
+eterize the covariance of the Gaussian policy to be of
+
+the form Σt,h = σu ∗ Id×d where σu is a scalar value
+
+cles. Our Halton B-Spline is able to ﬁnd a smooth short path to the goal while Random B-Spline takes a longer path. Halton with a comb ﬁlter is not smooth as shown by the sudden path changes.
+
+and Id×d is a d × d identity matrix, which forces the
+
+covariance to be the same across all control dimensions. However, in the case of manipulators it is
+
+desirable to allow the covariance of different joints to adapt independently so they can potentially
+
+optimize different cost terms such as pose reaching versus increasing manipulability. Thus we also
+
+consider covariance of the form ΣUt,h
+
+=
+
+σT
+u
+
+Id×d
+
+where
+
+σu
+
+=
+
+[σ1, . . . , σd].
+
+Each term in σu is
+
+then adapted based on the rollouts. Adapting the covariance along action dimensions has also been
+
+employed by [15] for CEM.
+
+Our sampling strategy also offers us the ﬂexibility of incorporating certain ﬁxed set of action trajectories which could be task-dependent or even a library of pre-deﬁned desired motions. We leverage this fact by incorporating a set of zero acceleration or “null” particles which allows the robot to coast at a constant velocity once the robot is accelerated sufﬁciently and also easily stop at the goal as demonstrated in our experiments.
+
+7
+
+4 Experimental Evaluation
+Through our experiments we aim to analyze the effectiveness of STORM as a framework for realtime, perception-driven feedback control in real-world manipulation scenarios. To this end, we ﬁrst study the performance of STORM in reacting to changing end-effector targets from perception data while satisfying task constraints such as maintaining user-speciﬁed orientation and avoiding obstacles in cluttered scenes. Second, we consider the dynamic task of balancing a ball on a tray grasped by the end effector that uses an approximate model of the ball dynamics. We provide results of ablation studies in simulation for different components of our framework such as cost terms, sampling strategy and policy parameterization in Appendix C, and a comparison to MOVEIT! and OSC [32] for the standard pose reaching problem in Appendix B.2. Detailed results of ablations as well as a qualitative comparison to Reimannian Motion Policies (RMPs) [33] can be found on our website (https://sites.google.com/view/manipulation-mpc).
+
+4.1 Tracking Moving Targets while Handling Task Constraints
+
+A key strength of feedback-based MPC over “plan and execute” and OSC approaches is its ability to simultaneously optimize complex cost functions over a long horizon while demonstrating reactive behavior. We demonstrate this by having the robot react to changing goal poses obtained from noisy perception, while satisfying task constraints such as maintaining desired orientation and avoiding obstacles. In these experiments, a ball held by a human is tracked using a depth camera and the robot tries to reach the ball as the human moves it to different locations in the workspace.
+
+Obstacle Avoidance: Demonstrating reactive motion and reasoning about obstacle avoidance in cluttered environments, while simultaneously coordinating large degrees of freedom leads to a hard online optimization problem. Standard planning and OSC approaches often fall short in optimizing for such behavior.
+
+To test our method’s capability to handle such scenarios, we setup two different table top environments, one consisting of two blocks representing common pick and place environments as shown in Fig. 1 and an environment with thin walls to represent a densely occupied space, as shown in Fig. 4. We use our perception based ball tracker to make the robot reach different positions in the environment. During the experiment, we also move the ball to some positions that are not reachable by the robot due to possibility of collision between the robot’s links and the obstacles. As seen in Fig. 4, the robot handles these situations very well as it prioritizes collision avoidance over reaching the pose accurately. We present our full obstacle avoidance experiments as well as several experiments in simulation in the accompanying videos.
+Orientation Constraints: Several common manipulation tasks such as moving a ﬁlled cup require maintaining orientation during motion which reduces the feasibility region of a controller. We test this scenario by imposing orientation constraints on the end-effector while tracking the ball. Our controller achieves a median quaternion error of 1.2485% while tracking the ball with sufﬁcient accuracy as shown in Fig. 5.
+
+x x_des
+
+y y_des
+
+z z_des
+
+0.5
+
+Position (m)
+
+0.0
+
+0.5
+
+1.0 0
+3
+
+20
+
+40
+
+60
+
+80
+
+100 120
+
+Time (sec)
+
+Orientation Error %
+
+2
+
+1
+
+0 0
+
+20
+
+40
+
+60
+
+80
+
+100 120
+
+Time (sec.)
+
+Figure 5: We move the ball across the workspace while having a high weight on maintaining a speciﬁc orientation of the endeffector. Our control scheme can maintain the orientation during motion as seen by the very low orientation error (< 3%).
+
+4.2 Dynamic Object Balancing
+We consider a hard dynamic manipulation task where the robot tries to balance a ball placed on a tray grasped by a parallel jaw gripper as shown in Fig. 1. The location of the ball is tracked using the RGBD input from a RealSense camera at 30Hz. We use a simpliﬁed dynamics model of the object rolling on the tray under acceleration due to gravity and do not explicitly account for friction or inertial properties of the ball and do not perform any system identiﬁcation. Fig. 6 shows a snapshot of the robot performing the task. The purpose of this task is to demonstrate the robustness of MPC
+
+8
+
+y (m)
+
+0.20 start end goal tray 0.15
+0.10
+0.05
+0.00
+0.05
+0.10
+0.15
+0.200.20 0.15 0.10 0.05 0.00 0.05 0.10 0.15 0.20 x (m)
+Figure 7: Trajectories of ball in tray frame for 10 different episodes of the dynamic balancing task. At the start of each episode the robot starts from the home conﬁguration and the ball is placed at an arbitrary location on the tray by the human operator. Our control framework is able to achieve a median error of 3.9 cm. Note that due to perception errors, sometimes the center of the ball is detected to be outside the tray when near the edge.
+under severe model-bias while optimizing complex objectives and dealing with noisy perception. We refer the reader to Appendix B.1 for more details of the experimental setup and ball dynamics.
+Analysis: Fig. 7 shows a superimposed plot of the (x,y) trajectories ball with respect to the tray frame for 10 different trials of the experiment. We observe that, even with our highly biased model and noise due to perception and state estimation, our MPC framework is able to achieve a median error of 3.9 cm in positioning the ball at the center of the tray. Moreover, the robot did not drop the ball in any trial. This experiment demonstrates the efﬁcacy of MPC in correcting for model bias while maintaining reactivity and handling complex task constraints. Our experimental results indicate that accurate and reac- Figure 6: Snapshot of Ball Balancing Task tive manipulation behavior can be obtained by using relatively simple models and intuitive cost functions in an MPC framework. Sampling-based MPC also provides us the ﬂexibility to encode different desired behaviors such as smooth motions directly in the optimization and tightly couple perception with control which are key components for real-world robot control.
+5 Related Work
+Perception driven feedback control on high dimensional systems is a large ﬁeld of research with several existing approaches [34]. Operation Space Controllers (OSC) are some of the fastest algorithms available for feedback control, with methods achieving control latency of 1-2 ms [6, 5, 32, 23]. However OSC methods rely heavily on a higher level planner for avoiding local minima (e.g.,obstacles).
+9
+
+A more global approach has been explored by reformulating standard motion planning methods to do feedback control via online replanning [35, 36, 37, 38, 39]. However most of these methods run at a slow rates on high dimensional systems, with control latencies between 140ms and 1000ms [35, 36, 37, 38]. Murray et al. [39] researched leveraging a custom chip to do fast parallel collision checking and use this with a PRM style planner to replan at 1ms for reaching Cartesian Poses in a semi-structured environment. Their chip based collision checker uses a complete pointcloud of the environment obtained by placing many cameras in the environment and combining their pointclouds. This is an highly unrealistic setting for real world manipulation in unstructured environments.
+In the realm of Model predictive control approaches, only gradient based joint space MPC methods have shown to work on real manipulation systems as their control latency is in an acceptable range (20ms - 125ms ) for feedback control [40, 8, 41]. Ishihara et al. [41] explore two stage hierarchical ILQR for fast MPC on a humanoid robot. Their two stage approach enables a very low control latency of 20ms. Erez et al. [8] explore ILQR on humanoid robots leveraging a simulator for the dynamics model. Fishman et al. [40] use gradient based MPC for ﬁnding trajectories for a manipulator while simultaneously predicting user intent in a human robot interaction setting. They solve the optimization problem leveraging Levenberg-Marquardt at a control latency of 140ms. Hogan and Rodriguez [42] explore gradient based MPC in the task space for planar non-prehensile manipulation leveraging a learned mode switcher to switch between different dynamic models. They are able to obtain a control latency of 5ms as their dynamic models are smooth.
+Sampling-based methods have a rich history in MPC. Model-Predictive Path Integral Control (MPPI) [10] is one of the leading sampling-based MPC approaches that has shown great performance on real-world aggressive off-road autonomous driving by leveraging learned models [13] and GPU acceleration [12]. Wagener et al. [14] analyze MPC algorithms from the perspective of online learning and show connections between different methods such as Cross-Entropy method (CEM) and MPPI and have also demonstrated control rates of 40Hz with 1200 samples and a horizon of 2.5 seconds for off-road driving using GPU acceleration.
+However, in the context of manipulation, sampling-based control in joint space has only been explored by optimizing in the joint position space without considering velocity and acceleration limits [17, 43, 44]. Danielczuk et al. [17] learn a collision classiﬁer and do online replanning in joint space leveraging an inverse kinematic function to get a goal joint conﬁguration and ﬁnd straight line paths in joint space to reach the goal while avoiding collisions. Their approach doesn’t handle different task spaces directly in the form of cost functions and also has a much larger control latency of 1000 ms. Hyatt et al. [43, 44] compare sampling based MPC with gradient based MPC on large dimensional robots with piecewise linear functions. They show that sampling based MPC can run at 200Hz (5ms) even with large number of dimensions due to it’s parallelizability on the GPU. However, they do not explore collision avoidance or task space cost terms in their approach and leave it for future work. Pinneri et al. [45] provide a method for adding correlated noise to action samples in Cross-Entropy Method to reduce the number of particles required for obtaining good performance on high-dimensional control tasks. However, their multi-threaded CPU implementation is unable to achieve real-time performance. Their experiments are also limited to simulation with access to true dynamics.
+Sampling based optimization has also been used for motion planning in high dimensional systems [46, 29, 47]. Kalakrishnan et al. [46] formulate planning as a stochastic trajectory optimization problem and plan over the joint position space to reach Cartesian positions while orientation constraints on the end-effector. They structure their co-variance matrix based on the ﬁnite difference matrix to sample delta joint positions that start and stop at 0 with a smooth proﬁle in between. This sampling along with projecting the weighted action through this matrix, pushes the optimization towards a smooth trajectory for execution on the real robot. Kobilarov [29, 47] explored using cross-entropy optimization for motion planning and showed global convergence in very tight environments on quadrotors and simple planar environments.
+6 Discussion
+We presented a sampling-based MPC framework for manipulation that operates in the joint space and is able achieve smooth and reactive motions while respecting constraints, and demonstrated its performance on dynamic control tasks. The ﬁrst key component of our approach is a fully tensorized kinematic model that allows for GPU-based acceleration of rollouts. Second, we leverage intuitive
+10
+
+cost terms that encourage desirable behaviors. Third, our formulation allows us to leverage diverse sampling strategies to embed desirable properties directly into the optimization. However, a few key questions remain. First, performance can be made more robust by directly accounting for state uncertainty in the control loop. Second, at higher speeds, the kinematic model might induce signiﬁcant model-bias. Here, learning a residual dynamics model [48] or a terminal Q-function [49] can help mitigate the effects of model-bias while still maintaining computational speed.
+References
+[1] J. Bohg, K. Hausman, B. Sankaran, O. Brock, D. Kragic, S. Schaal, and G. S. Sukhatme. Interactive perception: Leveraging action in perception and perception in action. IEEE Transactions on Robotics, 33(6):1273–1291, 2017.
+[2] D. Kappler, F. Meier, J. Issac, J. Mainprice, C. G. Cifuentes, M. Wu¨thrich, V. Berenz, S. Schaal, N. Ratliff, and J. Bohg. Real-time perception meets reactive motion generation. IEEE Robotics and Automation Letters, 3(3):1864–1871, 2018.
+[3] J. Luo and K. Hauser. Robust trajectory optimization under frictional contact with iterative learning. Autonomous Robots, 41(6):1447–1461, 2017.
+[4] J. Nakanishi, R. Cory, M. Mistry, J. Peters, and S. Schaal. Operational space control: A theoretical and empirical comparison. The International Journal of Robotics Research, 27(6): 737–757, 2008. doi:10.1177/0278364908091463. URL https://doi.org/10.1177/ 0278364908091463.
+[5] C.-A. Cheng, M. Mukadam, J. Issac, S. Birchﬁeld, D. Fox, B. Boots, and N. Ratliff. Rmpﬂow: A computational graph for automatic motion policy generation. In International Workshop on the Algorithmic Foundations of Robotics, pages 441–457. Springer, 2018.
+[6] A. Dietrich, T. Wimbock, A. Albu-Schaffer, and G. Hirzinger. Reactive whole-body control: Dynamic mobile manipulation using a large number of actuated degrees of freedom. IEEE Robotics & Automation Magazine, 19(2):20–33, 2012.
+[7] M. Bangura and R. Mahony. Real-time model predictive control for quadrotors. IFAC Proceedings Volumes, 47(3):11773–11780, 2014.
+[8] T. Erez, K. Lowrey, Y. Tassa, V. Kumar, S. Kolev, and E. Todorov. An integrated system for real-time model predictive control of humanoid robots. In 2013 13th IEEE-RAS International Conference on Humanoid Robots (Humanoids), pages 292–299, 2013. doi: 10.1109/HUMANOIDS.2013.7029990.
+[9] N. Scianca, D. De Simone, L. Lanari, and G. Oriolo. Mpc for humanoid gait generation: Stability and feasibility. IEEE Transactions on Robotics, 36(4):1171–1188, 2020. doi:10. 1109/TRO.2019.2958483.
+[10] G. Williams, P. Drews, B. Goldfain, J. M. Rehg, and E. A. Theodorou. Aggressive driving with model predictive path integral control. In 2016 IEEE International Conference on Robotics and Automation (ICRA), pages 1433–1440. IEEE, 2016.
+[11] Y. Tassa, N. Mansard, and E. Todorov. Control-limited differential dynamic programming. In 2014 IEEE International Conference on Robotics and Automation (ICRA), pages 1168–1175. IEEE, 2014.
+[12] G. Williams, A. Aldrich, and E. A. Theodorou. Model predictive path integral control: From theory to parallel computation. Journal of Guidance, Control, and Dynamics, 40(2):344–357, 2017.
+[13] G. Williams, N. Wagener, B. Goldfain, P. Drews, J. M. Rehg, B. Boots, and E. A. Theodorou. Information theoretic mpc for model-based reinforcement learning. In 2017 IEEE International Conference on Robotics and Automation (ICRA), pages 1714–1721. IEEE, 2017.
+[14] N. Wagener, C.-A. Cheng, J. Sacks, and B. Boots. An online learning approach to model predictive control. 2019.
+11
+
+[15] K. Chua, R. Calandra, R. McAllister, and S. Levine. Deep reinforcement learning in a handful of trials using probabilistic dynamics models. arXiv preprint arXiv:1805.12114, 2018.
+[16] A. Nagabandi, K. Konolige, S. Levine, and V. Kumar. Deep dynamics models for learning dexterous manipulation. In Conference on Robot Learning, pages 1101–1112. PMLR, 2020.
+[17] M. Danielczuk, A. Mousavian, C. Eppner, and D. Fox. Object rearrangement using learned implicit collision functions. arXiv preprint arXiv:2011.10726, 2020.
+[18] M. Zhong, M. Johnson, Y. Tassa, T. Erez, and E. Todorov. Value function approximation and model predictive control. In 2013 IEEE Symposium on Adaptive Dynamic Programming and Reinforcement Learning (ADPRL), pages 100–107, 2013. doi:10.1109/ADPRL.2013.6614995.
+[19] N. Wagener, C.-A. Cheng, J. Sacks, and B. Boots. An online learning approach to model predictive control. arXiv preprint arXiv:1902.08967, 2019.
+[20] F. Stulp and O. Sigaud. Path integral policy improvement with covariance matrix adaptation. arXiv preprint arXiv:1206.4621, 2012.
+[21] C. A. Klein and B. E. Blaho. Dexterity measures for the design and control of kinematically redundant manipulators. The international journal of robotics research, 6(2):72–83, 1987.
+[22] N. Vahrenkamp, T. Asfour, G. Metta, G. Sandini, and R. Dillmann. Manipulability analysis. In 2012 12th ieee-ras international conference on humanoid robots (humanoids 2012), pages 568–573. IEEE, 2012.
+[23] D. Rakita, B. Mutlu, and M. Gleicher. RelaxedIK: Real-time Synthesis of Accurate and Feasible Robot Arm Motion. In Proceedings of Robotics: Science and Systems, Pittsburgh, Pennsylvania, June 2018. doi:10.15607/RSS.2018.XIV.043.
+[24] B. Mildenhall, P. P. Srinivasan, M. Tancik, J. T. Barron, R. Ramamoorthi, and R. Ng. Nerf: Representing scenes as neural radiance ﬁelds for view synthesis. In European Conference on Computer Vision, pages 405–421. Springer, 2020.
+[25] M. Zucker, N. Ratliff, A. D. Dragan, M. Pivtoraiko, M. Klingensmith, C. M. Dellin, J. A. Bagnell, and S. S. Srinivasa. Chomp: Covariant hamiltonian optimization for motion planning. The International Journal of Robotics Research, 32(9-10):1164–1193, 2013.
+[26] H. Niederreiter. Random number generation and quasi-Monte Carlo methods, volume 63. Society for Industrial and Applied Mathematics, Philadelphia, US, 1992.
+[27] J. H. Halton and G. B. Smith. Algorithm 247: Radical-inverse quasi-random point sequence. Communications ACM, 7(12):701–702, 1964.
+[28] J. Dick, F. Y. Kuo, and I. H. Sloan. High-dimensional integration: The quasi-monte carlo way. Acta Numerica, 22:133–288, 2013.
+[29] M. Kobilarov. Cross-entropy randomized motion planning. In Robotics: Science and Systems, volume 7, pages 153–160, 2012.
+[30] Y. Yang, K. Caluwaerts, A. Iscen, T. Zhang, J. Tan, and V. Sindhwani. Data efﬁcient reinforcement learning for legged robots. In Conference on Robot Learning, pages 1–10. PMLR, 2020.
+[31] C. Summers, K. Lowrey, A. Rajeswaran, S. Srinivasa, and E. Todorov. Lyceum: An efﬁcient and scalable ecosystem for robot learning. In Learning for Dynamics and Control, pages 793– 803. PMLR, 2020.
+[32] J. Haviland and P. Corke. A purely-reactive manipulability-maximising motion controller. arXiv e-prints, pages arXiv–2002, 2020.
+[33] N. D. Ratliff, J. Issac, D. Kappler, S. Birchﬁeld, and D. Fox. Riemannian motion policies. arXiv preprint arXiv:1801.02854, 2018.
+12
+
+[34] D. Kappler, F. Meier, J. Issac, J. Mainprice, C. G. Cifuentes, M. Wu¨thrich, V. Berenz, S. Schaal, N. Ratliff, and J. Bohg. Real-time perception meets reactive motion generation. IEEE Robotics and Automation Letters, 3(3):1864–1871, 2018. doi:10.1109/LRA.2018.2795645.
+[35] A. Kuntz, C. Bowen, and R. Alterovitz. Fast anytime motion planning in point clouds by interleaving sampling and interior point optimization. In Robotics Research, pages 929–945. Springer, 2020.
+[36] L. G. Torres, A. Kuntz, H. B. Gilbert, P. J. Swaney, R. J. Hendrick, R. J. Webster, and R. Alterovitz. A motion planning approach to automatic obstacle avoidance during concentric tube robot teleoperation. In 2015 IEEE International Conference on Robotics and Automation (ICRA), pages 2361–2367. IEEE, 2015.
+[37] S. Karaman, M. R. Walter, A. Perez, E. Frazzoli, and S. Teller. Anytime motion planning using the rrt. In 2011 IEEE International Conference on Robotics and Automation, pages 1478–1483. IEEE, 2011.
+[38] K. V. Alwala and M. Mukadam. Joint sampling and trajectory optimization over graphs for online motion planning. arXiv preprint arXiv:2011.07171, 2020.
+[39] S. Murray, W. Floyd-Jones, Y. Qi, D. J. Sorin, and G. D. Konidaris. Robot motion planning on a chip. In Robotics: Science and Systems, 2016.
+[40] A. Fishman, C. Paxton, W. Yang, D. Fox, B. Boots, and N. Ratliff. Collaborative Behavior Models for Optimized Human-Robot Teamwork. arXiv e-prints, art. arXiv:1910.04339, Oct. 2019.
+[41] K. Ishihara, T. D. Itoh, and J. Morimoto. Full-body optimal control toward versatile and agile behaviors in a humanoid robot. IEEE Robotics and Automation Letters, 5(1):119–126, 2019.
+[42] F. R. Hogan and A. Rodriguez. Reactive planar non-prehensile manipulation with hybrid model predictive control. The International Journal of Robotics Research, 39(7):755–773, 2020.
+[43] P. Hyatt, C. S. Williams, and M. D. Killpack. Parameterized and gpu-parallelized real-time model predictive control for high degree of freedom robots. arXiv preprint arXiv:2001.04931, 2020.
+[44] P. Hyatt and M. D. Killpack. Real-time nonlinear model predictive control of robots using a graphics processing unit. IEEE Robotics and Automation Letters, 5(2):1468–1475, 2020.
+[45] C. Pinneri, S. Sawant, S. Blaes, J. Achterhold, J. Stueckler, M. Rolinek, and G. Martius. Sample-efﬁcient cross-entropy method for real-time planning. arXiv preprint arXiv:2008.06389, 2020.
+[46] M. Kalakrishnan, S. Chitta, E. Theodorou, P. Pastor, and S. Schaal. Stomp: Stochastic trajectory optimization for motion planning. In 2011 IEEE International Conference on Robotics and Automation, pages 4569–4574, 2011. doi:10.1109/ICRA.2011.5980280.
+[47] M. Kobilarov. Cross-entropy motion planning. The International Journal of Robotics Research, 31(7):855–871, 2012.
+[48] A. Zeng, S. Song, J. Lee, A. Rodriguez, and T. Funkhouser. Tossingbot: Learning to throw arbitrary objects with residual physics. IEEE Transactions on Robotics, 36(4):1307–1319, 2020.
+[49] M. Bhardwaj, A. Handa, D. Fox, and B. Boots. Information theoretic model predictive qlearning. In Learning for Dynamics and Control, pages 840–850. PMLR, 2020.
+[50] A. Paszke, S. Gross, F. Massa, A. Lerer, J. Bradbury, G. Chanan, T. Killeen, Z. Lin, N. Gimelshein, L. Antiga, A. Desmaison, A. Kopf, E. Yang, Z. DeVito, M. Raison, A. Tejani, S. Chilamkurthy, B. Steiner, L. Fang, J. Bai, and S. Chintala. Pytorch: An imperative style, high-performance deep learning library. In H. Wallach, H. Larochelle, A. Beygelzimer, F. d'Alche´-Buc, E. Fox, and R. Garnett, editors, Advances in Neural Information Processing Systems 32, pages 8024–8035. 2019.
+13
+
+[51] G. Sutanto, A. Wang, Y. Lin, M. Mukadam, G. Sukhatme, A. Rai, and F. Meier. Encoding physical constraints in differentiable newton-euler algorithm. volume 120 of Proceedings of Machine Learning Research, pages 804–813, The Cloud, 10–11 Jun 2020. PMLR. URL http://proceedings.mlr.press/v120/sutanto20a.html.
+14
+
+Appendix
+A Real-Time Control Implementation
+We implemented our MPC pipeline using PyTorch [50] with manipulator forward kinematics adapted from the open-source implementation provided by Sutanta et al. [51] and all cost terms and update equations implemented in a batched fashion. Further, multiprocessing is used to run MPC in a seperate process to avoid latency issues. Table 1 shows a timing comparison of our system running on a Titan RTX GPU against leading manipulator control approaches in literature.
+
+A.1 Franka Panda Control System
+
+The
+
+desired
+
+acceleration
+
+θ¨d
+t
+
+command
+
+from
+
+MPC
+
+is
+
+evaulated
+
+at
+
+100Hz
+
+and
+
+integrated
+
+forward
+
+to
+
+obtain
+
+desired
+
+joint
+
+position
+
+(θtd)
+
+and
+
+joint
+
+velocity
+
+θ˙d
+t
+
+commands
+
+respectively.
+
+These
+
+commands
+
+are
+
+sent to a custom low-level torque controller that computes desired torque commands at 1000Hz to
+
+control the Franka robot,
+
+τtff = M (θt)θ¨td + C(θt)θ˙t + Kp(θtd − θt) + Kd(θ˙td − θt)
+
+(16)
+
+where M (θ) and C(θ˙) are the inertia and coriolis force matrices respectively provided by libfranka and Kp, Kd are gains for the position and velocity errors respectively. Fig. 8 shows the overall architecture of the control system.
+
+A.2 State Estimation and Perception
+We found the noise in the joint state read from libfranka, especially in joint velocities, to be prohibitive for precise control with MPC. In order to circumvent this issue we implemented a joint state ﬁlter that ﬁrst predicts the state based on the previous commanded joint acceleration and then uses an exponential moving average ﬁlter to incorporate sensor readings.
+For our perception setup, we use an Intel Realsense D455 Depth Camera placed at a ﬁxed location in the workspace with a known camera-to-robot transform to obtain depth data in the form of point clouds. The raw point cloud is ﬁltered to remove all the points lying inside the robot body to obtain the scene point cloud. The robot URDF is used to sample points along the robot body to create a robot point cloud. Both these point clouds are fed as input to SceneCollisionNet [17] for computing the collision cost in Eq. 14. Since we only consider static scenes for the purposes of this work, the scene pointcloud is computed once at the start of the run. For dynamic scenes, the pointcloud would need to be processed in real-time. We defer this to future work.
+
+Intel RealSense Point cloud
+
+Control + Perception PC
+
+ROS MPC Node
+
+Filtered  point   cloud
+
+Filtered   state
+
+Command   buffer
+
+MPC Process
+
+100 Hz Joint command
+State
+
+Robot PC
+Torque Control
+
+1000 Hz
+
+Torque   command
+
+1000 Hz
+
+State
+
+Franka Panda
+
+Figure 8: The compute graph shows the ﬂow of information between the different components in our approach.
+
+15
+
+Table 1: Control Latency of methods that can handle collision avoidance in high dimensional systems is tabulated here. A more thorough description is available in Sec. 5.
+
+Method
+
+Latency (ms) Horizon
+
+OSC [6, 5, 32, 23]
+
+1-17
+
+1
+
+Motion Planning [36, 37, 38]
+
+140-1000
+
+N/A
+
+Custom Chip Motion Planning [39]
+
+1
+
+N/A
+
+Gradient MPC [40, 8, 41]
+
+20 - 140
+
+≤16
+
+Sampling MPC [17]
+
+100
+
+40
+
+Ours
+
+10
+
+30
+
+B Further Experimental Details
+
+B.1 Dynamic Object Balancing
+
+Experimental Setup: In this task, the real Franka Panda robot is required to balance a ball on tray grasped by the parallel jaw gripper. Every episode starts with the ball placed at an arbitrary location on the tray with the robot trying to center the ball without dropping it. Each episode lasts for 30 seconds after which the ball is placed at an arbitrary location by the human user. The position of the ball is measured at 30Hz using perception system that uses the RGBD input from a RealSense camera. The ball is detected from the RGB images using a blob-tracker and the corresponding depth is queried from the aligned depth image. The camera intrinsics are then used to compute the 3D coordinates.
+
+Ball Dynamics: We use a simple kinematic model of rolling on plane under acceleration due to gravity to predict the future positions and velocities of the ball in the frame of the tray given the end effector positions and orientations obtained from our arm model. In this simpliﬁed model, we do not explicitly account for friction or perform any system identiﬁcation. In order to predict the future states of the ball given accelerations, we can leverage our tensorized forward model and maintain a high control frequency. Let the state of the ball in world frame (as input by the perception system) be denoted by
+
+xball w = [x, y, z]
+
+x˙ ball w = [x˙ , y˙, z˙]
+
+Further, let the gravity vector in world frame be denoted by gw. From forward kinematics, we can calculate the homogeneous transform of the end effector with respect to world frame as
+
+T w R ee = ewe dwee 01
+
+Given a batch of such end-effector poses (obtained from our tensorized arm model rollouts), we can
+
+calculate
+
+the
+
+accelerations
+
+due
+
+to
+
+gravity
+
+of
+
+the
+
+ball
+
+in
+
+the
+
+end
+
+effector
+
+frame
+
+as
+
+gee
+
+=
+
+RwT
+ee
+
+gw
+
+and
+
+x¨ee obj =
+
+gee
+x
+
+,
+
+gee
+y
+
+,
+
+0
+
+.
+
+Here,
+
+we
+
+made
+
+the
+
+assumption
+
+that
+
+the
+
+ball
+
+does
+
+not
+
+lose
+
+contact
+
+with
+
+the
+
+plate
+
+which is reasonable at lower speeds. Similarly, the position and velocity of the ball in end effector
+
+frame
+
+are
+
+calculated
+
+as
+
+xee ball
+
+=
+
+T w−1
+ee
+
+∗ xwball
+
+and
+
+x˙ ee ball
+
+=
+
+RwT
+ee
+
+∗ x˙ wball
+
+with
+
+x˙ ebaell[2]
+
+=
+
+0.
+
+Finally,
+
+given the initial state and a batch of acceleration inputs in the end effector frame, we can simply
+
+employ our tensorized kinematic model to predict the future states of the ball.
+
+B.2 Reaching Cartesian Poses
+We test the accuracy and path length of Cartesian pose reaching by selecting a sequence of six hard poses for the robot to reach. We compare against baseline sampling based planners RRTCONNECT and RRTSTAR using MOVEIT! and, Manipulability Motion Control [32], an operation space controller. In these experiments, the MOVEIT! and MMC baselines use the position and velocity controllers provided by franka ros and libfranka respectively which have been extensively tuned and veriﬁed for accuracy. Hence, MMC represents the best accuracy achievable by a feedback controller.
+One of these poses requires a large change in the end-effector’s orientation as shown in Fig. 9. We found that MMC was unable to handle this pose and would repeatedly result in self collisions
+
+16
+
+Table 2: Comparison of STORM with baselines on pose reaching. Reported values are median across 5 poses excluding the ﬁrst pose which was unreachable by MMC. Max Joint Velocity is the maximum velocity achieved throughout the run.
+
+Method
+
+Pos. Error Quat. Error Joint Path Length EE Path Length Max. Joint Vel
+
+(mm)
+
+(%)
+
+(rad)
+
+(m)
+
+(rad/s)
+
+RRTCONNECT RRTSTAR MMC Ours
+
+0.5328 0.3433 0.0661 4.822
+
+0.054 0.0393 0.00267923 0.4619
+
+3.4527 1.7967 2.3394 3.41792
+
+1.0086 0.7626 0.74351317 1.087688
+
+1.3547 0.7626 0.268 1.2701
+
+owing to its local nature and no consideration of self-collision avoidance, whereas both STORM and MOVEIT! baselines are able to reach the it. For the other poses, we found the accuracy of STORM to be worse than the baselines (shown in Table 2) although the path lengths and max joint velocities are comparable. Even though our method obtains millimeter level accuracy, the performance is limited by the lower level controller which was not tuned extensively. As future work, we intend to further tune and improve the lower level controller to overcome these issues.
+B.3 SceneCollisionNet Training
+For the current experiments, we used a pre-trained SceneCollisionnet model (https://github.com/NVlabs/SceneCollisionNet) provided by the authors of [17]. The model was trained for table-top environments which is appropriate for our setting as well.
+
+C Ablation Studies
+
+We performed extensive quantitative ablation studies for individual components of our system for the reaching task in simulation. We also present qualitative demonstrations of dynamic obstacle avoidance, effect of horizon and a comparison to Reimannian Motion Policies (RMPs) [33] on our website https://sites.google.com/view/manipulationmpc/further-experimental-results.
+
+Figure 9: We show the robot trying to reach a very hard orientation (Appendix. B.2). MMC is unable to reach this pose and continuously enters states of self collision due to its inability to account for collision avoidance while both MPPI and MOVEIT! are able to reach it.
+
+C.1 Effect of Number of Particles
+
+First, we study the effect of number of trajectories sampled per iteration of optimization (or particles) on the controller performance in simulation. For this experiment, 10 end-effector pose targets were used that require signiﬁcant changes in orientation. Each episode is 700 timesteps long after which the manipulator is reset to the base orientation. The horizon is kept constant at 30 timesteps and all cost function weights are also ﬁxed.
+
+C.1.1 Position Accuracy
+The box plot in Fig. 10a shows the median (solid line) with conﬁdence interval (box) of position errors in the last 50 timesteps of every episode as a function of changing number of particles. We chose the last 50 timesteps to show the convergence of the controller to the goal. From the plot it can be seen that, increasing number of particles the controller is able to achieve more accurate median error with a tighter conﬁdence interval.
+
+C.1.2 Orientation Accuracy
+The box plot in Fig. 10b shows the median (solid line) with conﬁdence interval (box) of quaternion errors in the last 50 timesteps of every episode as a function of changing number of particles. Our framework achieves a conﬁdence interval over quaternion errors within 5
+
+17
+
+6
+
+5
+
+Position Error (cm)
+
+4
+
+3
+
+2
+
+1
+
+0
+
+100
+
+200
+
+500
+
+Number of particles
+
+(a) Median position error with conﬁdence bounds
+
+as a function of number of particles.
+
+10
+
+8
+
+Quaternion Error (%)
+
+6
+
+4
+
+2
+
+0
+
+100
+
+200
+
+500
+
+(b) Median quaternion error with conﬁdence bounds as a function of number of particles.
+
+1.4 20
+1.3
+15 1.2
+
+Max Joint Velocity (rad/s)
+
+Jerk Magnitude (rad/s3)
+
+10
+
+1.1
+
+1.0 5
+0.9
+
+0
+
+100
+
+200
+
+500
+
+Number of particles
+
+0.8
+
+100
+
+200
+
+500
+
+Number of particles
+
+(c) Jerk in robot motion as a function of number (d) Maximum joint velocity reached for different
+
+of particles.
+
+number of particles.
+
+Figure 10: Results for ablation study for number of sampled particles in MPPI.
+
+C.1.3 Jerk
+The box plot in Fig. 10c shows the median (solid line) with conﬁdence interval (box) of the jerk in the robot motion over all the timesteps and episodes. Our sampling strategy generates smooth (low jerk) motions even with 200 particles.
+C.1.4 Maximum Joint Velocity
+Fig. 10d demostrates that with increasing number of particles, our B-spline sampling strategy is able to ramp up the robot’s joint velocity while maintaining low jerk.
+C.2 Cost Terms
+We study the effect of different cost terms on the controller performance. We test the constraintbased self collision and joint limit avoidance terms and behavior-based manipulability and stop costs.
+C.2.1 Self-Collision Cost
+For this experiment, we chose 5 end effector target poses that are in collision with the robot and report the number of timesteps the robot spent in self collision. Table 3 shows that when the self collision cost is used, the robot never enters a state of self collision at the cost of not reaching the goal pose.
+C.2.2 Joint Limit Avoidance Cost
+For testing joint limit avoidance 10 end-effector targets with 500 particles were used with a varying weight on the joint limit cost. Table 4 shows that as the weight on the joint limit avoidance cost is
+18
+
+Weight Self Collision (count)
+
+0 50 500 1000 5000
+
+2730 0 0 0 0
+
+Table 3: Number of timesteps spent in self collision for changing weight on self collision cost
+
+Weight Joint Limits Violation (count)
+
+0 50 100 500 1000
+
+1624 218 49 0 0
+
+Table 4: Number of timesteps spent in joint limit violation for changing weight on joint limit cost
+
+Position Error (cm) Quaternion Error (%) Position Error (cm)
+
+3.5
+
+3.0
+
+2.5
+
+2.0
+
+1.5
+
+1.0
+
+0.5
+
+0.0 0
+
+10
+
+30
+
+50
+
+Manipulability Weight
+
+(a) Median position error with con-
+
+ﬁdence bounds as a function of ma-
+
+nipulability cost weight.
+
+5 4 3 2 1
+
+0
+
+10
+
+30
+
+50
+
+Manipulability Weight
+
+(b) Median quaternion error with
+
+conﬁdence bounds as a function of
+
+manipulability cost weight.
+
+weight=0
+
+80
+
+weight=10
+
+weight=50
+
+weight=100
+
+60
+
+40
+
+20
+
+0 0 25 50 75 100 125 150 175 200 Timestep
+(c) Position error over time for changing stop cost weight. Higher weight avoids oscillation near goal.
+
+Figure 11: Results for ablation study for behavior based manipulability and stop costs.
+
+increased, the number of violations steadily decreases, going to zero for a large weight of 500 and above.
+C.2.3 Manipulability Cost
+The manipulability cost acts as a regularizer to keep the manipulator away from singular conﬁgurations. The box plots in Fig. 11a and Fig. 11b show the median value with conﬁdence bounds of the position and orientation errors over the last 50 timesteps in 10 different pose reaching runs. We chose the last 50 timesteps and not just the last timestep to test the convergence to the goal. Here we see that as the weight on the manipulability cost is increased, the pose reaching accuracy improves. However, after a certain threshold, the manipulability cost interferes with pose reaching and the position accuracy decreases. Maintaining high manipulability allows the robot to reach different end effector orientations accurately.
+C.2.4 Stop Cost
+The stop cost penalizes joint velocities that are too high for the robot to safely stop within horizon based on a maximum acceleration threshold. An important consequence of this term is that it allows the robot to smoothly stop at the goal even with a short horizon. We demonstrate this effect in the plot in Fig. 11c where a lower weight on the stop cost leads to undesirable oscillations near the goal.
+C.3 Sampling Strategy
+C.3.1 Pseudo-random vs Halton Sampling
+Halton Sampling is a Quasi Monte-Carlo method that provides better coverage of the action space as compared to pseudo-random sampling that exhibits and undesired clustering of samples. We study the improvement gain by using Halton sampling in a low particle regime. The plots in Fig. 12 show the quaternion errors achieved by pseudo random and Halton samples with 100 and 500 particles respectively. With lesser number of particles, pseudo-random sampling with comb ﬁlter is unable to achieve a quaternion error with a conﬁdence interval within 5% whereas Halton sampling achieves less than 5% quaternion error with both 100 and 500 particles.
+19
+
+Quaternion Error (%) Quaternion Error (%)
+
+14 12 10 8 6 4 2 0
+pseudo-random+comb
+
+halton+comb
+
+4 3 2 1 0 pseudo-random+comb
+
+halton+comb
+
+(a) 100 particles .
+
+(b) 500 particles
+
+Figure 12: Median quaternion error with conﬁdence bounds for psedurandom and Halton sampling with 100 and 500 particles
+
+Position Error (cm) Quaternion Error (%) Max Joint Velocity (rad/s)
+
+1.4
+
+1.2
+
+1.0
+
+0.8
+
+0.6
+
+0.4
+
+0.2
+
+0.0
+
+halton+comb
+
+halton+bspline
+
+mixed
+
+8
+
+6
+
+4
+
+2
+
+0
+
+halton+comb
+
+halton+bspline
+
+mixed
+
+1.6
+
+1.5
+
+1.4
+
+1.3
+
+1.2
+
+1.1
+
+halton+comb
+
+halton+bspline
+
+mixed
+
+(a) Position Error
+
+(b) Quaternion Error
+
+(c) Max Joint Velocity
+
+Figure 13: Results for the comparison of pose reaching accuracy and max joint velocity achieved for different smoothing techniques in conjunction with Halton sampling.
+
+(a) Timing benchmark of learned versus baseline self-collision.
+
+(b) Timing benchmark of ten- (c) Timing benchmark of ten-
+
+sorized GPU model against CPU sorized GPU model against CPU
+
+baseline as a function of horizon baseline as a function of number of
+
+with 500 particles.
+
+particles with horizon of 30 steps.
+
+Figure 14: Timing benchmarks of different key components
+
+20
+
+C.3.2 Comb Filtering v/s B-Splines Fig. 14 shows a comparison of using comb ﬁltering versus bsplines in conjunction with Halton sampling. Comb ﬁltering smoothens out the sampled trajectories using user deﬁned ﬁltering coefﬁcients. In order to ensure smooth (low jerk) motions a very strong ﬁltering is required which prevents the robot from ramping up this velocity. Fitting B-Splines to sampled actions is able to ensure smooth acceleration proﬁles which allows the robot to smoothly ramp up the velocity but comes at the price of reduced pose accuracy. However, since our sampling strategy allows us to arbitrarily mix different kinds of trajectories, we create and test a hybrid sampling strategy (denoted as ”mixed”) with a ratio of 0.6 and 0.4 of B-Spline and comb ﬁltering. This provides comparable accuracy to comb ﬁltering while also achieving high joint velocities. C.4 Timing Benchmarks C.4.1 Learned v/s Baseline Self Collision Detection We quantify the computational gains obtained by using a learned self collision detector. In Fig. 14a we present a timing benchmark for an increasing batch size of query conﬁgurations. The learned function is over 40x faster on average than baseline self collision detection that uses forward kinematics to compute link poses and calculates minimum distance between them. Further, the learned self-collision detector maintains a very low latency of 0.4-0.6ms even for large batch sizes. C.4.2 Speedup from Tensorized Forward Model on GPU The timing benchmark in Fig. 14b and Fig. 14c show the computational gains from our tensorized GPU implementation of forward model versus a CPU baseline for varying horizon and number of particles used in MPC respectively. Fig. 14b shows that our model is over 5x faster than CPU baseline for different horizons with 500 particles. In Fig. 14c, we can see that the our model maintains similar latency for increasing number of particles owing to it being completely tensorized.
+21
+
+

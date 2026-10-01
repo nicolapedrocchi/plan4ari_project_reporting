@@ -1,0 +1,527 @@
+{
+ "kappen2005pathintegrals": {
+  "DOI": "10.1088/1742-5468/2005/11/p11011",
+  "title": [
+   "Path integrals and symmetry breaking for optimal control theory"
+  ],
+  "container-title": [
+   "Journal of Statistical Mechanics: Theory and Experiment"
+  ],
+  "volume": "2005",
+  "issue": "11",
+  "page": "P11011-P11011",
+  "issued": {
+   "date-parts": [
+    [
+     2005,
+     11,
+     1
+    ]
+   ]
+  },
+  "type": "journal-article"
+ },
+ "williams2017itmpc_arxiv": {
+  "DOI": "10.1109/tro.2018.2865891",
+  "title": [
+   "Information-Theoretic Model Predictive Control: Theory and Applications to Autonomous Driving"
+  ],
+  "container-title": [
+   "IEEE Transactions on Robotics"
+  ],
+  "volume": "34",
+  "issue": "6",
+  "page": "1603-1622",
+  "issued": {
+   "date-parts": [
+    [
+     2018,
+     12
+    ]
+   ]
+  },
+  "type": "journal-article"
+ },
+ "gandhi2021rmppi": {
+  "DOI": "10.1109/lra.2021.3057563",
+  "title": [
+   "Robust Model Predictive Path Integral Control: Analysis and Performance Guarantees"
+  ],
+  "container-title": [
+   "IEEE Robotics and Automation Letters"
+  ],
+  "volume": "6",
+  "issue": "2",
+  "page": "1423-1430",
+  "issued": {
+   "date-parts": [
+    [
+     2021,
+     4
+    ]
+   ]
+  },
+  "type": "journal-article"
+ },
+ "kim2022smppi": {
+  "DOI": "10.1109/lra.2022.3192800",
+  "title": [
+   "Smooth Model Predictive Path Integral Control Without Smoothing"
+  ],
+  "container-title": [
+   "IEEE Robotics and Automation Letters"
+  ],
+  "volume": "7",
+  "issue": "4",
+  "page": "10406-10413",
+  "issued": {
+   "date-parts": [
+    [
+     2022,
+     10
+    ]
+   ]
+  },
+  "type": "journal-article"
+ },
+ "pezzato2023isaacmppi": {
+  "DOI": "10.1109/lra.2025.3535185",
+  "title": [
+   "Sampling-Based Model Predictive Control Leveraging Parallelizable Physics Simulations"
+  ],
+  "container-title": [
+   "IEEE Robotics and Automation Letters"
+  ],
+  "volume": "10",
+  "issue": "3",
+  "page": "2750-2757",
+  "issued": {
+   "date-parts": [
+    [
+     2025,
+     3
+    ]
+   ]
+  },
+  "type": "journal-article"
+ },
+ "zhang2024m3p2i_arxiv": {
+  "DOI": "10.1109/lra.2024.3426183",
+  "title": [
+   "Multi-Modal MPPI and Active Inference for Reactive Task and Motion Planning"
+  ],
+  "container-title": [
+   "IEEE Robotics and Automation Letters"
+  ],
+  "volume": "9",
+  "issue": "9",
+  "page": "7461-7468",
+  "issued": {
+   "date-parts": [
+    [
+     2024,
+     9
+    ]
+   ]
+  },
+  "type": "journal-article"
+ },
+ "trevisan2024biasedmppi": {
+  "DOI": "10.1109/lra.2024.3397083",
+  "title": [
+   "Biased-MPPI: Informing Sampling-Based Model Predictive Control by Fusing Ancillary Controllers"
+  ],
+  "container-title": [
+   "IEEE Robotics and Automation Letters"
+  ],
+  "volume": "9",
+  "issue": "6",
+  "page": "5871-5878",
+  "issued": {
+   "date-parts": [
+    [
+     2024,
+     6
+    ]
+   ]
+  },
+  "type": "journal-article"
+ },
+ "yin2023shieldmppi": {
+  "DOI": "10.1109/lra.2023.3315211",
+  "title": [
+   "Shield Model Predictive Path Integral: A Computationally Efficient Robust MPC Method Using Control Barrier Functions"
+  ],
+  "container-title": [
+   "IEEE Robotics and Automation Letters"
+  ],
+  "volume": "8",
+  "issue": "11",
+  "page": "7106-7113",
+  "issued": {
+   "date-parts": [
+    [
+     2023,
+     11
+    ]
+   ]
+  },
+  "type": "journal-article"
+ },
+ "yin2022covsteering": {
+  "DOI": "10.1109/icra46639.2022.9811615",
+  "title": [
+   "Trajectory Distribution Control for Model Predictive Path Integral Control using Covariance Steering"
+  ],
+  "container-title": [
+   "2022 International Conference on Robotics and Automation (ICRA)"
+  ],
+  "page": "1478-1484",
+  "issued": {
+   "date-parts": [
+    [
+     2022,
+     5,
+     23
+    ]
+   ]
+  },
+  "type": "proceedings-article"
+ },
+ "wang2021tsallis": {
+  "DOI": "10.15607/rss.2021.xvii.073",
+  "title": [
+   "Variational Inference MPC using Tsallis Divergence"
+  ],
+  "container-title": [
+   "Robotics: Science and Systems XVII"
+  ],
+  "issued": {
+   "date-parts": [
+    [
+     2021,
+     7,
+     12
+    ]
+   ]
+  },
+  "type": "proceedings-article"
+ },
+ "asmar2023mpopi": {
+  "DOI": "10.1109/icra48891.2023.10160929",
+  "title": [
+   "Model Predictive Optimized Path Integral Strategies"
+  ],
+  "container-title": [
+   "2023 IEEE International Conference on Robotics and Automation (ICRA)"
+  ],
+  "page": "3182-3188",
+  "issued": {
+   "date-parts": [
+    [
+     2023,
+     5,
+     29
+    ]
+   ]
+  },
+  "type": "proceedings-article"
+ },
+ "honda2024svgmppi": {
+  "DOI": "10.1109/icra57147.2024.10611021",
+  "title": [
+   "Stein Variational Guided Model Predictive Path Integral Control: Proposal and Experiments with Fast Maneuvering Vehicles"
+  ],
+  "container-title": [
+   "2024 IEEE International Conference on Robotics and Automation (ICRA)"
+  ],
+  "page": "7020-7026",
+  "issued": {
+   "date-parts": [
+    [
+     2024,
+     5,
+     13
+    ]
+   ]
+  },
+  "type": "proceedings-article"
+ },
+ "mohamed2023gpmppi": {
+  "DOI": "10.1109/iros55552.2023.10341382",
+  "title": [
+   "GP-Guided MPPI for Efficient Navigation in Complex Unknown Cluttered Environments"
+  ],
+  "container-title": [
+   "2023 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS)"
+  ],
+  "page": "7463-7470",
+  "issued": {
+   "date-parts": [
+    [
+     2023,
+     10,
+     1
+    ]
+   ]
+  },
+  "type": "proceedings-article"
+ },
+ "mohamed2023umppi": {
+  "DOI": "10.1109/tro.2025.3526078",
+  "title": [
+   "Toward Efficient MPPI Trajectory Generation With Unscented Guidance: U-MPPI Control Strategy"
+  ],
+  "container-title": [
+   "IEEE Transactions on Robotics"
+  ],
+  "volume": "41",
+  "page": "1172-1192",
+  "issued": {
+   "date-parts": [
+    [
+     2025
+    ]
+   ]
+  },
+  "type": "journal-article"
+ },
+ "macenski2023nav2survey": {
+  "DOI": "10.1016/j.robot.2023.104493",
+  "title": [
+   "From the desks of ROS maintainers: A survey of modern &amp; capable mobile robotics algorithms in the robot operating system 2"
+  ],
+  "container-title": [
+   "Robotics and Autonomous Systems"
+  ],
+  "volume": "168",
+  "page": "104493",
+  "issued": {
+   "date-parts": [
+    [
+     2023,
+     10
+    ]
+   ]
+  },
+  "type": "journal-article"
+ },
+ "sundaralingam2023curobo": {
+  "DOI": "10.1109/icra48891.2023.10160765",
+  "title": [
+   "CuRobo: Parallelized Collision-Free Robot Motion Generation"
+  ],
+  "container-title": [
+   "2023 IEEE International Conference on Robotics and Automation (ICRA)"
+  ],
+  "page": "8112-8119",
+  "issued": {
+   "date-parts": [
+    [
+     2023,
+     5,
+     29
+    ]
+   ]
+  },
+  "type": "proceedings-article"
+ },
+ "xue2024dialmpc": {
+  "DOI": "10.1109/icra55743.2025.11127320",
+  "title": [
+   "Full-Order Sampling-Based MPC for Torque-Level Locomotion Control via Diffusion-Style Annealing"
+  ],
+  "container-title": [
+   "2025 IEEE International Conference on Robotics and Automation (ICRA)"
+  ],
+  "page": "4974-4981",
+  "issued": {
+   "date-parts": [
+    [
+     2025,
+     5,
+     19
+    ]
+   ]
+  },
+  "type": "proceedings-article"
+ },
+ "pan2024mbd": {
+  "DOI": "10.52202/079017-1846",
+  "title": [
+   "Model-based Diffusion for Trajectory Optimization"
+  ],
+  "container-title": [
+   "Advances in Neural Information Processing Systems 37"
+  ],
+  "page": "57914-57943",
+  "issued": {
+   "date-parts": [
+    [
+     2024
+    ]
+   ]
+  },
+  "type": "proceedings-article"
+ },
+ "kazim2024survey": {
+  "DOI": "10.1016/j.arcontrol.2023.100931",
+  "title": [
+   "Recent advances in path integral control for trajectory optimization: An overview in theoretical and algorithmic perspectives"
+  ],
+  "container-title": [
+   "Annual Reviews in Control"
+  ],
+  "volume": "57",
+  "page": "100931",
+  "issued": {
+   "date-parts": [
+    [
+     2024
+    ]
+   ]
+  },
+  "type": "journal-article"
+ },
+ "jankowski2023vpsto": {
+  "DOI": "10.1109/icra48891.2023.10160214",
+  "title": [
+   "VP-STO: Via-point-based Stochastic Trajectory Optimization for Reactive Robot Behavior"
+  ],
+  "container-title": [
+   "2023 IEEE International Conference on Robotics and Automation (ICRA)"
+  ],
+  "page": "10125-10131",
+  "issued": {
+   "date-parts": [
+    [
+     2023,
+     5,
+     29
+    ]
+   ]
+  },
+  "type": "proceedings-article"
+ },
+ "abraham2020emppi": {
+  "DOI": "10.1109/lra.2020.2972836",
+  "title": [
+   "Model-Based Generalization Under Parameter Uncertainty Using Path Integral Control"
+  ],
+  "container-title": [
+   "IEEE Robotics and Automation Letters"
+  ],
+  "volume": "5",
+  "issue": "2",
+  "page": "2864-2871",
+  "issued": {
+   "date-parts": [
+    [
+     2020,
+     4
+    ]
+   ]
+  },
+  "type": "journal-article"
+ },
+ "streichenberg2023mapi": {
+  "DOI": "10.1109/icra48891.2023.10161511",
+  "title": [
+   "Multi-Agent Path Integral Control for Interaction-Aware Motion Planning in Urban Canals"
+  ],
+  "container-title": [
+   "2023 IEEE International Conference on Robotics and Automation (ICRA)"
+  ],
+  "page": "1379-1385",
+  "issued": {
+   "date-parts": [
+    [
+     2023,
+     5,
+     29
+    ]
+   ]
+  },
+  "type": "proceedings-article"
+ },
+ "yin2024ccmppi": {
+  "DOI": "10.1109/cdc56724.2024.10885840",
+  "title": [
+   "Chance-Constrained Information-Theoretic Stochastic Model Predictive Control with Safety Shielding"
+  ],
+  "container-title": [
+   "2024 IEEE 63rd Conference on Decision and Control (CDC)"
+  ],
+  "page": "653-658",
+  "issued": {
+   "date-parts": [
+    [
+     2024,
+     12,
+     16
+    ]
+   ]
+  },
+  "type": "proceedings-article"
+ },
+ "rabiee2024cbfmppi": {
+  "DOI": "10.1109/cdc57313.2025.11312129",
+  "title": [
+   "Guaranteed-Safe MPPI Through Composite Control Barrier Functions for Efficient Sampling in Multi-Constrained Robotic Systems"
+  ],
+  "container-title": [
+   "2025 IEEE 64th Conference on Decision and Control (CDC)"
+  ],
+  "page": "5515-5520",
+  "issued": {
+   "date-parts": [
+    [
+     2025,
+     12,
+     9
+    ]
+   ]
+  },
+  "type": "proceedings-article"
+ },
+ "trevisan2025drampi": {
+  "DOI": "10.1109/iros60139.2025.11246822",
+  "title": [
+   "Dynamic Risk-Aware MPPI for Mobile Robots in Crowds via Efficient Monte Carlo Approximations"
+  ],
+  "container-title": [
+   "2025 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS)"
+  ],
+  "page": "313-320",
+  "issued": {
+   "date-parts": [
+    [
+     2025,
+     10,
+     19
+    ]
+   ]
+  },
+  "type": "proceedings-article"
+ },
+ "jansma2023interaction": {
+  "DOI": "10.1109/mrs60187.2023.10416788",
+  "title": [
+   "Interaction-Aware Sampling-Based MPC with Learned Local Goal Predictions"
+  ],
+  "container-title": [
+   "2023 International Symposium on Multi-Robot and Multi-Agent Systems (MRS)"
+  ],
+  "page": "15-21",
+  "issued": {
+   "date-parts": [
+    [
+     2023,
+     12,
+     4
+    ]
+   ]
+  },
+  "type": "proceedings-article"
+ }
+}

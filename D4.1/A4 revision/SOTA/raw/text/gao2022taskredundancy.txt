@@ -1,0 +1,514 @@
+Proceedings of the 2022 IEEE International Conference on Robotics and Biomimetics
+December 5-9, 2022, Xishuangbanna, China
+
+2022 IEEE International Conference on Robotics and Biomimetics (ROBIO) | 978-1-6654-8109-0/22/$31.00 ©2022 IEEE | DOI: 10.1109/ROBIO55434.2022.10011791
+
+Optimal Motion Planning Considering Task Redundancy in Trajectory Tracking Applications for Industrial Robot
+Wenxiang Gao, Qing Tang, Member, IEEE, and Jin Yao
+
+Abstract— Task redundancy which is deﬁned as that a robotic manipulator has more degrees of freedom than those strictly required to execute a given task exists in most industrial applications. This paper focuses on how to automatically generate a collision-free motion trajectory for an industrial robot with task redundant applications in a complex environment. The task redundant space is divided into grid for trajectory tracking motion planning. The expanding process map the joint space to the task redundant space for neighborhood searching. The cost evaluation not only calculates the distance in task redundant space but also considers the cost deﬁned in joint space including both singularity and joint limits. The simulation experiments verify that our proposed algorithm not only could realize a collision-free motion and handle the singularity and joint limits, but also be able to track complex end effector trajectory within an obstacle-intensive environment. The results show that the proposed algorithm could be used in all kinds of task redundant trajectory applications in industry.
+Index Terms— Task redundancy, collision-free motion planning, optimality, singularity, joint limits.
+I. INTRODUCTION
+Recent years, robots play an increasingly important role in manufacturing industries, especially with the hazardous tasks such as welding [1], polishing [2], spraying [3], etc. However, the increasingly complicated trajectories and complex workspace with dense obstacles make the automatic path planning much more difﬁcult [4].
+Task redundancy commonly exists in the industrial applications [5]. The degree of freedom of task redundancy varies with the speciﬁc task. The rotation of the tool around its symmetrical axis is redundant for most applications such as welding, polishing, and spraying. Thus there is at least 1-DOF of redundancy when executing the task. Besides rotation along the symmetrical axis of the tools, rotation around the axis in the tangent plane of the workpiece is also usually considered in the industrial applications such as the inclined welding and the oblique angle spray [6]. Different from the redundancy caused by symmetry axis, most of the time the redundancy caused by skew angle should be limited to a certain threshold in order to ensure the product quality [7]. In these circumstances, the dimension of the task redundancy would increase to two. Further more, considering the orientation of the torch might be totally undeﬁned in some welding applications is also uncertain [8],
+*This work was supported by Sichuan Key Research and Development Plan under Grant 2020YFG0116 and Grant 2021YFG0074. (Corresponding author: Qing Tang.).
+The authors are with the School of Mechanical Engineering, Sichuan University, Chengdu 610065, China (E-mail: gao scu@163.com; tangqing scu@163.com; jinyao163@163.com).
+
+the dimension of the task redundancy might be even higher. How to generate feasible motion for industrial robot in task redundancy space is an urgent problem to be solved in the application of robot in modern industry.
+Motion planning algorithms which output feasible robot motion for complex environment is widely studied [9]. Different algorithms have been proposed to avoid the potential collision and achieve a minimum trajectory cost [10], such as Combinatorial Roadmaps [11], Artiﬁcial Potential Field (APF) [12]. However, the Combinatorial Roadmaps needs explicit obstacle information and the APF method would easily be trapped with local minimum and usually be implemented as the low level control. Besides the above two algorithms, grid search algorithms and sampling-based algorithms are the most popular motion planning algorithms nowadays. The grid search algorithm is the most straightforward form of path planning. The conﬁguration space is directly rasterized. Once an initial-goal query is given, the graph search algorithms, such as A*, best-ﬁrst or bidirectional search, are used to ﬁnd the optimal path [13]. The A* algorithm which consists of a heuristic cost could generate an optimal trajectory in the grid efﬁciently. Lots of improvements are proposed to enhance the A* algorithm for lifelong planning [14], dynamic environment [15], anytime style [16], etc. On the other hand, sampling-base algorithms which include the PRM [17], RRT [18] and their variants have to construct a roadmap or tree using sampling techniques ﬁrst, then adopting different graph search algorithms according to the query form. Fortunately, most of the variants of the classical PRM and RRT, namely PRM*, RRT*, FMT*, RRTx, etc., are proved to be probabilistic complete and asymptotical optimal. However resolution complete rather than probabilistically complete is required for industrial applications. The grid search algorithm introduced above could easily obtain the resolution completeness according to its inherent rasterizing characteristics. LaValle et al. proves that some forms of grid search yield performance that is comparable to the sampling-based algorithm [19]. This makes the grid search algorithms a perfect choice to solve the robot motion planning problems for industrial applications.
+The remainder of this paper is organized as follows. The optimal motion planning algorithm is proposed in Section II which includes the algorithm framework, the cost function deﬁnition and the expanding strategy. Simulation experiments are carried out in Section III, which verify the ability of singularity and joint limit avoidance of the algorithm and its feasibility in 1D and 2D environment. Finally, the conclusion is presented in Section IV.
+
+978-1-6654-8109-0/22/$31.00 © 2022 IEEE
+
+1580
+
+Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:17:04 UTC from IEEE Xplore. Restrictions apply.
+
+II. OPTIMAL COLLISION-FREE MOTION PLANNING
+In this section, a modiﬁed A* algorithm is introduced to solve the optimal collision-free motion planning problem of the industrial robot for the task redundant applications. The following sections would introduce the framework of the algorithm, the cost evaluation function, expanding strategy and the proof of optimality respectively.
+A. The Framework of the Modiﬁed A* Algorithm
+
+Algorithm 1: The modiﬁed A* motion planning algorithm
+
+1 Initialization: Sclosed ← ∅, Sopen ← {pinit};
+
+2 while Sopen = ∅ do
+
+3 pmin ← arg min {f (p) |p ∈ Sopen };
+
+4 if pmin ∈/ pgoal then
+
+5
+
+{Sopen, Sclosed} =
+
+Expand (Sopen, Sclosed, pmin);
+
+6 else
+
+7
+
+q ← SearchP ath (Sclosed), break;
+
+8 end
+
+9 end
+
+The scheme of the modiﬁed A* motion planning algorithm is shown in Algorithm 1. The robot conﬁguration which is deﬁned in joint space could be denoted as p = {θi}. The corresponding end effector could be represented as {P, R} in Cartesian space. The two representations of the conﬁguration p are transformed by the forward and inverse kinematics of the robot. The algorithm maintains two sets: The OPEN set Sopen holds all the conﬁgurations to be explored and the CLOSED set Sclosed contains all the conﬁgurations which have been explored. In the initialization stage, both sets are set empty and the initial conﬁguration is inserted to the OPEN set (Algorithm 1 line 1). Then the A* algorithm repeatedly explores the conﬁgurations in the OPEN set until the OPEN set is empty (Algorithm 1 line 2-6). The exploration sequence is based on the cost evaluation of the conﬁguration and the OPEN set uses a priority queue for improving the efﬁciency. Once the exploring conﬁguration reaches the goal conﬁgurations, the motion planning algorithm terminates and an optimal path could be found by backtracking the conﬁgurations from the end to the start (Algorithm 1 line 7).
+B. Cost Evaluation Function
+It is well known that the A* algorithm achieves better performance by using heuristics to guide its expanding. No A*-like algorithm could expand fewer nodes than A* if the heuristic function is consistent. In this paper, not only the heuristic function is included in the cost evaluation, but also a guiding function which evaluate the singularity and joint limits of the whole trajectory is appended. The overall cost evaluation is deﬁned as follows:
+
+f (p) = ωgg (p) + ωhh (p) + ωee (p)
+
+(1)
+
+where the function g (p) denotes the actual cost from the start conﬁguration to the current conﬁguration, the function h (p) denotes the heuristic cost from the current conﬁguration to the goal conﬁgurations. The guiding function e (p) is designed to avoid the movement of robot toward the singularity and joint boundaries. The coefﬁcients ωg, ωh, ωe are the weights of the corresponding cost functions.
+1) Actual Cost and Heuristic Cost: In our proposed algorithm, the actual cost which consists of the distances in translation and rotation is deﬁned in an incremental form. The actual cost of the successor is the sum of the actual cost of the ancestor and the actual cost between the ancestor and successor. The equation (2) denotes the iteration calculation of the actual cost.
+g (psuc) = g (panc) + ωtcostt (panc, psuc) (2) +ωrcostr (panc, psuc)
+where g (panc) and g (psuc) are the actual cost of the ancestor conﬁguration and the successor conﬁguration respectively. costt (panc, psuc) and costr (panc, psuc) are the translational cost and the rotational cost between the ancestor conﬁguration and the successor conﬁguration respectively. ωt and ωr are the weights of the translational and rotational cost.
+The heuristic cost of the current conﬁguration which estimates the cost from the current conﬁguration to the goal is calculated as the instant cost from the two conﬁgurations rather than an accumulative cost like the actual cost. Equation 3 shows the deﬁnition.
+
+h (p) = ωtcostt (p, pgoal) + ωrcostr (p, pgoal) (3)
+
+The cost evaluation could refer to the metric of the task redundant space. The metric could be divided into translational metric and rotational metric. The task redundant space usually consists of one-dimensional translational space and n-dimensional rotational space depending on the task redundancy. Since the one-dimensional translational space is the space along the working trajectory, the Cartesian representation of the conﬁguration is adopted in the cost evaluation. The translational cost is deﬁned as the length of the working trajectory as follows:
+
+k−1
+
+costt (pj, pk) =
+
+Pi+1 − Pi
+
+(4)
+
+i=j
+
+where the trajectory is divided into small segments. The
+
+length of each segment is measured by the Euclidean dis-
+
+tance. The overall length of the trajectory is the sum of all
+
+segment lengths along the trajectory.
+
+The rotational cost deﬁnition is different from translational
+
+cost because the rotational space is an n-dimensional special
+
+orthogonal group. The orientation matrix of the end-effector
+
+Ri is adopted as the conﬁguration pi’s representation in the
+
+rotational cost representation. The rotation matrix between
+
+two conﬁgurations could be deﬁned by the relative rotation
+
+matrix
+
+Rij
+
+=
+
+RT
+i
+
+R
+
+j
+
+.
+
+Thus
+
+the
+
+rotational
+
+cost
+
+for
+
+the
+
+modiﬁed
+
+1581
+Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:17:04 UTC from IEEE Xplore. Restrictions apply.
+
+A* algorithm could be deﬁned as the angle rotated along the rotational axis, as follows:
+⎛ j⎞ trace Ri − 1
+costr (pi, pj) = θij = arccos ⎝ 2 ⎠ (5)
+where the rotational cost deﬁnition could be considered as the angle rotated around a unit axis from frame i to frame j. From the deﬁnition, we could notice that the translational cost would always be positive for different conﬁgurations, and would be zero if and only if the positions are the same. The rotational cost would be non-negative for all rotations in n-dimensional special orthogonal group.
+2) Guiding Cost Related to Joint Limits and Singularity: Different from the traditional A* algorithm, not only the obstacles occupy the infeasible conﬁgurations, but also the over limits of joint angles and singular conﬁgurations are included in the infeasible conﬁgurations. What’s more, the singularity and joint limits are not deﬁned by the end effector but the joints of the robot. Although the original A* algorithm is capable of avoiding the joint limits and singularity by considering the related conﬁgurations as the obstacle occupied conﬁgurations. However, keep a certain distance from the joint boundaries and singularity still sounds a nice solution to the robot. In this paper, we introduce a guiding function which works as part of the cost during planning to guide the planner away from the joint boundaries and singularity. The guiding function e (p) introduced in equation (1) could be deﬁned as follows:
+
+e (pi) = max e (pi−1) , ω (6) lcostl (pi) + ωscosts (pi)
+where costl (p) is the joint limits cost evaluation function and costs (p) is the singularity cost evaluation. ωl and ωs are the weights for each evaluation functions respectively. It could be noted from the formula (6) that the guiding function calculates the maximum cost of all conﬁgurations throughout the whole trajectory, thus it is used as the index for the evaluation of the entire trajectory.
+In order to keep the joint limit cost function consistent and with explicit physical meanings, we deﬁne the cost with the sigmoid function as follows:
+
+n kl1
+
+costl (p) =
+
+(7)
+
+(θi,max −θi )(θi −θi,min )
+
+i=1 1 + exp kl2 (θi,max−θi,min)2
+
+where θi is the ith joint of the serial industrial robot under the conﬁguration p. θi,min and θi,max are the lower and upper boundaries of the ith joint. n is the number of robot joints. Two parameters kl1 and kl2 represent the maximum cost of over limits and the rates of cost change near the boundaries respectively.
+Singularity evaluation is modiﬁed from the manipulability measure proposed by Yoshikawa [20]. Similar to the joint
+
+limits evaluation, we combined the manipulability with sigmoid function which is almost zero in ordinary conﬁguration but reaches up to maximum near the singularity. Equation (8) shows our evaluation function, in which ks1 and ks2 represent the maximum value of the singularity cost and the rate of manipulability measure change near singularity respectively. The parameter h is the threshold of the singularity.
+costs (p) = ks1 (8) 1 + exp ks2 det (JJT ) − h
+where J is the Jacobian matrix of the current robot conﬁguration.
+C. Expanding Strategy
+Line 3 in Algorithm 1 indicates that the minimum cost node is preferentially chosen in each iteration. Then the OPEN set and the CLOSED set are updated according to the expanded node’s neighbors as Line 5 in Algorithm 1. The speciﬁc expanding procedures are explained in Algorithm 2.
+Firstly the position and orientation of the end effector is calculated by the forward kinematic of the robot (Algorithm 2, line 1). Then the neighborhood of the end effector could easily be calculated from the grid by simply ﬁnding the adjacent grid in task redundant space. Let Sneighbor (TEE) denotes the neighbor set of the current robot conﬁguration in the task redundant space (Algorithm 2, line 2). For each endeffector conﬁguration in the neighbor set, the corresponding joint conﬁguration is be calculated by using the numerical iterative methods introduced in [21]. The current joint conﬁguration is used as the initial value for the iteration (Algorithm 2, line 3), therefore the joint trajectory could be continuous. Most of the time, the inverse kinematics could be calculated very quickly since the target end-effector conﬁguration is in the neighborhood of the initial iteration conﬁguration. However the convergence speed might slow down due to the singularity of the robot conﬁguration. Because the singularity is taken into consideration in our proposed planning algorithm as the cost evaluation, the generated trajectory could automatically deviate from the singular conﬁguration to achieve a relatively fast convergence speed of the inverse kinematics.
+The successor conﬁguration is ﬁrst searched in the OPEN set and CLOSED set. The conﬁguration would be skipped if it has been in the CLOSED set or its overall cost and actual cost would be set to inﬁnit if it could not be found in both OPEN and CLOSED set (Algorithm 2 line 4-8). Collision query is performed between the neighbor and the current conﬁguration (Algorithm 2 line 9). The actual cost of the neighbor would be calculated if there is a collisoin-free path from current conﬁguration to successor conﬁguration (Algorithm 2 line 10). If the newly calculated actual cost is smaller than the original actual cost, then the new conﬁguration costs are updated and the successor conﬁguration is inserted into the OPEN set (Algorithm 2 line 11-15). Finally, after all conﬁgurations in the neighbor set are expanded, the current
+
+1582
+Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:17:04 UTC from IEEE Xplore. Restrictions apply.
+
+Algorithm 2: Expanding Process {Sopen, Sclosed} = Expand (Sopen, Sclosed, p)
+
+Δ
+1 TEE = ffk p = θcur ;
+
+2 foreach Tsuc ∈ Sneighbor (TEE ) do
+
+Δ
+3 psuc = θsuc = fik (Tsuc, θcur);
+
+4 if psuc is in the CLOSED set then
+
+5
+
+continue;
+
+6 else if psuc is not in the OPEN set then
+
+7
+
+f (psuc) = g (psuc) = ∞;
+
+8 end
+
+9 if CollisionF ree (p, psuc) then
+
+10
+
+Calculate the new actual cost g(psuc)new
+
+according to the equations (2), (4) and (5).
+
+11
+
+if g(psuc)new < g (psuc) then
+
+12
+
+Update the actual cost:
+
+g (psuc) = g(psuc)new;
+
+13
+
+Update the total cost: f (psuc) according
+
+to the equation (1), (3) to (8);
+
+14
+
+Insert the neighbor conﬁguration into the
+
+OPEN set: Sopen = Sopen ∪ {psuc};
+
+15
+
+end
+
+16 end
+
+17 end
+
+18 Sclosed = Sclosed ∪ {p}, Sopen = Sopen/ {p};
+
+(a) Experiment Scenario
+
+Singularity Cost
+
+10000 8000
+
+MP MP+S
+
+6000
+
+4000
+
+2000
+
+0
+
+0
+
+100 200 300 400
+
+Position
+
+(b) Singularity Cost Comparison
+
+MP+S Angle/(deg)
+
+MP Angle/(deg)
+
+100
+
+Joint 4
+
+50
+
+Joint 5
+
+Joint 6
+
+0
+
+100
+
+Joint 4
+
+50
+
+Joint 5
+
+Joint 6
+
+0
+
+-50
+
+-50
+
+-100 0
+
+100
+
+200
+
+300
+
+400
+
+Position
+
+-100 0
+
+100
+
+200
+
+300
+
+400
+
+Position
+
+(c) The joint trajectory without con- (d) The joint trajectory considering
+
+sidering singularity
+
+singularity
+
+Fig. 1. Singularity Avoidance Experiment (MP stands for Motion planning without considering singularity, MP+S stands for Motion planning considering singularity.)
+
+conﬁguration is moved from the OPEN set to the CLOSED set. The expanding process ends.
+III. EXPERIMENTAL RESULTS
+In this section, experiments are conducted not only to verify the proposed algorithm’s ability of avoiding the singularity and joint limits, but also to demonstrate how our algorithms ﬁnd the optimal path in the task redundant space. Welding which has many task redundancy DOFs and is usually deployed in a dense object environment is taken as an example throughout this experimental section. Simulations show that our proposed algorithm could solve the optimal motion planning problem with traditional industrial robot and could also be implemented to other task redundant applications. All experiments are carried out on the selfdeveloped simulation platform.
+A. Singularity and Joint Limits Avoidance
+The ﬁrst experiment is conducted to verify the algorithms’ singularity avoidance ability. A scenario with a singularity along its trajectory is specially designed in the experiments. Fig. 1(a) shows the experiment scenario. The welding torch equipped at the end of the robot is moving along a horizontal trajectory. The singularity exists at the middle of the planned trajectory. Singularity costs are compared with two kinds of motion planning algorithms. Fig. 1(b) compares the singularity costs with and without considering the singularity. The results demonstrate that our proposed algorithm could return a path with lower singularity cost. Fig. 1(c)-1(d) show the
+
+(a) Over the Joint Limit
+
+(b) Within the Joint Llimit
+
+Joint 3 Angle/(deg) Joints limit cost of Joint 3
+
+160
+
+155
+
+150
+
+145
+
+140
+135
+130 0
+
+MP MP+JL Boundary
+
+100
+
+200
+
+300
+
+400
+
+Position
+
+(c) Joint Angle Comparison
+
+10000 8000
+
+MP MP+JL
+
+6000
+
+4000
+
+2000
+
+0
+
+0
+
+100
+
+200
+
+300
+
+400
+
+Position
+
+(d) Joint Limit Cost Comparison
+
+Fig. 2. Joint Limit Experiment (MP: Motion planning without considering the joint limits. MP+JL: Motion planning considering the joint limits.)
+
+joint trajectories of the two algorithms. Algorithms without singularity avoidance would cause the 4th joint and the 6th joint jump at the singularity point. And the 5th joint would decrease to zero and turn backward at zero position without crossing. On the contrary, the changes in 4th and 6th joint angles will be relatively gentle, and the 5th joint will be close to zero position but not equal to zero when singularity is considered in the motion planning algorithm.
+The second experiment is conducted to verify the joint limits avoidance ability of the proposed algorithm. Fig. 2 shows the comparison results of two different motion plan-
+
+1583
+Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:17:04 UTC from IEEE Xplore. Restrictions apply.
+
+ning algorithms with and without considering the joint limits. The experiment is carried out with the same robot tracking the same welding seam on a plate. The only difference is that Fig. 2(a) shows the robot conﬁguration that the angle of the joint exceeds the joint limits. If we could convert the joint angle limits to the cost, joint over limits could be avoided during motion planning. Fig. 2(b) shows the improved robot conﬁguration with all joints within their boundaries. It is easy to ﬁnd out that the robot posture looks more natural if joint limits are considered. Fig. 2(c) compares the 3rd joint trajectories under both situations. We could also see from the joint angle data that our proposed algorithm could constrain the joint angle within its boundaries under all circumstances. This would prevent the robot from occasionally shutting down and possibly causing some damage to itself. Our proposed algorithm avoids the potential problems by considering the joint limits cost in the motion planning. The cost variations when joint angle approaches the boundary is illustrated in Fig. 2(d). The joint limits cost will rise sharply as the joint approaches the boundary value. As we could see that our proposed motion planner would automatically choose the lower cost path which avoid the joint over limits.
+
+Top view
+
+(a) Experiment Scenario
+
+Front view
+
+(b) Initial Conﬁg (c) Intermediate Conﬁg (d) Final Conﬁg Fig. 3. Moition Planning with 1-D Task Redundancy
+
+B. Motion Planning with 1-D Task Redundancy
+In this experiment, a speciﬁc welding task which aims to control the welding torch to track a given welding seam on a yellow plane with a magenta cylinder obstacle on one side is shown in Fig. 3(a). We assume that the welding torch should be perpendicular to the plane and could only rotate along its symmetrical axis, therefore the task redundant space is onedimension. Fig. 3(b) shows the initial conﬁguration of the robot. It could easily be noticed that simply following the torch trajectory would trigger collision between the cylinder obstacle and the robot. By implementing our proposed algorithm, robot would rotate along the symmetrical axis of the welding torch to the opposite side of the cylinder. From Fig. 3(c) and 3(d), we could clearly see the process of obstacle avoidance.
+We could also analyse the motion planning algorithm by zoning the task redundant space. Fig. 4 marks different types of areas in the task redundant space with different colors. The yellow areas are the feasible conﬁgurations. The blue areas represent the conﬁgurations which would collide with the obstacles. The green areas indicate the unreachable conﬁgurations, and conﬁgurations which are out of joint limits are marked with magenta. Some areas have multiple features, such as the orange areas indicate that the conﬁgurations are both collided and beyond the joint limits. The singularity area doesn’t exist in this experiment, but the representation is the same with the other area if exists. The problem in this experiment is to ﬁnd an optimal trajectory in the feasible zone within this colored task redundant space. The red line indicates the optimal trajectory result. We could notice that our algorithm is able to ﬁnd the optimal trajectory in the task redundant space.
+
+RT Angle/(deg)
+
+Free
+
+-150
+
+-100
+
+-50
+
+0
+
+50
+
+100
+
+150
+
+0
+
+200
+
+Un
+
+Obs
+
+JL
+
+400
+
+600
+
+800
+
+Position
+
+Obs+JL Path
+1000 1200
+
+Fig. 4. Different zones of the task redundant space. (Free: Feasible areas; Un: Unreachable areas; Obs: Obstacle areas; JL: Joint limits areas; RT: Rotation around tool.)
+
+C. Motion Planning with 2-D Task Redundancy
+Robotic intersecting pipes welding in pipeline engineering and pressure vessel manufacturing is a typical example of complex robotic trajectory planning. In this example, the welding torch is constrained to the intersection line of two pipes with two degrees of freedom. One is the symmetrical axis of the torch and the other is the swing angle. Fig. 5(a) shows the experiment scenario. A cluster of red line segments represent the planned welding torch directions. From two welding snapshots shown on Fig. 5(b), we could easily ﬁnd out that our proposed algorithm could generate a collisionfree trajectory among complex environment with cluttered obstacles.
+Since it is difﬁcult and complex to depict the shapes of different regions and the trajectory in the two-dimensional
+
+1584
+Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:17:04 UTC from IEEE Xplore. Restrictions apply.
+
+Welding on the left side.
+
+(a) Experiment Scenario
+
+Welding on the right side. (b) Snapshots
+
+Fig. 5. Moition Planning with 2-D Task Redundancy
+
+50 RX
+RZ
+
+0
+
+Redudant Angle/(deg)
+
+-50 0
+
+100
+
+200
+
+300
+
+Step
+
+Fig. 6. The curves of redundant angles versus each steps. RZ curve stands for the rotational angle along the symmetrical axis of the welding torch and RX curve represents the rotational angle of the welding seam. Both singularity and joint limits are considered in this experiment.
+
+task redundant space as the previous experiment, we plot the redundant angle’s trajectory to specify how the motion planning algorithm works. Fig. 6 shows the curves of the redundant angles versus each steps. From the results we could see that our proposed motion planning algorithm plays a very important role in the complex environment with dense obstacles. It also should be noted that the redundant DOFs are no longer need to be concerned by using our proposed algorithm, which would make the motion planning much easier for most task redundant applications.
+IV. CONCLUSION
+Task redundancy exists in most robotic applications. An optimal motion planning algorithm is proposed to automatically generate a collision-free trajectory of typical industrial robot in applications where limited constraints are given. The A* algorithm which is originally designed for grid is modiﬁed to be implemented on traditional industrial robot. The cost evaluation is elaborately designed to consider not only distance in task redundant space but also the cost of singularity and joint limits. The experiment results verify that our proposed algorithm not only could handle the singularity and joint limits, realize a collision-free trajectory, but also could be used in complex environment.
+
+REFERENCES
+[1] S. Xia, C. K. Pang, A. Al Mamun, C. M. Chew, and K. P. Tan, “Feedforward compensation for suppression of seam boundary error propagation in robotic welding systems,” IEEE/ASME Transactions on Mechatronics, vol. 23, no. 4, pp. 1919–1929, 2018.
+[2] J. Liu, X. Huang, S. Fang, H. Chen, and N. Xi, “Industrial robot path planning for polishing applications,” in 2016 IEEE International Conference on Robotics and Biomimetics (ROBIO). IEEE, 2016, pp. 1764–1769.
+[3] B. Zhang, J. Wu, L. Wang, Z. Yu, and P. Fu, “A method to realize accurate dynamic feedforward control of a spray-painting robot for airplane wings,” IEEE/ASME Transactions on Mechatronics, vol. 23, no. 3, pp. 1182–1192, 2018.
+[4] Z. Zhang, Y. Lin, S. Li, Y. Li, Z. Yu, and Y. Luo, “Tricriteria optimization-coordination motion of dual-redundant-robot manipulators for complex path planning,” IEEE Transactions on Control Systems Technology, vol. 26, no. 4, pp. 1345–1357, 2017.
+[5] Z. Li, C. Li, S. Li, and X. Cao, “A fault-tolerant method for motion planning of industrial redundant manipulator,” IEEE Transactions on Industrial Informatics, 2019.
+[6] W. Lin, A. Anwar, Z. Li, M. Tong, J. Qiu, and H. Gao, “Recognition and pose estimation of auto parts for an autonomous spray painting robot,” IEEE Transactions on Industrial Informatics, vol. 15, no. 3, pp. 1709–1719, 2019.
+[7] N. Larkin, A. Short, Z. Pan, and S. van Duin, “Automated programming for robotic welding,” in Transactions on Intelligent Welding Manufacturing. Springer, 2018, pp. 48–59.
+[8] H. Cui, Z. Jiang, X. Tang, and F. Lu, “Research on narrow-gap gmaw with swing arc system in horizontal position,” The International Journal of Advanced Manufacturing Technology, vol. 74, no. 1-4, pp. 297–305, 2014.
+[9] D. Guo, Z. Li, A. H. Khan, Q. Feng, and J. Cai, “Repetitive motion planning of robotic manipulators with guaranteed precision,” IEEE Transactions on Industrial Informatics, 2020.
+[10] J.-J. Kim and J.-J. Lee, “Trajectory optimization with particle swarm optimization for manipulator motion planning,” IEEE Transactions on Industrial Informatics, vol. 11, no. 3, pp. 620–631, 2015.
+[11] I. Streinu, “Combinatorial roadmaps in conﬁguration spaces of simple planar polygons,” in Proc. DIMACS Workshop, Algorithmic and Quantitative Aspects of Real Algebraic Geometry in Mathematics and Computer Science, 2003, pp. 181–206.
+[12] O. Khatib, “Real-time obstacle avoidance for manipulators and mobile robots,” in Autonomous robot vehicles. Springer, 1986, pp. 396–404.
+[13] P. E. Hart, N. J. Nilsson, and B. Raphael, “A formal basis for the heuristic determination of minimum cost paths,” IEEE transactions on Systems Science and Cybernetics, vol. 4, no. 2, pp. 100–107, 1968.
+[14] S. Koenig, M. Likhachev, and D. Furcy, “Lifelong planning a*,” Artiﬁcial Intelligence, vol. 155, no. 1-2, pp. 93–146, 2004.
+[15] M. Likhachev, D. I. Ferguson, G. J. Gordon, A. Stentz, and S. Thrun, “Anytime dynamic a*: An anytime, replanning algorithm.” in ICAPS, vol. 5, 2005, pp. 262–271.
+[16] M. Likhachev, G. J. Gordon, and S. Thrun, “Ara*: Anytime a* with provable bounds on sub-optimality,” in Advances in neural information processing systems, 2004, pp. 767–774.
+[17] L. E. Kavraki, P. Svestka, J.-C. Latombe, and M. H. Overmars, “Probabilistic roadmaps for path planning in high-dimensional conﬁguration spaces,” IEEE transactions on Robotics and Automation, vol. 12, no. 4, pp. 566–580, 1996.
+[18] S. M. LaValle and J. J. Kuffner Jr, “Randomized kinodynamic planning,” The international journal of robotics research, vol. 20, no. 5, pp. 378–400, 2001.
+[19] S. M. LaValle, M. S. Branicky, and S. R. Lindemann, “On the relationship between classical grid search and probabilistic roadmaps,” The International Journal of Robotics Research, vol. 23, no. 7-8, pp. 673–692, 2004.
+[20] T. Yoshikawa, “Manipulability of robotic mechanisms,” The international journal of Robotics Research, vol. 4, no. 2, pp. 3–9, 1985.
+[21] A. Goldenberg, B. Benhabib, and R. Fenton, “A complete generalized solution to the inverse kinematics of robots,” IEEE Journal on Robotics and Automation, vol. 1, no. 1, pp. 14–20, 1985.
+
+1585
+Authorized licensed use limited to: CNR Area Ricerca Milano 1. Downloaded on October 01,2026 at 12:17:04 UTC from IEEE Xplore. Restrictions apply.
+
+

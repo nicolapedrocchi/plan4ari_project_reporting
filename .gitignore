@@ -1,0 +1,141 @@
+# =====================================================================
+# LaTeX build artifacts: pdfLaTeX, XeLaTeX, LuaLaTeX, latexmk, MiKTeX,
+# TeX Live, BibTeX/Biber, LaTeX Workshop.
+# Compiled PDFs are NOT ignored (they are the deliverables); uncomment
+# the *.pdf rule below if you prefer to keep them out of the repo.
+# =====================================================================
+
+# --- Aux directory used by the shared latexmkrc ($aux_dir) ---
+build/
+
+# --- Core auxiliary files ---
+*.aux
+*.auxlock
+*.fls
+*.fmt
+*.fot
+*.lof
+*.log
+*.lot
+*.out
+*.toc
+*.cb
+*.cb2
+.*.lb
+
+# --- Intermediate output ---
+*.dvi
+*.xdv
+*-converted-to.*
+# *.pdf
+
+# --- latexmk / SyncTeX ---
+*.fdb_latexmk
+*.synctex
+*.synctex(busy)
+*.synctex.gz
+*.synctex.gz(busy)
+*.pdfsync
+
+# --- Bibliography (BibTeX, Biber, biblatex) ---
+*.bbl
+*.bbl-SAVE-ERROR
+*.bcf
+*.bcf-SAVE-ERROR
+*.blg
+*-blx.aux
+*-blx.bib
+*.run.xml
+
+# --- MiKTeX / TeX Live temporary files ---
+texput.log
+texput.aux
+missfont.log
+
+# --- LuaLaTeX ---
+luatex-cache/
+
+# --- Lists, indexes, glossaries, nomenclature ---
+*.acn
+*.acr
+*.alg
+*.glg
+*.glo
+*.gls
+*.glsdefs
+*.glstex
+*.ist
+*.idx
+*.ilg
+*.ind
+*.nlg
+*.nlo
+*.nls
+*.xdy
+*.loa
+*.lol
+*.los
+*.lox
+*.listing
+
+# --- Package-specific files ---
+# beamer
+*.nav
+*.snm
+*.vrb
+# hyperref
+*.brf
+# cleveref
+*.sav
+# minted
+_minted*/
+*.pyg
+# pythontex
+*.pytxcode
+pythontex-files-*/
+# todonotes
+*.tdo
+# thmtools
+*.thm
+# comment
+*.cut
+# endnotes
+*.ent
+# acro
+*.acro
+# standalone
+*.sta
+# svg
+svg-inkscape/
+# tikz externalize
+*.figlist
+*.makefile
+*.md5
+*.dpth
+*.dep
+# pgfplots (gnuplot backend)
+*.pgf-plot.gnuplot
+*.pgf-plot.table
+# scrwfile
+*.wrt
+# vhistory
+*.hst
+*.ver
+
+# --- Editor backups (TeXstudio, TeXworks, WinEdt, Emacs, Vim) ---
+*.bak
+*.backup
+*~
+*.swp
+*.swo
+
+# --- VS Code / LaTeX Workshop (keep shared project settings) ---
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
+# --- OS and Office lock files ---
+Thumbs.db
+desktop.ini
+.DS_Store
+~$*

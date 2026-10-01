@@ -1,0 +1,1392 @@
+\documentclass[a4paper,10pt]{article}
+\usepackage{plan4ari}
+
+% \usepackage[utf8]{inputenc}
+% \usepackage[T1]{fontenc}
+% \usepackage[italian]{babel}
+% \usepackage[margin=2cm]{geometry}
+% \usepackage{booktabs,array,float,caption}
+% \usepackage[table]{xcolor}
+\usepackage{amsmath,amssymb}
+\usepackage{eurosym}
+\usepackage{pdflscape}
+% \usepackage{hyperref}
+
+\captionsetup{font=small,labelfont=bf}
+\setlength{\parskip}{4pt}
+\setlength{\parindent}{0pt}
+\definecolor{wpgreen}{HTML}{00FF00}
+\definecolor{taskblue}{HTML}{ADD8E6}
+\newcommand{\FR}{\mathrm{FR}}
+\newcommand{\IR}{\mathrm{IR}}
+\newcommand{\ED}{\mathrm{ED}}
+
+\title{Budget progetto COMAU (FISA-2024-00099)\\
+\large Tabelle estratte da \texttt{budget\_COMAU\_v6.xlsx}}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section*{Project details}\label{project-details}
+\addcontentsline{toc}{section}{Project details}
+
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 2\tabcolsep) * \real{0.3123}}
+  >{\raggedright\arraybackslash}p{(\columnwidth - 2\tabcolsep) * \real{0.6877}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Acronym
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+\brand{Plan4ARI}
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+Title & \textbf{Planning for Artificial Robotic Intelligence and
+Beyond} \\
+Duration (months): & \textbf{48} \\
+Keywords (max. 5 words) & \textbf{Advanced Robotics; Motion Control;
+Task Planning; Low-Code; Natural Interaction} \\
+Project Area & \textbf{Advanced Manufacturing} \\
+Principal Investigator (PI) & \textbf{Nicola Pedrocchi} \\
+Host Institution (HI) & \textbf{COMAU SpA} \\
+Affiliation Institution (AI) & \textbf{Consiglio Nazionale delle
+Ricerche} \\
+Research Organization & \textbf{Consiglio Nazionale delle Ricerche} \\
+\end{longtable}
+
+\section*{Convenzioni}
+\begin{itemize}
+  \item Importi in euro. Colonne: \textbf{FR} = Fundamental Research (ricerca fondamentale), \textbf{IR} = Industrial Research (ricerca industriale), \textbf{ED} = Experimental Development (sviluppo sperimentale).
+  \item Soggetti: \textbf{HI} = Host Institution (COMAU, azienda ospitante), \textbf{AI} = Affiliation Institution, \textbf{RO} = Research Organization (CNR). Nel foglio ``SOTTOMESSO'' gli stessi soggetti sono chiamati rispettivamente Host Organization, Affiliation Institution e Research Institution.
+  \item Voci di costo: \emph{direct cost} (costi diretti diversi dal personale: viaggi, materiali, robot, sistemi di visione, PC, sensori, consumabili, disseminazione), \emph{structured personnel} (personale strutturato), \emph{personnel to be acquired} (personale da acquisire), \emph{indirect costs} (spese generali).
+  \item Con $c^{s}_{v,k}$ si indica il costo del soggetto $s\in\{\mathrm{HI},\mathrm{AI},\mathrm{RO}\}$, voce $v$, tipologia di attivit\`a $k\in\{\FR,\IR,\ED\}$; con $a^{s}_{v,k}$ la corrispondente agevolazione.
+  \item I valori riportati sono quelli calcolati e salvati nel file Excel; le formule descritte nei preamboli sono quelle presenti nelle celle.
+\end{itemize}
+
+\section{Foglio ``SOTTOMESSO'' -- budget sottomesso}
+%%%%%%%
+\subsection{Budget totale sottomesso}
+\textbf{Formule e assunzioni.}
+\begin{itemize}
+  \item Il personale della RO (Research Institution) e della AI \`e inserito come valore fisso. Il personale della HI \`e calcolato come mesi-persona per una tariffa mensile di 5\,500\,\euro:
+  \[
+    c^{\mathrm{HI}}_{\mathrm{pers},k} = \mathrm{PM}^{\mathrm{HI}}_k \cdot 5\,500, \qquad \mathrm{PM}^{\mathrm{HI}} = (25,\ 410,\ 105)\ \text{per } (\FR,\IR,\ED),\ \text{in totale } 540\ \mathrm{PM}.
+  \]
+  \item Direct other costs: valori fissi. Indirect costs forfettari al 25\,\% di personale pi\`u costi diretti:
+  \[ c_{\mathrm{ind},k} = 0.25\,\bigl(c_{\mathrm{pers},k} + c_{\mathrm{dir},k}\bigr). \]
+  \item Costo totale per soggetto: $c_{\mathrm{tot},k} = c_{\mathrm{pers},k} + c_{\mathrm{dir},k} + c_{\mathrm{ind},k}$; il totale di riga \`e $\sum_k c_{\cdot,k}$.
+  \item Calcoli di controllo a lato della tabella: per la RO i mesi-persona sono stimati con una tariffa di 4\,500\,\euro/mese ($\mathrm{PM}^{\mathrm{RO}}_k = c^{\mathrm{RO}}_{\mathrm{pers},k}/4\,500$, cio\`e 42.2, 82.2, 7.8, totale 132.2 PM); sono inoltre riportate le quote di personale sul totale ($E_9/E_4 = 74.4\,\%$ per la RO, $E_{11}/E_6 = 73.4\,\%$ per la HI), le quote di costi diretti ($5.6\,\%$ e $6.6\,\%$) e il valore dell'80\,\% dei costi della HI (3\,235\,000\,\euro).
+\end{itemize}
+
+\begin{table}[H]\centering\small
+\caption{Budget totale sottomesso (tabella \texttt{SubmittedTotals}).}\label{tab:sub-tot}
+\begin{tabular}{lrrrr}\toprule
+\textbf{Voce} & \textbf{Fund. Research} & \textbf{Ind. Research} & \textbf{Exp. Development} & \textbf{Totale} \\\midrule
+\addlinespace[2pt]\multicolumn{5}{l}{\textit{\textbf{TOTAL COSTS}}} \\
+\quad Research Institution & 250\,000 & 500\,000 & 50\,000 & 800\,000 \\
+\quad Affiliation Institution & 96\,365 & 192\,730 & 96\,365 & 385\,460 \\
+\quad Host Organization & 190\,625 & 3\,068\,750 & 784\,375 & 4\,043\,750 \\
+\midrule
+\textbf{Total Amount} & \textbf{536\,990} & \textbf{3\,761\,480} & \textbf{930\,740} & \textbf{5\,229\,210} \\
+\addlinespace[2pt]\multicolumn{5}{l}{\textit{\textbf{PERSONNEL}}} \\
+\quad Research Institution & 190\,000 & 370\,000 & 35\,000 & 595\,000 \\
+\quad Affiliation Institution & 77\,092 & 154\,184 & 77\,092 & 308\,368 \\
+\quad Host Organization & 137\,500 & 2\,255\,000 & 577\,500 & 2\,970\,000 \\
+\midrule
+\textbf{Total Amount} & \textbf{404\,592} & \textbf{2\,779\,184} & \textbf{689\,592} & \textbf{3\,873\,368} \\
+\addlinespace[2pt]\multicolumn{5}{l}{\textit{\textbf{DIRECT OTHER COSTS}}} \\
+\quad Research Institution & 10\,000 & 30\,000 & 5\,000 & 45\,000 \\
+\quad Affiliation Institution &  &  &  & 0 \\
+\quad Host Organization & 15\,000 & 200\,000 & 50\,000 & 265\,000 \\
+\midrule
+\textbf{Total Amount} & \textbf{25\,000} & \textbf{230\,000} & \textbf{55\,000} & \textbf{310\,000} \\
+\addlinespace[2pt]\multicolumn{5}{l}{\textit{\textbf{INDIRECT COSTS}}} \\
+\quad Research Institution & 50\,000 & 100\,000 & 10\,000 & 160\,000 \\
+\quad Affiliation Institution & 19\,273 & 38\,546 & 19\,273 & 77\,092 \\
+\quad Host Organization & 38\,125 & 613\,750 & 156\,875 & 808\,750 \\
+\midrule
+\textbf{Total Amount} & \textbf{107\,398} & \textbf{752\,296} & \textbf{186\,148} & \textbf{1\,045\,842} \\
+\bottomrule\end{tabular}
+\end{table}
+
+
+
+%%%%%%%
+\subsection{Quota finanziata (``FOUNDED'')}
+\textbf{Formule e assunzioni.}
+\begin{itemize}
+  \item Tassi di finanziamento per tipologia: $\rho_{\FR} = 100\,\%$, $\rho_{\IR} = 65\,\%$, $\rho_{\ED} = 25\,\% + 15\,\% = 40\,\%$.
+  \item Per HI e RO: $f^{s}_{v,k} = \rho_k \, c^{s}_{v,k}$, per tutte le voci (personale, costi diretti, indiretti).
+  \item Per la AI si assume finanziamento al 100\,\% in tutte le tipologie: $f^{\mathrm{AI}}_{v,k} = c^{\mathrm{AI}}_{v,k}$.
+  \item I totali sono somme di colonna/riga; a lato: rapporto finanziato/costo per RO (74.4\,\%), AI (100\,\%) e HI (61.8\,\%).
+\end{itemize}
+
+\begin{table}[H]\centering\small
+\caption{Quota finanziata del budget sottomesso (tabella \texttt{SubmittedFunded}).}\label{tab:sub-fund}
+\begin{tabular}{lrrrr}\toprule
+\textbf{Voce} & \textbf{Fund. Research} & \textbf{Ind. Research} & \textbf{Exp. Development} & \textbf{Totale} \\\midrule
+\textbf{funding ratio} & \textbf{100\,\%} & \textbf{65\,\%} & \textbf{40\,\%} &  \\
+\addlinespace[2pt]\multicolumn{5}{l}{\textit{\textbf{TOTAL COSTS}}} \\
+\quad Research Institution & 250\,000 & 325\,000 & 20\,000 & 595\,000 \\
+\quad Affiliation Institution & 96\,365 & 192\,730 & 96\,365 & 385\,460 \\
+\quad Host Organization & 190\,625 & 1\,994\,687.50 & 313\,750 & 2\,499\,062.50 \\
+\midrule
+\textbf{Total Amount} & \textbf{536\,990} & \textbf{2\,512\,417.50} & \textbf{430\,115} & \textbf{3\,479\,522.50} \\
+\addlinespace[2pt]\multicolumn{5}{l}{\textit{\textbf{PERSONNEL}}} \\
+\quad Research Institution & 190\,000 & 240\,500 & 14\,000 & 444\,500 \\
+\quad Affiliation Institution & 77\,092 & 154\,184 & 77\,092 & 308\,368 \\
+\quad Host Organization & 137\,500 & 1\,465\,750 & 231\,000 & 1\,834\,250 \\
+\midrule
+\textbf{Total Amount} & \textbf{404\,592} & \textbf{1\,860\,434} & \textbf{322\,092} & \textbf{2\,587\,118} \\
+\addlinespace[2pt]\multicolumn{5}{l}{\textit{\textbf{DIRECT OTHER COSTS}}} \\
+\quad Research Institution & 10\,000 & 19\,500 & 2\,000 & 31\,500 \\
+\quad Affiliation Institution & 0 & 0 & 0 & 0 \\
+\quad Host Organization & 15\,000 & 130\,000 & 20\,000 & 165\,000 \\
+\midrule
+\textbf{Total Amount} & \textbf{25\,000} & \textbf{149\,500} & \textbf{22\,000} & \textbf{196\,500} \\
+\addlinespace[2pt]\multicolumn{5}{l}{\textit{\textbf{INDIRECT COSTS}}} \\
+\quad Research Institution & 50\,000 & 65\,000 & 4\,000 & 119\,000 \\
+\quad Affiliation Institution & 19\,273 & 38\,546 & 19\,273 & 77\,092 \\
+\quad Host Organization & 38\,125 & 398\,937.50 & 62\,750 & 499\,812.50 \\
+\midrule
+\textbf{Total Amount} & \textbf{107\,398} & \textbf{502\,483.50} & \textbf{86\,023} & \textbf{695\,904.50} \\
+\bottomrule\end{tabular}
+\end{table}
+
+
+
+%%%%%%%
+\subsection{Quota cofinanziata}
+\textbf{Formule e assunzioni.}
+\begin{itemize}
+  \item Quota di cofinanziamento: $1-\rho_k$, cio\`e $0\,\%$, $35\,\%$, $60\,\%$.
+  \item Ogni cella \`e la differenza tra costo e quota finanziata: $\mathit{cof}^{s}_{v,k} = c^{s}_{v,k} - f^{s}_{v,k}$ (per la AI risulta quindi sempre 0; gli indirect costs della AI sono comunque ricalcolati come differenza).
+  \item A lato: mesi-persona RO cofinanziati $=\mathit{cof}^{\mathrm{RO}}_{\mathrm{pers},k}/4\,500$ (totale 33.4 PM) e mesi-persona HI cofinanziati $=\mathit{cof}^{\mathrm{HI}}_{\mathrm{pers},k}/5\,500$ (totale 206.5 PM).
+\end{itemize}
+
+\begin{table}[H]\centering\small
+\caption{Quota cofinanziata del budget sottomesso (tabella \texttt{SubmittedCofunded}).}\label{tab:sub-cof}
+\begin{tabular}{lrrrr}\toprule
+\textbf{Voce} & \textbf{Fund. Research} & \textbf{Ind. Research} & \textbf{Exp. Development} & \textbf{Totale} \\\midrule
+\textbf{funding ratio} & \textbf{0\,\%} & \textbf{35\,\%} & \textbf{60\,\%} &  \\
+\addlinespace[2pt]\multicolumn{5}{l}{\textit{\textbf{TOTAL COSTS}}} \\
+\quad Research Institution & 0 & 175\,000 & 30\,000 & 205\,000 \\
+\quad Affiliation Institution & 0 & 0 & 0 & 0 \\
+\quad Host Organization & 0 & 1\,074\,062.50 & 470\,625 & 1\,544\,687.50 \\
+\midrule
+\textbf{Total Amount} & \textbf{0} & \textbf{1\,249\,062.50} & \textbf{500\,625} & \textbf{1\,749\,687.50} \\
+\addlinespace[2pt]\multicolumn{5}{l}{\textit{\textbf{PERSONNEL}}} \\
+\quad Research Institution & 0 & 129\,500 & 21\,000 & 150\,500 \\
+\quad Affiliation Institution & 0 & 0 & 0 & 0 \\
+\quad Host Organization & 0 & 789\,250 & 346\,500 & 1\,135\,750 \\
+\midrule
+\textbf{Total Amount} & \textbf{0} & \textbf{918\,750} & \textbf{367\,500} & \textbf{1\,286\,250} \\
+\addlinespace[2pt]\multicolumn{5}{l}{\textit{\textbf{DIRECT OTHER COSTS}}} \\
+\quad Research Institution & 0 & 10\,500 & 3\,000 & 13\,500 \\
+\quad Affiliation Institution & 0 & 0 & 0 & 0 \\
+\quad Host Organization & 0 & 70\,000 & 30\,000 & 100\,000 \\
+\midrule
+\textbf{Total Amount} & \textbf{0} & \textbf{80\,500} & \textbf{33\,000} & \textbf{113\,500} \\
+\addlinespace[2pt]\multicolumn{5}{l}{\textit{\textbf{INDIRECT COSTS}}} \\
+\quad Research Institution & 0 & 35\,000 & 6\,000 & 41\,000 \\
+\quad Affiliation Institution & 0 & 0 & 0 & 0 \\
+\quad Host Organization & 0 & 214\,812.50 & 94\,125 & 308\,937.50 \\
+\midrule
+\textbf{Total Amount} & \textbf{0} & \textbf{249\,812.50} & \textbf{100\,125} & \textbf{349\,937.50} \\
+\bottomrule\end{tabular}
+\end{table}
+
+
+
+\section{Foglio ``SOTTOMESSO ED AGEVOLAZIONI''}
+Area: \emph{Advanced Manufacturing}; codice FISA-2024-00099; costo totale da proposta 5\,229\,210\,\euro.
+
+%%%%%%%
+\subsection{Dettaglio costi di progetto (Tab.~1)}
+\textbf{Formule e assunzioni.}
+\begin{itemize}
+  \item Costi totali per soggetto e personale strutturato: valori fissi, coincidenti con il foglio ``SOTTOMESSO''.
+  \item Direct cost: collegati al foglio ``SOTTOMESSO'' (righe Direct other costs).
+  \item Indirect costs: $c_{\mathrm{ind},k} = 0.25\,(c_{\mathrm{pers},k} + c_{\mathrm{dir},k})$.
+  \item Total $= c^{\mathrm{HI}}_{\mathrm{tot}} + c^{\mathrm{AI}}_{\mathrm{tot}} + c^{\mathrm{RO}}_{\mathrm{tot}}$; la riga finale ``Structured personnel'' \`e la somma del personale dei tre soggetti.
+\end{itemize}
+
+\begin{table}[H]\centering\small
+\caption{Dettaglio costi di progetto sottomessi (tabella \texttt{TReSubmittedTotal}).}\label{tab:age-cost}
+\begin{tabular}{lrrrr}\toprule
+\textbf{Voce} & \textbf{Fund. Research} & \textbf{Ind. Research} & \textbf{Exp. Development} & \textbf{Totale} \\\midrule
+\textbf{Host Institution costs} & \textbf{190\,625} & \textbf{3\,068\,750} & \textbf{784\,375} & \textbf{4\,043\,750} \\
+\quad direct cost & 15\,000 & 200\,000 & 50\,000 & 265\,000 \\
+\quad Structured personnel & 137\,500 & 2\,255\,000 & 577\,500 & 2\,970\,000 \\
+\quad indirect costs & 38\,125 & 613\,750 & 156\,875 & 808\,750 \\
+\textbf{Affiliation Institution costs} & \textbf{96\,365} & \textbf{192\,730} & \textbf{96\,365} & \textbf{385\,460} \\
+\quad direct cost & 0 & 0 & 0 &  \\
+\quad Structured personnel & 77\,092 & 154\,184 & 77\,092 & 308\,368 \\
+\quad indirect costs & 19\,273 & 38\,546 & 19\,273 & 77\,092 \\
+\textbf{Research Organization costs} & \textbf{250\,000} & \textbf{500\,000} & \textbf{50\,000} & \textbf{800\,000} \\
+\quad direct cost & 10\,000 & 30\,000 & 5\,000 & 45\,000 \\
+\quad Structured personnel & 190\,000 & 370\,000 & 35\,000 & 595\,000 \\
+\quad indirect costs & 50\,000 & 100\,000 & 10\,000 & 160\,000 \\
+\midrule
+\textbf{Total} & \textbf{536\,990} & \textbf{3\,761\,480} & \textbf{930\,740} & \textbf{5\,229\,210} \\
+\quad Structured personnel & 404\,592 & 2\,779\,184 & 689\,592 & 3\,873\,368 \\
+\bottomrule\end{tabular}
+\end{table}
+
+
+
+%%%%%%%
+\subsection{Agevolazioni nominali}
+\textbf{Formule e assunzioni.}
+\begin{itemize}
+  \item Tassi nominali di agevolazione $\tau^{s}_k$: HI $(100\,\%, 50\,\%, 25\,\%)$; AI e RO $100\,\%$ in tutte le tipologie.
+  \item Costi diretti e personale: $a^{s}_{v,k} = \tau^{s}_k\, c^{s}_{v,k}$; il totale del soggetto \`e $a^{s}_{\mathrm{tot},k} = \tau^{s}_k\, c^{s}_{\mathrm{tot},k}$.
+  \item Indirect costs ricalcolati al 25\,\% delle voci agevolate: $a_{\mathrm{ind},k} = 0.25\,(a_{\mathrm{pers},k} + a_{\mathrm{dir},k})$.
+  \item Colonna Totale delle righe dei tassi: tasso medio effettivo $\bar\tau^{s} = a^{s}_{\mathrm{tot}}/c^{s}_{\mathrm{tot}}$ (47.5\,\% per la HI).
+\end{itemize}
+
+\begin{table}[H]\centering\small
+\caption{Agevolazioni nominali (tabella \texttt{TReSumbittedAgevolazioniNominali}).}\label{tab:age-nom}
+\begin{tabular}{lrrrr}\toprule
+\textbf{Voce} & \textbf{Fund. Research} & \textbf{Ind. Research} & \textbf{Exp. Development} & \textbf{Totale} \\\midrule
+\textbf{Tasso Nominale HI} & \textbf{100\,\%} & \textbf{50\,\%} & \textbf{25\,\%} & \textbf{47.51\,\%} \\
+\textbf{Tasso Nominale AI} & \textbf{100\,\%} & \textbf{100\,\%} & \textbf{100\,\%} & \textbf{100\,\%} \\
+\textbf{Tasso Nominale RO} & \textbf{100\,\%} & \textbf{100\,\%} & \textbf{100\,\%} & \textbf{100\,\%} \\
+\textbf{Host Institution costs} & \textbf{190\,625} & \textbf{1\,534\,375} & \textbf{196\,093.75} & \textbf{1\,921\,093.75} \\
+\quad direct cost & 15\,000 & 100\,000 & 12\,500 & 127\,500 \\
+\quad Structured personnel & 137\,500 & 1\,127\,500 & 144\,375 & 1\,409\,375 \\
+\quad indirect costs & 38\,125 & 306\,875 & 39\,218.75 & 384\,218.75 \\
+\textbf{Affiliation Institution costs} & \textbf{96\,365} & \textbf{192\,730} & \textbf{96\,365} & \textbf{385\,460} \\
+\quad direct cost & 0 & 0 & 0 & 0 \\
+\quad Structured personnel & 77\,092 & 154\,184 & 77\,092 & 308\,368 \\
+\quad indirect costs & 19\,273 & 38\,546 & 19\,273 & 77\,092 \\
+\textbf{Research Organization costs} & \textbf{250\,000} & \textbf{500\,000} & \textbf{50\,000} & \textbf{800\,000} \\
+\quad direct cost & 10\,000 & 30\,000 & 5\,000 & 45\,000 \\
+\quad Structured personnel & 190\,000 & 370\,000 & 35\,000 & 595\,000 \\
+\quad indirect costs & 50\,000 & 100\,000 & 10\,000 & 160\,000 \\
+\midrule
+\textbf{Total} & \textbf{536\,990} & \textbf{2\,227\,105} & \textbf{342\,458.75} & \textbf{3\,106\,553.75} \\
+\quad Structured personnel & 404\,592 & 1\,651\,684 & 256\,467 & 2\,312\,743 \\
+\bottomrule\end{tabular}
+\end{table}
+
+
+
+%%%%%%%
+\subsection{Agevolazioni proposte}
+\textbf{Formule e assunzioni.}
+\begin{itemize}
+  \item L'agevolazione totale di ciascun soggetto \`e un valore fisso (importi proposti): HI 1\,309\,859.30\,\euro, AI 251\,723.32\,\euro, RO 541\,953.64\,\euro.
+  \item Direct cost e indirect costs sono ripresi dalla tabella delle agevolazioni nominali; il personale strutturato \`e anch'esso un valore inserito (pari al residuo: totale $-$ diretti $-$ indiretti).
+  \item Le righe ``Tasso'' sono tassi effettivi: $\tau^{s}_k = a^{s}_{\mathrm{tot},k}/c^{s}_{\mathrm{tot},k}$, con $c$ dalla Tab.~\ref{tab:age-cost} (nel file sono etichettate ``Tasso Nominale'').
+\end{itemize}
+
+\begin{table}[H]\centering\small
+\caption{Agevolazioni proposte (tabella \texttt{TReceivedAgevolazioniProposte}).}\label{tab:age-prop}
+\begin{tabular}{lrrrr}\toprule
+\textbf{Voce} & \textbf{Fund. Research} & \textbf{Ind. Research} & \textbf{Exp. Development} & \textbf{Totale} \\\midrule
+\textbf{Tasso Nominale HI} & \textbf{68.72\,\%} & \textbf{34.07\,\%} & \textbf{17.02\,\%} & \textbf{32.39\,\%} \\
+\textbf{Tasso Nominale AI} & \textbf{65.3\,\%} & \textbf{65.3\,\%} & \textbf{65.3\,\%} & \textbf{65.3\,\%} \\
+\textbf{Tasso Nominale RO} & \textbf{67.04\,\%} & \textbf{67.91\,\%} & \textbf{69.64\,\%} & \textbf{67.74\,\%} \\
+\textbf{Host Institution} & \textbf{130\,992.37} & \textbf{1\,045\,387.44} & \textbf{133\,479.49} & \textbf{1\,309\,859.30} \\
+\quad direct cost & 15\,000 & 100\,000 & 12\,500 & 127\,500 \\
+\quad Structured personnel & 77\,867.37 & 638\,512.44 & 81\,760.74 & 798\,140.55 \\
+\quad indirect costs & 38\,125 & 306\,875 & 39\,218.75 & 384\,218.75 \\
+\textbf{Affiliation Institution} & \textbf{62\,930.83} & \textbf{125\,861.66} & \textbf{62\,930.83} & \textbf{251\,723.32} \\
+\quad direct cost & 0 & 0 & 0 & 0 \\
+\quad Structured personnel & 43\,657.83 & 87\,315.66 & 43\,657.83 & 174\,631.32 \\
+\quad indirect costs & 19\,273 & 38\,546 & 19\,273 & 77\,092 \\
+\textbf{Research Organization} & \textbf{167\,598.83} & \textbf{339\,534.02} & \textbf{34\,820.79} & \textbf{541\,953.64} \\
+\quad direct cost & 10\,000 & 30\,000 & 5\,000 & 45\,000 \\
+\quad Structured personnel & 107\,598.55 & 209\,534.02 & 19\,820.79 & 336\,953.36 \\
+\quad indirect costs & 50\,000 & 100\,000 & 10\,000 & 160\,000 \\
+\midrule
+\textbf{Total} & \textbf{361\,522.03} & \textbf{1\,510\,783.12} & \textbf{231\,231.11} & \textbf{2\,103\,536.26} \\
+\quad Structured personnel & 229\,123.75 & 935\,362.12 & 145\,239.36 & 1\,309\,725.23 \\
+\bottomrule\end{tabular}
+\end{table}
+
+
+
+\section{Foglio ``PROPOSTA ACCETTATA''}
+%%%%%%%
+\subsection{Dettaglio costi ammessi}
+\textbf{Formule e assunzioni.}
+\begin{itemize}
+  \item Tagli applicati ai costi della HI rispetto alla sottomissione (tabella a lato, uguali per FR/IR/ED): $\delta_{\mathrm{dir}} = 50\,\%$, $\delta_{\mathrm{pers}} = 16\,\%$, $\delta_{\mathrm{acq}} = 0$:
+  \[ c^{\mathrm{HI,acc}}_{v,k} = c^{\mathrm{HI,sub}}_{v,k}\,(1-\delta_v). \]
+  \item AI: costi invariati rispetto alla sottomissione.
+  \item RO: costi diretti ridotti a 4\,000 / 8\,000 / 3\,000\,\euro{} e personale ripartito tra strutturato (95\,000 / 190\,000 / 15\,000) e da acquisire (95\,000 / 210\,000 / 20\,000); valori inseriti a mano.
+  \item Indirect costs: $c_{\mathrm{ind},k} = 0.25\,(c_{\mathrm{dir},k} + c_{\mathrm{pers},k} + c_{\mathrm{acq},k})$.
+  \item Totale soggetto = somma delle quattro voci; ``AI+RO'' = somma voce per voce di AI e RO.
+  \item A lato: personale strutturato AI+RO + personale da acquisire RO $= 933\,368$\,\euro; costo AI+RO $= 1\,185\,460$\,\euro; agevolazione AI+RO $= 809\,140.40$\,\euro; differenza $= 376\,319.60$\,\euro.
+\end{itemize}
+
+\begin{table}[H]\centering\small
+\caption{Costi ammessi nella proposta accettata (tagli inclusi).}\label{tab:acc-cost}
+\begin{tabular}{lrrrr}\toprule
+\textbf{Voce} & \textbf{Fund. Research} & \textbf{Ind. Research} & \textbf{Exp. Development} & \textbf{Totale} \\\midrule
+\textbf{Host Institution costs} & \textbf{153\,750} & \textbf{2\,492\,750} & \textbf{637\,625} & \textbf{3\,284\,125} \\
+\quad direct cost & 7\,500 & 100\,000 & 25\,000 & 132\,500 \\
+\quad Structured personnel & 115\,500 & 1\,894\,200 & 485\,100 & 2\,494\,800 \\
+\quad Personnel to be Acquired & 0 & 0 & 0 & 0 \\
+\quad indirect costs & 30\,750 & 498\,550 & 127\,525 & 656\,825 \\
+\textbf{Affiliation Institution costs} & \textbf{96\,365} & \textbf{192\,730} & \textbf{96\,365} & \textbf{385\,460} \\
+\quad direct cost & 0 & 0 & 0 &  \\
+\quad Structured personnel & 77\,092 & 154\,184 & 77\,092 & 308\,368 \\
+\quad Personnel to be Acquired &  &  &  &  \\
+\quad indirect costs & 19\,273 & 38\,546 & 19\,273 & 77\,092 \\
+\textbf{Research Organization costs} & \textbf{242\,500} & \textbf{510\,000} & \textbf{47\,500} & \textbf{800\,000} \\
+\quad direct cost & 4\,000 & 8\,000 & 3\,000 & 15\,000 \\
+\quad Structured personnel & 95\,000 & 190\,000 & 15\,000 & 300\,000 \\
+\quad Personnel to be Acquired & 95\,000 & 210\,000 & 20\,000 & 325\,000 \\
+\quad indirect costs & 48\,500 & 102\,000 & 9\,500 & 160\,000 \\
+\midrule
+\textbf{Total} & \textbf{492\,615} & \textbf{3\,195\,480} & \textbf{781\,490} & \textbf{4\,469\,585} \\
+\quad Structured personnel & 287\,592 & 2\,238\,384 & 577\,192 & 3\,103\,168 \\
+\textbf{AI+RO} & \textbf{338\,865} & \textbf{702\,730} & \textbf{143\,865} & \textbf{1\,185\,460} \\
+\quad direct cost & 4\,000 & 8\,000 & 3\,000 & 15\,000 \\
+\quad Structured personnel & 172\,092 & 344\,184 & 92\,092 & 608\,368 \\
+\quad Personnel to be Acquired & 95\,000 & 210\,000 & 20\,000 & 325\,000 \\
+\quad indirect costs & 67\,773 & 140\,546 & 28\,773 & 237\,092 \\
+\bottomrule\end{tabular}
+\end{table}
+
+
+
+\begin{table}[H]\centering\small
+\caption{Percentuali di taglio applicate ai costi della Host Institution.}\label{tab:acc-cut}
+\begin{tabular}{lrrr}\toprule
+\textbf{Voce} & \textbf{Fund. Research} & \textbf{Ind. Research} & \textbf{Exp. Development} \\\midrule
+\quad direct cost & 50\,\% & 50\,\% & 50\,\% \\
+\quad Structured personnel & 16\,\% & 16\,\% & 16\,\% \\
+\quad Personnel to be Acquired & 0\,\% & 0\,\% & 0\,\% \\
+\bottomrule\end{tabular}
+\end{table}
+
+
+
+%%%%%%%
+\subsection{Agevolazioni accettate}
+\textbf{Formule e assunzioni.}
+\begin{itemize}
+  \item HI: agevolazione totale inserita come valore fisso (153\,750 / 1\,246\,375 / 159\,406\,\euro, cio\`e tassi $100\,\%$, $50\,\%$, $25\,\%$ sul costo ammesso). Costi diretti agevolati al $100\,\%$ (FR), $65\,\%$ (IR), $25\,\%$ (ED). Le spese generali sono il 20\,\% dell'agevolazione ($a_{\mathrm{ind}} = a_{\mathrm{tot}} - a_{\mathrm{tot}}/1.25$) e il personale \`e il residuo $a_{\mathrm{pers}} = a_{\mathrm{tot}} - a_{\mathrm{dir}} - a_{\mathrm{ind}}$.
+  \item AI e RO: tasso di finanziamento dall'Allegato~C (email MUR del 04/11/2025), calcolato per tipologia sul costo aggregato AI+RO:
+  \[ \phi_k = \frac{A^{\mathrm{AI+RO}}_k}{C^{\mathrm{AI+RO}}_k},\qquad \phi = (68.03\,\%,\ 66.23\,\%,\ 78.70\,\%), \]
+  con $A^{\mathrm{AI+RO}} = (230\,529.37;\ 465\,395.68;\ 113\,215.35)$ e $C^{\mathrm{AI+RO}} = (338\,865;\ 702\,730;\ 143\,865)$ (Tab.~\ref{tab:acc-phi}). Per $s\in\{\mathrm{AI},\mathrm{RO}\}$: $a^{s}_{\mathrm{tot},k} = \phi_k\, c^{s}_{\mathrm{tot},k}$.
+  \item AI e RO: costi diretti agevolati al 100\,\% (per la AI sono nulli); spese generali pari al 20\,\% dell'agevolazione ($a - a/1.25$). Il residuo va al personale: per la AI tutto allo strutturato; per la RO \`e ripartito pro quota sui costi:
+  \[ a^{\mathrm{RO}}_{\mathrm{pers},k} = \bigl(a^{\mathrm{RO}}_{\mathrm{tot},k} - a^{\mathrm{RO}}_{\mathrm{dir},k} - a^{\mathrm{RO}}_{\mathrm{ind},k}\bigr)\,\frac{c^{\mathrm{RO}}_{\mathrm{pers},k}}{c^{\mathrm{RO}}_{\mathrm{pers},k}+c^{\mathrm{RO}}_{\mathrm{acq},k}}, \]
+  e analogamente per il personale da acquisire.
+  \item Le righe ``Tasso'' sono i tassi effettivi $a^{s}_{\mathrm{tot},k}/c^{s}_{\mathrm{tot},k}$.
+  \item L'ultimo blocco (nel file etichettato ``Research Organization costs'', ma in realt\`a \`e AI+RO) somma voce per voce le agevolazioni di AI e RO; il totale coincide con i 809\,140.40\,\euro{} dell'Allegato~C (controlli a lato uguali a 0).
+\end{itemize}
+
+\begin{table}[H]\centering\small
+\caption{Agevolazioni nella proposta accettata.}\label{tab:acc-age}
+\begin{tabular}{lrrrr}\toprule
+\textbf{Voce} & \textbf{Fund. Research} & \textbf{Ind. Research} & \textbf{Exp. Development} & \textbf{Totale} \\\midrule
+\textbf{Tasso di agevolazione HI} & \textbf{100\,\%} & \textbf{50\,\%} & \textbf{25\,\%} & \textbf{47.49\,\%} \\
+\textbf{Tasso di agevolazione AI} & \textbf{68.03\,\%} & \textbf{66.23\,\%} & \textbf{78.7\,\%} & \textbf{69.79\,\%} \\
+\textbf{Tasso di agevolazione RO} & \textbf{68.03\,\%} & \textbf{66.23\,\%} & \textbf{78.7\,\%} & \textbf{67.51\,\%} \\
+\textbf{Host Institution} & \textbf{153\,750} & \textbf{1\,246\,375} & \textbf{159\,406} & \textbf{1\,559\,531} \\
+\quad direct cost & 7\,500 & 65\,000 & 6\,250 & 78\,750 \\
+\quad Structured personnel & 115\,500 & 932\,100 & 121\,274.80 & 1\,168\,874.80 \\
+\quad Personnel to be Acquired & 0 & 0 & 0 &  \\
+\quad indirect costs & 30\,750 & 249\,275 & 31\,881.20 & 311\,906.20 \\
+\textbf{Affiliation Institution} & \textbf{65\,556.97} & \textbf{127\,638.94} & \textbf{75\,834.96} & \textbf{269\,030.87} \\
+\quad direct cost & 0 & 0 & 0 & 0 \\
+\quad Structured personnel & 52\,445.58 & 102\,111.15 & 60\,667.97 & 215\,224.70 \\
+\quad Personnel to be Acquired &  &  &  &  \\
+\quad indirect costs & 13\,111.39 & 25\,527.79 & 15\,166.99 & 53\,806.17 \\
+\textbf{Research Organization costs} & \textbf{164\,972.40} & \textbf{337\,756.74} & \textbf{37\,380.39} & \textbf{540\,109.53} \\
+\quad direct cost & 4\,000 & 8\,000 & 3\,000 & 15\,000 \\
+\quad Structured personnel & 63\,988.96 & 124\,547.56 & 11\,530.42 & 200\,066.94 \\
+\quad Personnel to be Acquired & 63\,988.96 & 137\,657.83 & 15\,373.89 & 217\,020.68 \\
+\quad indirect costs & 32\,994.48 & 67\,551.35 & 7\,476.08 & 108\,021.91 \\
+\midrule
+\textbf{Total} & \textbf{384\,279.37} & \textbf{1\,711\,770.68} & \textbf{272\,621.35} & \textbf{2\,368\,671.40} \\
+\quad Structured personnel & 231\,934.54 & 1\,158\,758.71 & 193\,473.19 & 1\,584\,166.44 \\
+\textbf{AI+RO (agevolazione)} & \textbf{230\,529.37} & \textbf{465\,395.68} & \textbf{113\,215.35} & \textbf{809\,140.40} \\
+\quad direct cost & 4\,000 & 8\,000 & 3\,000 & 15\,000 \\
+\quad Structured personnel & 116\,434.54 & 226\,658.71 & 72\,198.39 & 415\,291.64 \\
+\quad Personnel to be Acquired & 63\,988.96 & 137\,657.83 & 15\,373.89 & 217\,020.68 \\
+\quad indirect costs & 46\,105.87 & 93\,079.14 & 22\,643.07 & 161\,828.08 \\
+\bottomrule\end{tabular}
+\end{table}
+
+
+
+\begin{table}[H]\centering\small
+\caption{Costi, agevolazioni e tasso di finanziamento AI+RO (Allegato C).}\label{tab:acc-phi}
+\begin{tabular}{lrrr}\toprule
+\textbf{Voce} & \textbf{Fund. Research} & \textbf{Ind. Research} & \textbf{Exp. Development} \\\midrule
+\textbf{Costi AI/RO} & \textbf{338\,865} & \textbf{702\,730} & \textbf{143\,865} \\
+\textbf{Agevolazione AI/RO} & \textbf{230\,529.37} & \textbf{465\,395.68} & \textbf{113\,215.35} \\
+\textbf{Finanziamento \%} & \textbf{68.03\,\%} & \textbf{66.23\,\%} & \textbf{78.7\,\%} \\
+\bottomrule\end{tabular}
+\end{table}
+
+
+
+\section{Foglio ``Gantt Chart''}
+\textbf{Formule e assunzioni.} Il foglio non contiene formule: il diagramma \`e disegnato con il colore di sfondo delle celle (verde = durata del WP, azzurro = durata del task), su 48 mesi. I deliverable dei WP cadono ai mesi 12, 24, 36 e 48 (milestone M1--M4); $\blacklozenge$ indica la cella che riporta il codice del deliverable, $\ast$ il contributo di un task al deliverable di quel mese. Il task 3.2 \`e annotato nel file come ``TO BE REMOVED''.
+
+\begin{landscape}
+\begin{table}[p]\centering\tiny\setlength{\tabcolsep}{0.5pt}\renewcommand{\arraystretch}{1.05}
+\caption{Diagramma di Gantt (48 mesi).}\label{tab:gantt}
+\begin{tabular}{l>{\centering\arraybackslash}p{3.3mm}>{\centering\arraybackslash}p{3.3mm}>{\centering\arraybackslash}p{3.3mm}>{\centering\arraybackslash}p{3.3mm}>{\centering\arraybackslash}p{3.3mm}>{\centering\arraybackslash}p{3.3mm}>{\centering\arraybackslash}p{3.3mm}>{\centering\arraybackslash}p{3.3mm}>{\centering\arraybackslash}p{3.3mm}>{\centering\arraybackslash}p{3.3mm}>{\centering\arraybackslash}p{3.3mm}>{\centering\arraybackslash}p{3.3mm}>{\centering\arraybackslash}p{3.3mm}>{\centering\arraybackslash}p{3.3mm}>{\centering\arraybackslash}p{3.3mm}>{\centering\arraybackslash}p{3.3mm}>{\centering\arraybackslash}p{3.3mm}>{\centering\arraybackslash}p{3.3mm}>{\centering\arraybackslash}p{3.3mm}>{\centering\arraybackslash}p{3.3mm}>{\centering\arraybackslash}p{3.3mm}>{\centering\arraybackslash}p{3.3mm}>{\centering\arraybackslash}p{3.3mm}>{\centering\arraybackslash}p{3.3mm}>{\centering\arraybackslash}p{3.3mm}>{\centering\arraybackslash}p{3.3mm}>{\centering\arraybackslash}p{3.3mm}>{\centering\arraybackslash}p{3.3mm}>{\centering\arraybackslash}p{3.3mm}>{\centering\arraybackslash}p{3.3mm}>{\centering\arraybackslash}p{3.3mm}>{\centering\arraybackslash}p{3.3mm}>{\centering\arraybackslash}p{3.3mm}>{\centering\arraybackslash}p{3.3mm}>{\centering\arraybackslash}p{3.3mm}>{\centering\arraybackslash}p{3.3mm}>{\centering\arraybackslash}p{3.3mm}>{\centering\arraybackslash}p{3.3mm}>{\centering\arraybackslash}p{3.3mm}>{\centering\arraybackslash}p{3.3mm}>{\centering\arraybackslash}p{3.3mm}>{\centering\arraybackslash}p{3.3mm}>{\centering\arraybackslash}p{3.3mm}>{\centering\arraybackslash}p{3.3mm}>{\centering\arraybackslash}p{3.3mm}>{\centering\arraybackslash}p{3.3mm}>{\centering\arraybackslash}p{3.3mm}>{\centering\arraybackslash}p{3.3mm}}\toprule
+\textbf{WP/Task} & 1 & 2 & 3 & 4 & 5 & 6 & 7 & 8 & 9 & 10 & 11 & 12 & 13 & 14 & 15 & 16 & 17 & 18 & 19 & 20 & 21 & 22 & 23 & 24 & 25 & 26 & 27 & 28 & 29 & 30 & 31 & 32 & 33 & 34 & 35 & 36 & 37 & 38 & 39 & 40 & 41 & 42 & 43 & 44 & 45 & 46 & 47 & 48 \\\midrule
+\textbf{WP1} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen}$\blacklozenge$ & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen}$\blacklozenge$ & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen}$\blacklozenge$ & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen}$\blacklozenge$ \\
+\quad 1.1 & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} \\
+\quad 1.2 & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} \\
+\quad 1.3 & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} \\
+\quad 1.4 & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} \\
+\quad 1.5 & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} \\
+\textbf{WP2} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen}$\blacklozenge$ & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen}$\blacklozenge$ & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen}$\blacklozenge$ &  &  &  &  &  &  &  &  &  &  &  &  \\
+\quad 2.1 & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  \\
+\quad 2.2 &  &  &  &  &  &  & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue}$\ast$ & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  \\
+\quad 2.3 &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  \\
+\quad 2.4 &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  \\
+\quad 2.5 &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue}$\ast$ & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} &  &  &  &  &  &  &  &  \\
+\quad 2.6 &  &  &  &  &  &  &  &  &  &  &  &  & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue}$\ast$ & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue}$\ast$ & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} &  &  &  &  &  &  &  &  \\
+\quad 2.7 &  &  &  &  &  &  &  &  &  &  &  &  & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} &  &  &  &  &  &  &  &  \\
+\quad 2.8 & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  \\
+\textbf{WP3} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen}$\blacklozenge$ & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen}$\blacklozenge$ & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen}$\blacklozenge$ & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} &  &  &  &  &  &  &  &  \\
+\quad 3.1 & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  \\
+\quad 3.2$^\dagger$ &  &  &  &  &  &  & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  \\
+\quad 3.3 &  &  &  &  &  &  &  &  &  & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  \\
+\quad 3.4 &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} &  &  &  &  &  &  &  &  \\
+\textbf{WP4} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen}$\blacklozenge$ & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen}$\blacklozenge$ & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen}$\blacklozenge$ & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} &  &  &  &  &  &  &  &  \\
+\quad 4.1 & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  \\
+\quad 4.2 &  &  &  & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue}$\ast$ & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue}$\ast$ &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  \\
+\quad 4.3 &  &  &  & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue}$\ast$ & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue}$\ast$ &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  \\
+\quad 4.4 &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  \\
+\quad 4.5 &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue}$\ast$ & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} &  &  &  &  &  &  &  &  \\
+\quad 4.6 &  &  &  & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  \\
+\quad 4.7 & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  \\
+\textbf{WP5} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen}$\blacklozenge$ & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen}$\blacklozenge$ & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen}$\blacklozenge$ & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} &  &  &  &  &  &  &  &  \\
+\quad 5.1 & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  \\
+\quad 5.2 &  &  &  & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue}$\ast$ & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue}$\ast$ & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  \\
+\quad 5.3 &  &  &  &  &  &  &  &  &  &  &  &  & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue}$\ast$ & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} &  &  &  &  &  &  &  &  \\
+\quad 5.4 &  &  &  & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue}$\ast$ & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} &  &  &  &  &  &  &  &  \\
+\quad 5.5 & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  \\
+\textbf{WP6} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen}$\blacklozenge$ & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen}$\blacklozenge$ & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen}$\blacklozenge$ & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} &  &  &  &  &  &  &  &  \\
+\quad 6.1 & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue}$\ast$ &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  \\
+\quad 6.2 &  &  &  &  &  &  &  &  &  &  &  &  & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  \\
+\quad 6.3 &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue}$\ast$ &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  \\
+\quad 6.4 &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue}$\ast$ & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} &  &  &  &  &  &  &  &  \\
+\textbf{WP7} &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen}$\blacklozenge$ \\
+\quad 7.1 &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue}$\ast$ \\
+\quad 7.2 &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue}$\ast$ \\
+\quad 7.3 &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  &  & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue}$\ast$ \\
+\textbf{WP8} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen}$\blacklozenge$ & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen}$\blacklozenge$ & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen}$\blacklozenge$ & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} & \cellcolor{wpgreen} \\
+\quad 8.1 & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} \\
+\quad 8.2 & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} \\
+\quad 8.3 & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} & \cellcolor{taskblue} \\
+\midrule
+\textbf{Milestone} &  &  &  &  &  &  &  &  &  &  &  & \textbf{M1} &  &  &  &  &  &  &  &  &  &  &  & \textbf{M2} &  &  &  &  &  &  &  &  &  &  &  & \textbf{M3} &  &  &  &  &  &  &  &  &  &  &  & \textbf{M4} \\
+\bottomrule\end{tabular}
+\par\smallskip $^\dagger$ Task annotato ``TO BE REMOVED''.
+\end{table}
+
+
+\end{landscape}
+\paragraph{Deliverable.} Codici presenti nel Gantt (mese di consegna) e descrizioni riportate nel foglio:
+\begin{itemize}\setlength{\itemsep}{0pt}
+\item \textbf{WP1}: D1.1 (M12), D1.2 (M24), D1.3 (M36), D1.4 (M48). D1.1 Management Report; D1.2 Management Report; D1.3 Management Report; D1.4 Management Report.
+\item \textbf{WP2}: D2.1 (M12), D2.2 (M24), D2.3 (M36). D2.1 Scientific Plan and First Running Mockup; D2.2 First Running Time-Variance Aware Planner Running in MI.RA/Dexter Environment; D2.3 Optimal Task and Motion Planning with online replanning module.
+\item \textbf{WP3}: D3.1 (M12), D3.2 (M24), D3.3 (M36).
+\item \textbf{WP4}: D4.1 (M12), D4.2 (M24), D4.3 (M36). D4.1 Scientific Plan and First Mockup of the Motion Planning Modules; D4.2 Motion Planners Modules Prototypes; D4.2 Motion Planners Modules Prototypes integrated in the COMAU IPC.
+\item \textbf{WP5}: D5.1 (M12), D5.2 (M24), D5.3 (M36). D5.1 Scientific Plan and First Mockup of the Neural Control Architecture; D5.2 First Release of the Neural Controller Prototype; D5.2 Neural Control Architecture integrated in the COMAU IPC.
+\item \textbf{WP6}: D6.1 (M12), D6.2 (M24), D6.3 (M36). D6.1 Scientific Plan and First Questionnaire Release; D6.2 Second Questionnaire Release; D6.3 Campaign Evaluation Report.
+\item \textbf{WP7}: D7.1 (M48). D7.1 Demonstrators.
+\item \textbf{WP8}: D8.1 (M12), D8.2 (M24), D8.3 (M36). D8.1 Exploitation, Communication, Dissemination Report; D8.2 Exploitation, Communication, Dissemination Report; D8.3 Exploitation, Communication, Dissemination Report.
+\end{itemize}
+Nota: nel foglio le descrizioni D4.2 e D5.2 compaiono due volte con testi diversi (la seconda occorrenza corrisponde verosimilmente a D4.3 e D5.3).
+
+\section{Foglio ``Budget Per Year''}
+%%%%%%%
+\subsection{Costi standard}
+\textbf{Formule e assunzioni.}
+\begin{itemize}
+  \item Costi orari standard per livello (ALTO/MEDIO/BASSO) e tipo di ente (azienda, universit\`a, EPR); ore annue $h = 1\,550$.
+  \item Costo mensile: $c_{\mathrm{mese}} = c_{\mathrm{ora}}\cdot h/12$.
+  \item Costi mensili usati per i mesi-persona: CNR TI $= 44.87\cdot 1\,550/12 = 5\,795.71$\,\euro; TD/CdI $=$ EPR medio $= 4\,650$\,\euro; COMAU $=$ azienda medio $= 6\,070.83$\,\euro. ``CNR pesato'' $= (c^{\mathrm{RO}}_{\mathrm{pers}} + c^{\mathrm{RO}}_{\mathrm{acq}})/\mathrm{PM}^{\mathrm{RO}}_{\mathrm{tot}} = 625\,000/121.65 = 5\,137.48$\,\euro.
+\end{itemize}
+
+\begin{table}[H]\centering\small\caption{Costi standard orari e mensili.}\label{tab:std}
+\begin{tabular}{lrrrrrr}\toprule
+& \multicolumn{3}{c}{\textbf{\euro/ora}} & \multicolumn{3}{c}{\textbf{\euro/mese}} \\\cmidrule(lr){2-4}\cmidrule(lr){5-7}
+\textbf{Livello} & \textbf{Azienda} & \textbf{Uni} & \textbf{EPR} & \textbf{Azienda} & \textbf{Uni} & \textbf{EPR} \\\midrule
+ALTO & 83 &  & 61 & 10\,720.83 & 0 & 7\,879.17 \\
+MEDIO & 47 &  & 36 & 6\,070.83 & 0 & 4\,650 \\
+BASSO & 30 &  & 32 & 3\,875 & 0 & 4\,133.33 \\
+\midrule Ore/anno & 1\,550 & & & & & \\
+\bottomrule\end{tabular}\par\medskip
+\begin{tabular}{lr}\toprule\textbf{Soggetto} & \textbf{\euro/mese} \\\midrule
+CNR TI & 5\,795.71 \\
+TD/CdI \euro{}/mese & 4\,650 \\
+COMAU \euro{}/mese & 6\,070.83 \\
+CNR Pesato & 5\,137.48 \\
+\bottomrule\end{tabular}\end{table}
+
+
+%%%%%%%
+\subsection{Allocazione delle risorse per annualit\`a}
+\textbf{Formule e assunzioni.} Per ogni soggetto $s$ e tipologia $k$ \`e definita la frazione $\alpha^{s}_{y,k}$ del totale di progetto attribuita all'anno (milestone) $y$. Gli anni 1--3 sono inseriti a mano; l'anno 4 chiude il totale: $\alpha^{s}_{4,k} = 1 - \alpha^{s}_{1,k} - \alpha^{s}_{2,k} - \alpha^{s}_{3,k}$. La stessa allocazione vale per costi, agevolazioni e mesi-persona. In sintesi: FR al 50\,\% negli anni 1--2; ED interamente nell'anno 4; IR distribuita in modo diverso per soggetto.
+
+\begin{table}[H]\centering\small\caption{Frazioni di allocazione $\alpha^{s}_{y,k}$ per anno.}\label{tab:alloc}
+\begin{tabular}{llrrr}\toprule\textbf{Anno} & \textbf{Soggetto} & \textbf{FR} & \textbf{IR} & \textbf{ED} \\\midrule
+Anno 1 & HI & 50\,\% & 33.4\,\% & 0\,\% \\
+ & AI & 50\,\% & 20\,\% & 0\,\% \\
+ & RO & 50\,\% & 30\,\% & 0\,\% \\
+\midrule
+Anno 2 & HI & 50\,\% & 33.3\,\% & 0\,\% \\
+ & AI & 50\,\% & 20\,\% & 0\,\% \\
+ & RO & 50\,\% & 30\,\% & 0\,\% \\
+\midrule
+Anno 3 & HI & 0\,\% & 33.3\,\% & 0\,\% \\
+ & AI & 0\,\% & 55\,\% & 0\,\% \\
+ & RO & 0\,\% & 30\,\% & 0\,\% \\
+\midrule
+Anno 4 & HI & 0\,\% & 0\,\% & 100\,\% \\
+ & AI & 0\,\% & 5\,\% & 100\,\% \\
+ & RO & 0\,\% & 10\,\% & 100\,\% \\
+\bottomrule\end{tabular}\end{table}
+
+
+%%%%%%%
+\subsection{Costi, agevolazioni e mesi-persona per annualit\`a}
+\textbf{Formule e assunzioni.}
+\begin{itemize}
+  \item \emph{Intero progetto}: i costi sono quelli della Tab.~\ref{tab:acc-cost} e le agevolazioni quelle della Tab.~\ref{tab:acc-age} (collegamenti diretti al foglio ``PROPOSTA ACCETTATA'').
+  \item \emph{Anno $y$}: ogni voce \`e il totale di progetto moltiplicato per la frazione dell'anno, $c^{s}_{v,k}(y) = \alpha^{s}_{y,k}\, c^{s}_{v,k}$ e $a^{s}_{v,k}(y) = \alpha^{s}_{y,k}\, a^{s}_{v,k}$ (Tab.~\ref{tab:alloc}).
+  \item \emph{Mesi-persona}, calcolati sui \emph{costi} (non sulle agevolazioni) divisi per il costo mensile standard:
+  \[
+  \mathrm{PM}^{\mathrm{HI}}_{\mathrm{pers}} = \frac{c^{\mathrm{HI}}_{\mathrm{pers}}}{6\,070.83},\quad
+  \mathrm{PM}^{\mathrm{AI}}_{\mathrm{pers}} = \frac{c^{\mathrm{AI}}_{\mathrm{pers}}}{7\,879.17},\quad
+  \mathrm{PM}^{\mathrm{RO}}_{\mathrm{pers}} = \frac{c^{\mathrm{RO}}_{\mathrm{pers}}}{5\,795.71},\quad
+  \mathrm{PM}^{\mathrm{RO}}_{\mathrm{acq}} = \frac{c^{\mathrm{RO}}_{\mathrm{acq}}}{4\,650},
+  \]
+  cio\`e COMAU (azienda medio), EPR alto, CNR TI e TD/CdI (EPR medio).
+  \item Total = somma dei tre soggetti; ``AI+RO'' = somma voce per voce di AI e RO. La somma dei quattro anni coincide con il totale di progetto (colonne di controllo = 0 nel file).
+\end{itemize}
+
+\begin{table}[H]\centering\small
+\caption{Costi -- intero progetto.}\label{tab:bpy-c-tot}
+\begin{tabular}{lrrrr}\toprule
+\textbf{Voce} & \textbf{Fund. Research} & \textbf{Ind. Research} & \textbf{Exp. Development} & \textbf{Totale} \\\midrule
+\textbf{Host Institution costs} & \textbf{153\,750} & \textbf{2\,492\,750} & \textbf{637\,625} & \textbf{3\,284\,125} \\
+\quad direct cost & 7\,500 & 100\,000 & 25\,000 & 132\,500 \\
+\quad Structured personnel & 115\,500 & 1\,894\,200 & 485\,100 & 2\,494\,800 \\
+\quad Personnel to be Acquired & 0 & 0 & 0 & 0 \\
+\quad indirect costs & 30\,750 & 498\,550 & 127\,525 & 656\,825 \\
+\textbf{Affiliation Institution costs} & \textbf{96\,365} & \textbf{192\,730} & \textbf{96\,365} & \textbf{385\,460} \\
+\quad direct cost & 0 & 0 & 0 & 0 \\
+\quad Structured personnel & 77\,092 & 154\,184 & 77\,092 & 308\,368 \\
+\quad Personnel to be Acquired & 0 & 0 & 0 & 0 \\
+\quad indirect costs & 19\,273 & 38\,546 & 19\,273 & 77\,092 \\
+\textbf{Research Organization costs} & \textbf{242\,500} & \textbf{510\,000} & \textbf{47\,500} & \textbf{800\,000} \\
+\quad direct cost & 4\,000 & 8\,000 & 3\,000 & 15\,000 \\
+\quad Structured personnel & 95\,000 & 190\,000 & 15\,000 & 300\,000 \\
+\quad Personnel to be Acquired & 95\,000 & 210\,000 & 20\,000 & 325\,000 \\
+\quad indirect costs & 48\,500 & 102\,000 & 9\,500 & 160\,000 \\
+\midrule
+\textbf{Total} & \textbf{492\,615} & \textbf{3\,195\,480} & \textbf{781\,490} & \textbf{4\,469\,585} \\
+\quad Structured personnel & 287\,592 & 2\,238\,384 & 577\,192 & 3\,103\,168 \\
+\textbf{AI+RO} & \textbf{338\,865} & \textbf{702\,730} & \textbf{143\,865} & \textbf{1\,185\,460} \\
+\quad direct cost & 4\,000 & 8\,000 & 3\,000 & 15\,000 \\
+\quad Structured personnel & 172\,092 & 344\,184 & 92\,092 & 608\,368 \\
+\quad Personnel to be Acquired & 95\,000 & 210\,000 & 20\,000 & 325\,000 \\
+\quad indirect costs & 67\,773 & 140\,546 & 28\,773 & 237\,092 \\
+\bottomrule\end{tabular}
+\end{table}
+
+
+
+\begin{table}[H]\centering\small
+\caption{Agevolazioni -- intero progetto.}\label{tab:bpy-a-tot}
+\begin{tabular}{lrrrr}\toprule
+\textbf{Voce} & \textbf{Fund. Research} & \textbf{Ind. Research} & \textbf{Exp. Development} & \textbf{Totale} \\\midrule
+\textbf{Host Institution costs} & \textbf{153\,750} & \textbf{1\,246\,375} & \textbf{159\,406} & \textbf{1\,559\,531} \\
+\quad direct cost & 7\,500 & 65\,000 & 6\,250 & 78\,750 \\
+\quad Structured personnel & 115\,500 & 932\,100 & 121\,274.80 & 1\,168\,874.80 \\
+\quad Personnel to be Acquired & 0 & 0 & 0 & 0 \\
+\quad indirect costs & 30\,750 & 249\,275 & 31\,881.20 & 311\,906.20 \\
+\textbf{Affiliation Institution costs} & \textbf{65\,556.97} & \textbf{127\,638.94} & \textbf{75\,834.96} & \textbf{269\,030.87} \\
+\quad direct cost & 0 & 0 & 0 & 0 \\
+\quad Structured personnel & 52\,445.58 & 102\,111.15 & 60\,667.97 & 215\,224.70 \\
+\quad Personnel to be Acquired & 0 & 0 & 0 & 0 \\
+\quad indirect costs & 13\,111.39 & 25\,527.79 & 15\,166.99 & 53\,806.17 \\
+\textbf{Research Organization costs} & \textbf{164\,972.40} & \textbf{337\,756.74} & \textbf{37\,380.39} & \textbf{540\,109.53} \\
+\quad direct cost & 4\,000 & 8\,000 & 3\,000 & 15\,000 \\
+\quad Structured personnel & 63\,988.96 & 124\,547.56 & 11\,530.42 & 200\,066.94 \\
+\quad Personnel to be Acquired & 63\,988.96 & 137\,657.83 & 15\,373.89 & 217\,020.68 \\
+\quad indirect costs & 32\,994.48 & 67\,551.35 & 7\,476.08 & 108\,021.91 \\
+\midrule
+\textbf{Total} & \textbf{384\,279.37} & \textbf{1\,711\,770.68} & \textbf{272\,621.35} & \textbf{2\,368\,671.40} \\
+\quad Structured personnel & 231\,934.54 & 1\,158\,758.71 & 193\,473.19 & 1\,584\,166.44 \\
+\textbf{AI+RO} & \textbf{230\,529.37} & \textbf{465\,395.68} & \textbf{113\,215.35} & \textbf{809\,140.40} \\
+\quad direct cost & 4\,000 & 8\,000 & 3\,000 & 15\,000 \\
+\quad Structured personnel & 116\,434.54 & 226\,658.71 & 72\,198.39 & 415\,291.64 \\
+\quad Personnel to be Acquired & 63\,988.96 & 137\,657.83 & 15\,373.89 & 217\,020.68 \\
+\quad indirect costs & 46\,105.87 & 93\,079.14 & 22\,643.07 & 161\,828.08 \\
+\bottomrule\end{tabular}
+\end{table}
+
+
+
+\begin{table}[H]\centering\small
+\caption{Mesi-persona -- intero progetto.}\label{tab:bpy-pm-tot}
+\begin{tabular}{lrrrr}\toprule
+\textbf{Voce} & \textbf{Fund. Research} & \textbf{Ind. Research} & \textbf{Exp. Development} & \textbf{Totale} \\\midrule
+\addlinespace[2pt]\multicolumn{5}{l}{\textit{\textbf{Host Institution costs}}} \\
+\quad Structured personnel & 19.03 & 312.02 & 79.91 & 410.95 \\
+\quad Personnel to be Acquired & 0.00 & 0.00 & 0.00 & 0.00 \\
+\addlinespace[2pt]\multicolumn{5}{l}{\textit{\textbf{Affiliation Institution costs}}} \\
+\quad Structured personnel & 9.78 & 19.57 & 9.78 & 39.14 \\
+\quad Personnel to be Acquired & 0.00 & 0.00 &  & 0.00 \\
+\addlinespace[2pt]\multicolumn{5}{l}{\textit{\textbf{Research Organization costs}}} \\
+\quad Structured personnel & 16.39 & 32.78 & 2.59 & 51.76 \\
+\quad Personnel to be Acquired & 20.43 & 45.16 & 4.30 & 69.89 \\
+\midrule
+\textbf{Total} & \textbf{65.63} & \textbf{409.53} & \textbf{96.58} & \textbf{571.74} \\
+\quad Structured personnel & 45.20 & 364.37 & 92.28 & 501.85 \\
+\textbf{AI+RO} & \textbf{46.61} & \textbf{97.51} & \textbf{16.67} & \textbf{160.79} \\
+\quad Structured personnel & 26.18 & 52.35 & 12.37 & 90.90 \\
+\quad Personnel to be Acquired & 20.43 & 45.16 & 4.30 & 69.89 \\
+\bottomrule\end{tabular}
+\end{table}
+
+
+
+\clearpage
+\begin{table}[H]\centering\small
+\caption{Costi -- anno 1 (milestone 1).}\label{tab:bpy-c-y1}
+\begin{tabular}{lrrrr}\toprule
+\textbf{Voce} & \textbf{Fund. Research} & \textbf{Ind. Research} & \textbf{Exp. Development} & \textbf{Totale} \\\midrule
+\textbf{Host Institution costs} & \textbf{76\,875} & \textbf{832\,578.50} & \textbf{0} & \textbf{909\,453.50} \\
+\quad direct cost & 3\,750 & 33\,400 & 0 & 37\,150 \\
+\quad Structured personnel & 57\,750 & 632\,662.80 & 0 & 690\,412.80 \\
+\quad Personnel to be Acquired & 0 & 0 & 0 & 0 \\
+\quad indirect costs & 15\,375 & 166\,515.70 & 0 & 181\,890.70 \\
+\textbf{Affiliation Institution costs} & \textbf{48\,182.50} & \textbf{38\,546} & \textbf{0} & \textbf{86\,728.50} \\
+\quad direct cost & 0 & 0 & 0 & 0 \\
+\quad Structured personnel & 38\,546 & 30\,836.80 & 0 & 69\,382.80 \\
+\quad Personnel to be Acquired & 0 & 0 & 0 & 0 \\
+\quad indirect costs & 9\,636.50 & 7\,709.20 & 0 & 17\,345.70 \\
+\textbf{Research Organization costs} & \textbf{121\,250} & \textbf{153\,000} & \textbf{0} & \textbf{274\,250} \\
+\quad direct cost & 2\,000 & 2\,400 & 0 & 4\,400 \\
+\quad Structured personnel & 47\,500 & 57\,000 & 0 & 104\,500 \\
+\quad Personnel to be Acquired & 47\,500 & 63\,000 & 0 & 110\,500 \\
+\quad indirect costs & 24\,250 & 30\,600 & 0 & 54\,850 \\
+\midrule
+\textbf{Total} & \textbf{246\,307.50} & \textbf{1\,024\,124.50} & \textbf{0} & \textbf{1\,270\,432} \\
+\quad Structured personnel & 143\,796 & 720\,499.60 & 0 & 864\,295.60 \\
+\textbf{AI+RO} & \textbf{169\,432.50} & \textbf{191\,546} & \textbf{0} & \textbf{360\,978.50} \\
+\quad direct cost & 2\,000 & 2\,400 & 0 & 4\,400 \\
+\quad Structured personnel & 86\,046 & 87\,836.80 & 0 & 173\,882.80 \\
+\quad Personnel to be Acquired & 47\,500 & 63\,000 & 0 & 110\,500 \\
+\quad indirect costs & 33\,886.50 & 38\,309.20 & 0 & 72\,195.70 \\
+\bottomrule\end{tabular}
+\end{table}
+
+
+
+\begin{table}[H]\centering\small
+\caption{Agevolazioni -- anno 1 (milestone 1).}\label{tab:bpy-a-y1}
+\begin{tabular}{lrrrr}\toprule
+\textbf{Voce} & \textbf{Fund. Research} & \textbf{Ind. Research} & \textbf{Exp. Development} & \textbf{Totale} \\\midrule
+\textbf{Host Institution costs} & \textbf{76\,875} & \textbf{416\,289.25} & \textbf{0} & \textbf{493\,164.25} \\
+\quad direct cost & 3\,750 & 21\,710 & 0 & 25\,460 \\
+\quad Structured personnel & 57\,750 & 311\,321.40 & 0 & 369\,071.40 \\
+\quad Personnel to be Acquired & 0 & 0 & 0 & 0 \\
+\quad indirect costs & 15\,375 & 83\,257.85 & 0 & 98\,632.85 \\
+\textbf{Affiliation Institution costs} & \textbf{32\,778.49} & \textbf{25\,527.79} & \textbf{0} & \textbf{58\,306.27} \\
+\quad direct cost & 0 & 0 & 0 & 0 \\
+\quad Structured personnel & 26\,222.79 & 20\,422.23 & 0 & 46\,645.02 \\
+\quad Personnel to be Acquired & 0 & 0 & 0 & 0 \\
+\quad indirect costs & 6\,555.70 & 5\,105.56 & 0 & 11\,661.25 \\
+\textbf{Research Organization costs} & \textbf{82\,486.20} & \textbf{101\,327.02} & \textbf{0} & \textbf{183\,813.22} \\
+\quad direct cost & 2\,000 & 2\,400 & 0 & 4\,400 \\
+\quad Structured personnel & 31\,994.48 & 37\,364.27 & 0 & 69\,358.75 \\
+\quad Personnel to be Acquired & 31\,994.48 & 41\,297.35 & 0 & 73\,291.83 \\
+\quad indirect costs & 16\,497.24 & 20\,265.40 & 0 & 36\,762.64 \\
+\midrule
+\textbf{Total} & \textbf{192\,139.68} & \textbf{543\,144.06} & \textbf{0} & \textbf{735\,283.75} \\
+\quad Structured personnel & 115\,967.27 & 369\,107.90 & 0 & 485\,075.17 \\
+\textbf{AI+RO} & \textbf{115\,264.68} & \textbf{126\,854.81} & \textbf{0} & \textbf{242\,119.50} \\
+\quad direct cost & 2\,000 & 2\,400 & 0 & 4\,400 \\
+\quad Structured personnel & 58\,217.27 & 57\,786.50 & 0 & 116\,003.77 \\
+\quad Personnel to be Acquired & 31\,994.48 & 41\,297.35 & 0 & 73\,291.83 \\
+\quad indirect costs & 23\,052.94 & 25\,370.96 & 0 & 48\,423.90 \\
+\bottomrule\end{tabular}
+\end{table}
+
+
+
+\begin{table}[H]\centering\small
+\caption{Mesi-persona -- anno 1 (milestone 1).}\label{tab:bpy-pm-y1}
+\begin{tabular}{lrrrr}\toprule
+\textbf{Voce} & \textbf{Fund. Research} & \textbf{Ind. Research} & \textbf{Exp. Development} & \textbf{Totale} \\\midrule
+\addlinespace[2pt]\multicolumn{5}{l}{\textit{\textbf{Host Institution costs}}} \\
+\quad Structured personnel & 9.51 & 104.21 & 0.00 & 113.73 \\
+\quad Personnel to be Acquired & 0.00 & 0.00 &  & 0.00 \\
+\addlinespace[2pt]\multicolumn{5}{l}{\textit{\textbf{Affiliation Institution costs}}} \\
+\quad Structured personnel & 4.89 & 3.91 & 0.00 & 8.81 \\
+\quad Personnel to be Acquired &  &  &  & 0.00 \\
+\addlinespace[2pt]\multicolumn{5}{l}{\textit{\textbf{Research Organization costs}}} \\
+\quad Structured personnel & 8.20 & 9.83 & 0.00 & 18.03 \\
+\quad Personnel to be Acquired & 10.22 & 13.55 & 0.00 & 23.76 \\
+\midrule
+\textbf{Total} & \textbf{32.82} & \textbf{131.51} & \textbf{0.00} & \textbf{164.33} \\
+\quad Structured personnel & 22.60 & 117.96 & 0.00 & 140.56 \\
+\textbf{AI+RO} & \textbf{23.30} & \textbf{27.30} & \textbf{0.00} & \textbf{50.60} \\
+\quad Structured personnel & 13.09 & 13.75 & 0.00 & 26.84 \\
+\quad Personnel to be Acquired & 10.22 & 13.55 & 0.00 & 23.76 \\
+\bottomrule\end{tabular}
+\end{table}
+
+
+
+\clearpage
+\begin{table}[H]\centering\small
+\caption{Costi -- anno 2 (milestone 2).}\label{tab:bpy-c-y2}
+\begin{tabular}{lrrrr}\toprule
+\textbf{Voce} & \textbf{Fund. Research} & \textbf{Ind. Research} & \textbf{Exp. Development} & \textbf{Totale} \\\midrule
+\textbf{Host Institution costs} & \textbf{76\,875} & \textbf{830\,085.75} & \textbf{0} & \textbf{906\,960.75} \\
+\quad direct cost & 3\,750 & 33\,300 & 0 & 37\,050 \\
+\quad Structured personnel & 57\,750 & 630\,768.60 & 0 & 688\,518.60 \\
+\quad Personnel to be Acquired & 0 & 0 & 0 & 0 \\
+\quad indirect costs & 15\,375 & 166\,017.15 & 0 & 181\,392.15 \\
+\textbf{Affiliation Institution costs} & \textbf{48\,182.50} & \textbf{38\,546} & \textbf{0} & \textbf{86\,728.50} \\
+\quad direct cost & 0 & 0 & 0 & 0 \\
+\quad Structured personnel & 38\,546 & 30\,836.80 & 0 & 69\,382.80 \\
+\quad Personnel to be Acquired & 0 & 0 & 0 & 0 \\
+\quad indirect costs & 9\,636.50 & 7\,709.20 & 0 & 17\,345.70 \\
+\textbf{Research Organization costs} & \textbf{121\,250} & \textbf{153\,000} & \textbf{0} & \textbf{274\,250} \\
+\quad direct cost & 2\,000 & 2\,400 & 0 & 4\,400 \\
+\quad Structured personnel & 47\,500 & 57\,000 & 0 & 104\,500 \\
+\quad Personnel to be Acquired & 47\,500 & 63\,000 & 0 & 110\,500 \\
+\quad indirect costs & 24\,250 & 30\,600 & 0 & 54\,850 \\
+\midrule
+\textbf{Total} & \textbf{246\,307.50} & \textbf{1\,021\,631.75} & \textbf{0} & \textbf{1\,267\,939.25} \\
+\quad Structured personnel & 143\,796 & 718\,605.40 & 0 & 862\,401.40 \\
+\textbf{AI+RO} & \textbf{169\,432.50} & \textbf{191\,546} & \textbf{0} & \textbf{360\,978.50} \\
+\quad direct cost & 2\,000 & 2\,400 & 0 & 4\,400 \\
+\quad Structured personnel & 86\,046 & 87\,836.80 & 0 & 173\,882.80 \\
+\quad Personnel to be Acquired & 47\,500 & 63\,000 & 0 & 110\,500 \\
+\quad indirect costs & 33\,886.50 & 38\,309.20 & 0 & 72\,195.70 \\
+\bottomrule\end{tabular}
+\end{table}
+
+
+
+\begin{table}[H]\centering\small
+\caption{Agevolazioni -- anno 2 (milestone 2).}\label{tab:bpy-a-y2}
+\begin{tabular}{lrrrr}\toprule
+\textbf{Voce} & \textbf{Fund. Research} & \textbf{Ind. Research} & \textbf{Exp. Development} & \textbf{Totale} \\\midrule
+\textbf{Host Institution costs} & \textbf{76\,875} & \textbf{415\,042.88} & \textbf{0} & \textbf{491\,917.88} \\
+\quad direct cost & 3\,750 & 21\,645 & 0 & 25\,395 \\
+\quad Structured personnel & 57\,750 & 310\,389.30 & 0 & 368\,139.30 \\
+\quad Personnel to be Acquired & 0 & 0 & 0 & 0 \\
+\quad indirect costs & 15\,375 & 83\,008.58 & 0 & 98\,383.58 \\
+\textbf{Affiliation Institution costs} & \textbf{32\,778.49} & \textbf{25\,527.79} & \textbf{0} & \textbf{58\,306.27} \\
+\quad direct cost & 0 & 0 & 0 & 0 \\
+\quad Structured personnel & 26\,222.79 & 20\,422.23 & 0 & 46\,645.02 \\
+\quad Personnel to be Acquired & 0 & 0 & 0 & 0 \\
+\quad indirect costs & 6\,555.70 & 5\,105.56 & 0 & 11\,661.25 \\
+\textbf{Research Organization costs} & \textbf{82\,486.20} & \textbf{101\,327.02} & \textbf{0} & \textbf{183\,813.22} \\
+\quad direct cost & 2\,000 & 2\,400 & 0 & 4\,400 \\
+\quad Structured personnel & 31\,994.48 & 37\,364.27 & 0 & 69\,358.75 \\
+\quad Personnel to be Acquired & 31\,994.48 & 41\,297.35 & 0 & 73\,291.83 \\
+\quad indirect costs & 16\,497.24 & 20\,265.40 & 0 & 36\,762.64 \\
+\midrule
+\textbf{Total} & \textbf{192\,139.68} & \textbf{541\,897.69} & \textbf{0} & \textbf{734\,037.37} \\
+\quad Structured personnel & 115\,967.27 & 368\,175.80 & 0 & 484\,143.07 \\
+\textbf{AI+RO} & \textbf{115\,264.68} & \textbf{126\,854.81} & \textbf{0} & \textbf{242\,119.50} \\
+\quad direct cost & 2\,000 & 2\,400 & 0 & 4\,400 \\
+\quad Structured personnel & 58\,217.27 & 57\,786.50 & 0 & 116\,003.77 \\
+\quad Personnel to be Acquired & 31\,994.48 & 41\,297.35 & 0 & 73\,291.83 \\
+\quad indirect costs & 23\,052.94 & 25\,370.96 & 0 & 48\,423.90 \\
+\bottomrule\end{tabular}
+\end{table}
+
+
+
+\begin{table}[H]\centering\small
+\caption{Mesi-persona -- anno 2 (milestone 2).}\label{tab:bpy-pm-y2}
+\begin{tabular}{lrrrr}\toprule
+\textbf{Voce} & \textbf{Fund. Research} & \textbf{Ind. Research} & \textbf{Exp. Development} & \textbf{Totale} \\\midrule
+\addlinespace[2pt]\multicolumn{5}{l}{\textit{\textbf{Host Institution costs}}} \\
+\quad Structured personnel & 9.51 & 103.90 & 0.00 & 113.41 \\
+\quad Personnel to be Acquired &  &  &  & 0.00 \\
+\addlinespace[2pt]\multicolumn{5}{l}{\textit{\textbf{Affiliation Institution costs}}} \\
+\quad Structured personnel & 4.89 & 3.91 & 0.00 & 8.81 \\
+\quad Personnel to be Acquired &  &  &  & 0.00 \\
+\addlinespace[2pt]\multicolumn{5}{l}{\textit{\textbf{Research Organization costs}}} \\
+\quad Structured personnel & 8.20 & 9.83 & 0.00 & 18.03 \\
+\quad Personnel to be Acquired & 10.22 & 13.55 & 0.00 & 23.76 \\
+\midrule
+\textbf{Total} & \textbf{32.82} & \textbf{131.20} & \textbf{0.00} & \textbf{164.01} \\
+\quad Structured personnel & 22.60 & 117.65 & 0.00 & 140.25 \\
+\textbf{AI+RO} & \textbf{23.30} & \textbf{27.30} & \textbf{0.00} & \textbf{50.60} \\
+\quad Structured personnel & 13.09 & 13.75 & 0.00 & 26.84 \\
+\quad Personnel to be Acquired & 10.22 & 13.55 & 0.00 & 23.76 \\
+\bottomrule\end{tabular}
+\end{table}
+
+
+
+\clearpage
+\begin{table}[H]\centering\small
+\caption{Costi -- anno 3 (milestone 3).}\label{tab:bpy-c-y3}
+\begin{tabular}{lrrrr}\toprule
+\textbf{Voce} & \textbf{Fund. Research} & \textbf{Ind. Research} & \textbf{Exp. Development} & \textbf{Totale} \\\midrule
+\textbf{Host Institution costs} & \textbf{0} & \textbf{830\,085.75} & \textbf{0} & \textbf{830\,085.75} \\
+\quad direct cost & 0 & 33\,300 & 0 & 33\,300 \\
+\quad Structured personnel & 0 & 630\,768.60 & 0 & 630\,768.60 \\
+\quad Personnel to be Acquired & 0 & 0 & 0 & 0 \\
+\quad indirect costs & 0 & 166\,017.15 & 0 & 166\,017.15 \\
+\textbf{Affiliation Institution costs} & \textbf{0} & \textbf{106\,001.50} & \textbf{0} & \textbf{106\,001.50} \\
+\quad direct cost & 0 & 0 & 0 & 0 \\
+\quad Structured personnel & 0 & 84\,801.20 & 0 & 84\,801.20 \\
+\quad Personnel to be Acquired & 0 & 0 & 0 & 0 \\
+\quad indirect costs & 0 & 21\,200.30 & 0 & 21\,200.30 \\
+\textbf{Research Organization costs} & \textbf{0} & \textbf{153\,000} & \textbf{0} & \textbf{153\,000} \\
+\quad direct cost & 0 & 2\,400 & 0 & 2\,400 \\
+\quad Structured personnel & 0 & 57\,000 & 0 & 57\,000 \\
+\quad Personnel to be Acquired & 0 & 63\,000 & 0 & 63\,000 \\
+\quad indirect costs & 0 & 30\,600 & 0 & 30\,600 \\
+\midrule
+\textbf{Total} & \textbf{0} & \textbf{1\,089\,087.25} & \textbf{0} & \textbf{1\,089\,087.25} \\
+\quad Structured personnel & 0 & 772\,569.80 & 0 & 772\,569.80 \\
+\textbf{AI+RO} & \textbf{0} & \textbf{259\,001.50} & \textbf{0} & \textbf{259\,001.50} \\
+\quad direct cost & 0 & 2\,400 & 0 & 2\,400 \\
+\quad Structured personnel & 0 & 141\,801.20 & 0 & 141\,801.20 \\
+\quad Personnel to be Acquired & 0 & 63\,000 & 0 & 63\,000 \\
+\quad indirect costs & 0 & 51\,800.30 & 0 & 51\,800.30 \\
+\bottomrule\end{tabular}
+\end{table}
+
+
+
+\begin{table}[H]\centering\small
+\caption{Agevolazioni -- anno 3 (milestone 3).}\label{tab:bpy-a-y3}
+\begin{tabular}{lrrrr}\toprule
+\textbf{Voce} & \textbf{Fund. Research} & \textbf{Ind. Research} & \textbf{Exp. Development} & \textbf{Totale} \\\midrule
+\textbf{Host Institution costs} & \textbf{0} & \textbf{415\,042.88} & \textbf{0} & \textbf{415\,042.88} \\
+\quad direct cost & 0 & 21\,645 & 0 & 21\,645 \\
+\quad Structured personnel & 0 & 310\,389.30 & 0 & 310\,389.30 \\
+\quad Personnel to be Acquired & 0 & 0 & 0 & 0 \\
+\quad indirect costs & 0 & 83\,008.58 & 0 & 83\,008.58 \\
+\textbf{Affiliation Institution costs} & \textbf{0} & \textbf{70\,201.41} & \textbf{0} & \textbf{70\,201.41} \\
+\quad direct cost & 0 & 0 & 0 & 0 \\
+\quad Structured personnel & 0 & 56\,161.13 & 0 & 56\,161.13 \\
+\quad Personnel to be Acquired & 0 & 0 & 0 & 0 \\
+\quad indirect costs & 0 & 14\,040.28 & 0 & 14\,040.28 \\
+\textbf{Research Organization costs} & \textbf{0} & \textbf{101\,327.02} & \textbf{0} & \textbf{101\,327.02} \\
+\quad direct cost & 0 & 2\,400 & 0 & 2\,400 \\
+\quad Structured personnel & 0 & 37\,364.27 & 0 & 37\,364.27 \\
+\quad Personnel to be Acquired & 0 & 41\,297.35 & 0 & 41\,297.35 \\
+\quad indirect costs & 0 & 20\,265.40 & 0 & 20\,265.40 \\
+\midrule
+\textbf{Total} & \textbf{0} & \textbf{586\,571.31} & \textbf{0} & \textbf{586\,571.31} \\
+\quad Structured personnel & 0 & 403\,914.70 & 0 & 403\,914.70 \\
+\textbf{AI+RO} & \textbf{0} & \textbf{171\,528.44} & \textbf{0} & \textbf{171\,528.44} \\
+\quad direct cost & 0 & 2\,400 & 0 & 2\,400 \\
+\quad Structured personnel & 0 & 93\,525.40 & 0 & 93\,525.40 \\
+\quad Personnel to be Acquired & 0 & 41\,297.35 & 0 & 41\,297.35 \\
+\quad indirect costs & 0 & 34\,305.69 & 0 & 34\,305.69 \\
+\bottomrule\end{tabular}
+\end{table}
+
+
+
+\begin{table}[H]\centering\small
+\caption{Mesi-persona -- anno 3 (milestone 3).}\label{tab:bpy-pm-y3}
+\begin{tabular}{lrrrr}\toprule
+\textbf{Voce} & \textbf{Fund. Research} & \textbf{Ind. Research} & \textbf{Exp. Development} & \textbf{Totale} \\\midrule
+\addlinespace[2pt]\multicolumn{5}{l}{\textit{\textbf{Host Institution costs}}} \\
+\quad Structured personnel & 0.00 & 103.90 & 0.00 & 103.90 \\
+\quad Personnel to be Acquired &  &  &  & 0.00 \\
+\addlinespace[2pt]\multicolumn{5}{l}{\textit{\textbf{Affiliation Institution costs}}} \\
+\quad Structured personnel & 0.00 & 10.76 & 0.00 & 10.76 \\
+\quad Personnel to be Acquired &  &  &  & 0.00 \\
+\addlinespace[2pt]\multicolumn{5}{l}{\textit{\textbf{Research Organization costs}}} \\
+\quad Structured personnel & 0.00 & 9.83 & 0.00 & 9.83 \\
+\quad Personnel to be Acquired & 0.00 & 13.55 & 0.00 & 13.55 \\
+\midrule
+\textbf{Total} & \textbf{0.00} & \textbf{138.05} & \textbf{0.00} & \textbf{138.05} \\
+\quad Structured personnel & 0.00 & 124.50 & 0.00 & 124.50 \\
+\textbf{AI+RO} & \textbf{0.00} & \textbf{34.15} & \textbf{0.00} & \textbf{34.15} \\
+\quad Structured personnel & 0.00 & 20.60 & 0.00 & 20.60 \\
+\quad Personnel to be Acquired & 0.00 & 13.55 & 0.00 & 13.55 \\
+\bottomrule\end{tabular}
+\end{table}
+
+
+
+\clearpage
+\begin{table}[H]\centering\small
+\caption{Costi -- anno 4 (milestone 4).}\label{tab:bpy-c-y4}
+\begin{tabular}{lrrrr}\toprule
+\textbf{Voce} & \textbf{Fund. Research} & \textbf{Ind. Research} & \textbf{Exp. Development} & \textbf{Totale} \\\midrule
+\textbf{Host Institution costs} & \textbf{0} & \textbf{0} & \textbf{637\,625} & \textbf{637\,625} \\
+\quad direct cost & 0 & 0 & 25\,000 & 25\,000 \\
+\quad Structured personnel & 0 & 0 & 485\,100 & 485\,100 \\
+\quad Personnel to be Acquired & 0 & 0 & 0 & 0 \\
+\quad indirect costs & 0 & 0 & 127\,525 & 127\,525 \\
+\textbf{Affiliation Institution costs} & \textbf{0} & \textbf{9\,636.50} & \textbf{96\,365} & \textbf{106\,001.50} \\
+\quad direct cost & 0 & 0 & 0 & 0 \\
+\quad Structured personnel & 0 & 7\,709.20 & 77\,092 & 84\,801.20 \\
+\quad Personnel to be Acquired & 0 & 0 & 0 & 0 \\
+\quad indirect costs & 0 & 1\,927.30 & 19\,273 & 21\,200.30 \\
+\textbf{Research Organization costs} & \textbf{0} & \textbf{51\,000} & \textbf{47\,500} & \textbf{98\,500} \\
+\quad direct cost & 0 & 800 & 3\,000 & 3\,800 \\
+\quad Structured personnel & 0 & 19\,000 & 15\,000 & 34\,000 \\
+\quad Personnel to be Acquired & 0 & 21\,000 & 20\,000 & 41\,000 \\
+\quad indirect costs & 0 & 10\,200 & 9\,500 & 19\,700 \\
+\midrule
+\textbf{Total} & \textbf{0} & \textbf{60\,636.50} & \textbf{781\,490} & \textbf{842\,126.50} \\
+\quad Structured personnel & 0 & 26\,709.20 & 577\,192 & 603\,901.20 \\
+\textbf{AI+RO} & \textbf{0} & \textbf{60\,636.50} & \textbf{143\,865} & \textbf{204\,501.50} \\
+\quad direct cost & 0 & 800 & 3\,000 & 3\,800 \\
+\quad Structured personnel & 0 & 26\,709.20 & 92\,092 & 118\,801.20 \\
+\quad Personnel to be Acquired & 0 & 21\,000 & 20\,000 & 41\,000 \\
+\quad indirect costs & 0 & 12\,127.30 & 28\,773 & 40\,900.30 \\
+\bottomrule\end{tabular}
+\end{table}
+
+
+
+\begin{table}[H]\centering\small
+\caption{Agevolazioni -- anno 4 (milestone 4).}\label{tab:bpy-a-y4}
+\begin{tabular}{lrrrr}\toprule
+\textbf{Voce} & \textbf{Fund. Research} & \textbf{Ind. Research} & \textbf{Exp. Development} & \textbf{Totale} \\\midrule
+\textbf{Host Institution costs} & \textbf{0} & \textbf{0} & \textbf{159\,406} & \textbf{159\,406} \\
+\quad direct cost & 0 & 0 & 6\,250 & 6\,250 \\
+\quad Structured personnel & 0 & 0 & 121\,274.80 & 121\,274.80 \\
+\quad Personnel to be Acquired & 0 & 0 & 0 & 0 \\
+\quad indirect costs & 0 & 0 & 31\,881.20 & 31\,881.20 \\
+\textbf{Affiliation Institution costs} & \textbf{0} & \textbf{6\,381.95} & \textbf{75\,834.96} & \textbf{82\,216.91} \\
+\quad direct cost & 0 & 0 & 0 & 0 \\
+\quad Structured personnel & 0 & 5\,105.56 & 60\,667.97 & 65\,773.53 \\
+\quad Personnel to be Acquired & 0 & 0 & 0 & 0 \\
+\quad indirect costs & 0 & 1\,276.39 & 15\,166.99 & 16\,443.38 \\
+\textbf{Research Organization costs} & \textbf{0} & \textbf{33\,775.67} & \textbf{37\,380.39} & \textbf{71\,156.06} \\
+\quad direct cost & 0 & 800 & 3\,000 & 3\,800 \\
+\quad Structured personnel & 0 & 12\,454.76 & 11\,530.42 & 23\,985.17 \\
+\quad Personnel to be Acquired & 0 & 13\,765.78 & 15\,373.89 & 29\,139.67 \\
+\quad indirect costs & 0 & 6\,755.13 & 7\,476.08 & 14\,231.21 \\
+\midrule
+\textbf{Total} & \textbf{0} & \textbf{40\,157.62} & \textbf{272\,621.35} & \textbf{312\,778.97} \\
+\quad Structured personnel & 0 & 17\,560.31 & 193\,473.19 & 211\,033.50 \\
+\textbf{AI+RO} & \textbf{0} & \textbf{40\,157.62} & \textbf{113\,215.35} & \textbf{153\,372.97} \\
+\quad direct cost & 0 & 800 & 3\,000 & 3\,800 \\
+\quad Structured personnel & 0 & 17\,560.31 & 72\,198.39 & 89\,758.70 \\
+\quad Personnel to be Acquired & 0 & 13\,765.78 & 15\,373.89 & 29\,139.67 \\
+\quad indirect costs & 0 & 8\,031.52 & 22\,643.07 & 30\,674.59 \\
+\bottomrule\end{tabular}
+\end{table}
+
+
+
+\begin{table}[H]\centering\small
+\caption{Mesi-persona -- anno 4 (milestone 4).}\label{tab:bpy-pm-y4}
+\begin{tabular}{lrrrr}\toprule
+\textbf{Voce} & \textbf{Fund. Research} & \textbf{Ind. Research} & \textbf{Exp. Development} & \textbf{Totale} \\\midrule
+\addlinespace[2pt]\multicolumn{5}{l}{\textit{\textbf{Host Institution costs}}} \\
+\quad Structured personnel & 0.00 & 0.00 & 79.91 & 79.91 \\
+\quad Personnel to be Acquired &  &  &  & 0.00 \\
+\addlinespace[2pt]\multicolumn{5}{l}{\textit{\textbf{Affiliation Institution costs}}} \\
+\quad Structured personnel & 0.00 & 0.98 & 9.78 & 10.76 \\
+\quad Personnel to be Acquired &  &  &  & 0.00 \\
+\addlinespace[2pt]\multicolumn{5}{l}{\textit{\textbf{Research Organization costs}}} \\
+\quad Structured personnel & 0.00 & 3.28 & 2.59 & 5.87 \\
+\quad Personnel to be Acquired & 0.00 & 4.52 & 4.30 & 8.82 \\
+\midrule
+\textbf{Total} & \textbf{0.00} & \textbf{8.77} & \textbf{96.58} & \textbf{105.35} \\
+\quad Structured personnel & 0.00 & 4.26 & 92.28 & 96.54 \\
+\textbf{AI+RO} & \textbf{0.00} & \textbf{8.77} & \textbf{16.67} & \textbf{25.45} \\
+\quad Structured personnel & 0.00 & 4.26 & 12.37 & 16.63 \\
+\quad Personnel to be Acquired & 0.00 & 4.52 & 4.30 & 8.82 \\
+\bottomrule\end{tabular}
+\end{table}
+
+
+
+\clearpage\section{Foglio ``Budget Per Year and WP''}
+%%%%%%%
+\subsection{Ripartizione dei mesi-persona tra i WP}
+\textbf{Formule e assunzioni.} Matrice delle quote $\omega^{s}_{k,\mathrm{WP}}$ con cui i mesi-persona di ogni soggetto e tipologia sono assegnati ai WP 2--7; ogni riga somma a 1 (colonna di controllo nel file). Il WP1 (management) e il WP8 (sfruttamento/disseminazione) non ricevono mesi-persona in questa ripartizione.
+
+\begin{table}[H]\centering\small\caption{Quote di ripartizione dei mesi-persona per WP.}\label{tab:wpshare}
+\begin{tabular}{llrrrrrr}\toprule\textbf{Tipologia} & \textbf{Soggetto} & \textbf{WP2} & \textbf{WP3} & \textbf{WP4} & \textbf{WP5} & \textbf{WP6} & \textbf{WP7} \\\midrule
+FR & HI & 20\,\% & 20\,\% & 20\,\% & 20\,\% & 20\,\% & 0\,\% \\
+ & AI & 20\,\% & 20\,\% & 20\,\% & 20\,\% & 20\,\% & 0\,\% \\
+ & RO & 30\,\% & 10\,\% & 25\,\% & 25\,\% & 10\,\% & 0\,\% \\
+\midrule
+IR & HI & 20\,\% & 20\,\% & 20\,\% & 20\,\% & 20\,\% & 0\,\% \\
+ & AI & 20\,\% & 20\,\% & 20\,\% & 20\,\% & 20\,\% & 0\,\% \\
+ & RO & 30\,\% & 10\,\% & 25\,\% & 25\,\% & 10\,\% & 0\,\% \\
+\midrule
+ED & HI & 0\,\% & 0\,\% & 0\,\% & 0\,\% & 0\,\% & 100\,\% \\
+ & AI & 0\,\% & 0\,\% & 0\,\% & 0\,\% & 0\,\% & 100\,\% \\
+ & RO & 0\,\% & 0\,\% & 0\,\% & 0\,\% & 0\,\% & 100\,\% \\
+\bottomrule\end{tabular}
+\par\smallskip\footnotesize La cella IR/HI/WP7 \`e vuota nel file (trattata come 0).
+\end{table}
+
+
+%%%%%%%
+\subsection{Mesi-persona per soggetto e per WP}
+\textbf{Formule e assunzioni.}
+\begin{itemize}
+  \item Tabelle per soggetto: mesi-persona ripresi dal foglio ``mBudget Per Year'' (strutturato e da acquisire, con totale per soggetto).
+  \item Tabelle per WP: per FR e IR,
+  \[ \mathrm{PM}^{s}_{k,\mathrm{WP}} = \mathrm{PM}^{s}_{k}\cdot \omega^{s}_{k,\mathrm{WP}}, \]
+  dove $\mathrm{PM}^{s}_{k}$ \`e il totale del soggetto (strutturato + da acquisire), selezionato nel file con \texttt{INDIRECT}/\texttt{INDEX}/\texttt{MATCH}. Per ED tutti i mesi-persona sono assegnati direttamente al WP7 ($\mathrm{PM}^{s}_{\ED,\mathrm{WP7}} = \mathrm{PM}^{s}_{\ED}$).
+  \item Controllo: $\sum_{\mathrm{WP}} \mathrm{PM}^{s}_{\mathrm{WP}} = \mathrm{PM}^{s}_{\mathrm{tot}}$ (colonna di controllo = 0).
+\end{itemize}
+
+\clearpage
+\begin{table}[H]\centering\small\caption{Mesi-persona per soggetto -- intero progetto.}\label{tab:wp-s-tot}
+\begin{tabular}{llrrrr}\toprule\textbf{Soggetto} & \textbf{Voce} & \textbf{Fund. Research} & \textbf{Ind. Research} & \textbf{Exp. Development} & \textbf{Totale} \\\midrule
+HI & Structured personnel & 19.03 & 312.02 & 79.91 & 410.95 \\
+ & Personnel to be Acquired & 0.00 & 0.00 & 0.00 & 0.00 \\
+ & \textbf{Totale} & \textbf{19.03} & \textbf{312.02} & \textbf{79.91} & \textbf{410.95} \\\midrule
+AI & Structured personnel & 9.78 & 19.57 & 9.78 & 39.14 \\
+ & Personnel to be Acquired & 0.00 & 0.00 & 0.00 & 0.00 \\
+ & \textbf{Totale} & \textbf{9.78} & \textbf{19.57} & \textbf{9.78} & \textbf{39.14} \\\midrule
+RO & Structured personnel & 16.39 & 32.78 & 2.59 & 51.76 \\
+ & Personnel to be Acquired & 20.43 & 45.16 & 4.30 & 69.89 \\
+ & \textbf{Totale} & \textbf{36.82} & \textbf{77.94} & \textbf{6.89} & \textbf{121.65} \\\midrule
+\textbf{Totale} & & \textbf{65.63} & \textbf{409.53} & \textbf{96.58} & \textbf{571.74} \\
+\bottomrule\end{tabular}\end{table}
+
+
+\begin{table}[H]\centering\small\caption{Mesi-persona per WP -- intero progetto.}\label{tab:wp-w-tot}
+\begin{tabular}{llrrrr}\toprule\textbf{WP} & \textbf{Soggetto} & \textbf{Fund. Research} & \textbf{Ind. Research} & \textbf{Exp. Development} & \textbf{Totale} \\\midrule
+WP2 & HI & 3.81 & 62.40 & 0.00 & 66.21 \\
+ & AI & 1.96 & 3.91 & 0.00 & 5.87 \\
+ & RO & 11.05 & 23.38 & 0.00 & 34.43 \\
+ & \textit{Totale WP} & \textit{16.81} & \textit{89.70} & \textit{0.00} & \textit{106.51} \\\midrule
+WP3 & HI & 3.81 & 62.40 & 0.00 & 66.21 \\
+ & AI & 1.96 & 3.91 & 0.00 & 5.87 \\
+ & RO & 3.68 & 7.79 & 0.00 & 11.48 \\
+ & \textit{Totale WP} & \textit{9.44} & \textit{74.11} & \textit{0.00} & \textit{83.56} \\\midrule
+WP4 & HI & 3.81 & 62.40 & 0.00 & 66.21 \\
+ & AI & 1.96 & 3.91 & 0.00 & 5.87 \\
+ & RO & 9.21 & 19.49 & 0.00 & 28.69 \\
+ & \textit{Totale WP} & \textit{14.97} & \textit{85.80} & \textit{0.00} & \textit{100.77} \\\midrule
+WP5 & HI & 3.81 & 62.40 & 0.00 & 66.21 \\
+ & AI & 1.96 & 3.91 & 0.00 & 5.87 \\
+ & RO & 9.21 & 19.49 & 0.00 & 28.69 \\
+ & \textit{Totale WP} & \textit{14.97} & \textit{85.80} & \textit{0.00} & \textit{100.77} \\\midrule
+WP6 & HI & 3.81 & 62.40 & 0.00 & 66.21 \\
+ & AI & 1.96 & 3.91 & 0.00 & 5.87 \\
+ & RO & 3.68 & 7.79 & 0.00 & 11.48 \\
+ & \textit{Totale WP} & \textit{9.44} & \textit{74.11} & \textit{0.00} & \textit{83.56} \\\midrule
+WP7 & HI & 0.00 & 0.00 & 79.91 & 79.91 \\
+ & AI & 0.00 & 0.00 & 9.78 & 9.78 \\
+ & RO & 0.00 & 0.00 & 6.89 & 6.89 \\
+ & \textit{Totale WP} & \textit{0.00} & \textit{0.00} & \textit{96.58} & \textit{96.58} \\
+\midrule\textbf{Totale} & & \textbf{65.63} & \textbf{409.53} & \textbf{96.58} & \textbf{571.74} \\
+\bottomrule\end{tabular}
+\par\smallskip\footnotesize Le righe ``Totale WP'' e ``Totale'' sono calcolate in questa trascrizione (non presenti nel file).
+\end{table}
+
+
+\clearpage
+\begin{table}[H]\centering\small\caption{Mesi-persona per soggetto -- anno 1.}\label{tab:wp-s-y1}
+\begin{tabular}{llrrrr}\toprule\textbf{Soggetto} & \textbf{Voce} & \textbf{Fund. Research} & \textbf{Ind. Research} & \textbf{Exp. Development} & \textbf{Totale} \\\midrule
+HI & Structured personnel & 9.51 & 104.21 & 0.00 & 113.73 \\
+ & Personnel to be Acquired & 0.00 & 0.00 & 0.00 & 0.00 \\
+ & \textbf{Totale} & \textbf{9.51} & \textbf{104.21} & \textbf{0.00} & \textbf{113.73} \\\midrule
+AI & Structured personnel & 4.89 & 3.91 & 0.00 & 8.81 \\
+ & Personnel to be Acquired & 0.00 & 0.00 & 0.00 & 0.00 \\
+ & \textbf{Totale} & \textbf{4.89} & \textbf{3.91} & \textbf{0.00} & \textbf{8.81} \\\midrule
+RO & Structured personnel & 8.20 & 9.83 & 0.00 & 18.03 \\
+ & Personnel to be Acquired & 10.22 & 13.55 & 0.00 & 23.76 \\
+ & \textbf{Totale} & \textbf{18.41} & \textbf{23.38} & \textbf{0.00} & \textbf{41.79} \\\midrule
+\textbf{Totale} & & \textbf{32.82} & \textbf{131.51} & \textbf{0.00} & \textbf{164.33} \\
+\bottomrule\end{tabular}\end{table}
+
+
+\begin{table}[H]\centering\small\caption{Mesi-persona per WP -- anno 1.}\label{tab:wp-w-y1}
+\begin{tabular}{llrrrr}\toprule\textbf{WP} & \textbf{Soggetto} & \textbf{Fund. Research} & \textbf{Ind. Research} & \textbf{Exp. Development} & \textbf{Totale} \\\midrule
+WP2 & HI & 1.90 & 20.84 & 0.00 & 22.75 \\
+ & AI & 0.98 & 0.78 & 0.00 & 1.76 \\
+ & RO & 5.52 & 7.01 & 0.00 & 12.54 \\
+ & \textit{Totale WP} & \textit{8.40} & \textit{28.64} & \textit{0.00} & \textit{37.04} \\\midrule
+WP3 & HI & 1.90 & 20.84 & 0.00 & 22.75 \\
+ & AI & 0.98 & 0.78 & 0.00 & 1.76 \\
+ & RO & 1.84 & 2.34 & 0.00 & 4.18 \\
+ & \textit{Totale WP} & \textit{4.72} & \textit{23.96} & \textit{0.00} & \textit{28.69} \\\midrule
+WP4 & HI & 1.90 & 20.84 & 0.00 & 22.75 \\
+ & AI & 0.98 & 0.78 & 0.00 & 1.76 \\
+ & RO & 4.60 & 5.85 & 0.00 & 10.45 \\
+ & \textit{Totale WP} & \textit{7.48} & \textit{27.47} & \textit{0.00} & \textit{34.95} \\\midrule
+WP5 & HI & 1.90 & 20.84 & 0.00 & 22.75 \\
+ & AI & 0.98 & 0.78 & 0.00 & 1.76 \\
+ & RO & 4.60 & 5.85 & 0.00 & 10.45 \\
+ & \textit{Totale WP} & \textit{7.48} & \textit{27.47} & \textit{0.00} & \textit{34.95} \\\midrule
+WP6 & HI & 1.90 & 20.84 & 0.00 & 22.75 \\
+ & AI & 0.98 & 0.78 & 0.00 & 1.76 \\
+ & RO & 1.84 & 2.34 & 0.00 & 4.18 \\
+ & \textit{Totale WP} & \textit{4.72} & \textit{23.96} & \textit{0.00} & \textit{28.69} \\\midrule
+WP7 & HI & 0.00 & 0.00 & 0.00 & 0.00 \\
+ & AI & 0.00 & 0.00 & 0.00 & 0.00 \\
+ & RO & 0.00 & 0.00 & 0.00 & 0.00 \\
+ & \textit{Totale WP} & \textit{0.00} & \textit{0.00} & \textit{0.00} & \textit{0.00} \\
+\midrule\textbf{Totale} & & \textbf{32.82} & \textbf{131.51} & \textbf{0.00} & \textbf{164.33} \\
+\bottomrule\end{tabular}
+\par\smallskip\footnotesize Le righe ``Totale WP'' e ``Totale'' sono calcolate in questa trascrizione (non presenti nel file).
+\end{table}
+
+
+\clearpage
+\begin{table}[H]\centering\small\caption{Mesi-persona per soggetto -- anno 2.}\label{tab:wp-s-y2}
+\begin{tabular}{llrrrr}\toprule\textbf{Soggetto} & \textbf{Voce} & \textbf{Fund. Research} & \textbf{Ind. Research} & \textbf{Exp. Development} & \textbf{Totale} \\\midrule
+HI & Structured personnel & 9.51 & 103.90 & 0.00 & 113.41 \\
+ & Personnel to be Acquired & 0.00 & 0.00 & 0.00 & 0.00 \\
+ & \textbf{Totale} & \textbf{9.51} & \textbf{103.90} & \textbf{0.00} & \textbf{113.41} \\\midrule
+AI & Structured personnel & 4.89 & 3.91 & 0.00 & 8.81 \\
+ & Personnel to be Acquired & 0.00 & 0.00 & 0.00 & 0.00 \\
+ & \textbf{Totale} & \textbf{4.89} & \textbf{3.91} & \textbf{0.00} & \textbf{8.81} \\\midrule
+RO & Structured personnel & 8.20 & 9.83 & 0.00 & 18.03 \\
+ & Personnel to be Acquired & 10.22 & 13.55 & 0.00 & 23.76 \\
+ & \textbf{Totale} & \textbf{18.41} & \textbf{23.38} & \textbf{0.00} & \textbf{41.79} \\\midrule
+\textbf{Totale} & & \textbf{32.82} & \textbf{131.20} & \textbf{0.00} & \textbf{164.01} \\
+\bottomrule\end{tabular}\end{table}
+
+
+\begin{table}[H]\centering\small\caption{Mesi-persona per WP -- anno 2.}\label{tab:wp-w-y2}
+\begin{tabular}{llrrrr}\toprule\textbf{WP} & \textbf{Soggetto} & \textbf{Fund. Research} & \textbf{Ind. Research} & \textbf{Exp. Development} & \textbf{Totale} \\\midrule
+WP2 & HI & 1.90 & 20.78 & 0.00 & 22.68 \\
+ & AI & 0.98 & 0.78 & 0.00 & 1.76 \\
+ & RO & 5.52 & 7.01 & 0.00 & 12.54 \\
+ & \textit{Totale WP} & \textit{8.40} & \textit{28.58} & \textit{0.00} & \textit{36.98} \\\midrule
+WP3 & HI & 1.90 & 20.78 & 0.00 & 22.68 \\
+ & AI & 0.98 & 0.78 & 0.00 & 1.76 \\
+ & RO & 1.84 & 2.34 & 0.00 & 4.18 \\
+ & \textit{Totale WP} & \textit{4.72} & \textit{23.90} & \textit{0.00} & \textit{28.62} \\\midrule
+WP4 & HI & 1.90 & 20.78 & 0.00 & 22.68 \\
+ & AI & 0.98 & 0.78 & 0.00 & 1.76 \\
+ & RO & 4.60 & 5.85 & 0.00 & 10.45 \\
+ & \textit{Totale WP} & \textit{7.48} & \textit{27.41} & \textit{0.00} & \textit{34.89} \\\midrule
+WP5 & HI & 1.90 & 20.78 & 0.00 & 22.68 \\
+ & AI & 0.98 & 0.78 & 0.00 & 1.76 \\
+ & RO & 4.60 & 5.85 & 0.00 & 10.45 \\
+ & \textit{Totale WP} & \textit{7.48} & \textit{27.41} & \textit{0.00} & \textit{34.89} \\\midrule
+WP6 & HI & 1.90 & 20.78 & 0.00 & 22.68 \\
+ & AI & 0.98 & 0.78 & 0.00 & 1.76 \\
+ & RO & 1.84 & 2.34 & 0.00 & 4.18 \\
+ & \textit{Totale WP} & \textit{4.72} & \textit{23.90} & \textit{0.00} & \textit{28.62} \\\midrule
+WP7 & HI & 0.00 & 0.00 & 0.00 & 0.00 \\
+ & AI & 0.00 & 0.00 & 0.00 & 0.00 \\
+ & RO & 0.00 & 0.00 & 0.00 & 0.00 \\
+ & \textit{Totale WP} & \textit{0.00} & \textit{0.00} & \textit{0.00} & \textit{0.00} \\
+\midrule\textbf{Totale} & & \textbf{32.82} & \textbf{131.20} & \textbf{0.00} & \textbf{164.01} \\
+\bottomrule\end{tabular}
+\par\smallskip\footnotesize Le righe ``Totale WP'' e ``Totale'' sono calcolate in questa trascrizione (non presenti nel file).
+\end{table}
+
+
+\clearpage
+\begin{table}[H]\centering\small\caption{Mesi-persona per soggetto -- anno 3.}\label{tab:wp-s-y3}
+\begin{tabular}{llrrrr}\toprule\textbf{Soggetto} & \textbf{Voce} & \textbf{Fund. Research} & \textbf{Ind. Research} & \textbf{Exp. Development} & \textbf{Totale} \\\midrule
+HI & Structured personnel & 0.00 & 103.90 & 0.00 & 103.90 \\
+ & Personnel to be Acquired & 0.00 & 0.00 & 0.00 & 0.00 \\
+ & \textbf{Totale} & \textbf{0.00} & \textbf{103.90} & \textbf{0.00} & \textbf{103.90} \\\midrule
+AI & Structured personnel & 0.00 & 10.76 & 0.00 & 10.76 \\
+ & Personnel to be Acquired & 0.00 & 0.00 & 0.00 & 0.00 \\
+ & \textbf{Totale} & \textbf{0.00} & \textbf{10.76} & \textbf{0.00} & \textbf{10.76} \\\midrule
+RO & Structured personnel & 0.00 & 9.83 & 0.00 & 9.83 \\
+ & Personnel to be Acquired & 0.00 & 13.55 & 0.00 & 13.55 \\
+ & \textbf{Totale} & \textbf{0.00} & \textbf{23.38} & \textbf{0.00} & \textbf{23.38} \\\midrule
+\textbf{Totale} & & \textbf{0.00} & \textbf{138.05} & \textbf{0.00} & \textbf{138.05} \\
+\bottomrule\end{tabular}\end{table}
+
+
+\begin{table}[H]\centering\small\caption{Mesi-persona per WP -- anno 3.}\label{tab:wp-w-y3}
+\begin{tabular}{llrrrr}\toprule\textbf{WP} & \textbf{Soggetto} & \textbf{Fund. Research} & \textbf{Ind. Research} & \textbf{Exp. Development} & \textbf{Totale} \\\midrule
+WP2 & HI & 0.00 & 20.78 & 0.00 & 20.78 \\
+ & AI & 0.00 & 2.15 & 0.00 & 2.15 \\
+ & RO & 0.00 & 7.01 & 0.00 & 7.01 \\
+ & \textit{Totale WP} & \textit{0.00} & \textit{29.95} & \textit{0.00} & \textit{29.95} \\\midrule
+WP3 & HI & 0.00 & 20.78 & 0.00 & 20.78 \\
+ & AI & 0.00 & 2.15 & 0.00 & 2.15 \\
+ & RO & 0.00 & 2.34 & 0.00 & 2.34 \\
+ & \textit{Totale WP} & \textit{0.00} & \textit{25.27} & \textit{0.00} & \textit{25.27} \\\midrule
+WP4 & HI & 0.00 & 20.78 & 0.00 & 20.78 \\
+ & AI & 0.00 & 2.15 & 0.00 & 2.15 \\
+ & RO & 0.00 & 5.85 & 0.00 & 5.85 \\
+ & \textit{Totale WP} & \textit{0.00} & \textit{28.78} & \textit{0.00} & \textit{28.78} \\\midrule
+WP5 & HI & 0.00 & 20.78 & 0.00 & 20.78 \\
+ & AI & 0.00 & 2.15 & 0.00 & 2.15 \\
+ & RO & 0.00 & 5.85 & 0.00 & 5.85 \\
+ & \textit{Totale WP} & \textit{0.00} & \textit{28.78} & \textit{0.00} & \textit{28.78} \\\midrule
+WP6 & HI & 0.00 & 20.78 & 0.00 & 20.78 \\
+ & AI & 0.00 & 2.15 & 0.00 & 2.15 \\
+ & RO & 0.00 & 2.34 & 0.00 & 2.34 \\
+ & \textit{Totale WP} & \textit{0.00} & \textit{25.27} & \textit{0.00} & \textit{25.27} \\\midrule
+WP7 & HI & 0.00 & 0.00 & 0.00 & 0.00 \\
+ & AI & 0.00 & 0.00 & 0.00 & 0.00 \\
+ & RO & 0.00 & 0.00 & 0.00 & 0.00 \\
+ & \textit{Totale WP} & \textit{0.00} & \textit{0.00} & \textit{0.00} & \textit{0.00} \\
+\midrule\textbf{Totale} & & \textbf{0.00} & \textbf{138.05} & \textbf{0.00} & \textbf{138.05} \\
+\bottomrule\end{tabular}
+\par\smallskip\footnotesize Le righe ``Totale WP'' e ``Totale'' sono calcolate in questa trascrizione (non presenti nel file).
+\end{table}
+
+
+\clearpage
+\begin{table}[H]\centering\small\caption{Mesi-persona per soggetto -- anno 4.}\label{tab:wp-s-y4}
+\begin{tabular}{llrrrr}\toprule\textbf{Soggetto} & \textbf{Voce} & \textbf{Fund. Research} & \textbf{Ind. Research} & \textbf{Exp. Development} & \textbf{Totale} \\\midrule
+HI & Structured personnel & 0.00 & 0.00 & 79.91 & 79.91 \\
+ & Personnel to be Acquired & 0.00 & 0.00 & 0.00 & 0.00 \\
+ & \textbf{Totale} & \textbf{0.00} & \textbf{0.00} & \textbf{79.91} & \textbf{79.91} \\\midrule
+AI & Structured personnel & 0.00 & 0.98 & 9.78 & 10.76 \\
+ & Personnel to be Acquired & 0.00 & 0.00 & 0.00 & 0.00 \\
+ & \textbf{Totale} & \textbf{0.00} & \textbf{0.98} & \textbf{9.78} & \textbf{10.76} \\\midrule
+RO & Structured personnel & 0.00 & 3.28 & 2.59 & 5.87 \\
+ & Personnel to be Acquired & 0.00 & 4.52 & 4.30 & 8.82 \\
+ & \textbf{Totale} & \textbf{0.00} & \textbf{7.79} & \textbf{6.89} & \textbf{14.68} \\\midrule
+\textbf{Totale} & & \textbf{0.00} & \textbf{8.77} & \textbf{96.58} & \textbf{105.35} \\
+\bottomrule\end{tabular}\end{table}
+
+
+\begin{table}[H]\centering\small\caption{Mesi-persona per WP -- anno 4.}\label{tab:wp-w-y4}
+\begin{tabular}{llrrrr}\toprule\textbf{WP} & \textbf{Soggetto} & \textbf{Fund. Research} & \textbf{Ind. Research} & \textbf{Exp. Development} & \textbf{Totale} \\\midrule
+WP2 & HI & 0.00 & 0.00 & 0.00 & 0.00 \\
+ & AI & 0.00 & 0.20 & 0.00 & 0.20 \\
+ & RO & 0.00 & 2.34 & 0.00 & 2.34 \\
+ & \textit{Totale WP} & \textit{0.00} & \textit{2.53} & \textit{0.00} & \textit{2.53} \\\midrule
+WP3 & HI & 0.00 & 0.00 & 0.00 & 0.00 \\
+ & AI & 0.00 & 0.20 & 0.00 & 0.20 \\
+ & RO & 0.00 & 0.78 & 0.00 & 0.78 \\
+ & \textit{Totale WP} & \textit{0.00} & \textit{0.98} & \textit{0.00} & \textit{0.98} \\\midrule
+WP4 & HI & 0.00 & 0.00 & 0.00 & 0.00 \\
+ & AI & 0.00 & 0.20 & 0.00 & 0.20 \\
+ & RO & 0.00 & 1.95 & 0.00 & 1.95 \\
+ & \textit{Totale WP} & \textit{0.00} & \textit{2.14} & \textit{0.00} & \textit{2.14} \\\midrule
+WP5 & HI & 0.00 & 0.00 & 0.00 & 0.00 \\
+ & AI & 0.00 & 0.20 & 0.00 & 0.20 \\
+ & RO & 0.00 & 1.95 & 0.00 & 1.95 \\
+ & \textit{Totale WP} & \textit{0.00} & \textit{2.14} & \textit{0.00} & \textit{2.14} \\\midrule
+WP6 & HI & 0.00 & 0.00 & 0.00 & 0.00 \\
+ & AI & 0.00 & 0.20 & 0.00 & 0.20 \\
+ & RO & 0.00 & 0.78 & 0.00 & 0.78 \\
+ & \textit{Totale WP} & \textit{0.00} & \textit{0.98} & \textit{0.00} & \textit{0.98} \\\midrule
+WP7 & HI & 0.00 & 0.00 & 79.91 & 79.91 \\
+ & AI & 0.00 & 0.00 & 9.78 & 9.78 \\
+ & RO & 0.00 & 0.00 & 6.89 & 6.89 \\
+ & \textit{Totale WP} & \textit{0.00} & \textit{0.00} & \textit{96.58} & \textit{96.58} \\
+\midrule\textbf{Totale} & & \textbf{0.00} & \textbf{8.77} & \textbf{96.58} & \textbf{105.35} \\
+\bottomrule\end{tabular}
+\par\smallskip\footnotesize Le righe ``Totale WP'' e ``Totale'' sono calcolate in questa trascrizione (non presenti nel file).
+\end{table}
+
+
+\clearpage\section{Foglio ``CNR''}
+%%%%%%%
+\subsection{Budget CNR (AI+RO) al netto della tassa}
+\textbf{Formule e assunzioni.}
+\begin{itemize}
+  \item Il budget ``CNR'' \`e l'agevolazione aggregata AI+RO del foglio ``Budget Per Year'' (voce per voce: AI + RO), per l'intero progetto e per ciascun anno.
+  \item Tassa (prelievo) $t = 17\,\%$: $\text{Tot netto tassa} = (1-t)\cdot \text{Tot}$.
+  \item Nel file le etichette di riga delle tabelle annuali sono riferimenti sfasati al foglio ``Budget Per Year'' (es.\ ``indirect costs'', ``Subjects'', ``0''), mentre i valori sono sempre, nell'ordine, direct cost, structured personnel, personnel to be acquired, indirect costs: qui sono riportate le etichette corrette.
+\end{itemize}
+
+\begin{table}[H]\centering\footnotesize\caption{Agevolazione CNR (AI+RO) -- intero progetto.}\label{tab:cnr-tot}
+\begin{tabular}{lrrrrr}\toprule\textbf{Voce} & \textbf{FR} & \textbf{IR} & \textbf{ED} & \textbf{Totale} & \textbf{Tot netto tassa} \\\midrule
+\quad direct cost & 4\,000 & 8\,000 & 3\,000 & 15\,000 &  \\
+\quad Structured personnel & 116\,434.54 & 226\,658.71 & 72\,198.39 & 415\,291.64 &  \\
+\quad Personnel to be Acquired & 63\,988.96 & 137\,657.83 & 15\,373.89 & 217\,020.68 &  \\
+\quad indirect costs & 46\,105.87 & 93\,079.14 & 22\,643.07 & 161\,828.08 &  \\
+\midrule\textbf{Total} & \textbf{230\,529.37} & \textbf{465\,395.68} & \textbf{113\,215.35} & \textbf{809\,140.40} & \textbf{671\,586.53} \\
+\bottomrule\end{tabular}\end{table}
+
+
+\begin{table}[H]\centering\footnotesize\caption{Agevolazione CNR (AI+RO) -- anno 1.}\label{tab:cnr-y1}
+\begin{tabular}{lrrrrr}\toprule\textbf{Voce} & \textbf{FR} & \textbf{IR} & \textbf{ED} & \textbf{Totale} & \textbf{Tot netto tassa} \\\midrule
+\quad direct cost & 2\,000 & 2\,400 & 0 & 4\,400 &  \\
+\quad Structured personnel & 58\,217.27 & 57\,786.50 & 0 & 116\,003.77 &  \\
+\quad Personnel to be Acquired & 31\,994.48 & 41\,297.35 & 0 & 73\,291.83 &  \\
+\quad indirect costs & 23\,052.94 & 25\,370.96 & 0 & 48\,423.90 &  \\
+\midrule\textbf{Total} & \textbf{115\,264.68} & \textbf{126\,854.81} & \textbf{0} & \textbf{242\,119.50} & \textbf{200\,959.18} \\
+\bottomrule\end{tabular}\end{table}
+
+
+\begin{table}[H]\centering\footnotesize\caption{Agevolazione CNR (AI+RO) -- anno 2.}\label{tab:cnr-y2}
+\begin{tabular}{lrrrrr}\toprule\textbf{Voce} & \textbf{FR} & \textbf{IR} & \textbf{ED} & \textbf{Totale} & \textbf{Tot netto tassa} \\\midrule
+\quad direct cost & 2\,000 & 2\,400 & 0 & 4\,400 &  \\
+\quad Structured personnel & 58\,217.27 & 57\,786.50 & 0 & 116\,003.77 &  \\
+\quad Personnel to be Acquired & 31\,994.48 & 41\,297.35 & 0 & 73\,291.83 &  \\
+\quad indirect costs & 23\,052.94 & 25\,370.96 & 0 & 48\,423.90 &  \\
+\midrule\textbf{Total} & \textbf{115\,264.68} & \textbf{126\,854.81} & \textbf{0} & \textbf{242\,119.50} & \textbf{200\,959.18} \\
+\bottomrule\end{tabular}\end{table}
+
+
+\begin{table}[H]\centering\footnotesize\caption{Agevolazione CNR (AI+RO) -- anno 3.}\label{tab:cnr-y3}
+\begin{tabular}{lrrrrr}\toprule\textbf{Voce} & \textbf{FR} & \textbf{IR} & \textbf{ED} & \textbf{Totale} & \textbf{Tot netto tassa} \\\midrule
+\quad direct cost & 0 & 2\,400 & 0 & 2\,400 &  \\
+\quad Structured personnel & 0 & 93\,525.40 & 0 & 93\,525.40 &  \\
+\quad Personnel to be Acquired & 0 & 41\,297.35 & 0 & 41\,297.35 &  \\
+\quad indirect costs & 0 & 34\,305.69 & 0 & 34\,305.69 &  \\
+\midrule\textbf{Total} & \textbf{0} & \textbf{171\,528.44} & \textbf{0} & \textbf{171\,528.44} & \textbf{142\,368.60} \\
+\bottomrule\end{tabular}\end{table}
+
+
+\begin{table}[H]\centering\footnotesize\caption{Agevolazione CNR (AI+RO) -- anno 4.}\label{tab:cnr-y4}
+\begin{tabular}{lrrrrr}\toprule\textbf{Voce} & \textbf{FR} & \textbf{IR} & \textbf{ED} & \textbf{Totale} & \textbf{Tot netto tassa} \\\midrule
+\quad direct cost & 0 & 800 & 3\,000 & 3\,800 &  \\
+\quad Structured personnel & 0 & 17\,560.31 & 72\,198.39 & 89\,758.70 &  \\
+\quad Personnel to be Acquired & 0 & 13\,765.78 & 15\,373.89 & 29\,139.67 &  \\
+\quad indirect costs & 0 & 8\,031.52 & 22\,643.07 & 30\,674.59 &  \\
+\midrule\textbf{Total} & \textbf{0} & \textbf{40\,157.62} & \textbf{113\,215.35} & \textbf{153\,372.97} & \textbf{127\,299.57} \\
+\bottomrule\end{tabular}\end{table}
+
+
+%%%%%%%
+\subsection{Piano dei costi operativi CNR e avanzo a fine progetto}
+\textbf{Formule e assunzioni.}
+\begin{itemize}
+  \item Ogni voce di costo operativo: $\text{costo} = \text{costo annuo unitario}\times\text{numero persone}\times\text{anni}$; il robot (cane robot/umanoide) \`e una spesa una tantum di 50\,000\,\euro.
+  \item Risorse: liquidit\`a al 1/1/2025 (360\,000\,\euro) e impegno per l'assegno di Samuele che verrebbe rilasciato (45\,000\,\euro).
+  \item Avanzo a fine progetto:
+  \[
+    \text{Avanzo} = \underbrace{(1-t)\,A^{\mathrm{CNR}}_{\mathrm{tot}}}_{671\,586.53} - \underbrace{a_{\mathrm{dir}}}_{15\,000} - \sum \text{costi operativi} + 360\,000 + 45\,000 .
+  \]
+\end{itemize}
+
+\begin{table}[H]\centering\footnotesize\caption{Costi operativi CNR.}\label{tab:cnr-op}
+\begin{tabular}{lrrrr>{\raggedright\arraybackslash}p{4.2cm}}\toprule\textbf{Voce} & \textbf{\euro/anno} & \textbf{N.\ persone} & \textbf{Anni} & \textbf{Costo} & \textbf{Note} \\\midrule
+CdR & 50\,000 & 2 & 3.00 & 300\,000 & \footnotesize 2 persone 3 anni Samuele e Adriano \\
+IdR & 30\,000 & 2 & 3.00 & 180\,000 & \footnotesize da giugno Roberto e Michele \\
+BdR & 22\,000 & 2 & 0.33 & 14\,520 & \footnotesize borse samuele e roberto fino a maggio \\
+BdR & 22\,000 & 1 & 2.00 & 44\,000 & \footnotesize  \\
+PhD-PoliMi-Faroni & 33\,000 & 1 & 3.00 & 99\,000 & \footnotesize dalla primavera 2025 \\
+PhD-PoliMi-Roveda & 33\,000 & 1 & 3.00 & 99\,000 & \footnotesize da gennaio prox anno 2026 \\
+Phd-UniBs-Beschi & 28\,000 & 2 & 3.00 & 168\,000 & \footnotesize uno novembre 2025, uno novembre 2026 \\
+Missioni ed altre spese & 3\,000 & 6 & 4.00 & 72\,000 & \footnotesize  \\
+Cane robot/umanoide & 50\,000 &  &  & 50\,000 & \footnotesize  \\
+\midrule\textbf{Totale costi operativi} & & & & \textbf{1\,026\,520} & \\
+\midrule Tot.\ agevolazione CNR netto tassa & & & & 671\,586.53 & \\
+$-$ Direct cost & & & & -15\,000 & \\
+$-$ Costi operativi & & & & -1\,026\,520 & \\
+$+$ Liquidità al 1/1/2025 & & & & 360\,000 & \\
+$+$ Impegno assegno rilasciato & & & & 45\,000 & \\
+\midrule\textbf{Avanzo a fine progetto} & & & & \textbf{35\,066.53} & \\
+\bottomrule\end{tabular}
+\par\smallskip\footnotesize La riga ``Totale costi operativi'' \`e calcolata in questa trascrizione; nel file compare solo dentro la formula dell'avanzo. La durata della voce BdR (0.33 anni) \`e riportata con due decimali.
+\end{table}
+
+
+\end{document}

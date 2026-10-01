@@ -1,0 +1,98 @@
+\section{Gap analysis and revised architecture}\label{sec:arch}
+
+\subsection{What changes with respect to the proposal}
+\begin{table}[h]
+\centering\small
+\caption{Original plan (Project Description, \S A.4 and \S E.3) versus updated plan.}\label{tab:delta}
+\begin{plangrid}{|L{3.0cm}|Y|Y|}
+\planheadrow \thead{} & \thead{Original plan} & \thead{Updated plan} \\ \hline
+Global / online planning (T4.2) & Informed sampling-based planner, mixed global/local sampling, multi-path reuse & \textbf{Retained}; also used for transfer motions (retract, reconfigure, approach) and station-level feasibility; vectorised CPU primitives~\cite{thomason2024vamp} \\ \hline
+Local reactive layer & MPC ``alongside'' the sampling-based planner & \textbf{New: MPPI look-ahead} over the task null space with multiple goals, guided by the sampling-based planner~\cite{trevisan2024biasedmppi,tao2023rrtmppi} \\ \hline
+Micro-interpolation (T4.3) & MPC in the Core IPC, speed override, visual servoing & \textbf{Retained}; specified as path--velocity layer with hard limits and speed band~\cite{faulwasser2017pathfollowing,lange2016pathaccurate,faroni2020scaling} \\ \hline
+Task localisation & Implicit (industrial practice) & \textbf{Explicit pipeline stage}: optimal placement of robot / AGV / external axis~\cite{weingartshofer2021tcpbase,nguyen2023taskclustering} \\ \hline
+Safety-aware cost & ISO/TS 15066 cost in the replanner~\cite{faroni2022safetyaware} & \textbf{Retained}; evaluated per rollout and per planner edge \\ \hline
+Robot dependence & COMAU platform & \textbf{Robot-agnostic} kinematic abstraction \\ \hline
+Benchmarking (T4.7) & $\geq$50 scenarios, OMPL baseline, GPU planners not compared & Same KPIs; application catalogue; welding on hardware, others in simulation; GPU methods in a separate track \\ \hline
+\end{plangrid}
+\end{table}
+
+\subsection{Updated approach: sampling-based planning and MPPI}
+Industrial controllers rely on look-ahead: a buffer of future path samples is analysed to adapt speed under kinematic limits~\cite{lange2016pathaccurate}. For under-constrained tasks this look-ahead is limited to a single, pre-computed joint solution. MPPI acts as a \emph{stochastic look-ahead} that explores the redundancy ahead of the robot: it samples many short futures of the null-space variables (torch roll, cone tilt, external axis), evaluates them with arbitrary, non-smooth costs (collisions with the structure, joint-limit and singularity margins, ISO/TS 15066 slowdown, speed feasibility) and returns an improved plan every cycle~\cite{williams2018tro}. Null-space sampling with exact task satisfaction~\cite{wang2024constrainedpi,lee2026prmppi}, its deterministic counterpart~\cite{sun2024nullspacempc} and planner-guided MPPI~\cite{tao2023rrtmppi,trevisan2024biasedmppi} support this choice. Sampling-based planning remains essential where MPPI is weak: long transfer motions in clutter, station-level feasibility and multi-path reuse. \emph{The sampling-based planner proposes, MPPI refines and reacts, the Core-IPC MPC certifies.}
+
+\subsubsection{Multi-goal MPPI look-ahead}
+The goal of the look-ahead is a Cartesian task segment (e.g.\ ${\sim}10$\,cm of seam) with a \emph{set of start configurations}, one per inverse-kinematics solution class (up to 8 for a non-cuspidal 6R arm, up to 16 for cuspidal arms, multiplied by joint turns where ranges exceed $\pm\pi$~\cite{elias2025cuspidal}). For each class MPPI optimises the null-space variables along the segment with exact IK on that class. Classes are \emph{selected, never blended}~\cite{liu2026clusteringmppi,wang2026mppiem}. Continuing on the current class has no transfer cost; switching class costs a transfer (planned by the sampling-based planner first to the nominal start for a cost estimate, then to the optimised start, with a consistency check) plus the restart overlap. The time-dilation factor $\lambda=\max_j |\dot q_j^{\mathrm{req}}|/\dot q_j^{\max}$ along each rollout measures speed feasibility ($\lambda\le 1/0.9$ for a $\pm10\%$ band), so that a reconfiguration emerges from cost comparison when the current class cannot keep the speed or approaches joint limits.
+
+\subsection{End-to-end pipeline}\label{sec:pipeline}
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[font=\footnotesize, node distance=3.5mm,
+  st/.style={draw,rounded corners=2pt,align=center,text width=2.35cm,minimum height=14mm,fill=#1!12},
+  arr/.style={-{Stealth[length=2mm]},thick}]
+\node[st=gray] (p0) {\textbf{P0} Scene \& task model\\CAD + registration\\(Activity 3)};
+\node[st=gray, right=of p0] (p1) {\textbf{P1} Task segmentation\\seams / toolpaths / goals};
+\node[st=orange, right=of p1] (p2) {\textbf{P2} Optimal task localisation\\stations, base, rail};
+\node[st=orange, right=of p2] (p3) {\textbf{P3} Segment feasibility \& cost-to-go};
+\node[st=blue, right=of p3] (p4) {\textbf{P4} Online execution\\MPPI look-ahead + transfers};
+\node[st=green, right=of p4] (p5) {\textbf{P5} Core IPC\\path--velocity MPC, safety};
+\foreach \a/\b in {p0/p1,p1/p2,p2/p3,p3/p4,p4/p5} \draw[arr] (\a) -- (\b);
+\draw[arr,dashed] (p5.south) -- ++(0,-5mm) -| node[pos=0.25,below]{\scriptsize state, $s(t)$, band violations, scene updates} (p4.south);
+\draw[arr,dashed] (p4.north) -- ++(0,4mm) -| node[pos=0.25,above]{\scriptsize re-plan request (infeasible segment / station)} (p2.north);
+\end{tikzpicture}
+\caption{End-to-end pipeline. Orange: planning before execution (Open IPC, seconds to minutes). Blue: online planning (Open IPC, 10--100\,Hz). Green: hard real time (Core IPC, 1\,kHz).}\label{fig:pipeline}
+\end{figure}
+
+\begin{description}[leftmargin=0pt]
+\item[P0 -- Scene and task model.] CAD of workpiece and cell registered with the sensing modules of Activity~3; local registration at each station (R5).
+\item[P1 -- Task segmentation.] Segments with homogeneous constraints (welding: seams split at corners, interruptions and process changes; corners at constant speed are where joint-speed limits break~\cite{gautier2024weldingbase}).
+\item[P2 -- Optimal task localisation.] Minimum set of stations (AGV poses, rail intervals or fixed base) such that each segment is \emph{path-wise feasible} from at least one station: set-cover over segments~\cite{nguyen2023taskclustering} with a continuous-branch test~\cite{weingartshofer2021tcpbase}, the speed check $\lambda$, margins for positioning error and orientation tolerances; candidates from inverse reachability maps~\cite{makhal2018reuleaux} and joint base--path optimisation~\cite{zhao2025bstar}.
+\item[P3 -- Segment feasibility and cost-to-go.] Per station and segment: feasible IK classes, nominal null-space seeds, reconfiguration points and a cost-to-go table from a deterministic layered-graph / dynamic-programming planner~\cite{yin2024dpbreakpoints,demaeyer2017descartes}; sequence of segments and transfers (with Activity~2 for multi-robot allocation~\cite{tang2023dualrobotweld}).
+\item[P4 -- Online execution.] Multi-goal MPPI look-ahead on the registered segment with the P3 cost-to-go as terminal cost; transfers by the T4.2 planner; reaction to scene changes and humans.
+\item[P5 -- Core IPC.] Path--velocity layer: the joint path $q(s)$ from P4 is time-parametrised within the speed band under hard limits; speed override and ISO/TS 15066 rules; synchronous sensor input (seam tracking, visual servoing). A band violation is reported upstream as a detach request.
+\end{description}
+
+\subsection{Open IPC / Core IPC allocation}\label{sec:ipc}
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[font=\footnotesize,
+  blk/.style={draw,rounded corners=2pt,align=center,fill=#1!12,minimum height=9mm},
+  arr/.style={-{Stealth[length=2mm]},thick},
+  zone/.style={draw,dashed,rounded corners=4pt,inner sep=5pt}]
+\node[blk=gray,text width=3.4cm] (dex) at (0,0) {MI.RA/Dexter low-code\\task flow, dispatcher, monitor};
+\node[blk=orange,text width=3.4cm,below=4mm of dex] (sta) {Station \& sequence planner\\(P1--P3, dockerised)};
+\node[blk=blue,text width=3.4cm,below=4mm of sta] (mppi) {MPPI look-ahead\\(P4, 10--100\,Hz, CPU)};
+\node[blk=blue,text width=3.4cm,below=4mm of mppi] (sbp) {Sampling-based planner\\(T4.2: transfers, multi-path)};
+\node[blk=gray,text width=3.0cm,left=8mm of sta] (perc) {Perception (Act.\,3)\\registration, humans};
+\node[blk=gray,text width=3.0cm,below=4mm of perc] (task) {Task planner (Act.\,2)\\allocation, alternatives};
+\node[zone,fit=(dex)(sta)(mppi)(sbp),label={[font=\footnotesize\bfseries]above:Open IPC (ROS\,2, non-RT)}] (open) {};
+\node[blk=green,text width=3.6cm,right=22mm of mppi] (mpc) {Path--velocity MPC\\micro-interpolator (P5, 1\,kHz)};
+\node[blk=green,text width=3.6cm,above=4mm of mpc] (saf) {Safety rules, speed override\\ISO/TS 15066};
+\node[blk=green,text width=3.6cm,below=4mm of mpc] (ctl) {Motion / neural controller\\(Activity 5)};
+\node[zone,fit=(saf)(mpc)(ctl),label={[font=\footnotesize\bfseries]above:Core IPC (hard RT)}] (core) {};
+\node[blk=gray,text width=2.6cm,right=8mm of ctl] (rob) {Robot, external axes, AGV};
+\node[blk=gray,text width=2.6cm,above=4mm of rob] (sens) {High-rate sensors\\(seam tracker, camera)};
+\draw[arr] (mppi.east) -- node[above]{\scriptsize $q(s)$ + band}(mpc.west);
+\draw[arr] ([yshift=-2mm]mpc.west) -- node[below,align=center]{\scriptsize $s(t)$, state,\\ \scriptsize events} ([yshift=-2mm]mppi.east);
+\draw[arr] (mpc) -- (ctl); \draw[arr] (ctl) -- (rob); \draw[arr] (sens) -- (mpc.east);
+\draw[arr] (perc) -- (sta); \draw[arr] (task) -- (sta.south west);
+\draw[arr] (sta) -- (mppi); \draw[arr] (sbp) -- (mppi); \draw[arr] (dex) -- (sta);
+\end{tikzpicture}
+\caption{Allocation of the pipeline to the two computing units.}\label{fig:ipcalloc}
+\end{figure}
+
+\begin{table}[h]
+\centering\small
+\caption{Function allocation, rates and interfaces (timing budgets are targets to be confirmed in T4.6/T4.7).}\label{tab:alloc}
+\begin{plangrid}{|L{3.6cm}|L{1.5cm}|L{2.5cm}|Y|}
+\planheadrow \thead{Function} & \thead{Unit} & \thead{Rate / latency} & \thead{Interface} \\ \hline
+Segmentation, task localisation, cost-to-go (P1--P3) & Open IPC & seconds--minutes, before execution & Dockerised MI.RA/Dexter actions; input CAD + registration; output stations, sequence, IK classes, cost-to-go \\ \hline
+Sampling-based planner (T4.2) & Open IPC & $\mu$s--ms per query (CPU SIMD~\cite{thomason2024vamp}) & Service: start/goal configuration $\to$ time-parametrised path + cost \\ \hline
+MPPI look-ahead (P4) & Open IPC & 10--100\,Hz & Streams $q(s)$ over a horizon of the segment, admissible speed band, mode/detach events \\ \hline
+Path--velocity MPC (P5) & Core IPC & 1\,kHz, deterministic & Async channel from Open IPC; sync channel from sensors; hard channel to drives~\cite{faulwasser2017pathfollowing} \\ \hline
+Safety / speed override & Core IPC & 1\,kHz & ISO/TS 15066 limits, human data from Activity 3~\cite{faroni2022safetyaware} \\ \hline
+\end{plangrid}
+\end{table}
+
+\runin{Design rules.} (i) Everything stochastic runs in the Open IPC; the Core IPC receives smooth references and enforces hard limits deterministically. (ii) The MPPI layer runs on CPU by default (vectorised kinematics and collision checking~\cite{thomason2024vamp}) to stay comparable with the OMPL-based KPI; GPU execution is a separately reported variant. (iii) Every online plan has a deterministic fallback: the P3 plan of the current segment. (iv) Fixed-seed, low-discrepancy sampling and logging make execution repeatable for process qualification.
+
+\subsection{Robot-agnostic design}\label{sec:agnostic}
+The framework is parametrised by a \emph{kinematic description} (URDF, joint ranges, external axes, base model) and a \emph{task description} (constraint type per Cartesian degree of freedom: exact, band, cone, free). From these it derives automatically: the IK solver class --- analytic where available (6R families, including cuspidal arms~\cite{elias2025cuspidal}), numerical functional-redundancy IK otherwise~\cite{razjigaev2025functional} --- and the set of \emph{solution classes} used as goals (branches $\times$ joint turns); the null-space coordinates sampled by MPPI (tool roll, cone tilts, external axes, redundant joints, base); collision geometry (sphere approximations for vectorised checking) and kinematic limits. Supported configurations: fixed arms, arms on linear or rotary axes, arms on AGVs (base fixed per station or interpolated), dual-arm and multi-robot cells~\cite{ye2026nullspacemultirobot}.
