@@ -1,0 +1,68 @@
+\begin{tikzpicture}[
+  font=\sffamily,
+  stage/.style={
+    rounded corners=2pt,
+    line width=.8pt,
+    text width=3.2cm,
+    minimum height=1.65cm,
+    align=center,
+    inner sep=5pt,
+    font=\small
+  },
+  discover/.style={stage, draw=teal!60!black, fill=teal!8},
+  model/.style={stage, draw=blue!60!black, fill=blue!8},
+  dialogue/.style={stage, draw=orange!70!black, fill=orange!10},
+  execution/.style={stage, draw=green!50!black, fill=green!9},
+  flow/.style={-{Stealth[length=2mm]}, draw=black!70, line width=.8pt},
+  node distance=8mm and 5mm
+]
+
+\node[font=\bfseries\large, align=center] (title) at (0,0)
+  {Updated Plan4ARI Activity 2 architecture};
+
+\node[discover, below=8mm of title, xshift=-6.075cm] (step1)
+  {\textbf{1. DISCOVER}\\[2pt]
+   ROS 2 / OPC UA / ML.RA\\Docs, code and scene};
+\node[model, right=of step1] (step2)
+  {\textbf{2. NORMALISE}\\[2pt]
+   Skill and capability registry\\Ontology and provenance};
+\node[model, right=of step2] (step3)
+  {\textbf{3. FORMALISE}\\[2pt]
+   Structured intermediate representation\\PDDL 2.1 and constraints};
+\node[dialogue, right=of step3] (step4)
+  {\textbf{4. DIALOGUE}\\[2pt]
+   Goals and preferences\\Resolve missing information};
+
+\node[execution, below=15mm of step1] (step8)
+  {\textbf{8. EXECUTE AND MONITOR}\\[2pt]
+   PlanSys2 / BT.CPP\\Replan or safe fallback};
+\node[execution, right=of step8] (step7)
+  {\textbf{7. VERIFY}\\[2pt]
+   Digital twin, safety, code\\and plan checks};
+\node[discover, right=of step7] (step6)
+  {\textbf{6. GROUND}\\[2pt]
+   Map symbolic actions\\to executable skills};
+\node[dialogue, right=of step6] (step5)
+  {\textbf{5. PLAN AND SCHEDULE}\\[2pt]
+   Planner / CP portfolio\\Validation and selection};
+
+\draw[flow] (step1.east) -- (step2.west);
+\draw[flow] (step2.east) -- (step3.west);
+\draw[flow] (step3.east) -- (step4.west);
+\draw[flow] (step4.south) -- (step5.north);
+\draw[flow] (step5.west) -- (step6.east);
+\draw[flow] (step6.west) -- (step7.east);
+\draw[flow] (step7.west) -- (step8.east);
+
+\coordinate (feedback-path) at ($(step8.south)+(0,-8mm)$);
+\draw[flow] (step8.south) -- (feedback-path) -| (step5.south);
+\node[font=\small, fill=white, inner sep=2pt, align=center]
+  at ($(step8.south)!0.5!(step5.south)+(0,-10mm)$)
+  {Runtime evidence, execution outcomes, updated scene and capability status};
+
+\node[draw=black!25, fill=black!3, rounded corners=2pt,
+  text width=14.5cm, align=center, inner sep=6pt,
+  font=\footnotesize, below=14mm of step8.south, xshift=6.075cm] (llm-boundary)
+  {\textbf{LLM boundary:} semantic interpretation, evidence extraction and repair only.\\
+   Formal solvers, validators and trusted executors retain decision and execution authority.};
+\end{tikzpicture}

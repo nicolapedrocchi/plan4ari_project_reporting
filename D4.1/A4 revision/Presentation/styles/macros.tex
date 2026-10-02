@@ -1,0 +1,351 @@
+% chktex-file 44
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Basic Style Macros
+\newcommand{\paemph}[1]{%
+    \textcolor{pagRed}{\textit{#1}}%
+}
+
+\newcommand{\patextbf}[1]{%
+    \textcolor{pagBlue}{\textbf{#1}}%
+}
+
+\newcommand{\patextbfo}[1]{%
+    \textcolor{pagOrange}{\textbf{#1}}%
+}
+\newcommand{\placeholder}[1]{\textit{[#1]}}
+
+\newcommand{\blueitem}{%
+\textcolor{pagBlue}{\rule{0.8ex}{0.8ex}}% 
+}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Table Formatting
+\newcommand{\parowcolored}[1]{%
+    \rowcolor{#1}
+    [\dimexpr\tabcolsep+0.2pt\relax]
+    [\dimexpr\tabcolsep+0.2pt\relax]
+}
+
+\newcommand{\parowcolor}{%
+    \parowcolored{pagMidBlue}%
+}
+
+\newcommand{\paheaderstrut}{%
+  \rule[\dimexpr-\dp\strutbox-2pt\relax]{0pt}%
+       {\dimexpr\ht\strutbox+\dp\strutbox+4pt\relax}%
+}
+
+\NewExpandableDocumentCommand{\pahcell}{o O{|l|} m}{%
+    \IfNoValueTF{#1}{%
+        \leavevmode\color{white}\paheaderstrut\textbf{#3}
+    }{%
+        \multicolumn{#1}{#2}{%
+            \leavevmode\color{white}\paheaderstrut\textbf{#3}%
+        }%
+    }%
+}
+
+\NewDocumentCommand{\patableformat}{O{1.0} O{2pt} O{2pt}}{%
+    \small
+    \centering
+    \renewcommand{\arraystretch}{#1}
+    \setlength{\tabcolsep}{#2}
+    \setlength{\extrarowheight}{#3}
+    \arrayrulecolor{pagBorder}
+}
+
+
+\NewDocumentCommand{\patableformatnormalsize}{O{1.0} O{2pt} O{2pt}}{%
+    \normalsize
+    \centering
+    \renewcommand{\arraystretch}{#1}
+    \setlength{\tabcolsep}{#2}
+    \setlength{\extrarowheight}{#3}
+    \arrayrulecolor{pagBorder}
+}
+
+\newcommand{\rowspace}{\rule{0pt}{2ex}}
+
+
+\NewDocumentCommand{\pafirstlinecell}{O{t} m m}{%
+    \multirow[#1]{#2}{=}{%
+        \parbox[t]{\dimexpr\linewidth-2\tabcolsep\relax}{%
+            \raggedright #3 
+        }%
+    }% 
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% TOC Formatting
+\newlength{\palabelwidth}
+
+\NewDocumentCommand{\pasubsubsectiononeline}{O{pagMidGreen} m +g o}{%
+  \par
+  \begingroup
+  \raggedright
+  \settowidth{\palabelwidth}{\textbf{#2}}%
+  \addtolength{\palabelwidth}{4pt}%
+  \phantomsection
+  \addcontentsline{toc}{subsubsection}{#2}%
+  \nopagebreak[4]%
+  \noindent
+  \IfNoValueTF{#3}{%
+    \begin{tabularx}{\linewidth}{%
+      >{\raggedright\arraybackslash}X}%
+      \parowcolored{#1}\pahcell{#2}\\%
+    \end{tabularx}%
+  }{%
+    \begin{tabularx}{\linewidth}{%
+      >{\raggedright\arraybackslash}p{\palabelwidth}
+      >{\raggedright\arraybackslash}X}%
+      \cellcolor{#1}\pahcell{#2}
+      &%
+      \leavevmode\color{#1}\paheaderstrut\textbf{#3}
+      \IfValueT{#4}{%
+        \hfill
+        {\color{black}#4} 
+        \kern4pt \vrule width 1.5pt
+      }\\%
+      \IfNoValueT{#4}{\arrayrulecolor{#1}\hline}
+    \end{tabularx}%
+    \arrayrulecolor{pagBorder}%
+  }%
+  \par
+  \endgroup
+}
+
+\NewDocumentCommand{\pasubsubsectionboxed}{O{pagMidGreen} m +g}{%
+  \par
+  \begingroup
+  \phantomsection
+  \addcontentsline{toc}{subsubsection}{#2}%
+  \nopagebreak[4]%
+  \noindent
+  \begin{tabular}{|>{\raggedright\arraybackslash}%
+    p{\dimexpr\linewidth-2\tabcolsep-2\arrayrulewidth\relax}|}%
+    \rowcolor{#1}%
+    \leavevmode\color{white}\paheaderstrut\textbf{#2}\\%
+    \IfNoValueF{#3}{%
+      \leavevmode\color{#1}\paheaderstrut\textbf{#3}\\%
+      \hline
+    }%
+  \end{tabular}%
+  \arrayrulecolor{pagBorder}%
+  \par
+  \endgroup
+}
+
+\NewDocumentCommand{\pasubsubsectionnamedboxed}
+  {O{pagMidBlue} O{pagMidBlue} m m m o}{%
+    \par
+    \begingroup
+    \raggedright
+    \settowidth{\palabelwidth}{\textbf{#3}}%
+    \addtolength{\palabelwidth}{4pt}%
+    \IfNoValueT{#6}{
+        \phantomsection
+        \addcontentsline{toc}{subsubsection}{#3: #4}%
+        \nopagebreak[4]%
+    }
+    \noindent
+    \arrayrulecolor{#1}
+    \begin{tabularx}{\dimexpr\linewidth-2pt\relax}{%
+        >{\raggedright\arraybackslash}p{\palabelwidth}
+        >{\raggedright\arraybackslash}X}%
+        \cellcolor{#1}\pahcell{#3} &
+        \leavevmode\color{#1}\paheaderstrut\textbf{#4}%
+        \par
+        \hrule height \arrayrulewidth
+        \kern1pt
+        \color{#2}\noindent\paheaderstrut#5\\%
+    \end{tabularx}%
+    \arrayrulecolor{pagBorder}%
+    \par
+    \endgroup
+}
+\NewDocumentCommand{\pasubsubsection}{m o}{%
+    \par
+    \phantomsection
+    \addcontentsline{toc}{subsubsection}{#1}%
+    \nopagebreak[4]%
+    \textcolor{pagBlue}{%
+        \textbf{#1}%
+        \IfValueT{#2}{: \textbf{#2}}%
+        \IfNoValueT{#2}{.}% 
+    }% 
+}
+
+\newcounter{paRQ}
+\NewExpandableDocumentCommand{\paRQrow}{m m}{%
+  \IfValueT{#2}{%
+    \IfBlankF{#2}{%
+      \stepcounter{paRQ}%
+      \patextbf{RQ\arabic{paRQ}} &
+      \leavevmode\textit{#2}\\%
+    }%
+  }%
+}
+
+\newlength{\padefaultlabelwidth}
+\NewDocumentCommand{\pasubsubsectionobjective}
+  {O{pagMidGreen} m m m o o o o o}{%
+    \par
+    \begingroup
+    \raggedright
+    \settowidth{\palabelwidth}{\textbf{#2}}%
+    \settowidth{\padefaultlabelwidth}{\textbf{RQ10}}%
+    \ifdim\palabelwidth<\padefaultlabelwidth%
+        \setlength{\palabelwidth}{\padefaultlabelwidth}%
+    \fi%
+    \addtolength{\palabelwidth}{4pt}%
+    \phantomsection
+    \addcontentsline{toc}{subsubsection}{#2: #3}%
+    \nopagebreak[4]%
+    \noindent
+    \arrayrulecolor{#1}%
+    \setlength{\extrarowheight}{1pt}%
+    \begin{tabularx}{\linewidth}{%
+        >{\raggedright\arraybackslash}p{\palabelwidth}
+        >{\raggedright\arraybackslash}X}%
+    \cellcolor{#1}\pahcell{#2} & 
+    \leavevmode\color{#1}\paheaderstrut\textbf{#3}%
+        \par
+        \hrule height \arrayrulewidth
+        \kern1pt
+        \noindent\paheaderstrut#4\\%
+        \paRQrow{#1}{#5}%
+        \paRQrow{#1}{#6}%
+        \paRQrow{#1}{#7}%
+        \paRQrow{#1}{#8}%
+        \paRQrow{#1}{#9}%
+    \end{tabularx}%
+    \arrayrulecolor{pagBorder}%
+    \par
+    \endgroup
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% ---------- Project ID ----------
+\NewDocumentCommand{\patextbfgraphic}{O{pagGreen} O{pagGreen} m m}{%
+\IfBlankTF{#3}{%
+  \begin{tikzpicture}[baseline=(txt.base)]
+    \node[inner xsep=0pt, inner ysep=0pt, text=#2, font=\bfseries] (txt) {#4};
+    \draw[#1, line width=0.8pt] (txt.south west) -- (txt.south east);
+  \end{tikzpicture}%
+}{%
+  \begin{tikzpicture}[baseline=(txt.base)]
+    \node[inner sep=2pt, fill=#1, text=white, font=\bfseries] (tag) {#3};
+    \node[anchor=west, inner xsep=0pt, inner ysep=0pt, text=#2, font=\bfseries] (txt) at ([yshift=-0.4pt]tag.east) {#4};
+    \draw[#1, line width=0.8pt] (tag.south west) -- (txt.south east);
+  \end{tikzpicture}%
+}%
+}
+
+\newcommand{\ProjectName}{SMARTHER}
+\newcommand{\CallIdentifier}{[HORIZON-EIC-2026-PATHFINDERCHALLENGES-01--03]}
+\newcommand{\CallName}{[DeepRAP:\@ Deep Reasoning, Abstraction \& Planning]}
+% \newcommand{\ProposalTitle}{%
+% \begin{center}
+% \begin{minipage}{0.15\textwidth}
+% \includegraphics[width=\textwidth]{images/logo.png}
+% \end{minipage}
+% \begin{minipage}{0.7\textwidth}
+% \centering
+%   %\makebox[\textwidth][c]{%
+%     \patextbfgraphic[pagOrange][black]
+%       {}
+%       {\patextbfo{S}emantic \patextbfo{M}etacognitive \patextbfo{A}utonomy Ha\patextbfo{R}ness for \patextbfo{T}rustworthy,}%
+%   %}
+%   \\[6pt]
+%   %\makebox[\textwidth][c]{%
+%     \patextbfgraphic[pagOrange][black]
+%       {}
+%       {\patextbfo{H}uman-Aware, \patextbfo{E}xplainable \patextbfo{R}obotics}%
+%   %}%
+% \end{minipage}
+% \end{center}
+% }
+
+\newcommand{\ProposalTitle}{%
+\includegraphics[width=0.95\textwidth]{images/logo9.png}
+}
+
+
+\DeclareRobustCommand{\pag}{%
+  \textcolor{pagOrange}{\textbf{\ProjectName}}%
+}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Work-package description block. Duplicate the call once per WP.
+\newcommand{\WorkPackageDescription}[4]{%
+  \par
+  \begingroup
+  \setlength{\LTpre}{0pt}%
+  \setlength{\LTpost}{0pt}%
+  %
+  \phantomsection
+  \addcontentsline{toc}{subsection}{Table 3.1a - #1: #2}%
+  \nopagebreak[4]%
+  
+  \begin{xltabular}{\textwidth}{|
+    >{\raggedright\arraybackslash\bfseries}m{0.26\textwidth}|
+    X|}
+    \hline%
+    \cellcolor{pagMidBlue}\color{white}Work package number & #1 \\\hline%
+    \cellcolor{pagMidBlue}\color{white}Work package title & #2 \\\hline%
+  \end{xltabular}
+  \vspace{4pt}
+  \begin{xltabular}{\textwidth}{|J{0.99\textwidth}|}
+    \hline%
+    \patextbf{Objectives.}
+    #3\\[1.5em]\hline%
+  \end{xltabular}
+  \vspace{4pt}\begin{tcolorbox}[
+  breakable,
+  colback=white,
+  colframe=pagBlue,
+  boxrule=0.4pt,
+  sharp corners,
+  boxsep=0pt,
+  left=3pt,
+  right=3pt,
+  top=3pt,
+  bottom=3pt,
+  before skip=2pt,
+  after skip=18pt
+]
+    \setlength{\emergencystretch}{1em}%
+    \patextbf{Description of work.}
+    #4
+  \end{tcolorbox}
+
+  \endgroup
+}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\renewcommand{\tabularxcolumn}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcommand{\src}[1]{\vfill{\tiny\color{gray}Source: #1\par}}
+\newcommand{\lead}[1]{{\large\color{accent}\textbf{#1}}\par\medskip}
+\newcommand{\items}{\setlength{\itemsep}{7pt}}
+

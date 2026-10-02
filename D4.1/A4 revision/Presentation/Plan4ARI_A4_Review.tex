@@ -1,0 +1,402 @@
+\documentclass[aspectratio=169,10pt]{beamer}
+\usepackage{plan4ari_beamer}
+
+\input{styles/packages.tex}
+\input{styles/layout.tex}
+\input{styles/math.tex}
+\input{styles/macros.tex}
+\input{styles/bibliography.tex}
+
+
+\title[Plan4ARI / A4 Review]{Plan4ARI\\\large Review of Activity A4}
+\subtitle{Local and Global Autonomous Motion Planning}
+\author{Plan4ARI}
+\institute{Scientific update and proposed technical specification revision}
+\date{Draft for technical discussion / 2 October 2026}
+\hypersetup{pdftitle={Plan4ARI~-~Review of Activity A4},pdfauthor={Plan4ARI},pdfsubject={Scientific update and proposed technical specification revision}}
+
+\begin{document}
+\begin{frame}
+\titlepage
+\end{frame}
+
+\begin{frame}{Scope of the review}
+\lead{Retained commitments and proposed scientific changes}
+\begin{itemize}\items
+\item Compare the original A4 methodology and tasks with D4.1 v0.7.
+\item Explain the role of MPPI, path-wise redundancy and task localisation.
+\item Map the update to deliverables, benchmarks and industrial interfaces.
+\item Identify wording and schedule issues for the next specification revision.
+\end{itemize}
+\medskip
+\textbf{Status:} scientific proposals and implementation targets. The repository and design exist; simulator completion, MPPI validation and industrial deployment remain planned.
+\src{Technical specification, Activity 4 and project description; D4.1 v0.7, Sections 1, 6, 8 and 10.}
+\end{frame}
+
+\begin{frame}{Baseline commitments for A4}
+\begin{columns}[T]
+\begin{column}{.48\textwidth}
+\lead{Application objective}
+Autonomous motion planning for teams of manipulators in dynamic, human-shared environments.\par\medskip
+Joint and Cartesian planning, with safe velocity adaptation.\par\medskip
+MI.RA/Dexter and Core IPC integration.\par
+Activity A4: \textbf{M1--M36}.
+\end{column}
+\begin{column}{.48\textwidth}
+\lead{Evaluation commitments}
+\begin{itemize}\items
+\item \textbf{30\%} reduction in interaction-task execution time.
+\item At least \textbf{50 application scenarios}.
+\item Mean computation time over \textbf{more than 100 contexts}.
+\item OMPL comparison; GPU planners excluded from that comparison.
+\end{itemize}
+\end{column}
+\end{columns}
+\src{Technical specification, Activity 4; project description, Expected Results and Computation Time Target.}
+\end{frame}
+
+\begin{frame}{Original approach and proposed revision}
+\small\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{\textwidth}{@{}p{.20\textwidth}XX@{}}
+\toprule
+Function & Original approach & D4.1 v0.7 proposal\\\midrule
+Global planning & Informed sampling, adaptive local/global exploration, path reuse & Retained; also transfer motions and station feasibility\\
+Online adaptation & MPC alongside the sampling planner & MPPI look-ahead over task redundancy in the Open IPC\\
+Micro-interpolation & Core-IPC MPC, speed override and sensor interfaces & Deterministic path--velocity MPC with a process speed band\\
+Task placement & No explicit pipeline stage & Station/base/rail selection using whole-path feasibility\\
+Robot support & Industrial COMAU integration & Parametric robot models, retaining COMAU deployment\\\bottomrule
+\end{tabularx}
+\src{Technical specification, project methodology and T4.2--T4.5; D4.1, Sections 5--7. Changes proposed for review.}
+\end{frame}
+
+\begin{frame}{Scientific evidence behind the update}
+\small\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{\textwidth}{@{}p{.25\textwidth}XX@{}}
+\toprule
+Research development & Implication for A4 & Evaluation required\\\midrule
+Vectorised sampling-based planning & Faster CPU kinematics and collision checks for transfers and placement & Same hardware, scenes and budgets as OMPL\\
+Tolerance-aware Cartesian planning & Explore tool roll, cone angles and IK classes along a process path & Task accuracy, speed and reconfigurations\\
+Constrained and multimodal MPPI & Receding-horizon search with exact IK and separate configuration modes & Constraint violations, latency and fallback tests\\
+Predictive path following & Separate geometric path choice from the time law & Speed band and joint-limit satisfaction\\\bottomrule
+\end{tabularx}
+\src{D4.1, Section 4: VAMP (Thomason et al., 2024), Descartes, constrained MPPI and predictive path-following sources. Literature results are not A4 measurements.}
+\end{frame}
+
+\begin{frame}{Scientific contribution to make explicit}
+\lead{Joint selection of redundancy, transfers and task placement}
+\begin{itemize}\items
+\item Explore future tool orientations and external-axis configurations along a task segment.
+\item Compare distinct IK solution classes, including the cost of changing class.
+\item Plan retract--reconfigure--approach motions and process restarts explicitly.
+\item Select stations that make complete segments feasible at the required speed.
+\end{itemize}
+\medskip
+Null-space MPPI alone is established prior work. The proposed contribution concerns its combination with these decisions and industrial execution constraints.
+\src{D4.1, Sections 5, 6 and 11; constrained path-integral control and path-wise redundancy literature cited there.}
+\end{frame}
+
+\begin{frame}{Reference use case and process constraints}
+\begin{columns}[T]
+\begin{column}{.48\textwidth}
+\lead{Large-structure arc welding}
+Industrial arm at a station; mobile base and optional rail extend coverage.\par\medskip
+The initial simulator uses a \textbf{fixed COMAU N-220-2.7} and a synthetic stiffened shipbuilding panel.
+\end{column}
+\begin{column}{.48\textwidth}
+\lead{Proposed task parameters}
+\begin{itemize}\items
+\item Exact seam position; free torch roll.
+\item Orientation cone around \textbf{$10^\circ$}.
+\item Travel speed band \textbf{$\pm10\%$}.
+\item Planned restart overlap around \textbf{1 cm}.
+\end{itemize}
+\end{column}
+\end{columns}
+\medskip\small Process experts must confirm tolerances and restart rules. These parameters do not replace the contractual KPIs.
+\src{D4.1, Sections 2.3--2.4 and 8.4. Mobile-base configurations are subsequent simulator extensions.}
+\end{frame}
+
+\begin{frame}{Proposed functional architecture}
+\small\renewcommand{\arraystretch}{1.25}
+\begin{tabularx}{\textwidth}{@{}p{.26\textwidth}XX@{}}
+\toprule
+Stage & Output & Required check\\\midrule
+P0 Scene and task model & Registered geometry and constraints & Frames and sensing consistency\\
+P1 Task segmentation & Homogeneous process segments & Process continuity and corners\\
+P2 Task localisation & Stations, base poses or rail intervals & Whole-segment feasibility\\
+P3 Segment planning & IK classes, nominal path and cost-to-go & Collision, limits and speed feasibility\\
+P4 Online look-ahead & MPPI path and planned transfers & Mode selection and planning deadline\\
+P5 Micro-interpolation & Time law and motion reference & Deterministic limits and safety rules\\\bottomrule
+\end{tabularx}
+\src{D4.1, Section 6.3. Full research architecture; the initial static mockup implements a smaller scope.}
+\end{frame}
+
+\begin{frame}{Multi-goal MPPI and deterministic alternatives}
+\lead{Solution classes remain separate throughout optimisation}
+\begin{itemize}\items
+\item Sample the available task redundancy; compute exact IK within each class.
+\item Compare continuation with a class change that includes transfer and restart costs.
+\item Use the deterministic segment plan as terminal guidance and a fallback candidate.
+\item Report a speed-band violation upstream when the current segment is infeasible.
+\end{itemize}
+\small
+\textbf{Comparison:} deterministic graph/DP replay, predictive IK and null-space NMPC. A fallback requires validation in the current scene; stochastic performance does not establish certification.
+\src{D4.1, Sections 6.1--6.2 and 7.}
+\end{frame}
+
+\begin{frame}{Open IPC and Core IPC responsibilities}
+\small\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{\textwidth}{@{}p{.21\textwidth}XX@{}}
+\toprule
+Unit & Functions & Interface and timing target\\\midrule
+Open IPC & Segmentation, station selection, sampling planner, MPPI and Dexter orchestration & Path $q(s)$, speed band and reconfiguration events; MPPI target 10--100 Hz\\
+Core IPC & Path--velocity MPC, hard limits, speed override and control interfaces & Time law $s(t)$, state and constraint events; target 1 kHz\\
+A3 sensing & Registration, scene and human updates, seam tracking & Timestamped geometry and uncertainty; synchronous sensor input where required\\\bottomrule
+\end{tabularx}\par\medskip
+Timing budgets require measurement on the target IPC. The first simulator checks nominal kinematics and does not demonstrate hard-real-time execution.
+\src{D4.1, Section 6.4; technical specification, T4.3 and T4.5.}
+\end{frame}
+
+\begin{frame}{Proposed revision of T4.1--T4.3}
+\small\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{\textwidth}{@{}p{.15\textwidth}XX@{}}
+\toprule
+Task / period & Proposed clarification & Required evidence\\\midrule
+T4.1\newline M1--M6 & Include MPPI, path-wise redundancy, placement and CPU/GPU tool comparison & Scientific decision record and baseline selection\\
+T4.2\newline M4--M24 & Retain informed sampling/path reuse; add station checks, transfers and MPPI look-ahead & Ablations, OMPL comparison and constraint checks\\
+T4.3\newline M4--M24 & Specify deterministic path--velocity MPC with speed band and upstream infeasibility events & Sensor interfaces, deadline and limit tests\\\bottomrule
+\end{tabularx}\par\medskip\small Task periods retained. The detailed informed/local sampling review in D4.1 still requires completion by the T4.2 team.
+\src{Technical specification, T4.1--T4.3; D4.1, Sections 4.1, 6, 7 and 10.}
+\end{frame}
+
+\begin{frame}{Proposed revision of T4.4--T4.7}
+\small\renewcommand{\arraystretch}{1.25}
+\begin{tabularx}{\textwidth}{@{}p{.15\textwidth}XX@{}}
+\toprule
+Task / period & Proposed clarification & Required evidence\\\midrule
+T4.4\newline M25--M30 & Wrap P1--P4 as Dockerised Dexter actions with versioned interfaces & Dependency, compatibility and workflow tests\\
+T4.5\newline M31--M36 & Integrate P5 in Core IPC; separate asynchronous path input and synchronous feedback & Industrial timing, limit and safety assessment\\
+T4.6\newline M4--M36 & Version code, models, scenarios and evaluation configurations & Reproducible releases and regression results\\
+T4.7\newline M1--M6 & Initial catalogue/protocol, followed by explicit later evaluation campaigns & Agreed contexts, baselines and operator evaluation\\\bottomrule
+\end{tabularx}
+\src{Technical specification, T4.4--T4.7; D4.1, Sections 8 and 10. Continued T4.7 evaluation requires schedule alignment.}
+\end{frame}
+
+\begin{frame}{Deliverables and schedule dependencies}
+\small\renewcommand{\arraystretch}{1.35}
+\begin{tabularx}{\textwidth}{@{}p{.15\textwidth}XX@{}}
+\toprule
+Delivery & Baseline commitment & Review implication\\\midrule
+D4.1 / M12 & Scientific plan and first motion-planning mockup & Scientific review at M1--M6 is distinct from mockup delivery; state implemented functions explicitly\\
+D4.2 / M24 & Motion-planner module prototypes & Evidence for T4.2/T4.3 prototypes; distinguish research environment from later industrial integration\\
+D4.3 / M36 & Motion-planner prototypes integrated in COMAU IPC & Trace Dexter integration at M25--M30 and Core IPC integration at M31--M36\\\bottomrule
+\end{tabularx}\par\medskip\small December 2026 and March 2027 are calendar implementation targets. Their correspondence to project months requires the agreed project calendar.
+\src{Technical specification, deliverable list and T4.1--T4.5; D4.1, purpose and Section 10.2.}
+\end{frame}
+
+\begin{frame}{First mockup and evidence package}
+\lead{Initial static-scene planning and nominal trajectory replay}
+\begin{itemize}\items
+\item Load the robot, cell geometry, seam paths and configured process constraints.
+\item Generate a complete plan with baseline adapters before motion starts.
+\item Validate collision-free feasibility, Cartesian tolerances, speed and joint limits.
+\item Keep the robot stationary and welding inactive if planning fails or times out.
+\end{itemize}
+\small
+\textbf{Review evidence:} software versions, models, seeds, launch procedure, attempt logs, demonstration recording and pending interfaces. Early mockups explicitly identify MPPI as pending.
+\src{D4.1, Sections 6.6, 8.4 and 10.2. Planned scope; no completed demonstration is asserted.}
+\end{frame}
+
+\begin{frame}{Initial simulation environment design}
+\small\renewcommand{\arraystretch}{1.25}
+\begin{tabularx}{\textwidth}{@{}p{.25\textwidth}XX@{}}
+\toprule
+Layer & Proposed implementation & Validation needed\\\midrule
+Integration & ROS2, behaviour tree, interchangeable planner adapters & Task sequencing and consistent adapter contracts\\
+Scene / replay & MuJoCo; fixed N-220-2.7 and synthetic welding panel & USD conversion, frames, kinematics and collisions\\
+Baseline planning & OMPL transfers; Tesseract/Descartes process paths & Compatibility and trajectory validation; later TrajOpt refinement\\
+Target platform & Ubuntu 26.04 / ROS2 Lyrical; WSL or native; CPU, up to 32 GB RAM & Dependency compatibility and measured resource use\\
+Results & Local dashboard; code/assets in GitHub, campaign data in SharePoint & Reproduction and access to approved assets\\\bottomrule
+\end{tabularx}
+\src{D4.1, Sections 8.3--8.4; repository design reference dea82b3. Stack choices remain subject to prototype validation.}
+\end{frame}
+
+\begin{frame}{Application catalogue and validation coverage}
+\small\renewcommand{\arraystretch}{1.25}
+\begin{tabularx}{\textwidth}{@{}p{.25\textwidth}Xp{.22\textwidth}@{}}
+\toprule
+Family & Examples from the 17-application catalogue & Planned evaluation\\\midrule
+Welding & Large structures; multi-robot welding & Large-structure welding: hardware + simulation; multi-robot: simulation\\
+Continuous toolpaths & Painting, spray, dispensing, WAAM, fibre placement, laser processing & Simulation\\
+Surface/contact tasks & Grinding, milling, polishing, NDT & Initial kinematic checks; force/dynamics require extensions\\
+Discrete operations & Drilling, riveting, pick-and-place, tending, assembly & Simulation\\
+Shared spaces / fleets & Collaborative operations; intralogistics and AMR fleets & Subsequent dynamic-scene evaluation\\\bottomrule
+\end{tabularx}\par\medskip\small The December environment covers the first static welding application. It does not complete all 17 families or the 50-scenario commitment.
+\src{D4.1, Sections 8.1 and 10.2. Application families summarise the catalogue without changing its scope.}
+\end{frame}
+
+\begin{frame}{Baseline KPIs and additional metrics}
+\begin{columns}[T]
+\begin{column}{.48\textwidth}
+\lead{Baseline commitments}
+\begin{itemize}\items
+\item Interaction execution time: $-30\%$.
+\item 50 or more application scenarios.
+\item Mean planning time over $>100$ contexts; OMPL baseline.
+\item Registration accuracy: about $+20\%$.\item Tracking performance: about $+50\%$.
+\end{itemize}
+\end{column}
+\begin{column}{.48\textwidth}
+\lead{Additional D4.1 metrics}
+\begin{itemize}\items
+\item Success, timeout and failure rates.
+\item Planning/replanning latency.
+\item Stations, restarts and IK changes.
+\item Speed-band and task violations.
+\item Jerk, joint margins and CPU/RAM.
+\end{itemize}
+\end{column}
+\end{columns}
+\src{Technical specification, A4 expected results; D4.1, Section 8.2. Registration and tracking targets require dedicated sensing/control evidence; static kinematics alone cannot substantiate them.}
+\end{frame}
+
+\begin{frame}{Proposed evaluation protocol}
+\begin{enumerate}\items
+\item Agree on scenario instances, difficulty, constraints and completion criteria.
+\item Use identical contexts, hardware budgets and seeds for comparable planners.
+\item Report every attempt, including invalid plans, timeouts and failures.
+\item Analyse nominal trajectory quality on successful runs, separated by scenario type.
+\item Compare MPPI/no MPPI, optimised/fixed placement, horizon length and IK-class count.
+\end{enumerate}
+\small
+Execution-time reduction: $100\,(T_{\mathrm{baseline}}-T_{\mathrm{A4}})/T_{\mathrm{baseline}}$. Report GPU experiments separately; human-interaction metrics follow dynamic-scene and hardware validation.
+\src{Technical specification, Computation Time Target; D4.1, Sections 8.2--8.4.}
+\end{frame}
+
+\begin{frame}{Implementation targets and research extensions}
+\small\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{\textwidth}{@{}p{.22\textwidth}XX@{}}
+\toprule
+Calendar target & Planned output & Evidence\\\midrule
+October 2026 & Validate stack, robot model and synthetic cell & Reproducible loading, frames and baseline paths\\
+November 2026 & BT execution, adapters and independent validation & Static task, failure behaviour and initial logs\\
+December 2026 & Initial simulator and CPU benchmark environment & Baseline campaign, dashboard and archived results\\
+January--February 2027 & MPPI development and integration preparation & Interfaces and common comparison protocol\\
+Around March 2027 & Initial MPPI integration/evaluation & Comparative campaign on established scenarios\\\bottomrule
+\end{tabularx}
+\src{D4.1, Section 10.2. Planning targets, separate from contractual project months. Mobile bases and broader applications follow.}
+\end{frame}
+
+\begin{frame}{Interfaces and responsibilities to agree}
+\small\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{\textwidth}{@{}p{.25\textwidth}X@{}}
+\toprule
+Interface & Required agreement\\\midrule
+CNR / planning team & Planner design, IK/task descriptions, benchmark adapters and scientific comparisons\\
+COMAU / Dexter & Robot assets, process cases, deployment contracts and industrial requirements\\
+COMAU / Core IPC & Path streaming, sensor input, timing budgets, fallback and safety assessment\\
+A2 / A3 & Task allocation and constraints; scene registration, tracking and uncertainty\\
+Control / user evaluation & Actuation and tracking models; operator evaluation and demonstrator acceptance\\\bottomrule
+\end{tabularx}\par\medskip\small D4.1 assigns dynamics/control extensions to the later A6 revision, while its architecture links control to A5. Confirm this activity reference before editing the specification.
+\src{Technical specification, A4 roles; D4.1, Sections 6, 8.4 and 10.1. Assignments and cross-activity references require confirmation.}
+\end{frame}
+
+\begin{frame}{Potential COMAU design contributions}
+\small\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{\textwidth}{@{}p{.25\textwidth}XX@{}}
+\toprule
+Contribution to confirm & Effect on the mockup & Evidence to retrieve\\\midrule
+Robot and cell assets & Valid model conversion and realistic collision geometry & Approved assets, versions and model checks\\
+Process/use-case definition & Welding paths, tolerances and restart rules & Annotated seams and expert review\\
+Industrial interface design & Dexter adapters, IPC allocation and computing budget & Interface specifications and review decisions\\
+Demo and acceptance review & Relevant scenarios and measurable completion criteria & Feedback, test records and resulting changes\\\bottomrule
+\end{tabularx}\par\medskip\small Existing platform availability is distinct from project-specific contributions. This slide does not certify completed activities or assign effort.
+\src{D4.1, Section 9; technical specification, Host Institution role and T4.3--T4.5.}
+\end{frame}
+
+\begin{frame}{Specification corrections for discussion}
+\small\renewcommand{\arraystretch}{1.25}
+\begin{tabularx}{\textwidth}{@{}p{.22\textwidth}XX@{}}
+\toprule
+Issue & Current evidence & Proposed correction\\\midrule
+Output text & A4 paragraph describes natural language to part program & Replace with motion-planning outputs and interfaces\\
+Planning layers & MPC described alongside sampling and inside Core IPC & Distinguish Open-IPC MPPI from deterministic P5 MPC\\
+T4.4 wording & Motion-planning task refers to deployment of the ``task planning module'' & Correct module reference and define P1--P4 interfaces\\
+T4.7 period & M1--M6 includes later platform/end-user evaluation & Separate protocol design from continuing campaigns\\
+M48 output & Milestone cites D4.4; deliverable list ends at D4.3/M36 & Confirm intended M48 output before changing the list\\\bottomrule
+\end{tabularx}
+\src{Technical specification, project methodology, T4.4/T4.7 and milestones; D4.1, Sections 6 and 10. Discussion points only.}
+\end{frame}
+
+\begin{frame}{Validation boundaries and open risks}
+\begin{itemize}\items
+\item Static kinematics checks nominal feasibility; forces, tracking error and stability need dedicated models and tests.
+\item The $30\%$ interaction-time KPI requires dynamic scenes and comparable human/safety conditions.
+\item Exact IK does not establish complete feasibility: collisions, limits and timing need independent checks.
+\item CPU timing targets, mobile registration and mode-switch stability require experimental evidence.
+\item System-level safety assessment governs deployment; MPPI costs and simulation alone do not establish certification.
+\end{itemize}
+\src{Technical specification, A4 methodology and expected results; D4.1, Sections 7, 8.4 and 11.}
+\end{frame}
+
+\begin{frame}{Proposed wording for the A4 objective}
+\lead{Working text for the next specification revision}
+Activity A4 will develop local and global motion planning for robotic teams in dynamic, human-shared environments, integrated into MI.RA/Dexter and the COMAU IPC architecture.\par\medskip
+The framework will combine informed sampling and path reuse with task localisation, deterministic segment planning and MPPI look-ahead over task redundancy. A deterministic Core-IPC path--velocity layer will enforce configured execution limits and support sensor-driven adaptation.\par\medskip
+Evaluation will retain the contractual scenario, computation-time and interaction-time targets, using reproducible baselines and reporting simulation, dynamic-scene and industrial validation separately.
+\src{Proposed wording based on the technical specification, Activity 4, and D4.1 v0.7. Pending discussion; no specification file is changed.}
+\end{frame}
+
+\begin{frame}{Decisions required for the revision}
+\begin{enumerate}\items
+\item Confirm the layered architecture and the scope assigned to T4.2 and T4.3.
+\item Agree on mockup acceptance, calendar/project-month alignment and later MPPI evidence.
+\item Confirm the static benchmark scope and later dynamic/control activity interfaces.
+\item Resolve T4.4 terminology, continuing T4.7 evaluation and the M48 deliverable reference.
+\item Assign model/process inputs, industrial integration owners and comparable KPI protocols.
+\end{enumerate}
+\src{Summary of issues identified through comparison of the current specification and D4.1 v0.7.}
+\end{frame}
+
+\begin{frame}{Sources and document status}
+\small
+\begin{itemize}\items
+\item \textbf{Technical specification:} plan4ari\_capitolato.tex and its included project description/plan sections; original A4 tasks, KPIs and deliverables.
+\item \textbf{D4.1 v0.7, 2 October 2026:} scientific update, revised architecture, simulation design and implementation targets.
+\item \textbf{A2 review presentation:} organisational reference only; A2 claims, methods and submission dates are not transferred to A4.
+\item \textbf{Budget v6 tables:} existing WP4 effort values retained in the following reference slides; no resource amendment proposed.
+\end{itemize}
+\small Literature findings are summarised from D4.1. Candidate software and performance claims require validation during implementation.
+\src{Supplied local documents. The technical specification revision will follow after version consolidation.}
+\end{frame}
+
+% Existing A4 budget reference slides retained without changing their data.
+% Budget analysis: first three of four project years; CNR = AI+RO.
+\begin{frame}{Budget analysis: scope and assumptions}
+
+
+\begin{table}[H]\centering\scriptsize\caption{Mesi-persona per WP~-~intero progetto.}\label{tab:wp-w-tot}
+\begin{tabular}{llrrrr}\toprule\textbf{WP} & \textbf{Soggetto} & \textbf{Fund. Research} & \textbf{Ind. Research} & \textbf{Exp. Development} & \textbf{Totale} \\\midrule
+WP4 & HI & 3.81 & 62.40 & 0.00 & 66.21 \\
+ & AI & 1.96 & 3.91 & 0.00 & 5.87 \\
+ & RO & 9.21 & 19.49 & 0.00 & 28.69 \\
+ & \textit{Totale WP} & \textit{14.97} & \textit{85.80} & \textit{0.00} & \textit{100.77} \\
+\bottomrule\end{tabular}
+\end{table}
+
+\end{frame}
+
+\begin{frame}{Budget analysis: Y1}
+  
+\begin{table}[H]\centering\scriptsize\caption{Mesi-persona per WP~-~anno 1.}\label{tab:wp-w-y1}
+\begin{tabular}{llrrrr}\toprule\textbf{WP} & \textbf{Soggetto} & \textbf{Fund. Research} & \textbf{Ind. Research} & \textbf{Exp. Development} & \textbf{Totale} \\\midrule
+WP4 & HI & 1.90 & 20.84 & 0.00 & 22.75 \\
+ & AI & 0.98 & 0.78 & 0.00 & 1.76 \\
+ & RO & 4.60 & 5.85 & 0.00 & 10.45 \\
+ & \textit{Totale WP} & \textit{7.48} & \textit{27.47} & \textit{0.00} & \textit{34.95} \\
+\bottomrule\end{tabular}
+\end{table}
+\end{frame}
+
+
+\end{document}

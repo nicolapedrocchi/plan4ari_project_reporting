@@ -1,0 +1,94 @@
+\begin{tikzpicture}[
+  font=\sffamily,
+  source/.style={
+    draw=teal!55!black,
+    fill=teal!7,
+    rounded corners=2pt,
+    line width=.7pt,
+    text width=3.8cm,
+    minimum height=1.55cm,
+    align=center,
+    inner sep=6pt
+  },
+  registry/.style={
+    draw=blue!55!black,
+    fill=blue!10,
+    rounded corners=3pt,
+    line width=1pt,
+    text width=12.8cm,
+    minimum height=1.05cm,
+    align=center,
+    inner sep=7pt
+  },
+  evidence/.style={
+    draw=orange!65!black,
+    fill=orange!9,
+    rounded corners=2pt,
+    line width=.65pt,
+    text width=2.9cm,
+    minimum height=1.15cm,
+    align=center,
+    inner sep=5pt
+  },
+  output/.style={
+    draw=green!45!black,
+    fill=green!9,
+    rounded corners=3pt,
+    line width=.8pt,
+    text width=12.8cm,
+    minimum height=1.15cm,
+    align=center,
+    inner sep=7pt
+  },
+  flow/.style={-{Stealth[length=2.2mm]}, draw=black!65, line width=.8pt},
+  node distance=8mm and 5mm
+]
+
+\node[font=\bfseries\large, align=center] (title) at (0,0)
+  {Capability discovery extends beyond network sniffing};
+
+\node[source, below=9mm of title, xshift=-4.5cm] (operational)
+  {\textbf{Operational systems}\\[2pt]
+   ROS 2 graph (nodes, topics, services, actions)\\
+   PLC, OPC UA, AAS, AutomationML};
+\node[source, right=of operational] (skills)
+  {\textbf{Reusable skills and code}\\[2pt]
+   MLRA/Dexter block library\\
+   Documentation, manuals, code};
+\node[source, right=of skills] (environment)
+  {\textbf{Environment models}\\[2pt]
+   Scene graph and digital twin};
+
+\coordinate (merge) at ($(skills.south)+(0,-9mm)$);
+\draw[flow] (operational.south) -- ++(0,-4mm) -| (merge);
+\draw[flow] (skills.south) -- (merge);
+\draw[flow] (environment.south) -- ++(0,-4mm) -| (merge);
+
+\node[registry, below=8mm of merge] (registry)
+  {\textbf{Evidence-fused skill and capability registry}\\[-1pt]
+   Each capability is represented consistently and linked to its source evidence.};
+\draw[flow] (merge) -- (registry.north);
+
+\node[font=\bfseries, below=8mm of registry] (evidence-title)
+  {Evidence captured for each capability};
+\node[evidence, below=4mm of evidence-title, xshift=-5.625cm] (contract)
+  {\textbf{Contract}\\Typed inputs and outputs\\Preconditions, invariants, effects};
+\node[evidence, right=of contract] (profile)
+  {\textbf{Execution profile}\\Duration, cost, uncertainty};
+\node[evidence, right=of profile] (safety)
+  {\textbf{Safety}\\Safety class and failure modes};
+\node[evidence, right=of safety] (evidence-data)
+  {\textbf{Resources and evidence}\\Interfaces, provenance, confidence, test status};
+
+\coordinate (out-merge) at ($(evidence-title.south)+(0,-27mm)$);
+\draw[flow] (registry.south) -- (evidence-title.north);
+\draw[draw=black!65, line width=.8pt] (contract.south) -- ++(0,-4mm) -| (out-merge);
+\draw[draw=black!65, line width=.8pt] (profile.south) -- ++(0,-4mm) -| (out-merge);
+\draw[draw=black!65, line width=.8pt] (safety.south) -- ++(0,-4mm) -| (out-merge);
+\draw[draw=black!65, line width=.8pt] (evidence-data.south) -- ++(0,-4mm) -| (out-merge);
+
+\node[output, below=8mm of out-merge] (planning)
+  {\textbf{Generated and validated planning models}\\[2pt]
+   PDDL 2.1 domain and problem; resource constraints; grounding map; executable plan};
+\draw[flow] (out-merge) -- (planning.north);
+\end{tikzpicture}

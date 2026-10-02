@@ -1,21 +1,48 @@
 \NeedsTeXFormat{LaTeX2e}
-\ProvidesPackage{plan4ari_capitolato}[2026/07/22 Plan4ARI document style]
+\ProvidesPackage{plan4ari_capitolato}[2026/10/02 Plan4ARI document style (Word layout of FISA_2024_00099_Allegato A)]
 
-\RequirePackage[a4paper,left=1.45cm,right=1.45cm,top=2.45cm,bottom=1.55cm,headheight=34pt,headsep=8pt,footskip=22pt]{geometry}
+% All measures below are taken from Plan4ARI_v3_capittolato_definitivo.docx
+% (styles.xml, numbering.xml, sectPr), so that the PDF reproduces the
+% Word document. 1 twip = 1/20 pt; 720 tw = 1.27 cm.
+
+% ---------------------------------------------------------------- page ----
+% pgMar top=1843 right/bottom/left=720 header=523 footer=466 (twips).
+% The footer holds the page number plus an empty paragraph (2 x 13.43 pt above
+% the 0.82 cm footer distance), so Word stops the body at ~1.77 cm, not 1.27 cm.
+\RequirePackage[a4paper,
+  left=1.27cm,right=1.27cm,top=3.25cm,bottom=1.77cm,
+  headheight=2.0cm,headsep=0.33cm,footskip=0.47cm]{geometry}
+
+% --------------------------------------------------------------- fonts ----
 \RequirePackage{fontspec}
-\defaultfontfeatures{Ligatures=TeX,Scale=MatchLowercase}
-\setmainfont{Latin Modern Sans}
-\setsansfont{Latin Modern Sans}
-\RequirePackage{microtype}
-\RequirePackage{setspace}
-\setstretch{1.015}
+\defaultfontfeatures{Ligatures=TeX}
+\setmainfont{Calibri}
+\setsansfont{Calibri}
+\newfontfamily\planfootnotefont{Times New Roman}
+\newfontfamily\plancourierfont{Courier New}
+% Wingdings/Symbol bullets of the DOCX, via their Unicode equivalents
+\newfontfamily\plansymbolfont{Segoe UI Symbol}
+
+% Normal: Calibri 11 pt, single line spacing (Calibri: 1.2207 em)
+\makeatletter
+\renewcommand\normalsize{%
+  \@setfontsize\normalsize{11pt}{13.43pt}%
+  \abovedisplayskip 6pt \belowdisplayskip 6pt
+  \abovedisplayshortskip 3pt \belowdisplayshortskip 3pt}
+\renewcommand\small{\@setfontsize\small{10pt}{12.21pt}}
+\renewcommand\footnotesize{\@setfontsize\footnotesize{8pt}{9.2pt}}
+\makeatother
+\normalsize
 
 \RequirePackage{xcolor}
-\definecolor{PlanBlue}{HTML}{56A6D5}
-\definecolor{PlanBlueDark}{HTML}{2D759F}
-\definecolor{PlanPale}{HTML}{DDEBF7}
+\definecolor{PlanBlue}{HTML}{4C94D8}      % ProjectName / bullets (text2 tint 80)
+\definecolor{PlanBlueDark}{HTML}{0E2841}  % caption (text2)
+\definecolor{PlanLink}{HTML}{0000FF}
+\definecolor{PlanPale}{HTML}{DAE9F7}      % TechnicalObject shading
+\definecolor{PlanGray}{HTML}{E8E8E8}      % activity rows (background2)
+\definecolor{PlanRule}{HTML}{A6A6A6}      % table borders
+\definecolor{PlanText}{HTML}{404040}
 \definecolor{PlanGreen}{HTML}{D9EFD0}
-\definecolor{PlanGray}{HTML}{D0D0D0}
 
 \RequirePackage{graphicx}
 \RequirePackage{array,booktabs,longtable,calc,colortbl}
@@ -30,30 +57,45 @@
 \RequirePackage{needspace}
 \RequirePackage[normalem]{ulem}
 \RequirePackage{soul}
+\RequirePackage[most]{tcolorbox}
 \RequirePackage{xurl}
+\RequirePackage[hyperfootnotes=false]{hyperref}
 \RequirePackage{bookmark}
-\RequirePackage{hyperref}
 \hypersetup{
   colorlinks=true,
-  linkcolor=PlanBlueDark,
-  urlcolor=PlanBlueDark,
-  citecolor=PlanBlueDark,
+  linkcolor=PlanBlue,
+  urlcolor=PlanLink,
+  citecolor=PlanBlue,
   pdfauthor={Plan4ARI Consortium},
   pdftitle={Plan4ARI - Planning for Artificial Robotic Intelligence and Beyond},
-  pdfsubject={FISA project proposal converted from DOCX to LaTeX},
+  pdfsubject={FISA project proposal},
   bookmarksopen=true,
   bookmarksnumbered=true
 }
 \urlstyle{same}
 
+% ----------------------------------------------------------- paragraphs ----
+% Normal: space after 4 pt, justified, no hyphenation (as in Word)
 \setlength{\parindent}{0pt}
-\setlength{\parskip}{3.2pt plus 1.2pt minus .7pt}
-\setlength{\emergencystretch}{3em}
+\setlength{\parskip}{4pt}
+\raggedbottom
+\frenchspacing
+\hyphenpenalty=10000
+\exhyphenpenalty=10000
+\tolerance=9999
+\emergencystretch=4em
+\widowpenalty=10000
+\clubpenalty=10000
 \setlength{\LTleft}{0pt}
 \setlength{\LTright}{0pt}
+\setlength{\LTpre}{4pt}
+\setlength{\LTpost}{4pt}
 \setlength{\tabcolsep}{4pt}
-\renewcommand{\arraystretch}{1.05}
-\AtBeginEnvironment{longtable}{\small\setlength{\parskip}{1.5pt}}
+\renewcommand{\arraystretch}{1.0}
+\AtBeginEnvironment{longtable}{\setlength{\parskip}{4pt}}
+
+% figures are plain centred paragraphs in Word (no extra list spacing)
+\renewenvironment{center}{\par\centering}{\par}
 
 \makeatletter
 \patchcmd\longtable{\par}{\if@noskipsec\mbox{}\fi\par}{}{}
@@ -68,55 +110,167 @@
 \makeatother
 \setkeys{Gin}{width=\maxwidth,height=\maxheight,keepaspectratio}
 
+% ------------------------------------------------------------ footnotes ----
+% Footnote Text: Times New Roman 8 pt; separator: 2 in rule
+\makeatletter
+\renewcommand{\footnoterule}{\kern-3pt\hrule width 2in height 0.5pt\kern 2.5pt}
+\renewcommand{\@makefntext}[1]{%
+  \noindent\planfootnotefont\fontsize{8pt}{9.2pt}\selectfont
+  \textsuperscript{\@thefnmark}\,#1}
+\makeatother
+\setlength{\footnotesep}{6.5pt}
+\setlength{\skip\footins}{14pt plus 2pt}
+
+% ------------------------------------------------------------- headings ----
+% numbering: A / A.1 / A.1.1 / A.1.1.1 with hanging indents 432/576/720/864 tw
 \renewcommand{\thesection}{\Alph{section}}
 \renewcommand{\thesubsection}{\thesection.\arabic{subsection}}
 \renewcommand{\thesubsubsection}{\thesubsection.\arabic{subsubsection}}
 \renewcommand{\theparagraph}{\thesubsubsection.\arabic{paragraph}}
 \setcounter{secnumdepth}{4}
 
-\titleformat{\section}[hang]{\normalfont\fontsize{13}{15}\selectfont\bfseries}{\thesection}{0.8em}{}
-\titleformat{\subsection}[hang]{\normalfont\fontsize{10.5}{12.5}\selectfont\bfseries}{\thesubsection}{0.75em}{}
-\titleformat{\subsubsection}[hang]{\normalfont\fontsize{10.2}{12.2}\selectfont\bfseries}{\thesubsubsection}{0.7em}{\uline}
-\titleformat{\paragraph}[hang]{\normalfont\fontsize{9.8}{11.8}\selectfont\bfseries}{\theparagraph}{0.65em}{}
-\titlespacing*{\section}{0pt}{1.2em}{0.45em}
-\titlespacing*{\subsection}{0pt}{0.9em}{0.3em}
-\titlespacing*{\subsubsection}{0pt}{0.75em}{0.22em}
-\titlespacing*{\paragraph}{0pt}{0.62em}{0.18em}
+% Heading 1: 14 pt bold, after 5 pt
+\titleformat{\section}[hang]
+  {\normalfont\fontsize{14pt}{17.09pt}\selectfont\bfseries}
+  {\makebox[0.762cm][l]{\thesection}}{0pt}{}
+% Heading 2: 11 pt bold, line 1.08, after 7.7 pt
+\titleformat{\subsection}[hang]
+  {\normalfont\fontsize{11pt}{14.49pt}\selectfont\bfseries}
+  {\makebox[1.016cm][l]{\thesubsection}}{0pt}{}
+% Heading 3: 11 pt regular, title underlined, after 7.85 pt
+\titleformat{\subsubsection}[hang]
+  {\normalfont\fontsize{11pt}{14.49pt}\selectfont}
+  {\makebox[1.27cm][l]{\thesubsubsection}}{0pt}{\uline}
+% Heading 4: 11 pt bold, after 7.7 pt
+\titleformat{\paragraph}[hang]
+  {\normalfont\fontsize{11pt}{14.49pt}\selectfont\bfseries}
+  {\makebox[1.524cm][l]{\theparagraph}}{0pt}{}
+% \parskip (4 pt) is added by TeX after each heading: subtract it
+% (values calibrated against the Word PDF)
+\titlespacing*{\section}{0pt}{0pt}{-1pt}
+\titlespacing*{\subsection}{0pt}{0pt}{5.2pt}
+\titlespacing*{\subsubsection}{0pt}{0pt}{4.85pt}
+\titlespacing*{\paragraph}{0pt}{0pt}{5.2pt}
+% every Heading 1 starts on a new page (explicit page breaks in the DOCX)
+\newcommand{\sectionbreak}{\clearpage}
 
-\setlist[itemize,1]{label=\textcolor{PlanBlue}{\rule{3.2pt}{3.2pt}},leftmargin=2.0em,itemsep=1.5pt,topsep=2pt,parsep=0pt}
-\setlist[itemize,2]{label=\textcolor{PlanBlueDark}{$\circ$},leftmargin=2.1em,itemsep=1pt,topsep=1pt,parsep=0pt}
-\setlist[enumerate]{leftmargin=2.1em,itemsep=1.5pt,topsep=2pt,parsep=0pt}
-
-\newcommand{\brand}[1]{\textcolor{PlanBlue}{\textbf{#1}}}
-\newcommand{\xref}[1]{\textcolor{PlanBlue}{\textbf{#1}}}
-\newcommand{\planfigurecaption}[1]{\begin{center}\vspace{-2pt}\parbox{0.94\linewidth}{\centering\small\itshape #1}\vspace{2pt}\end{center}}
-\newcommand{\planhighlight}[1]{\colorbox{PlanPale}{\parbox{\dimexpr\linewidth-2\fboxsep}{#1}}}
+% ---------------------------------------------------------------- lists ----
+% List Paragraph: left 720 tw, hanging 360 tw, contextual spacing
+\newcommand{\planbulletsquare}{\textcolor{PlanBlue}{\rule[1.9pt]{3.6pt}{3.6pt}}}
+\newcommand{\planbulletarrow}{\textcolor{PlanBlue}{\plansymbolfont\symbol{"21E8}}}
+\newcommand{\planbulletdot}{{\plansymbolfont\symbol{"2022}}}
+\newcommand{\planbulletcirc}{{\plancourierfont o}}
+\setlist{topsep=0pt,partopsep=0pt,parsep=0pt,itemsep=0pt}
+\setlist[itemize]{leftmargin=1.27cm,labelindent=0.635cm,labelwidth=0.635cm,
+  labelsep=0pt,align=left}
+\setlist[itemize,1]{label=\planbulletsquare}
+\setlist[itemize,2]{label=\planbulletcirc}
+\setlist[enumerate]{leftmargin=1.27cm,labelindent=0.635cm,labelwidth=0.635cm,
+  labelsep=0pt,align=left}
+\SetEnumitemKey{arrow}{label=\planbulletarrow}
+\SetEnumitemKey{dot}{label=\planbulletdot}
+\SetEnumitemKey{dash}{label=-}
+% numbering "Action #%1." (accent1), left 57 tw, tab at 1021 tw
+\definecolor{PlanAccent}{HTML}{156082}
+\SetEnumitemKey{action}{label=\textcolor{PlanAccent}{Action \#\arabic*.},
+  leftmargin=1.8cm,labelindent=0.1cm,labelwidth=1.7cm}
+\SetEnumitemKey{compact}{leftmargin=0.4cm,labelindent=0pt,labelwidth=0.4cm}
+\AtBeginEnvironment{itemize}{\setlength{\parskip}{0pt}}
+\AtEndEnvironment{itemize}{\par}
+\AtBeginEnvironment{enumerate}{\setlength{\parskip}{0pt}}
+% the paragraph before a top-level list keeps its 4 pt "space after"
+\setlist[itemize,1]{before=\vspace{4pt}}
+\setlist[enumerate,1]{before=\vspace{4pt}}
 \providecommand{\tightlist}{\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
 
+% --------------------------------------------------------- inline styles ----
+\newcommand{\brand}[1]{\textcolor{PlanBlue}{\textbf{#1}}}
+\newcommand{\xref}[1]{\textcolor{PlanBlue}{\textbf{#1}}}
+
+% Caption: 9 pt italic, text2 colour, centred, after 10 pt
+\newcommand{\planfigurecaption}[1]{%
+  \par{\centering\fontsize{9pt}{10.99pt}\selectfont\itshape\color{PlanBlueDark}#1\par}%
+  \vspace{6pt}}
+
+% TechnicalObject: shaded paragraph DAE9F7, border 4 pt left/right, 1 pt top/bottom,
+% 6 pt before/after
+\newcommand{\planhighlight}[1]{%
+  % Word: 4 pt after the previous paragraph + 6 pt before + 1 pt padding; 6 pt after
+  % (the next paragraph adds its own 4 pt \parskip)
+  \par
+  \begin{tcolorbox}[enhanced,breakable,sharp corners,boxrule=0pt,frame hidden,
+      colback=PlanPale,left=4.5pt,right=4.5pt,top=1pt,bottom=1pt,boxsep=0pt,
+      enlarge left by=-4.5pt,enlarge right by=-4.5pt,width=\linewidth+9pt,
+      before skip=15pt,after skip=9pt]
+    \setlength{\parskip}{4pt}#1%
+  \end{tcolorbox}}
+
+% ------------------------------------------------------- activity table ----
+% "List of Activities": grid columns 1385/4974/2327/1690 tw, borders A6A6A6 1 pt,
+% activity rows shaded E8E8E8, row height 593-638 tw, body cells break across pages.
+\newlength{\planactcolA}\setlength{\planactcolA}{2.443cm}
+\newlength{\planactcolB}\setlength{\planactcolB}{8.775cm}
+\newlength{\planactcolC}\setlength{\planactcolC}{4.105cm}
+\newlength{\planactcolD}
+\newcommand{\planactrow}[6]{% shading, min height, #3..#6 cells
+  \begingroup
+  \setlength{\planactcolD}{\linewidth-\planactcolA-\planactcolB-\planactcolC}%
+  \setlength{\tabcolsep}{0pt}\setlength{\arrayrulewidth}{1pt}%
+  \arrayrulecolor{PlanRule}\renewcommand{\arraystretch}{1}%
+  \def\planactcell##1##2{\parbox[c][#2][c]{##1}{\centering\bfseries ##2}}%
+  \noindent\begin{tabular}{|*{4}{@{}c@{}|}}
+  \ifx\relax#1\relax\else\rowcolor{#1}\fi
+  \planactcell{\planactcolA-1pt}{#3}&\planactcell{\planactcolB-1pt}{#4}&
+  \planactcell{\planactcolC-1pt}{#5}&\planactcell{\planactcolD-1.25pt}{#6}\\
+  \end{tabular}\par
+  \endgroup}
+\newcommand{\planactivityhead}{%
+  \par\vspace{4pt}\nopagebreak
+  \planactrow{}{1.125cm}{ID activity}{Description}{Start month}{Duration}\nopagebreak}
+\newcommand{\planactivity}[4]{%
+  \par\nopagebreak\vspace{-1pt}\nopagebreak
+  \planactrow{PlanGray}{1.046cm}{#1}{\color{PlanText}#2}{\color{PlanText}#3}{\color{PlanText}#4}%
+  \nopagebreak}
+\newtcolorbox{planactivitybody}{enhanced,breakable,sharp corners,
+  colback=white,colframe=PlanRule,boxrule=1pt,arc=0pt,
+  left=3.5pt,right=6.5pt,top=2.65pt,bottom=4pt,boxsep=0pt,
+  before skip=0pt,after skip=0pt,before upper={\setlength{\parskip}{4pt}},
+  enlarge top by=-1pt}
+% blank line that precedes every task title inside an activity
+\newcommand{\plantaskskip}{\par\vspace{\baselineskip}}
+
+% ------------------------------------------------------- header / footer ----
+% header: FISA 4.15 x 1.52 cm and MUR 2.15 x 2.00 cm inline, bottom aligned;
+% footer: page number right aligned, Calibri 11 pt
 \fancypagestyle{plan4ari}{%
   \fancyhf{}
-  \fancyhead[L]{\includegraphics[height=0.72cm]{assets/fisa.jpg}}
-  \fancyhead[R]{\includegraphics[height=0.80cm]{assets/mur.jpg}}
-  \fancyfoot[R]{\footnotesize\thepage}
+  \fancyhead[L]{\includegraphics[width=4.15cm,height=1.52cm]{fisa.jpg}}
+  \fancyhead[R]{\includegraphics[width=2.15cm,height=2.0cm]{mur.jpg}}
+  \fancyfoot[R]{\normalsize\thepage}
   \renewcommand{\headrulewidth}{0pt}
   \renewcommand{\footrulewidth}{0pt}
 }
 \pagestyle{plan4ari}
 
+% ------------------------------------------------------------ title page ----
+% Subtitle 12 pt centred (36 pt before, contextual spacing),
+% ProjectName 16 pt bold PlanBlue, Title 14 pt bold
 \newcommand{\PlanTitlePage}{%
   \thispagestyle{plan4ari}
-  \vspace*{2.0cm}
-  \begin{center}
-    {\fontsize{13}{16}\selectfont Ministero dell'Università e della Ricerca\par}
-    {\fontsize{12}{15}\selectfont Direzione Generale della Ricerca\par}
-    \vspace{0.8cm}
-    {\fontsize{12}{15}\selectfont FONDO ITALIANO PER LE SCIENZE APPLICATE (FISA)\par}
-    {\fontsize{12}{15}\selectfont AVVISO PER LA PRESENTAZIONE DI PROPOSTE PROGETTUALI\par}
-    \vspace{1.0cm}
-    {\fontsize{16}{19}\selectfont\brand{Plan4ARI}\par}
-    \vspace{0.25cm}
-    {\fontsize{15}{18}\selectfont\bfseries Planning for Artificial Robotic Intelligence and Beyond\par}
-  \end{center}
-  \vfill
+  \begingroup
+  \centering\setlength{\parskip}{0pt}%
+  \vspace*{36pt}%
+  {\fontsize{12pt}{14.65pt}\selectfont
+   Ministero dell'Università e della Ricerca\par
+   Direzione Generale della Ricerca\par
+   \mbox{}\par
+   FONDO ITALIANO PER LE SCIENZE APPLICATE (FISA)\par
+   AVVISO PER LA PRESENTAZIONE DI PROPOSTE PROGETTUALI\par
+   \mbox{}\par}%
+  \vspace{18pt}%
+  {\fontsize{16pt}{19.53pt}\selectfont\brand{Plan4ARI}\par}%
+  \vspace{10pt}%
+  {\fontsize{14pt}{16.6pt}\selectfont\bfseries Planning for Artificial Robotic Intelligence and Beyond\par}%
+  \endgroup
   \clearpage
 }

@@ -1,0 +1,14 @@
+% =====================================================================
+%  Revision A2 (23 September 2026) - change tracking
+%  Text introduced or modified by revision A2 is typeset in RevAii.
+%  The approved baseline is ../2026-02-01-approved.
+% =====================================================================
+\definecolor{RevAii}{HTML}{B4237A}
+
+% Inline revised text (may contain paragraphs)
+\newcommand{\revAii}[1]{{\color{RevAii}#1}}
+
+% Full-width row of the "List of Activities" longtable. Each paragraph block
+% is a separate row so that the table can break across pages.
+\newcommand{\activityrow}[1]{%
+  \multicolumn{5}{@{}>{\raggedright\arraybackslash}p{(\columnwidth - 8\tabcolsep) * \real{1.0000} + 8\tabcolsep}@{}}{#1}\\}

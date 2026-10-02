@@ -1,0 +1,180 @@
+
+% Keep normal, uncompressed character spacing and standard single spacing.
+\linespread{1.0}\selectfont
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.35em}
+\raggedbottom%
+
+\setlength{\tabcolsep}{2.2pt}
+
+
+% pa glossary colour
+\definecolor{paWhite}{HTML}{FFFFFF}
+
+\definecolor{ink}{HTML}{16324A}
+\definecolor{accent}{HTML}{087E8B}
+
+\definecolor{paBlue}{HTML}{244A73}
+\definecolor{paMidBlue}{HTML}{5287C0}
+\definecolor{paLightBlue}{HTML}{EEF4F8}
+\definecolor{paTermBlue}{HTML}{DCEAF3}
+\definecolor{paBorder}{HTML}{9EB6C8}
+
+\definecolor{paGreen}{HTML}{438961}
+\definecolor{paMidGreen}{HTML}{5A966F}
+\definecolor{paTermGreen}{HTML}{DCEFE3}
+\definecolor{paLightGreen}{HTML}{EEF7F1}
+\definecolor{paGreenBorder}{HTML}{A4C5B1}
+
+\definecolor{paGray900}{HTML}{222222}
+\definecolor{paGray700}{HTML}{4D5661}
+\definecolor{paGray500}{HTML}{7B8490}
+\definecolor{paGray300}{HTML}{C9D0D6}
+\definecolor{paGray100}{HTML}{F3F5F7}
+
+\definecolor{paOrange}{HTML}{D97706} 
+\definecolor{paLightOrange}{HTML}{FDF4E7} 
+\definecolor{paTermOrange}{HTML}{F6E2BF} 
+\definecolor{paOrangeBorder}{HTML}{D8B070}
+
+\definecolor{LightOrange}{HTML}{FFB347}
+\definecolor{Orange}{HTML}{FFA500}
+\definecolor{DarkOrange}{HTML}{FF8C00}
+\definecolor{BurntOrange}{HTML}{CC5500}
+\definecolor{paRed}{HTML}{C0392B}
+
+
+% Keep the shared plan4ari_beamer colours, title sizes, margins and footer.
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.15}
+\emergencystretch=1em
+
+% ---------- Useful column types ----------
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcolumntype{M}[1]{>{\centering\arraybackslash\bfseries}m{#1}}
+\newcolumntype{J}[1]{>{\arraybackslash}p{#1}}
+
+\newcolumntype{s}{>{\hsize=.8\hsize\raggedright\arraybackslash}X}
+
+% ---------- pa concept box ----------
+\newtcolorbox{paConcept}[1]{
+    colback=paLightBlue,
+    colframe=paBlue,
+    colbacktitle=paBlue,
+    coltitle=white,
+    fonttitle=\bfseries,
+    title={#1},
+    boxrule=0.5pt,
+    arc=1mm,
+    left=1.5mm,
+    right=1.5mm,
+    top=1.5mm,
+    bottom=1.5mm,
+    before skip=3pt,
+    after skip=3pt,
+    breakable,
+    enhanced
+}
+
+% ---------- pa concept box ----------
+\newtcolorbox{paBox}[1][]{
+    colback=paLightBlue,
+    colframe=paBlue,
+    boxrule=0.5pt,
+    arc=1mm,
+    left=1.5mm,
+    right=1.5mm,
+    top=1.5mm,
+    bottom=1.5mm,
+    before skip=3pt,
+    after skip=3pt,
+    breakable,
+    enhanced,
+    #1
+}
+
+
+
+% ---------- pa concept box ----------
+\newtcolorbox{paBoxGreen}[1][]{
+    colback=paLightGreen,
+    colframe=paGreen,
+    boxrule=0.1pt,
+    arc=0.5mm,
+    left=1.5mm,
+    right=1.5mm,
+    top=1.5mm,
+    bottom=1.5mm,
+    before skip=6pt,
+    after skip=6pt,
+    breakable,
+    enhanced,
+    #1
+}
+
+% ---------- pa examnple box ----------
+\newtcolorbox{paExampleBox}[1][]{
+    fonttitle=\bfseries,
+    fontupper=\itshape,
+    colback=paLightBlue,
+    colframe=paLightBlue,
+    coltitle=paBlue,
+    boxrule=0.1pt,
+    arc=0.1mm,
+    left=1.mm,
+    right=1.1mm,
+    top=1.mm,
+    bottom=1.mm,
+    before skip=3pt,
+    after skip=3pt,
+    breakable,
+    enhanced,
+    #1
+}
+
+
+% ---------- pa light box ----------
+\newtcolorbox{paLightBox}[1][]{
+    colback=paGray100,
+    colframe=paGray100,
+    boxrule=0.1pt,
+    arc=0.1mm,
+    left=1.mm,
+    right=1.1mm,
+    top=1.mm,
+    bottom=1.mm,
+    before skip=3pt,
+    after skip=3pt,
+    breakable,
+    enhanced,
+    #1
+}
+
+% ---------- pa light box ----------
+\newtcolorbox{paLightBluesBox}[1][]{
+    colback=paLightBlue,
+    colframe=paLightBlue,
+    boxrule=0.1pt,
+    arc=0.1mm,
+    left=1.mm,
+    right=1.1mm,
+    top=1.mm,
+    bottom=1.mm,
+    before skip=3pt,
+    after skip=3pt,
+    breakable,
+    enhanced,
+    #1
+}
+
+
+\newtcbox{\boxedmath}[1][]{%
+    nobeforeafter, math upper, tcbox raise base,
+    enhanced, boxrule=0.2pt,
+    #1}
+
+
+\renewcommand{\cellalign}{vh}
+\renewcommand{\theadalign}{vh}

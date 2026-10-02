@@ -1,0 +1,7 @@
+# D2.1: XeLaTeX (Cambria/Calibri system fonts), shared Project Reporting config
+$root   = '../..';
+$engine = 'xelatex';
+do "$root/latexmkrc";
+
+# Bibliography (references.bib next to the main .tex)
+bib_dirs('.');
